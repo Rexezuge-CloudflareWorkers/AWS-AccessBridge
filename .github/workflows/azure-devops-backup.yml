@@ -1,6 +1,9 @@
 # $version: v4-1766267229
 name: Backup Main Branch to Azure DevOps
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
