@@ -11,6 +11,8 @@ jobs:
     if: ${{ github.repository != 'Rexezuge-CloudflareWorkers/AWS-AccessBridge' }}
     name: Deploy to Cloudflare
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Repository
