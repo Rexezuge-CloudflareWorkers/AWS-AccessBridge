@@ -19,7 +19,7 @@
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
-    "globals": "^17.8.0",
+    "globals": "^17.9.0",
     "jsonc-parser": "^3.3.1",
     "prettier": "^3.9.6",
     "tsx": "^4.23.1",
