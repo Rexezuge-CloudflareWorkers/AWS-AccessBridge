@@ -27,7 +27,7 @@
   "dependencies": {
     "aws4fetch": "^1.0.20",
     "hono": "^4.13.3",
-    "jose": "^6.2.8"
+    "jose": "^6.2.9"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
