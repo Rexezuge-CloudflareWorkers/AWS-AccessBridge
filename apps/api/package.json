@@ -12,7 +12,7 @@
     "@aws-access-bridge/shared": "workspace:*",
     "@opennextjs/cloudflare": "^1.20.2",
     "aws4fetch": "^1.0.20",
-    "chanfana": "^3.3.0",
+    "chanfana": "^3.4.0",
     "hono": "^4.13.2",
     "jose": "^6.2.8",
     "zod": "^4.4.3"
