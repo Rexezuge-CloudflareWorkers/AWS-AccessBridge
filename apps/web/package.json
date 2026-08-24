@@ -15,7 +15,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "terser": "^5.49.2",
     "vite": "^8.2.1",
     "@types/react": "^19.2.18",
