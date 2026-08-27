@@ -1,0 +1,43 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "aws-access-bridge-integration-test",
+  "main": "self.ts",
+  "compatibility_date": "2025-11-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "AccessBridgeDB",
+      "database_name": "aws-access-bridge-test-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "AccessBridgeKV",
+      "id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "AES_ENCRYPTION_KEY_SECRET",
+      "store_id": "00000000-0000-0000-0000-000000000000",
+      "secret_name": "test-aes-encryption-key",
+    },
+    {
+      "binding": "INTERNAL_HMAC_SECRET",
+      "store_id": "00000000-0000-0000-0000-000000000000",
+      "secret_name": "test-internal-hmac-secret",
+    },
+  ],
+  "vars": {
+    "DEV_AUTH_EMAIL": "test@example.com",
+    "SERVE_SPA_FROM_WORKER": "false",
+    "POLICY_AUD": "test-aud",
+    "TEAM_DOMAIN": "https://test.cloudflareaccess.com",
+    "MAX_TOKENS_PER_USER": "5",
+    "MAX_TOKEN_EXPIRY_DAYS": "90",
+    "PRINCIPAL_TRUST_CHAIN_LIMIT": "3",
+    "AUDIT_LOG_RETENTION_DAYS": "90",
+    "DEMO_MODE": "false",
+  },
+}

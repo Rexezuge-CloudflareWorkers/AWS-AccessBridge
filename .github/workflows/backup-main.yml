@@ -1,0 +1,104 @@
+# $version: v8-1782241313
+name: Backup Main Branch
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 5 * *'
+
+jobs:
+  check-secrets:
+    name: Check Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      azure-configured: ${{ steps.check.outputs.azure }}
+      gitlab-configured: ${{ steps.check.outputs.gitlab }}
+    steps:
+      - name: Detect Configured Destinations
+        id: check
+        env:
+          AZURE_KEY: ${{ secrets.BACKUP_REPO_AZURE_DEVOPS_SSH_KEY }}
+          AZURE_URL: ${{ secrets.BACKUP_REPO_AZURE_DEVOPS_REPO_URL }}
+          GITLAB_KEY: ${{ secrets.BACKUP_REPO_GITLAB_SSH_KEY }}
+          GITLAB_URL: ${{ secrets.BACKUP_REPO_GITLAB_REPO_URL }}
+        run: |
+          [ -n "$AZURE_KEY" ] && [ -n "$AZURE_URL" ] && echo "azure=true" >> "$GITHUB_OUTPUT" || echo "azure=false" >> "$GITHUB_OUTPUT"
+          [ -n "$GITLAB_KEY" ] && [ -n "$GITLAB_URL" ] && echo "gitlab=true" >> "$GITHUB_OUTPUT" || echo "gitlab=false" >> "$GITHUB_OUTPUT"
+
+  backup-azure-devops:
+    needs: check-secrets
+    if: >-
+      ${{ !github.event.repository.fork &&
+          needs.check-secrets.outputs.azure-configured == 'true' }}
+    name: Azure DevOps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "Actions"
+          git config user.email "actions@github.com"
+
+      - name: Set Up SSH for Azure DevOps
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BACKUP_REPO_AZURE_DEVOPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Add SSH Remote
+        run: git remote add backup "${{ secrets.BACKUP_REPO_AZURE_DEVOPS_REPO_URL }}"
+
+      - name: Push main Branch to Azure DevOps
+        uses: ./.github/actions/retry-step
+        with:
+          command: git push --force backup main:main
+          max_attempts: '3'
+
+  backup-gitlab:
+    needs: check-secrets
+    if: >-
+      ${{ !github.event.repository.fork &&
+          needs.check-secrets.outputs.gitlab-configured == 'true' }}
+    name: GitLab
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "Actions"
+          git config user.email "actions@github.com"
+
+      - name: Set Up SSH for GitLab
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BACKUP_REPO_GITLAB_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Add SSH Remote
+        run: git remote add backup "${{ secrets.BACKUP_REPO_GITLAB_REPO_URL }}"
+
+      - name: Push main Branch to GitLab
+        uses: ./.github/actions/retry-step
+        with:
+          command: git push --force backup main:main
+          max_attempts: '3'
