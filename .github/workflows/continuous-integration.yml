@@ -79,8 +79,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
       - name: Enable Auto-Merge
-        run: gh pr merge --auto --merge "$PR_URL"
+        uses: ./.github/actions/retry-step
+        with:
+          command: gh pr merge --auto --merge "$PR_URL"
+          max_attempts: '5'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
