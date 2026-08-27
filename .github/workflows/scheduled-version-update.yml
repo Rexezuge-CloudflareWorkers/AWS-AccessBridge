@@ -35,4 +35,10 @@ jobs:
           fi
 
           git commit -m "CHORE: version update"
-          git push
+
+          for i in {1..3}; do
+            if git push; then
+              break
+            fi
+            if [ $i -lt 3 ]; then sleep 10; else exit 1; fi
+          done
