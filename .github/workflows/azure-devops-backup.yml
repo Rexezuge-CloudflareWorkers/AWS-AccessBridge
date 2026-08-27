@@ -38,9 +38,11 @@ jobs:
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_rsa
 
-      - name: Add SSH Remote and Push main Branch
-        env:
-          REMOTE_REPO_URL: ${{ secrets.BACKUP_REPO_AZURE_DEVOPS_REPO_URL }}
-        run: |
-          git remote add backup "${REMOTE_REPO_URL}"
-          git push --force backup main:main
+      - name: Add SSH Remote
+        run: git remote add backup "${{ secrets.BACKUP_REPO_AZURE_DEVOPS_REPO_URL }}"
+
+      - name: Push main Branch to Azure DevOps
+        uses: ./.github/actions/retry-step
+        with:
+          command: git push --force backup main:main
+          max_attempts: '3'

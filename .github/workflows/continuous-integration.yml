@@ -36,10 +36,16 @@ jobs:
           cache: pnpm
 
       - name: Install Dependencies
-        run: pnpm install
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm install
+          max_attempts: '3'
 
       - name: Run Tests and Checks
-        run: pnpm run checks
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run checks
+          max_attempts: '2'
 
   build:
     name: Build
@@ -59,7 +65,10 @@ jobs:
           cache: pnpm
 
       - name: Install Dependencies
-        run: pnpm install
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm install
+          max_attempts: '3'
 
       - name: Build Web App
         run: pnpm --filter @aws-access-bridge/web build
@@ -102,16 +111,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
       - name: Dispatch Deployment
-        uses: actions/github-script@v7
+        uses: ./.github/actions/retry-step
         with:
-          script: |
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'Upstream Sync Deployment',
-              client_payload: {
-                branch: context.payload.client_payload?.branch || 'main',
-                sha: context.payload.client_payload?.sha || context.sha,
-              },
-            });
+          command: >
+            printf '{"event_type":"Upstream Sync Deployment","client_payload":{"branch":"%s","sha":"%s"}}\n'
+            "$PAYLOAD_BRANCH" "$PAYLOAD_SHA"
+            | gh api repos/${{ github.repository }}/dispatches --method POST --input -
+          max_attempts: '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAYLOAD_BRANCH: ${{ github.event.client_payload.branch || 'main' }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.sha || github.sha }}

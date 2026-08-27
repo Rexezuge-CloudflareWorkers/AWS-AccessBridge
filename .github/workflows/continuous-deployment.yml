@@ -42,10 +42,16 @@ jobs:
           cache: pnpm
 
       - name: Install Dependencies
-        run: pnpm install
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm install
+          max_attempts: '3'
 
       - name: Prepare Wrangler Configuration
-        run: pnpm exec tsx scripts/prepare-wrangler-config.ts
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm exec tsx scripts/prepare-wrangler-config.ts
+          max_attempts: '3'
         env:
           WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -62,13 +68,19 @@ jobs:
           fi
 
       - name: Initialize Cloudflare Secrets Store
-        run: pnpm exec tsx scripts/init-secrets.ts
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm exec tsx scripts/init-secrets.ts
+          max_attempts: '3'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Apply Database Migration
-        run: pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
+          max_attempts: '3'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -92,7 +104,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy with Wrangler
-        run: pnpm exec wrangler deploy
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm exec wrangler deploy
+          max_attempts: '3'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -118,7 +133,10 @@ jobs:
           cache: pnpm
 
       - name: Install Dependencies
-        run: pnpm install
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm install
+          max_attempts: '3'
 
       - name: Build Frontend
         run: pnpm --filter @aws-access-bridge/web build
@@ -134,12 +152,15 @@ jobs:
           CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
 
       - name: Deploy with Wrangler Pages
-        run: |
-          pnpm exec wrangler pages deploy \
-            --project-name "${CLOUDFLARE_PAGES_PROJECT_NAME}" \
-            --branch "${DEPLOY_BRANCH}" \
-            --commit-hash "${DEPLOY_SHA}" \
+        uses: ./.github/actions/retry-step
+        with:
+          command: >
+            pnpm exec wrangler pages deploy
+            --project-name "${CLOUDFLARE_PAGES_PROJECT_NAME}"
+            --branch "${DEPLOY_BRANCH}"
+            --commit-hash "${DEPLOY_SHA}"
             --commit-message "$(git log -1 --pretty=%s)"
+          max_attempts: '3'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
