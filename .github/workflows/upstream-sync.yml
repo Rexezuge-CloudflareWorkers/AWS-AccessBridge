@@ -1,4 +1,3 @@
-# $version: v3-1779804803
 name: Upstream Sync
 
 on:
@@ -6,14 +5,12 @@ on:
     - cron: '0 2 * * 1'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  actions: write
-
 jobs:
   sync:
     if: ${{ github.event.repository.fork }}
-    name: Sync From Upstream
+    name: Sync latest commits from upstream
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

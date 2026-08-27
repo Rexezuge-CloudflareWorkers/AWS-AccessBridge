@@ -41,10 +41,53 @@ jobs:
           command: pnpm install
           max_attempts: '3'
 
-      - name: Run Tests and Checks
+      - name: Run Type Check and Lint
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm run checks
+          command: pnpm -r typecheck && pnpm run lint
+          max_attempts: '2'
+
+      - name: Run Tests with Coverage
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run test:coverage
+          max_attempts: '2'
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install Dependencies
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm install
+          max_attempts: '3'
+
+      - name: Run Integration Tests
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run test:integration
           max_attempts: '2'
 
   build:
@@ -81,6 +124,7 @@ jobs:
     name: Auto-Merge Dependabot PR
     needs:
       - checks
+      - integration-tests
       - build
     permissions:
       contents: write
@@ -105,6 +149,7 @@ jobs:
     name: Dispatch Upstream Sync Deployment
     needs:
       - checks
+      - integration-tests
       - build
     permissions:
       contents: write
