@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['test/**/*.test.ts'],
+    exclude: ['test/integration/**'],
   },
   resolve: {
     alias: [
