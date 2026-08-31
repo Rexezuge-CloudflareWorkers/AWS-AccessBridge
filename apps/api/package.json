@@ -14,7 +14,7 @@
     "aws4fetch": "^1.0.20",
     "chanfana": "^3.4.0",
     "hono": "^4.13.3",
-    "jose": "^6.2.9",
+    "jose": "^6.2.10",
     "zod": "^4.4.3"
   },
   "devDependencies": {
