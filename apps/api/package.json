@@ -10,7 +10,7 @@
     "@aws-access-bridge/backend-core": "workspace:*",
     "@aws-access-bridge/background": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.4",
     "aws4fetch": "^1.0.20",
     "chanfana": "^3.4.0",
     "hono": "^4.13.3",
