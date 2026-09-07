@@ -5,119 +5,10 @@ import { createPortal } from 'react-dom';
 import OnboardingWizard from './OnboardingWizard';
 import AuditLogsTab from './AuditLogsTab';
 import TeamsTab from './TeamsTab';
-
-interface LoadingButtonProps {
-  onClick: () => Promise<void> | void;
-  disabled?: boolean;
-  variant?: 'blue' | 'green' | 'red';
-  children: React.ReactNode;
-  type?: 'button' | 'submit';
-}
-
-const buttonColors: Record<string, { bg: string; hover: string }> = {
-  blue: { bg: '#2563eb', hover: '#1d4ed8' },
-  green: { bg: '#16a34a', hover: '#15803d' },
-  red: { bg: '#dc2626', hover: '#b91c1c' },
-};
-
-function LoadingButton({ onClick, disabled = false, variant = 'blue', children, type = 'button' }: LoadingButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleClick = async () => {
-    if (disabled || isLoading) return;
-
-    setIsLoading(true);
-    try {
-      await onClick();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const colors = buttonColors[variant] || buttonColors.blue;
-  const isDisabledOrLoading = disabled || isLoading;
-
-  const btnStyle: React.CSSProperties = {
-    borderRadius: '8px',
-    padding: '10px 20px',
-    fontWeight: 500,
-    color: isDisabledOrLoading ? '#6b7280' : '#ffffff',
-    background: isDisabledOrLoading ? '#374151' : isHovered ? colors.hover : colors.bg,
-    cursor: isDisabledOrLoading ? 'not-allowed' : 'pointer',
-    border: 'none',
-    transition: 'background 0.15s',
-  };
-
-  return (
-    <button
-      type={type}
-      onClick={handleClick}
-      disabled={isDisabledOrLoading}
-      style={btnStyle}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {isLoading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '9999px',
-              border: '2px solid #ffffff',
-              borderTopColor: 'transparent',
-            }}
-          />
-        </div>
-      ) : (
-        children
-      )}
-    </button>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  background: '#1e2433',
-  borderRadius: '12px',
-  padding: '24px',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '12px',
-  background: '#252d3d',
-  borderRadius: '8px',
-  border: '1px solid #374151',
-  color: '#ffffff',
-  outline: 'none',
-  boxSizing: 'border-box',
-  transition: 'border-color 0.15s',
-};
-
-function FocusInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const [focused, setFocused] = useState(false);
-  const { style: extraStyle, ...rest } = props;
-  return (
-    <input
-      {...rest}
-      style={{
-        ...inputStyle,
-        borderColor: focused ? '#3b82f6' : '#374151',
-        ...extraStyle,
-      }}
-      onFocus={(e) => {
-        setFocused(true);
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        setFocused(false);
-        props.onBlur?.(e);
-      }}
-    />
-  );
-}
+import LoadingButton from './ui/LoadingButton';
+import FocusInput from './ui/FocusInput';
+import { cardStyle, inputStyle } from './ui/theme';
+import { apiFetch } from '../lib/api';
 
 interface AdminPageProps {
   activeTab?: string;
@@ -297,107 +188,58 @@ function CredentialsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleAddCredentials = async () => {
     if (!isCredFormValid) return;
 
-    try {
-      const response = await fetch('/api/admin/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          principalArn: credForm.principalArn,
-          accessKeyId: credForm.accessKeyId,
-          secretAccessKey: credForm.secretAccessKey,
-          ...(credForm.sessionToken && { sessionToken: credForm.sessionToken }),
-        }),
-      });
+    const result = await apiFetch('/api/admin/credentials', {
+      method: 'POST',
+      body: {
+        principalArn: credForm.principalArn,
+        accessKeyId: credForm.accessKeyId,
+        secretAccessKey: credForm.secretAccessKey,
+        ...(credForm.sessionToken && { sessionToken: credForm.sessionToken }),
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Response status:', response.status);
-      console.log('Response text:', responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Credentials added successfully');
-        setCredForm({ principalArn: '', accessKeyId: '', secretAccessKey: '', sessionToken: '' });
-      } else {
-        let errorMessage = 'Failed to add credentials';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Credentials added successfully');
+      setCredForm({ principalArn: '', accessKeyId: '', secretAccessKey: '', sessionToken: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to add credentials');
     }
   };
 
   const handleAddRelation = async () => {
     if (!isRelationFormValid) return;
 
-    try {
-      const response = await fetch('/api/admin/credentials/relationship', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          principalArn: relationForm.principalArn,
-          assumedBy: relationForm.assumedBy,
-        }),
-      });
+    const result = await apiFetch('/api/admin/credentials/relationship', {
+      method: 'POST',
+      body: {
+        principalArn: relationForm.principalArn,
+        assumedBy: relationForm.assumedBy,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Relationship response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Credential relationship added successfully');
-        setRelationForm({ principalArn: '', assumedBy: '' });
-      } else {
-        let errorMessage = 'Failed to add relationship';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Credential relationship added successfully');
+      setRelationForm({ principalArn: '', assumedBy: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to add relationship');
     }
   };
 
   const handleRemoveRelation = async () => {
     if (!isRemoveRelationFormValid) return;
 
-    try {
-      const response = await fetch('/api/admin/credentials/relationship', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          principalArn: relationForm.principalArn,
-        }),
-      });
+    const result = await apiFetch('/api/admin/credentials/relationship', {
+      method: 'DELETE',
+      body: {
+        principalArn: relationForm.principalArn,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Remove relationship response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Credential relationship removed successfully');
-        setRelationForm({ principalArn: '', assumedBy: '' });
-      } else {
-        let errorMessage = 'Failed to remove relationship';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Credential relationship removed successfully');
+      setRelationForm({ principalArn: '', assumedBy: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to remove relationship');
     }
   };
 
@@ -482,72 +324,40 @@ function AccessTab({ showMessage }: { showMessage: (type: 'success' | 'error', t
   const handleGrantAccess = async () => {
     if (!isFormValid) return;
 
-    try {
-      const response = await fetch('/api/admin/access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail: accessForm.userEmail || undefined,
-          awsAccountId: accessForm.awsAccountId,
-          roleName: accessForm.roleName,
-        }),
-      });
+    const result = await apiFetch('/api/admin/access', {
+      method: 'POST',
+      body: {
+        userEmail: accessForm.userEmail || undefined,
+        awsAccountId: accessForm.awsAccountId,
+        roleName: accessForm.roleName,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Grant access response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Access granted successfully');
-        setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
-      } else {
-        let errorMessage = 'Failed to grant access';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Access granted successfully');
+      setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to grant access');
     }
   };
 
   const handleRevokeAccess = async () => {
     if (!isFormValid) return;
 
-    try {
-      const response = await fetch('/api/admin/access', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail: accessForm.userEmail || undefined,
-          awsAccountId: accessForm.awsAccountId,
-          roleName: accessForm.roleName,
-        }),
-      });
+    const result = await apiFetch('/api/admin/access', {
+      method: 'DELETE',
+      body: {
+        userEmail: accessForm.userEmail || undefined,
+        awsAccountId: accessForm.awsAccountId,
+        roleName: accessForm.roleName,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Revoke access response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Access revoked successfully');
-        setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
-      } else {
-        let errorMessage = 'Failed to revoke access';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Access revoked successfully');
+      setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to revoke access');
     }
   };
 
@@ -599,69 +409,37 @@ function AccountsTab({ showMessage }: { showMessage: (type: 'success' | 'error',
   const handleSetNickname = async () => {
     if (!isSetNicknameValid) return;
 
-    try {
-      const response = await fetch('/api/admin/account/nickname', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          awsAccountId: nicknameForm.awsAccountId,
-          nickname: nicknameForm.nickname,
-        }),
-      });
+    const result = await apiFetch('/api/admin/account/nickname', {
+      method: 'PUT',
+      body: {
+        awsAccountId: nicknameForm.awsAccountId,
+        nickname: nicknameForm.nickname,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Set nickname response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Account nickname set successfully');
-        setNicknameForm({ awsAccountId: '', nickname: '' });
-      } else {
-        let errorMessage = 'Failed to set nickname';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Account nickname set successfully');
+      setNicknameForm({ awsAccountId: '', nickname: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to set nickname');
     }
   };
 
   const handleRemoveNickname = async () => {
     if (!isRemoveNicknameValid) return;
 
-    try {
-      const response = await fetch('/api/admin/account/nickname', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          awsAccountId: nicknameForm.awsAccountId,
-        }),
-      });
+    const result = await apiFetch('/api/admin/account/nickname', {
+      method: 'DELETE',
+      body: {
+        awsAccountId: nicknameForm.awsAccountId,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Remove nickname response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Account nickname removed successfully');
-        setNicknameForm({ awsAccountId: '', nickname: '' });
-      } else {
-        let errorMessage = 'Failed to remove nickname';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Account nickname removed successfully');
+      setNicknameForm({ awsAccountId: '', nickname: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to remove nickname');
     }
   };
 
@@ -711,75 +489,43 @@ function RoleConfigTab({ showMessage }: { showMessage: (type: 'success' | 'error
   const handleSetConfig = async () => {
     if (!isSetConfigValid) return;
 
-    try {
-      const response = await fetch('/api/admin/role/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          awsAccountId: configForm.awsAccountId,
-          roleName: configForm.roleName,
-          ...(configForm.destinationPath && { destinationPath: configForm.destinationPath }),
-          ...(configForm.destinationRegion && { destinationRegion: configForm.destinationRegion }),
-          ...(configForm.roleSessionDurationSeconds && {
-            roleSessionDurationSeconds: Number(configForm.roleSessionDurationSeconds),
-          }),
+    const result = await apiFetch('/api/admin/role/config', {
+      method: 'PUT',
+      body: {
+        awsAccountId: configForm.awsAccountId,
+        roleName: configForm.roleName,
+        ...(configForm.destinationPath && { destinationPath: configForm.destinationPath }),
+        ...(configForm.destinationRegion && { destinationRegion: configForm.destinationRegion }),
+        ...(configForm.roleSessionDurationSeconds && {
+          roleSessionDurationSeconds: Number(configForm.roleSessionDurationSeconds),
         }),
-      });
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Set role config response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Role configuration set successfully');
-        setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
-      } else {
-        let errorMessage = 'Failed to set role configuration';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Role configuration set successfully');
+      setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to set role configuration');
     }
   };
 
   const handleDeleteConfig = async () => {
     if (!isDeleteConfigValid) return;
 
-    try {
-      const response = await fetch('/api/admin/role/config', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          awsAccountId: configForm.awsAccountId,
-          roleName: configForm.roleName,
-        }),
-      });
+    const result = await apiFetch('/api/admin/role/config', {
+      method: 'DELETE',
+      body: {
+        awsAccountId: configForm.awsAccountId,
+        roleName: configForm.roleName,
+      },
+    });
 
-      const responseText = await response.text();
-      console.log('Delete role config response:', response.status, responseText);
-
-      if (response.ok) {
-        showMessage('success', 'Role configuration deleted successfully');
-        setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
-      } else {
-        let errorMessage = 'Failed to delete role configuration';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Role configuration deleted successfully');
+      setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
+    } else {
+      showMessage('error', result.error || 'Failed to delete role configuration');
     }
   };
 
@@ -853,63 +599,36 @@ function SpendAlertsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleCreateAlert = async () => {
     if (!isCreateValid) return;
 
-    try {
-      const response = await fetch('/api/admin/cost/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          awsAccountId: createForm.awsAccountId,
-          thresholdAmount: parseFloat(createForm.thresholdAmount),
-          periodType: createForm.periodType,
-        }),
-      });
+    const result = await apiFetch<{ alert?: { id?: string } }>('/api/admin/cost/alerts', {
+      method: 'POST',
+      body: {
+        awsAccountId: createForm.awsAccountId,
+        thresholdAmount: parseFloat(createForm.thresholdAmount),
+        periodType: createForm.periodType,
+      },
+    });
 
-      const responseText = await response.text();
-      if (response.ok) {
-        const data = JSON.parse(responseText);
-        showMessage('success', `Spend alert created (ID: ${data.alert?.id || 'unknown'})`);
-        setCreateForm({ awsAccountId: '', thresholdAmount: '', periodType: 'monthly' });
-      } else {
-        let errorMessage = 'Failed to create spend alert';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', `Spend alert created (ID: ${result.data?.alert?.id || 'unknown'})`);
+      setCreateForm({ awsAccountId: '', thresholdAmount: '', periodType: 'monthly' });
+    } else {
+      showMessage('error', result.error || 'Failed to create spend alert');
     }
   };
 
   const handleDeleteAlert = async () => {
     if (!isDeleteValid) return;
 
-    try {
-      const response = await fetch('/api/admin/cost/alerts', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alertId: deleteAlertId.trim() }),
-      });
+    const result = await apiFetch('/api/admin/cost/alerts', {
+      method: 'DELETE',
+      body: { alertId: deleteAlertId.trim() },
+    });
 
-      const responseText = await response.text();
-      if (response.ok) {
-        showMessage('success', 'Spend alert deleted');
-        setDeleteAlertId('');
-      } else {
-        let errorMessage = 'Failed to delete spend alert';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', 'Spend alert deleted');
+      setDeleteAlertId('');
+    } else {
+      showMessage('error', result.error || 'Failed to delete spend alert');
     }
   };
 
@@ -1000,64 +719,38 @@ function DataCollectionTab({ showMessage }: { showMessage: (type: 'success' | 'e
     if (enableForm.costEnabled) collectionTypes.push('cost');
     if (enableForm.resourceEnabled) collectionTypes.push('resource');
 
-    try {
-      const response = await fetch('/api/admin/collection/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          principalArn: enableForm.principalArn,
-          collectionTypes,
-        }),
-      });
+    const result = await apiFetch('/api/admin/collection/config', {
+      method: 'POST',
+      body: {
+        principalArn: enableForm.principalArn,
+        collectionTypes,
+      },
+    });
 
-      const responseText = await response.text();
-      if (response.ok) {
-        showMessage('success', `Data collection enabled for ${collectionTypes.join(', ')}`);
-        setEnableForm({ principalArn: '', costEnabled: true, resourceEnabled: true });
-      } else {
-        let errorMessage = 'Failed to enable data collection';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', `Data collection enabled for ${collectionTypes.join(', ')}`);
+      setEnableForm({ principalArn: '', costEnabled: true, resourceEnabled: true });
+    } else {
+      showMessage('error', result.error || 'Failed to enable data collection');
     }
   };
 
   const handleDisableCollection = async () => {
     if (!isDisableValid) return;
 
-    try {
-      const response = await fetch('/api/admin/collection/config', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          principalArn: disableForm.principalArn,
-          collectionType: disableForm.collectionType,
-        }),
-      });
+    const result = await apiFetch('/api/admin/collection/config', {
+      method: 'DELETE',
+      body: {
+        principalArn: disableForm.principalArn,
+        collectionType: disableForm.collectionType,
+      },
+    });
 
-      const responseText = await response.text();
-      if (response.ok) {
-        showMessage('success', `Data collection disabled for ${disableForm.collectionType}`);
-        setDisableForm({ principalArn: '', collectionType: 'cost' });
-      } else {
-        let errorMessage = 'Failed to disable data collection';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok) {
+      showMessage('success', `Data collection disabled for ${disableForm.collectionType}`);
+      setDisableForm({ principalArn: '', collectionType: 'cost' });
+    } else {
+      showMessage('error', result.error || 'Failed to disable data collection');
     }
   };
 
@@ -1175,30 +868,17 @@ function MaintenanceTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleRunCleanup = async () => {
     if (!confirmed) return;
 
-    try {
-      const response = await fetch('/api/admin/maintenance/cleanup-orphaned', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const result = await apiFetch<CleanupResult>('/api/admin/maintenance/cleanup-orphaned', {
+      method: 'POST',
+    });
 
-      const responseText = await response.text();
-      if (response.ok) {
-        const data = JSON.parse(responseText) as CleanupResult;
-        setLastResult(data);
-        setConfirmed(false);
-        showMessage('success', `Cleanup complete — ${data.totalDeleted} orphaned row(s) removed`);
-      } else {
-        let errorMessage = 'Failed to run cleanup';
-        try {
-          const error = JSON.parse(responseText);
-          errorMessage = error.Exception?.Message || error.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${responseText}`;
-        }
-        showMessage('error', errorMessage);
-      }
-    } catch (err) {
-      showMessage('error', `Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    if (result.ok && result.data) {
+      const data: CleanupResult = result.data;
+      setLastResult(data);
+      setConfirmed(false);
+      showMessage('success', `Cleanup complete — ${data.totalDeleted} orphaned row(s) removed`);
+    } else {
+      showMessage('error', result.error || 'Failed to run cleanup');
     }
   };
 

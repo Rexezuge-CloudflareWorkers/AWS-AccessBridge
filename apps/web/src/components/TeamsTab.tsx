@@ -1,6 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import FocusInput from './ui/FocusInput';
+import Spinner from './ui/Spinner';
+import { apiCall } from '../lib/api';
+import {
+  cardStyle,
+  inputStyle,
+  tableCardStyle,
+  thStyle,
+  tdStyle,
+  btnBlueStyle,
+  btnGreenStyle,
+  btnRedStyle,
+  btnSmallStyle,
+} from './ui/theme';
+
+const styles = {
+  card: cardStyle,
+  input: inputStyle,
+  btnBlue: btnBlueStyle,
+  btnGreen: btnGreenStyle,
+  btnRed: btnRedStyle,
+  btnSmall: btnSmallStyle,
+  tableCard: tableCardStyle,
+  th: thStyle,
+  td: tdStyle,
+};
 
 const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -20,133 +46,6 @@ interface TeamMember {
 
 interface TeamsTabProps {
   showMessage: (type: 'success' | 'error', text: string) => void;
-}
-
-const styles = {
-  card: {
-    background: '#1e2433',
-    borderRadius: '12px',
-    padding: '24px',
-  } as React.CSSProperties,
-  input: {
-    width: '100%',
-    padding: '12px',
-    background: '#252d3d',
-    borderRadius: '8px',
-    border: '1px solid #374151',
-    color: '#ffffff',
-    outline: 'none',
-    boxSizing: 'border-box' as const,
-    transition: 'border-color 0.15s',
-  } as React.CSSProperties,
-  btnBlue: {
-    background: '#2563eb',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    color: 'white',
-    fontWeight: 500,
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
-  btnGreen: {
-    background: '#16a34a',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    color: 'white',
-    fontWeight: 500,
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
-  btnRed: {
-    background: '#dc2626',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    color: 'white',
-    fontWeight: 500,
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
-  btnSmall: {
-    padding: '6px 12px',
-    borderRadius: '6px',
-    color: 'white',
-    fontWeight: 500,
-    fontSize: '13px',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
-  tableCard: {
-    background: '#1e2433',
-    borderRadius: '12px',
-    overflow: 'hidden',
-  } as React.CSSProperties,
-  th: {
-    textAlign: 'left' as const,
-    padding: '12px',
-    background: '#252d3d',
-    color: '#9ca3af',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-    fontSize: '12px',
-    fontWeight: 500,
-  } as React.CSSProperties,
-  td: {
-    padding: '12px',
-    borderTop: '1px solid rgba(55,65,81,0.3)',
-  } as React.CSSProperties,
-};
-
-function FocusInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const [focused, setFocused] = useState(false);
-  const { style: extraStyle, ...rest } = props;
-  return (
-    <input
-      {...rest}
-      style={{
-        ...styles.input,
-        borderColor: focused ? '#3b82f6' : '#374151',
-        ...extraStyle,
-      }}
-      onFocus={(e) => {
-        setFocused(true);
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        setFocused(false);
-        props.onBlur?.(e);
-      }}
-    />
-  );
-}
-
-async function apiCall(
-  url: string,
-  method: string,
-  body?: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
-  try {
-    const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
-    if (body) opts.body = JSON.stringify(body);
-    const response = await fetch(url, opts);
-    const text = await response.text();
-    if (response.ok) {
-      return { ok: true, data: JSON.parse(text) };
-    }
-    let errorMessage = `HTTP ${response.status}`;
-    try {
-      const err = JSON.parse(text);
-      errorMessage = err.Exception?.Message || err.message || errorMessage;
-    } catch {
-      errorMessage = `${errorMessage}: ${text}`;
-    }
-    return { ok: false, error: errorMessage };
-  } catch (err) {
-    return { ok: false, error: `Network error: ${err instanceof Error ? err.message : 'Unknown error'}` };
-  }
 }
 
 export default function TeamsTab({ showMessage }: TeamsTabProps) {
@@ -366,21 +265,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       <div style={styles.card}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Teams</h3>
 
-        {isLoading && (
-          <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <div
-              className="animate-spin"
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                border: '2px solid #60a5fa',
-                borderTopColor: 'transparent',
-                margin: '0 auto',
-              }}
-            />
-          </div>
-        )}
+        {isLoading && <Spinner size={24} />}
 
         {!isLoading && teams.length === 0 && (
           <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280' }}>No teams found. Create one above.</div>
@@ -523,21 +408,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
               </button>
             </form>
 
-            {membersLoading && (
-              <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <div
-                  className="animate-spin"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    border: '2px solid #60a5fa',
-                    borderTopColor: 'transparent',
-                    margin: '0 auto',
-                  }}
-                />
-              </div>
-            )}
+            {membersLoading && <Spinner size={20} />}
 
             {!membersLoading && members.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280', fontSize: '14px' }}>
@@ -635,21 +506,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
               </button>
             </form>
 
-            {accountsLoading && (
-              <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <div
-                  className="animate-spin"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    border: '2px solid #60a5fa',
-                    borderTopColor: 'transparent',
-                    margin: '0 auto',
-                  }}
-                />
-              </div>
-            )}
+            {accountsLoading && <Spinner size={20} />}
 
             {!accountsLoading && accounts.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280', fontSize: '14px' }}>

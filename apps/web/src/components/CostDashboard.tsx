@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Spinner from './ui/Spinner';
 
 interface CostSummary {
   accounts: Record<string, { totalCost: number; currency: string }>;
@@ -62,22 +63,7 @@ export default function CostDashboard() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '48px 0' }}>
-        <div
-          className="animate-spin"
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            border: '2px solid #60a5fa',
-            borderTopColor: 'transparent',
-            margin: '0 auto 16px',
-          }}
-        ></div>
-        <p style={{ color: '#9ca3af' }}>Loading cost data...</p>
-      </div>
-    );
+    return <Spinner size={40} label="Loading cost data..." padding="48px 0" />;
   }
 
   if (error) {

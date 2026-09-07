@@ -109,6 +109,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@aws-access-bridge/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       react:
         specifier: ^19.2.8
         version: 19.2.8

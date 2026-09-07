@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Spinner from './ui/Spinner';
+import Pagination from './ui/Pagination';
+import { apiFetch } from '../lib/api';
+import { cardStyle, tableCardStyle, inputStyle, btnBlueStyle, thStyle, tdStyle } from './ui/theme';
 
 interface AuditLog {
   logId: string;
@@ -21,58 +25,16 @@ interface AuditLogsTabProps {
 }
 
 const styles = {
-  card: {
-    background: '#1e2433',
-    borderRadius: '12px',
-    padding: '16px',
-  } as React.CSSProperties,
-  tableCard: {
-    background: '#1e2433',
-    borderRadius: '12px',
-    overflow: 'hidden',
-  } as React.CSSProperties,
-  input: {
-    padding: '8px 12px',
-    background: '#252d3d',
-    borderRadius: '8px',
-    border: '1px solid #374151',
-    color: 'white',
-    outline: 'none',
-    transition: 'border-color 0.15s',
-  } as React.CSSProperties,
-  btnBlue: {
-    background: '#2563eb',
-    padding: '8px 16px',
-    borderRadius: '8px',
-    color: 'white',
-    border: 'none',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
+  card: { ...cardStyle, padding: '16px' },
+  tableCard: tableCardStyle,
+  input: { ...inputStyle, width: 'auto', padding: '8px 12px' },
+  btnBlue: { ...btnBlueStyle, padding: '8px 16px' },
   table: {
     width: '100%',
     borderCollapse: 'collapse' as const,
   } as React.CSSProperties,
-  th: {
-    textAlign: 'left' as const,
-    padding: '12px',
-    background: '#252d3d',
-    color: '#9ca3af',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-  } as React.CSSProperties,
-  td: {
-    padding: '12px',
-    borderTop: '1px solid rgba(55,65,81,0.3)',
-  } as React.CSSProperties,
-  paginationBtn: {
-    padding: '6px 12px',
-    background: '#252d3d',
-    border: 'none',
-    borderRadius: '8px',
-    color: 'white',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  } as React.CSSProperties,
+  th: thStyle,
+  td: tdStyle,
   expandedRow: {
     background: '#181d2a',
     padding: '16px',
@@ -98,26 +60,20 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (filterEmail.trim()) params.set('userEmail', filterEmail.trim());
-      if (filterAction.trim()) params.set('action', filterAction.trim());
-      params.set('limit', pageSize.toString());
-      params.set('offset', (page * pageSize).toString());
+    const params = new URLSearchParams();
+    if (filterEmail.trim()) params.set('userEmail', filterEmail.trim());
+    if (filterAction.trim()) params.set('action', filterAction.trim());
+    params.set('limit', pageSize.toString());
+    params.set('offset', (page * pageSize).toString());
 
-      const response = await fetch(`/api/admin/audit-logs?${params.toString()}`);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Failed to fetch logs: ${response.status} ${text}`);
-      }
-      const data = (await response.json()) as { logs: AuditLog[]; total: number };
-      setLogs(data.logs);
-      setTotal(data.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load audit logs');
-    } finally {
-      setIsLoading(false);
+    const result = await apiFetch<{ logs: AuditLog[]; total: number }>(`/api/admin/audit-logs?${params.toString()}`);
+    if (result.ok && result.data) {
+      setLogs(result.data.logs);
+      setTotal(result.data.total);
+    } else {
+      setError(result.error || 'Failed to load audit logs');
     }
+    setIsLoading(false);
   }, [filterEmail, filterAction, page]);
 
   useEffect(() => {
@@ -198,21 +154,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
       </div>
 
       {/* Loading spinner */}
-      {isLoading && (
-        <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              border: '2px solid #60a5fa',
-              borderTopColor: 'transparent',
-              margin: '0 auto',
-            }}
-          ></div>
-        </div>
-      )}
+      {isLoading && <Spinner size={24} />}
 
       {/* Error state */}
       {!isLoading && error && (
@@ -336,45 +278,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-            className="text-sm"
-            style={{
-              ...styles.paginationBtn,
-              opacity: page === 0 ? 0.4 : 1,
-              cursor: page === 0 ? 'default' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (page !== 0) e.currentTarget.style.background = '#252d3d';
-            }}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#1e2433')}
-          >
-            Prev
-          </button>
-          <span className="text-sm" style={{ color: '#6b7280' }}>
-            Page {page + 1} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-            disabled={page >= totalPages - 1}
-            className="text-sm"
-            style={{
-              ...styles.paginationBtn,
-              opacity: page >= totalPages - 1 ? 0.4 : 1,
-              cursor: page >= totalPages - 1 ? 'default' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (page < totalPages - 1) e.currentTarget.style.background = '#252d3d';
-            }}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#1e2433')}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} variant="compact" />
     </div>
   );
 }

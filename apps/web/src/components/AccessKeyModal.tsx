@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { AccessKeysResponse } from '@aws-access-bridge/shared';
+import { exportEnv } from '@aws-access-bridge/shared';
 
-interface Props {
-  accessKeyId: string;
-  secretAccessKey: string;
-  sessionToken: string;
-  expiration: string;
+interface Props extends AccessKeysResponse {
   onClose: () => void;
 }
 
@@ -121,11 +119,7 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
             style={modalStyles.btnCopy(copied)}
             onMouseEnter={(e) => (e.currentTarget.style.background = copied ? '#15803d' : '#1d4ed8')}
             onMouseLeave={(e) => (e.currentTarget.style.background = copied ? '#16a34a' : '#2563eb')}
-            onClick={() =>
-              copyToClipboard(
-                `export AWS_ACCESS_KEY_ID="${accessKeyId}"\nexport AWS_SECRET_ACCESS_KEY="${secretAccessKey}"\nexport AWS_SESSION_TOKEN="${sessionToken}"`,
-              )
-            }
+            onClick={() => copyToClipboard(exportEnv(accessKeyId, secretAccessKey, sessionToken))}
           >
             {copied ? 'Copied!' : 'Copy All'}
           </button>
