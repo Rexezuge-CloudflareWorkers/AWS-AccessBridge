@@ -4,6 +4,9 @@ import AdminPage from './components/AdminPage';
 import CostDashboard from './components/CostDashboard';
 import ResourceInventory from './components/ResourceInventory';
 import Unauthorized from './components/Unauthorized';
+import Spinner from './components/ui/Spinner';
+import Pagination from './components/ui/Pagination';
+import { useAuth } from './hooks/useAuth';
 
 type View = 'accounts' | 'costs' | 'resources' | 'admin';
 
@@ -30,10 +33,7 @@ function parseRoute(): { view: View; adminTab?: string } {
 }
 
 export default function SpaApp() {
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail } = useAuth();
   const [currentView, setCurrentView] = useState<View>(() => parseRoute().view);
   const [adminTab, setAdminTab] = useState<string | undefined>(() => parseRoute().adminTab);
   const [showHidden, setShowHidden] = useState(false);
@@ -88,28 +88,6 @@ export default function SpaApp() {
   }, []);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/user/me');
-        if (response.status === 401) {
-          setIsAuthorized(false);
-        } else if (response.ok) {
-          const userData = (await response.json()) as { isSuperAdmin?: boolean; email?: string; demoMode?: boolean };
-          setIsAuthorized(true);
-          setIsSuperAdmin(userData.isSuperAdmin || false);
-          setIsDemoMode(userData.demoMode || false);
-          setUserEmail(userData.email || '');
-        } else {
-          setIsAuthorized(false);
-        }
-      } catch {
-        setIsAuthorized(false);
-      }
-    };
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterOpen && !(event.target as Element).closest('.filter-dropdown')) {
         setFilterOpen(false);
@@ -123,18 +101,7 @@ export default function SpaApp() {
     return (
       <div className="bg-gray-900 min-h-screen text-white flex items-center justify-center">
         <div className="text-center">
-          <div
-            className="animate-spin"
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              border: '2px solid #60a5fa',
-              borderTopColor: 'transparent',
-              margin: '0 auto 16px',
-            }}
-          ></div>
-          <p className="text-gray-400">Loading...</p>
+          <Spinner size={48} label="Loading..." />
         </div>
       </div>
     );
@@ -262,63 +229,12 @@ export default function SpaApp() {
                           {Math.min((currentPage - 1) * pageSize + 1, totalAccounts)}&ndash;
                           {Math.min(currentPage * pageSize, totalAccounts)} of {totalAccounts}
                         </div>
-                        {Math.ceil(totalAccounts / pageSize) > 1 && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                              disabled={currentPage === 1}
-                              className="text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={{
-                                padding: '6px 10px',
-                                background: '#252d3d',
-                                borderRadius: '6px',
-                                border: 'none',
-                                cursor: currentPage === 1 ? 'default' : 'pointer',
-                              }}
-                            >
-                              Prev
-                            </button>
-                            {Array.from({ length: Math.min(5, Math.ceil(totalAccounts / pageSize)) }, (_, i) => {
-                              const totalPages = Math.ceil(totalAccounts / pageSize);
-                              let pageNum;
-                              if (totalPages <= 5) pageNum = i + 1;
-                              else if (currentPage <= 3) pageNum = i + 1;
-                              else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                              else pageNum = currentPage - 2 + i;
-                              return (
-                                <button
-                                  key={pageNum}
-                                  onClick={() => setCurrentPage(pageNum)}
-                                  className="text-sm"
-                                  style={{
-                                    padding: '6px 12px',
-                                    background: currentPage === pageNum ? '#2563eb' : '#252d3d',
-                                    color: currentPage === pageNum ? '#fff' : '#d1d5db',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                  }}
-                                >
-                                  {pageNum}
-                                </button>
-                              );
-                            })}
-                            <button
-                              onClick={() => setCurrentPage(Math.min(Math.ceil(totalAccounts / pageSize), currentPage + 1))}
-                              disabled={currentPage === Math.ceil(totalAccounts / pageSize)}
-                              className="text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={{
-                                padding: '6px 10px',
-                                background: '#252d3d',
-                                borderRadius: '6px',
-                                border: 'none',
-                                cursor: currentPage === Math.ceil(totalAccounts / pageSize) ? 'default' : 'pointer',
-                              }}
-                            >
-                              Next
-                            </button>
-                          </div>
-                        )}
+                        <Pagination
+                          currentPage={currentPage}
+                          totalPages={Math.ceil(totalAccounts / pageSize)}
+                          onPageChange={setCurrentPage}
+                          variant="full"
+                        />
                       </>
                     )}
                   </div>

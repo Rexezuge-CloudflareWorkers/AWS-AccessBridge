@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import AccessKeyModal from './AccessKeyModal';
+import Spinner from './ui/Spinner';
+import type { AccessKeysResponse } from '@aws-access-bridge/shared';
+import { buildPrincipalArn } from '@aws-access-bridge/shared';
 
 type RoleMap = Record<string, { roles: string[]; hiddenRoles?: string[]; nickname?: string; favorite: boolean }>;
 
@@ -17,8 +20,7 @@ interface AccountListProps {
 export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts }: AccountListProps) {
   const [rolesData, setRolesData] = useState<RoleMap>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [modalData, setModalData] = useState<any | null>(null);
+  const [modalData, setModalData] = useState<AccessKeysResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingKeys, setLoadingKeys] = useState<string | null>(null);
   const [loadingConsole, setLoadingConsole] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
   };
 
   const handleAccessKeys = async (accountId: string, role: string) => {
-    const principalArn = `arn:aws:iam::${accountId}:role/${role}`;
+    const principalArn = buildPrincipalArn(accountId, role);
     const loadingKey = `${accountId}-${role}`;
 
     setLoadingKeys(loadingKey);
@@ -172,7 +174,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
         throw new Error(`Assume role failed: ${assumeRes.status} ${errorText}`);
       }
 
-      const creds = await assumeRes.json();
+      const creds = (await assumeRes.json()) as AccessKeysResponse;
       setModalData(creds);
     } catch (error) {
       console.error(error);
@@ -222,22 +224,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
 
   return (
     <div>
-      {isLoading && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '2px solid #60a5fa',
-              borderTopColor: 'transparent',
-              margin: '0 auto 16px',
-            }}
-          ></div>
-          <p style={{ color: '#9ca3af' }}>Loading Accounts...</p>
-        </div>
-      )}
+      {isLoading && <Spinner size={32} label="Loading Accounts..." padding="32px 0" />}
       {!isLoading && error && (
         <div
           style={{

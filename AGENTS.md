@@ -206,8 +206,7 @@ React components live in `apps/web/src/components/`. All interactive components 
 
 Key components:
 
-- `apps/web/src/components/HomePage.tsx` — Landing / empty-state page
-- `apps/web/src/components/Navbar.tsx` — Top navigation shared across views
+- `apps/web/src/SpaApp.tsx` — SPA shell: auth gate, pathname routing, `SpaNavbar`, accounts/costs/resources/admin views
 - `apps/web/src/components/AccountList.tsx` — Main account list with role assumption and favorites
 - `apps/web/src/components/AccessKeyModal.tsx` — Displays generated AWS access keys
 - `apps/web/src/components/AdminPage.tsx` — Tabbed admin interface organized as a grouped left sidebar:
@@ -218,12 +217,13 @@ Key components:
   - **SYSTEM**: Audit Logs, Maintenance
 - `apps/web/src/components/OnboardingWizard.tsx` — Guided admin account setup
 - `apps/web/src/components/CostDashboard.tsx` — Cost summary cards, trend bar chart, account breakdown
-- `apps/web/src/components/CostDashboardView.tsx` — Page-level cost dashboard view wrapper
 - `apps/web/src/components/ResourceInventory.tsx` — Resource summary, type/search filters, paginated table
-- `apps/web/src/components/ResourceInventoryView.tsx` — Page-level resource inventory view wrapper
 - `apps/web/src/components/AuditLogsTab.tsx` — Filterable, paginated audit log viewer
 - `apps/web/src/components/TeamsTab.tsx` — Team management (create/rename/delete, members, accounts)
 - `apps/web/src/components/Unauthorized.tsx` — Unauthorized access screen
+- `apps/web/src/components/ui/` — Shared primitives (`theme`, `Spinner`, `LoadingButton`, `FocusInput`, `Card`, `Pagination`)
+- `apps/web/src/hooks/useAuth.ts` — Shared `fetch('/api/user/me')` auth gate hook
+- `apps/web/src/lib/api.ts` — Shared `apiFetch` JSON/error helper (replaces per-tab `response.text()` parsing)
 
 ### TypeScript configuration
 

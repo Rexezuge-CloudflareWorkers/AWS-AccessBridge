@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiCall } from '../lib/api';
 
 interface OnboardingWizardProps {
   showMessage: (type: 'success' | 'error', text: string) => void;
@@ -143,34 +144,6 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       setChainTestResult(null);
     }
   }, [intermediateRoleArn]);
-
-  const apiCall = async (
-    url: string,
-    method: string,
-    body: Record<string, unknown>,
-  ): Promise<{ ok: boolean; data: unknown; error?: string }> => {
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const text = await response.text();
-      let data: unknown;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
-      }
-      if (!response.ok) {
-        const err = (data as { Exception?: { Message?: string } })?.Exception?.Message || `HTTP ${response.status}`;
-        return { ok: false, data, error: err };
-      }
-      return { ok: true, data };
-    } catch (err) {
-      return { ok: false, data: null, error: err instanceof Error ? err.message : 'Network error' };
-    }
-  };
 
   // Step 1 handlers
   const handleSaveAccount = async () => {

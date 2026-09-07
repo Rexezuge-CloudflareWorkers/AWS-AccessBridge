@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Spinner from './ui/Spinner';
+import Pagination from './ui/Pagination';
 
 interface ResourceItem {
   awsAccountId: string;
@@ -248,19 +250,7 @@ export default function ResourceInventory() {
 
       {/* Resource Table */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              border: '2px solid #60a5fa',
-              borderTopColor: 'transparent',
-              margin: '0 auto',
-            }}
-          />
-        </div>
+        <Spinner size={24} padding="32px 0" />
       ) : resources.length === 0 ? (
         <div
           style={{
@@ -432,66 +422,7 @@ export default function ResourceInventory() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}
-        >
-          <button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-            className="text-sm"
-            style={{
-              padding: '6px 12px',
-              background: '#1e2433',
-              borderRadius: '8px',
-              border: 'none',
-              color: '#e5e7eb',
-              cursor: page === 0 ? 'default' : 'pointer',
-              opacity: page === 0 ? 0.4 : 1,
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (page !== 0) (e.currentTarget as HTMLElement).style.background = '#252d3d';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = '#1e2433';
-            }}
-          >
-            Prev
-          </button>
-          <span className="text-sm" style={{ color: '#6b7280' }}>
-            Page {page + 1} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-            disabled={page >= totalPages - 1}
-            className="text-sm"
-            style={{
-              padding: '6px 12px',
-              background: '#1e2433',
-              borderRadius: '8px',
-              border: 'none',
-              color: '#e5e7eb',
-              cursor: page >= totalPages - 1 ? 'default' : 'pointer',
-              opacity: page >= totalPages - 1 ? 0.4 : 1,
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (page < totalPages - 1) (e.currentTarget as HTMLElement).style.background = '#252d3d';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = '#1e2433';
-            }}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} variant="compact" />
     </div>
   );
 }
