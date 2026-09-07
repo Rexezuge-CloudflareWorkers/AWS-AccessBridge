@@ -15,7 +15,7 @@
     "chanfana": "^3.4.0",
     "hono": "^4.13.3",
     "jose": "^6.2.11",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
