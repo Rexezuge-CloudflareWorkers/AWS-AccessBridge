@@ -113,32 +113,41 @@ Cloudflare Pages uses `functions/[[path]].ts` as a catch-all Pages Function. It 
 
 ### Endpoint pattern
 
-Every API endpoint is a standalone file under `apps/api/src/endpoints/api/{domain}/{resource}/{METHOD}.ts`. Each extends one of two abstract base classes:
+User endpoints live under `apps/api/src/endpoints/user/{domain}/{resource}/{METHOD}.ts`; the three programmatic AWS endpoints live under `apps/api/src/endpoints/api/aws/`. Each extends one of two abstract base classes:
 
-- **`IActivityAPIRoute`** (`apps/api/src/endpoints/IActivityAPIRoute.ts`) — Authenticates the user (via Cloudflare Zero Trust JWT or Bearer PAT), parses the request body, writes an audit log entry via `waitUntil()`, and delegates to `handleRequest()`. All endpoints inherit from this.
+- **`IActivityAPIRoute`** (`apps/api/src/endpoints/IActivityAPIRoute.ts`) — Resolves the authenticated user from context (populated by middleware), parses the request body, writes an audit log entry via `waitUntil()`, and delegates to `handleRequest()`. All endpoints inherit from this.
 - **`IAdminActivityAPIRoute`** (`apps/api/src/endpoints/IAdminActivityAPIRoute.ts`) — Extends `IActivityAPIRoute`, adds a superadmin check and a demo-mode guard (throws `MethodNotAllowedError` when `DEMO_MODE=true`) before delegating to `handleAdminRequest()`.
 
-Endpoints are re-exported through `apps/api/src/endpoints/index.ts` (cast to `any` for Chanfana compatibility) and registered as Hono routes in `AccessBridgeWorker`.
+Endpoints are re-exported through `apps/api/src/endpoints/index.ts` (cast to `any` for Chanfana compatibility) and registered as Hono routes in `AccessBridgeWorker` (`registerUserRoutes` / `registerApiRoutes`).
 
-### API endpoints (48 total routes registered)
+### Auth and routing (user/api split)
 
-Counts reflect routes registered in `AccessBridgeWorker` — note several admin-adjacent operations (cost alerts, data collection config, teams, maintenance) live under the `/api/admin/*` prefix.
+Modeled on Mail-Otter: Cloudflare Access protects the human surface only.
 
-**Root (1):** `/federate` (wrapper that proxies to `/api/aws/federate`)
-**AWS Operations (3):** `POST /api/aws/assume-role`, `POST /api/aws/console`, `GET /api/aws/federate`
-**User Operations (10):** assumables list/search, me, favorites (POST/DELETE), hidden roles (POST/DELETE), access tokens (POST/DELETE/GET)
+- **`/user/*` — Cloudflare Access only** (`MiddlewareHandlers.userAuthentication()` → `EmailValidationUtil` JWT verify; `DEMO_MODE=true` bypasses). Bearer PATs are rejected here; internal `X-Internal-*` self-calls are rejected here. Covers all SPA calls: `GET /user/me`, assumables/search, favorites, hidden roles, tokens management (`GET/POST/DELETE /user/tokens`), `POST /user/aws/assume-role`, `POST /user/aws/console`, `GET /user/aws/federate`, costs (`GET /user/costs/summary|account|trends`), resources (`GET /user/resources[/summary]`), and everything under `/user/admin/*` (credentials, access, nicknames, role config, audit-logs, costs/alerts, collection/config, teams, maintenance).
+- **`/api/*` — Bearer PAT or HMAC-signed internal calls only** (`MiddlewareHandlers.apiAuthentication()` → `TokenAuthUtil.authenticateWithPAT`; `X-Internal-*`/self-hostname requests resolve the user from `X-Internal-User-Email` after the global `hmacValidation()` middleware verifies the signature). Access JWTs are rejected here. Only three routes: `POST /api/aws/assume-role`, `POST /api/aws/console`, `GET /api/aws/federate` (the `/user/aws/federate` flow fans out to the `/api/aws/*` pair internally via SELF + HMAC).
+- **Cloudflare Access policy** must cover `/user/*` plus the SPA page routes (`/`, `/costs`, `/resources`, `/admin/*`) and must **exclude** `/api/*`, `/docs`, `/openapi.json`.
+- **`/docs`, `/openapi.json`** — Chanfana generated, public.
+
+### API endpoints (51 total routes registered)
+
+Counts reflect routes registered in `AccessBridgeWorker` — the three AWS operations are registered twice (once per surface, sharing the same Route classes); admin-adjacent operations (costs alerts, data collection config, teams, maintenance) live under the `/user/admin/*` prefix.
+
+**User — AWS Operations (3):** `POST /user/aws/assume-role`, `POST /user/aws/console`, `GET /user/aws/federate`
+**User Operations (10):** assumables list/search, me, favorites (POST/DELETE), hidden roles (POST/DELETE), access tokens (`GET/POST/DELETE /user/tokens`)
 **Admin — Credentials & Access (7):** credentials POST, credentials/relationship (POST/DELETE), credentials/validate POST, credentials/test-chain POST, access grant/revoke (POST/DELETE)
 **Admin — Account & Role Config (5):** account/nickname (PUT/DELETE), role/config (PUT/DELETE), account/roles POST (IAM role discovery)
-**Admin — Audit (1):** `GET /api/admin/audit-logs`
-**Admin — Cost & Data Collection (4):** cost/alerts (POST/DELETE), collection/config (POST/DELETE)
+**Admin — Audit (1):** `GET /user/admin/audit-logs`
+**Admin — Cost & Data Collection (4):** costs/alerts (POST/DELETE), collection/config (POST/DELETE)
 **Admin — Teams (11):** team CRUD, team name PUT, team member add/remove/list, team member role PUT, team account add/remove/list
-**Admin — Maintenance (1):** `POST /api/admin/maintenance/cleanup-orphaned` (admin-triggered orphan purge across satellite tables)
-**Cost Operations (3):** summary, account detail, trends (all GET)
-**Resource Operations (2):** resources list (with filters), resources summary
+**Admin — Maintenance (1):** `POST /user/admin/maintenance/cleanup-orphaned` (admin-triggered orphan purge across satellite tables)
+**Cost Operations (3):** `GET /user/costs/summary`, `GET /user/costs/account`, `GET /user/costs/trends`
+**Resource Operations (2):** `GET /user/resources` (with filters), `GET /user/resources/summary`
+**Programmatic API — AWS Operations (3):** `POST /api/aws/assume-role`, `POST /api/aws/console`, `GET /api/aws/federate` (Bearer PAT or HMAC internal; same handlers as the `/user/aws/*` trio)
 
 ### Internal service-to-service calls
 
-The worker calls itself via the `SELF` service binding. These internal requests are signed with HMAC-SHA256 using the `INTERNAL_HMAC_SECRET` secret (`apps/api/src/utils/helpers/InternalRequestHelper.ts`, `apps/api/src/middleware/HMACHandler.ts`). Requests with `X-Internal-*` headers or originating from the self-worker hostname are validated by the HMAC middleware; external requests pass through without HMAC checks.
+The worker calls itself via the `SELF` service binding. These internal requests target `/api/aws/*` and are signed with HMAC-SHA256 using the `INTERNAL_HMAC_SECRET` secret (`packages/backend-core/src/utils/helpers/InternalRequestHelper.ts`, `apps/api/src/middleware/HMACHandler.ts`). Requests with `X-Internal-*` headers or originating from the self-worker hostname are validated by the HMAC middleware; external requests pass through without HMAC checks.
 
 ### Credential chain and caching
 
@@ -146,7 +155,7 @@ Credentials are stored encrypted (AES-GCM, key from `AES_ENCRYPTION_KEY_SECRET`)
 
 ### Audit logging
 
-Every API request is automatically logged via the `IActivityAPIRoute` base class. The `handle()` method has a `finally` block that uses `c.executionCtx.waitUntil()` to write audit logs asynchronously. A path-to-action map in `apps/api/src/constants/AuditActions.ts` translates HTTP method+path to semantic action names (e.g., `ASSUME_ROLE`, `GRANT_ACCESS`). The `AuditLogCleanupTask` deletes entries older than `AUDIT_LOG_RETENTION_DAYS` (default 90).
+Every API request is automatically logged via the `IActivityAPIRoute` base class. The `handle()` method has a `finally` block that uses `c.executionCtx.waitUntil()` to write audit logs asynchronously. A path-to-action map in `packages/backend-core/src/constants/AuditActions.ts` translates HTTP method+path to semantic action names (e.g., `ASSUME_ROLE`, `GRANT_ACCESS`). The `AuditLogCleanupTask` deletes entries older than `AUDIT_LOG_RETENTION_DAYS` (default 90).
 
 ### Cost analytics
 
@@ -222,7 +231,7 @@ Key components:
 - `apps/web/src/components/TeamsTab.tsx` — Team management (create/rename/delete, members, accounts)
 - `apps/web/src/components/Unauthorized.tsx` — Unauthorized access screen
 - `apps/web/src/components/ui/` — Shared primitives (`theme`, `Spinner`, `LoadingButton`, `FocusInput`, `Card`, `Pagination`)
-- `apps/web/src/hooks/useAuth.ts` — Shared `fetch('/api/user/me')` auth gate hook
+- `apps/web/src/hooks/useAuth.ts` — Shared `fetch('/user/me')` auth gate hook
 - `apps/web/src/lib/api.ts` — Shared `apiFetch` JSON/error helper (replaces per-tab `response.text()` parsing)
 
 ### TypeScript configuration

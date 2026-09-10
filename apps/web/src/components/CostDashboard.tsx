@@ -44,7 +44,7 @@ export default function CostDashboard() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [summaryRes, trendsRes] = await Promise.all([fetch('/api/cost/summary'), fetch('/api/cost/trends?months=6')]);
+        const [summaryRes, trendsRes] = await Promise.all([fetch('/user/costs/summary'), fetch('/user/costs/trends?months=6')]);
 
         if (summaryRes.ok) {
           setSummary((await summaryRes.json()) as CostSummary);

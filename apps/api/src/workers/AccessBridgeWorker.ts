@@ -21,7 +21,6 @@ import {
   UnhideRoleRoute,
   SetRoleConfigRoute,
   DeleteRoleConfigRoute,
-  FederateWrapperRoute,
   CreateTokenRoute,
   ListTokensRoute,
   DeleteTokenRoute,
@@ -55,94 +54,44 @@ import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { DEFAULT_SERVE_SPA_FROM_WORKER, DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@/constants';
 
+type AppRouter = HonoOpenAPIRouterType<{
+  Bindings: Env;
+  Variables: { AuthenticatedUserEmailAddress: string };
+}>;
+
 class AccessBridgeWorker extends AbstractEntrypointWorker {
-  protected readonly app: Hono<{ Bindings: Env }>;
+  protected readonly app: AppRouter;
 
   constructor() {
     super();
 
     const app: Hono<{
       Bindings: Env;
-    }> = new Hono<{ Bindings: Env }>();
+      Variables: { AuthenticatedUserEmailAddress: string };
+    }> = new Hono<{
+      Bindings: Env;
+      Variables: { AuthenticatedUserEmailAddress: string };
+    }>();
 
     // Middleware Handlers
+    // Cloudflare Access protects the human surface (/user/*) only.
+    // The programmatic surface (/api/*) authenticates via Bearer PAT
+    // (or HMAC-signed internal SELF calls) and must stay outside Access.
     app.use('*', MiddlewareHandlers.hmacValidation());
+    app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/api/*', MiddlewareHandlers.activityAudit());
-    app.use('/federate', MiddlewareHandlers.activityAudit());
-    app.use('/api/*', MiddlewareHandlers.authentication());
-    app.use('/federate', MiddlewareHandlers.authentication());
+    app.use('/user/*', MiddlewareHandlers.userAuthentication());
+    app.use('/api/*', MiddlewareHandlers.apiAuthentication());
 
-    const openapi: HonoOpenAPIRouterType<{
-      Bindings: Env;
-    }> = fromHono(app, {
+    const openapi: AppRouter = fromHono(app, {
       docs_url: '/docs',
     });
 
-    // Root Routes
-    openapi.get('/federate', FederateWrapperRoute);
+    this.registerUserRoutes(openapi);
+    this.registerApiRoutes(openapi);
 
-    // AWS Routes
-    openapi.post('/api/aws/console', GenerateConsoleUrlRoute);
-    openapi.post('/api/aws/assume-role', AssumeRoleRoute);
-    openapi.get('/api/aws/federate', FederateRoute);
-
-    // User Routes
-    openapi.get('/api/user/assumables', ListAssumablesRoute);
-    openapi.get('/api/user/assumables/search', SearchAccountsRoute);
-    openapi.get('/api/user/me', GetCurrentUserRoute);
-    openapi.post('/api/user/favorites', FavoriteAccountRoute);
-    openapi.delete('/api/user/favorites', UnfavoriteAccountRoute);
-    openapi.post('/api/user/assumable/hidden', HideRoleRoute);
-    openapi.delete('/api/user/assumable/hidden', UnhideRoleRoute);
-    openapi.post('/api/user/token', CreateTokenRoute);
-    openapi.delete('/api/user/token', DeleteTokenRoute);
-    openapi.get('/api/user/tokens', ListTokensRoute);
-
-    // Admin Routes
-    openapi.post('/api/admin/credentials', StoreCredentialRoute);
-    openapi.post('/api/admin/credentials/relationship', StoreCredentialRelationshipRoute);
-    openapi.delete('/api/admin/credentials/relationship', RemoveCredentialRelationshipRoute);
-    openapi.post('/api/admin/access', GrantAccessRoute);
-    openapi.delete('/api/admin/access', RevokeAccessRoute);
-    openapi.put('/api/admin/account/nickname', SetAccountNicknameRoute);
-    openapi.delete('/api/admin/account/nickname', RemoveAccountNicknameRoute);
-    openapi.put('/api/admin/role/config', SetRoleConfigRoute);
-    openapi.delete('/api/admin/role/config', DeleteRoleConfigRoute);
-    openapi.post('/api/admin/credentials/validate', ValidateCredentialsRoute);
-    openapi.post('/api/admin/credentials/test-chain', TestCredentialChainRoute);
-    openapi.post('/api/admin/account/roles', ListAccountRolesRoute);
-    openapi.get('/api/admin/audit-logs', ListAuditLogsRoute);
-
-    // Cost Routes
-    openapi.get('/api/cost/summary', GetCostSummaryRoute);
-    openapi.get('/api/cost/account', GetAccountCostRoute);
-    openapi.get('/api/cost/trends', GetCostTrendsRoute);
-    openapi.post('/api/admin/cost/alerts', CreateSpendAlertRoute);
-    openapi.delete('/api/admin/cost/alerts', DeleteSpendAlertRoute);
-    openapi.post('/api/admin/collection/config', EnableDataCollectionRoute);
-    openapi.delete('/api/admin/collection/config', DisableDataCollectionRoute);
-
-    // Resource Routes
-    openapi.get('/api/resources', ListResourcesRoute);
-    openapi.get('/api/resources/summary', GetResourceSummaryRoute);
-
-    // Team Routes
-    openapi.post('/api/admin/team', CreateTeamRoute);
-    openapi.delete('/api/admin/team', DeleteTeamRoute);
-    openapi.get('/api/admin/teams', ListTeamsRoute);
-    openapi.put('/api/admin/team/name', UpdateTeamNameRoute);
-    openapi.post('/api/admin/team/member', AddTeamMemberRoute);
-    openapi.delete('/api/admin/team/member', RemoveTeamMemberRoute);
-    openapi.get('/api/admin/team/members', ListTeamMembersRoute);
-    openapi.put('/api/admin/team/member/role', UpdateTeamMemberRoleRoute);
-    openapi.post('/api/admin/team/account', AddTeamAccountRoute);
-    openapi.delete('/api/admin/team/account', RemoveTeamAccountRoute);
-    openapi.get('/api/admin/team/accounts', ListTeamAccountsRoute);
-
-    // Maintenance Routes
-    openapi.post('/api/admin/maintenance/cleanup-orphaned', CleanupOrphanedDataRoute);
-
-    // SPA catch-all: serve embedded index.html for frontend routes
+    // SPA catch-all: serve embedded index.html for frontend page routes only.
+    // API surfaces (/user/* JSON, /api/* JSON) must never fall through to HTML.
     app.get('*', (c) => {
       const env = c.env as Env & { SERVE_SPA_FROM_WORKER?: string | undefined };
       const serveSpaFromWorker: boolean = (env.SERVE_SPA_FROM_WORKER || DEFAULT_SERVE_SPA_FROM_WORKER) === 'true';
@@ -150,13 +99,91 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (path.startsWith('/api/') || path.startsWith('/openapi.') || path === '/docs' || path === '/redocs' || /\.\w+$/.test(path)) {
+      if (
+        path.startsWith('/user/') ||
+        path.startsWith('/api/') ||
+        path.startsWith('/openapi.') ||
+        path === '/docs' ||
+        path === '/redocs' ||
+        /\.\w+$/.test(path)
+      ) {
         return c.notFound();
       }
       return c.html(SPA_HTML);
     });
 
     this.app = openapi;
+  }
+
+  private registerUserRoutes(openapi: AppRouter): void {
+    // AWS operations (browser flows, Cloudflare Access)
+    openapi.post('/user/aws/console', GenerateConsoleUrlRoute);
+    openapi.post('/user/aws/assume-role', AssumeRoleRoute);
+    openapi.get('/user/aws/federate', FederateRoute);
+
+    // User operations
+    openapi.get('/user/assumables', ListAssumablesRoute);
+    openapi.get('/user/assumables/search', SearchAccountsRoute);
+    openapi.get('/user/me', GetCurrentUserRoute);
+    openapi.post('/user/favorites', FavoriteAccountRoute);
+    openapi.delete('/user/favorites', UnfavoriteAccountRoute);
+    openapi.post('/user/assumable/hidden', HideRoleRoute);
+    openapi.delete('/user/assumable/hidden', UnhideRoleRoute);
+    openapi.post('/user/tokens', CreateTokenRoute);
+    openapi.delete('/user/tokens', DeleteTokenRoute);
+    openapi.get('/user/tokens', ListTokensRoute);
+
+    // Admin operations
+    openapi.post('/user/admin/credentials', StoreCredentialRoute);
+    openapi.post('/user/admin/credentials/relationship', StoreCredentialRelationshipRoute);
+    openapi.delete('/user/admin/credentials/relationship', RemoveCredentialRelationshipRoute);
+    openapi.post('/user/admin/access', GrantAccessRoute);
+    openapi.delete('/user/admin/access', RevokeAccessRoute);
+    openapi.put('/user/admin/account/nickname', SetAccountNicknameRoute);
+    openapi.delete('/user/admin/account/nickname', RemoveAccountNicknameRoute);
+    openapi.put('/user/admin/role/config', SetRoleConfigRoute);
+    openapi.delete('/user/admin/role/config', DeleteRoleConfigRoute);
+    openapi.post('/user/admin/credentials/validate', ValidateCredentialsRoute);
+    openapi.post('/user/admin/credentials/test-chain', TestCredentialChainRoute);
+    openapi.post('/user/admin/account/roles', ListAccountRolesRoute);
+    openapi.get('/user/admin/audit-logs', ListAuditLogsRoute);
+
+    // Cost operations
+    openapi.get('/user/costs/summary', GetCostSummaryRoute);
+    openapi.get('/user/costs/account', GetAccountCostRoute);
+    openapi.get('/user/costs/trends', GetCostTrendsRoute);
+    openapi.post('/user/admin/costs/alerts', CreateSpendAlertRoute);
+    openapi.delete('/user/admin/costs/alerts', DeleteSpendAlertRoute);
+    openapi.post('/user/admin/collection/config', EnableDataCollectionRoute);
+    openapi.delete('/user/admin/collection/config', DisableDataCollectionRoute);
+
+    // Resource operations
+    openapi.get('/user/resources', ListResourcesRoute);
+    openapi.get('/user/resources/summary', GetResourceSummaryRoute);
+
+    // Team operations
+    openapi.post('/user/admin/team', CreateTeamRoute);
+    openapi.delete('/user/admin/team', DeleteTeamRoute);
+    openapi.get('/user/admin/teams', ListTeamsRoute);
+    openapi.put('/user/admin/team/name', UpdateTeamNameRoute);
+    openapi.post('/user/admin/team/member', AddTeamMemberRoute);
+    openapi.delete('/user/admin/team/member', RemoveTeamMemberRoute);
+    openapi.get('/user/admin/team/members', ListTeamMembersRoute);
+    openapi.put('/user/admin/team/member/role', UpdateTeamMemberRoleRoute);
+    openapi.post('/user/admin/team/account', AddTeamAccountRoute);
+    openapi.delete('/user/admin/team/account', RemoveTeamAccountRoute);
+    openapi.get('/user/admin/team/accounts', ListTeamAccountsRoute);
+
+    // Maintenance operations
+    openapi.post('/user/admin/maintenance/cleanup-orphaned', CleanupOrphanedDataRoute);
+  }
+
+  private registerApiRoutes(openapi: AppRouter): void {
+    // Programmatic API (Bearer PAT or HMAC-signed internal calls, never Cloudflare Access).
+    // Federate internally fans out to these two endpoints via SELF + HMAC.
+    openapi.post('/api/aws/console', GenerateConsoleUrlRoute);
+    openapi.post('/api/aws/assume-role', AssumeRoleRoute);
+    openapi.get('/api/aws/federate', FederateRoute);
   }
 
   protected async onRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {

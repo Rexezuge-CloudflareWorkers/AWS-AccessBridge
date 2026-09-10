@@ -66,7 +66,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const fetchTeams = useCallback(async () => {
     setIsLoading(true);
-    const result = await apiCall('/api/admin/teams', 'GET');
+    const result = await apiCall('/user/admin/teams', 'GET');
     if (result.ok && result.data) {
       setTeams((result.data as { teams: Team[] }).teams || []);
     } else {
@@ -82,7 +82,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
   const fetchMembers = useCallback(
     async (teamId: string) => {
       setMembersLoading(true);
-      const result = await apiCall(`/api/admin/team/members?teamId=${teamId}`, 'GET');
+      const result = await apiCall(`/user/admin/team/members?teamId=${teamId}`, 'GET');
       if (result.ok && result.data) {
         setMembers((result.data as { members: TeamMember[] }).members || []);
       } else {
@@ -96,7 +96,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
   const fetchAccounts = useCallback(
     async (teamId: string) => {
       setAccountsLoading(true);
-      const result = await apiCall(`/api/admin/team/accounts?teamId=${teamId}`, 'GET');
+      const result = await apiCall(`/user/admin/team/accounts?teamId=${teamId}`, 'GET');
       if (result.ok && result.data) {
         setAccounts((result.data as { accountIds: string[] }).accountIds || []);
       } else {
@@ -122,7 +122,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleCreateTeam = async () => {
     if (!createTeamName.trim()) return;
-    const result = await apiCall('/api/admin/team', 'POST', { teamName: createTeamName.trim() });
+    const result = await apiCall('/user/admin/team', 'POST', { teamName: createTeamName.trim() });
     if (result.ok) {
       showMessage('success', 'Team created successfully');
       setCreateTeamName('');
@@ -133,7 +133,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
   };
 
   const handleDeleteTeam = async (teamId: string) => {
-    const result = await apiCall('/api/admin/team', 'DELETE', { teamId });
+    const result = await apiCall('/user/admin/team', 'DELETE', { teamId });
     if (result.ok) {
       showMessage('success', 'Team deleted successfully');
       if (selectedTeamId === teamId) {
@@ -149,7 +149,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleRenameTeam = async () => {
     if (!selectedTeamId || !renameTeamName.trim()) return;
-    const result = await apiCall('/api/admin/team/name', 'PUT', { teamId: selectedTeamId, teamName: renameTeamName.trim() });
+    const result = await apiCall('/user/admin/team/name', 'PUT', { teamId: selectedTeamId, teamName: renameTeamName.trim() });
     if (result.ok) {
       showMessage('success', 'Team renamed successfully');
       fetchTeams();
@@ -160,7 +160,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleAddMember = async () => {
     if (!selectedTeamId || !memberEmail.trim()) return;
-    const result = await apiCall('/api/admin/team/member', 'POST', {
+    const result = await apiCall('/user/admin/team/member', 'POST', {
       teamId: selectedTeamId,
       userEmail: memberEmail.trim(),
       role: memberRole,
@@ -177,7 +177,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleRemoveMember = async (email: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/api/admin/team/member', 'DELETE', { teamId: selectedTeamId, userEmail: email });
+    const result = await apiCall('/user/admin/team/member', 'DELETE', { teamId: selectedTeamId, userEmail: email });
     if (result.ok) {
       showMessage('success', 'Member removed successfully');
       fetchMembers(selectedTeamId);
@@ -188,7 +188,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/api/admin/team/member/role', 'PUT', {
+    const result = await apiCall('/user/admin/team/member/role', 'PUT', {
       teamId: selectedTeamId,
       userEmail: email,
       role: newRole,
@@ -203,7 +203,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleAddAccount = async () => {
     if (!selectedTeamId || !accountId.trim()) return;
-    const result = await apiCall('/api/admin/team/account', 'POST', { teamId: selectedTeamId, awsAccountId: accountId.trim() });
+    const result = await apiCall('/user/admin/team/account', 'POST', { teamId: selectedTeamId, awsAccountId: accountId.trim() });
     if (result.ok) {
       showMessage('success', 'Account added to team');
       setAccountId('');
@@ -215,7 +215,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
   const handleRemoveAccount = async (awsAccountId: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/api/admin/team/account', 'DELETE', { teamId: selectedTeamId, awsAccountId });
+    const result = await apiCall('/user/admin/team/account', 'DELETE', { teamId: selectedTeamId, awsAccountId });
     if (result.ok) {
       showMessage('success', 'Account removed from team');
       fetchAccounts(selectedTeamId);

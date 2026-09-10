@@ -216,6 +216,8 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
         },
       },
     },
+    // Registered on both surfaces: /user/aws/* (Cloudflare Access JWT)
+    // and /api/aws/* (Bearer PAT or HMAC-signed internal calls).
     security: [
       {
         CloudflareAccess: [],
@@ -231,7 +233,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
     const signinToken: string = await AwsConsoleUtil.getSigninToken(request.accessKeyId, request.secretAccessKey, request.sessionToken);
     let federateUrl: string = this.getBaseUrl(cxt);
     if (request.awsAccountId && request.roleName) {
-      federateUrl = `${federateUrl}/api/aws/federate?awsAccountId=${request.awsAccountId}&role=${request.roleName}`;
+      federateUrl = `${federateUrl}/user/aws/federate?awsAccountId=${request.awsAccountId}&role=${request.roleName}`;
     }
     let destination: string = 'https://console.aws.amazon.com/';
     if (request.destinationPath) {

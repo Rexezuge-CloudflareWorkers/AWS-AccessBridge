@@ -153,7 +153,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     }
     setIsValidating(true);
     if (nickname.trim()) {
-      const result = await apiCall('/api/admin/account/nickname', 'PUT', { awsAccountId, nickname: nickname.trim() });
+      const result = await apiCall('/user/admin/account/nickname', 'PUT', { awsAccountId, nickname: nickname.trim() });
       if (!result.ok) {
         showMessage('error', result.error!);
         setIsValidating(false);
@@ -168,7 +168,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   // Step 2 handlers
   const handleValidateCredentials = async () => {
     setIsValidating(true);
-    const result = await apiCall('/api/admin/credentials/validate', 'POST', {
+    const result = await apiCall('/user/admin/credentials/validate', 'POST', {
       accessKeyId,
       secretAccessKey,
       sessionToken: sessionToken || undefined,
@@ -192,7 +192,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       return;
     }
     setIsStoring(true);
-    const result = await apiCall('/api/admin/credentials', 'POST', {
+    const result = await apiCall('/user/admin/credentials', 'POST', {
       principalArn,
       accessKeyId,
       secretAccessKey,
@@ -214,7 +214,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       return;
     }
     setIsSettingChain(true);
-    const result = await apiCall('/api/admin/credentials/relationship', 'POST', {
+    const result = await apiCall('/user/admin/credentials/relationship', 'POST', {
       principalArn: intermediateRoleArn,
       assumedBy: principalArn,
     });
@@ -231,7 +231,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   const handleTestChain = async () => {
     setIsTestingChain(true);
     const roleArnToTest = roleForDiscovery || principalArn;
-    const result = await apiCall('/api/admin/credentials/test-chain', 'POST', { principalArn: roleArnToTest });
+    const result = await apiCall('/user/admin/credentials/test-chain', 'POST', { principalArn: roleArnToTest });
     if (result.ok) {
       const d = result.data as { success: boolean; chain: Array<{ arn: string; status: string }> };
       setChainTestResult(d.chain);
@@ -247,7 +247,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   const handleDiscoverRoles = async () => {
     setIsLoading(true);
     const roleArnToUse = roleForDiscovery || principalArn;
-    const result = await apiCall('/api/admin/account/roles', 'POST', { principalArn: roleArnToUse });
+    const result = await apiCall('/user/admin/account/roles', 'POST', { principalArn: roleArnToUse });
     if (result.ok) {
       const d = result.data as { roles: Array<{ roleName: string; arn: string; description: string }> };
       setDiscoveredRoles(d.roles);
@@ -286,7 +286,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       const role = discoveredRoles.find((r) => r.roleName === roleName);
       if (!role || !role.arn) continue;
 
-      const result = await apiCall('/api/admin/credentials/relationship', 'POST', {
+      const result = await apiCall('/user/admin/credentials/relationship', 'POST', {
         principalArn: role.arn,
         assumedBy: assumedByArn,
       });
@@ -319,7 +319,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     let failures = 0;
     for (const email of validEmails) {
       for (const role of selectedRoles) {
-        const result = await apiCall('/api/admin/access', 'POST', { userEmail: email.trim(), awsAccountId, roleName: role });
+        const result = await apiCall('/user/admin/access', 'POST', { userEmail: email.trim(), awsAccountId, roleName: role });
         if (!result.ok) failures++;
       }
     }

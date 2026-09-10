@@ -229,6 +229,8 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
         },
       },
     },
+    // Registered on both surfaces: /user/aws/* (Cloudflare Access JWT)
+    // and /api/aws/* (Bearer PAT or HMAC-signed internal calls).
     security: [
       {
         CloudflareAccess: [],

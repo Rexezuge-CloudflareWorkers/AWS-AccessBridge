@@ -34,14 +34,14 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
       const params = new URLSearchParams();
       params.set('q', searchTerm.trim());
       if (showHidden) params.set('showHidden', 'true');
-      url = `/api/user/assumables/search?${params.toString()}`;
+      url = `/user/assumables/search?${params.toString()}`;
     } else {
       const offset = (currentPage - 1) * pageSize;
       const params = new URLSearchParams();
       if (showHidden) params.set('showHidden', 'true');
       params.set('limit', pageSize.toString());
       params.set('offset', offset.toString());
-      url = `/api/user/assumables?${params.toString()}`;
+      url = `/user/assumables?${params.toString()}`;
     }
 
     try {
@@ -88,7 +88,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     const isFavorite = rolesData[accountId]?.favorite;
 
     try {
-      const response = await fetch('/api/user/favorites', {
+      const response = await fetch('/user/favorites', {
         method: isFavorite ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ awsAccountId: accountId }),
@@ -130,7 +130,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     }));
 
     try {
-      const response = await fetch('/api/user/assumable/hidden', {
+      const response = await fetch('/user/assumable/hidden', {
         method: currentlyHidden ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ awsAccountId: accountId, roleName: role }),
@@ -158,7 +158,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
 
     setLoadingKeys(loadingKey);
     try {
-      const assumeRes = await fetch('/api/aws/assume-role', {
+      const assumeRes = await fetch('/user/aws/assume-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ principalArn }),
@@ -188,7 +188,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     const loadingKey = `${accountId}-${role}`;
     setLoadingConsole(loadingKey);
     try {
-      const federateUrl = `/federate?awsAccountId=${accountId}&role=${encodeURIComponent(role)}`;
+      const federateUrl = `/user/aws/federate?awsAccountId=${accountId}&role=${encodeURIComponent(role)}`;
       window.open(federateUrl, '_blank');
     } catch (error) {
       console.error(error);

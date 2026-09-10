@@ -63,12 +63,21 @@ function withCloudflareMetadata(request: Request): Request {
   return request;
 }
 
-function createApp(includeAudit: boolean = false): TestApp {
+function createUserApp(includeAudit: boolean = false): TestApp {
   const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
   if (includeAudit) {
     app.use('*', MiddlewareHandlers.activityAudit());
   }
-  app.use('*', MiddlewareHandlers.authentication());
+  app.use('*', MiddlewareHandlers.userAuthentication());
+  app.get('/user/test', async (c) => {
+    return c.json({ email: c.get('AuthenticatedUserEmailAddress') });
+  });
+  return app;
+}
+
+function createApiApp(): TestApp {
+  const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+  app.use('*', MiddlewareHandlers.apiAuthentication());
   app.get('/api/test', async (c) => {
     return c.json({ email: c.get('AuthenticatedUserEmailAddress') });
   });
@@ -225,9 +234,118 @@ describe('MiddlewareHandlers', () => {
     });
   });
 
-  describe('authentication', () => {
+  describe('userAuthentication', () => {
     it('uses the demo user when demo mode is enabled', async () => {
-      const app: TestApp = createApp();
+      const app: TestApp = createUserApp();
+
+      const response: Response = await app.fetch(
+        new Request('https://worker.example.com/user/test'),
+        createEnv({ DEMO_MODE: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ email: DEMO_USER_EMAIL });
+    });
+
+    it('rejects bearer tokens on the user surface (strict split: PAT is /api/* only)', async () => {
+      const app: TestApp = createUserApp();
+      const authenticateWithPATSpy = vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
+
+      const response: Response = await app.fetch(
+        new Request('https://worker.example.com/user/test', {
+          headers: {
+            Authorization: 'Bearer test-token',
+          },
+        }),
+        createEnv(),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No Cloudflare Access JWT token provided in request headers.',
+        },
+      });
+      expect(authenticateWithPATSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not authenticate using the Cloudflare Access email header', async () => {
+      const app: TestApp = createUserApp();
+
+      const response: Response = await app.fetch(
+        new Request('https://worker.example.com/user/test', {
+          headers: {
+            'Cf-Access-Authenticated-User-Email': 'header@example.com',
+          },
+        }),
+        createEnv(),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No Cloudflare Access JWT token provided in request headers.',
+        },
+      });
+    });
+
+    it('rejects internal self-worker requests on the user surface (strict split)', async () => {
+      const app: TestApp = createUserApp();
+
+      const response: Response = await app.fetch(
+        new Request(`https://${SELF_WORKER_BASE_HOSTNAME}/user/test`, {
+          headers: {
+            [INTERNAL_USER_EMAIL_HEADER]: 'internal@example.com',
+          },
+        }),
+        createEnv(),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No Cloudflare Access JWT token provided in request headers.',
+        },
+      });
+    });
+
+    it('returns a 401 response and audit log entry when authentication fails before route execution', async () => {
+      const app: TestApp = createUserApp(true);
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/user/test'), createEnv(), createExecutionContext());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No Cloudflare Access JWT token provided in request headers.',
+        },
+      });
+      expect(auditLogCreateSpy).toHaveBeenCalledWith(
+        'unknown',
+        'GET:/user/test',
+        'GET',
+        '/user/test',
+        401,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      expect(waitUntilSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('apiAuthentication', () => {
+    it('uses the demo user when demo mode is enabled', async () => {
+      const app: TestApp = createApiApp();
 
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/api/test'),
@@ -240,7 +358,7 @@ describe('MiddlewareHandlers', () => {
     });
 
     it('authenticates bearer tokens via PAT lookup', async () => {
-      const app: TestApp = createApp();
+      const app: TestApp = createApiApp();
       const authenticateWithPATSpy = vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
 
       const response: Response = await app.fetch(
@@ -259,7 +377,7 @@ describe('MiddlewareHandlers', () => {
     });
 
     it('returns a 401 response when PAT authentication fails', async () => {
-      const app: TestApp = createApp();
+      const app: TestApp = createApiApp();
       vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockRejectedValue(new UnauthorizedError('PAT rejected'));
 
       const response: Response = await app.fetch(
@@ -281,13 +399,27 @@ describe('MiddlewareHandlers', () => {
       });
     });
 
-    it('does not authenticate using the Cloudflare Access email header', async () => {
-      const app: TestApp = createApp();
+    it('returns a 401 response when no bearer token is provided', async () => {
+      const app: TestApp = createApiApp();
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No personal access token provided in request headers.',
+        },
+      });
+    });
+
+    it('ignores Cloudflare Access JWT on the api surface (strict split: Access is /user/* only)', async () => {
+      const app: TestApp = createApiApp();
 
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/api/test', {
           headers: {
-            'Cf-Access-Authenticated-User-Email': 'header@example.com',
+            'cf-access-jwt-assertion': 'some-jwt-token',
           },
         }),
         createEnv(),
@@ -298,13 +430,13 @@ describe('MiddlewareHandlers', () => {
       await expect(response.json()).resolves.toEqual({
         Exception: {
           Type: 'Unauthorized',
-          Message: 'No Cloudflare Access JWT token provided in request headers.',
+          Message: 'No personal access token provided in request headers.',
         },
       });
     });
 
-    it('authenticates internal self-worker requests from the internal user header', async () => {
-      const app: TestApp = createApp();
+    it('authenticates HMAC-signed internal self-worker requests from the internal user header', async () => {
+      const app: TestApp = createApiApp();
 
       const response: Response = await app.fetch(
         new Request(`https://${SELF_WORKER_BASE_HOSTNAME}/api/test`, {
@@ -318,32 +450,6 @@ describe('MiddlewareHandlers', () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ email: 'internal@example.com' });
-    });
-
-    it('returns a 401 response and audit log entry when authentication fails before route execution', async () => {
-      const app: TestApp = createApp(true);
-
-      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({
-        Exception: {
-          Type: 'Unauthorized',
-          Message: 'No Cloudflare Access JWT token provided in request headers.',
-        },
-      });
-      expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'unknown',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        401,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-      );
-      expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

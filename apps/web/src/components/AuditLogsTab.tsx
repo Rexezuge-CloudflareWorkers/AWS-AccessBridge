@@ -66,7 +66,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
     params.set('limit', pageSize.toString());
     params.set('offset', (page * pageSize).toString());
 
-    const result = await apiFetch<{ logs: AuditLog[]; total: number }>(`/api/admin/audit-logs?${params.toString()}`);
+    const result = await apiFetch<{ logs: AuditLog[]; total: number }>(`/user/admin/audit-logs?${params.toString()}`);
     if (result.ok && result.data) {
       setLogs(result.data.logs);
       setTotal(result.data.total);

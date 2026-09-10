@@ -24,7 +24,7 @@ export function useAuth(): AuthState {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/user/me');
+        const response = await fetch('/user/me');
         if (response.status === 401) {
           setIsAuthorized(false);
         } else if (response.ok) {

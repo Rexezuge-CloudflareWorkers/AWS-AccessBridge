@@ -67,7 +67,7 @@ export default function ResourceInventory() {
   const pageSize = 25;
 
   useEffect(() => {
-    fetch('/api/resources/summary')
+    fetch('/user/resources/summary')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) setSummary(data as ResourceSummary);
@@ -83,7 +83,7 @@ export default function ResourceInventory() {
     params.set('offset', (page * pageSize).toString());
 
     try {
-      const res = await fetch(`/api/resources?${params.toString()}`);
+      const res = await fetch(`/user/resources?${params.toString()}`);
       if (res.ok) {
         const data = (await res.json()) as { items: ResourceItem[]; total: number; rolesByAccount: Record<string, string[]> };
         setResources(data.items);
@@ -128,7 +128,7 @@ export default function ResourceInventory() {
     if (destination.region) {
       params.set('destinationRegion', destination.region);
     }
-    window.open(`/api/aws/federate?${params.toString()}`, '_blank', 'noopener,noreferrer');
+    window.open(`/user/aws/federate?${params.toString()}`, '_blank', 'noopener,noreferrer');
   };
 
   return (

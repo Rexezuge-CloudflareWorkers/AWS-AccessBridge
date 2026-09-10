@@ -13,9 +13,17 @@ function createExecutionContext(): ExecutionContext {
 }
 
 function createEnv(overrides: Partial<TestEnv> = {}): Env {
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        run: async () => ({ success: true }),
+      }),
+    }),
+  };
   return {
+    AccessBridgeDB: mockDb,
     ...overrides,
-  } as Env;
+  } as unknown as Env;
 }
 
 describe('AccessBridgeWorker', () => {
@@ -39,6 +47,32 @@ describe('AccessBridgeWorker', () => {
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toContain('AWS AccessBridge');
+    });
+
+    it('never serves the SPA for unknown /user/* paths (auth rejects first)', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/user/unknown-route-xyz'),
+        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('content-type')).toContain('application/json');
+    });
+
+    it('never serves the SPA for unknown /api/* paths (auth rejects first)', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/api/unknown-route-xyz'),
+        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('content-type')).toContain('application/json');
     });
   });
 });
