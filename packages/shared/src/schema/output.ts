@@ -172,97 +172,99 @@ const CleanupOrphanedDataResponseSchema = z.object({
 });
 
 const RouteOutputSchemas = {
-  'GET /federate': z.undefined(),
-  'POST /api/aws/assume-role': AccessKeysResponseSchema,
+    'POST /api/aws/assume-role': AccessKeysResponseSchema,
   'POST /api/aws/console': ConsoleUrlResponseSchema,
   'GET /api/aws/federate': z.undefined(),
-  'GET /api/user/assumables': AssumableAccountsResponseSchema,
-  'GET /api/user/assumables/search': z.record(z.string(), AssumableAccountSchema),
-  'GET /api/user/me': z.object({
+  'POST /user/aws/assume-role': AccessKeysResponseSchema,
+  'POST /user/aws/console': ConsoleUrlResponseSchema,
+  'GET /user/aws/federate': z.undefined(),
+  'GET /user/assumables': AssumableAccountsResponseSchema,
+  'GET /user/assumables/search': z.record(z.string(), AssumableAccountSchema),
+  'GET /user/me': z.object({
     email: z.string(),
     isSuperAdmin: z.boolean(),
     demoMode: z.boolean(),
   }),
-  'POST /api/user/favorites': SuccessResponseSchema,
-  'DELETE /api/user/favorites': SuccessResponseSchema,
-  'POST /api/user/assumable/hidden': SuccessResponseSchema,
-  'DELETE /api/user/assumable/hidden': SuccessResponseSchema,
-  'POST /api/user/token': z.object({
+  'POST /user/favorites': SuccessResponseSchema,
+  'DELETE /user/favorites': SuccessResponseSchema,
+  'POST /user/assumable/hidden': SuccessResponseSchema,
+  'DELETE /user/assumable/hidden': SuccessResponseSchema,
+  'POST /user/tokens': z.object({
     tokenId: z.string(),
     token: z.string(),
     name: z.string(),
     expiresAt: z.number(),
   }),
-  'DELETE /api/user/token': SuccessResponseSchema,
-  'GET /api/user/tokens': z.object({
+  'DELETE /user/tokens': SuccessResponseSchema,
+  'GET /user/tokens': z.object({
     tokens: z.array(UserAccessTokenMetadataSchema),
   }),
-  'GET /api/admin/audit-logs': z.object({
+  'GET /user/admin/audit-logs': z.object({
     logs: z.array(AuditLogSchema),
     total: z.number(),
   }),
-  'POST /api/admin/credentials': MessageResponseSchema,
-  'POST /api/admin/credentials/relationship': MessageResponseSchema,
-  'DELETE /api/admin/credentials/relationship': MessageResponseSchema,
-  'POST /api/admin/access': MessageResponseSchema,
-  'DELETE /api/admin/access': MessageResponseSchema,
-  'PUT /api/admin/account/nickname': z.object({
+  'POST /user/admin/credentials': MessageResponseSchema,
+  'POST /user/admin/credentials/relationship': MessageResponseSchema,
+  'DELETE /user/admin/credentials/relationship': MessageResponseSchema,
+  'POST /user/admin/access': MessageResponseSchema,
+  'DELETE /user/admin/access': MessageResponseSchema,
+  'PUT /user/admin/account/nickname': z.object({
     success: z.boolean(),
     accountId: z.string(),
     nickname: z.string(),
   }),
-  'DELETE /api/admin/account/nickname': z.object({
+  'DELETE /user/admin/account/nickname': z.object({
     success: z.boolean(),
     accountId: z.string(),
   }),
-  'PUT /api/admin/role/config': MessageResponseSchema,
-  'DELETE /api/admin/role/config': MessageResponseSchema,
-  'POST /api/admin/credentials/validate': CredentialValidationResponseSchema,
-  'POST /api/admin/credentials/test-chain': CredentialChainTestResponseSchema,
-  'POST /api/admin/account/roles': z.object({
+  'PUT /user/admin/role/config': MessageResponseSchema,
+  'DELETE /user/admin/role/config': MessageResponseSchema,
+  'POST /user/admin/credentials/validate': CredentialValidationResponseSchema,
+  'POST /user/admin/credentials/test-chain': CredentialChainTestResponseSchema,
+  'POST /user/admin/account/roles': z.object({
     roles: z.array(RoleDiscoveryItemSchema),
   }),
-  'GET /api/cost/summary': CostSummaryResponseSchema,
-  'GET /api/cost/account': z.object({
+  'GET /user/costs/summary': CostSummaryResponseSchema,
+  'GET /user/costs/account': z.object({
     awsAccountId: z.string(),
     dailyCosts: z.array(CostDataSchema),
     serviceBreakdown: z.record(z.string(), z.number()),
     total: z.number(),
   }),
-  'GET /api/cost/trends': CostTrendsResponseSchema,
-  'POST /api/admin/cost/alerts': z.object({
+  'GET /user/costs/trends': CostTrendsResponseSchema,
+  'POST /user/admin/costs/alerts': z.object({
     success: z.boolean(),
     alert: SpendAlertSchema,
   }),
-  'DELETE /api/admin/cost/alerts': MessageResponseSchema,
-  'POST /api/admin/collection/config': MessageResponseSchema,
-  'DELETE /api/admin/collection/config': MessageResponseSchema,
-  'GET /api/resources': z.object({
+  'DELETE /user/admin/costs/alerts': MessageResponseSchema,
+  'POST /user/admin/collection/config': MessageResponseSchema,
+  'DELETE /user/admin/collection/config': MessageResponseSchema,
+  'GET /user/resources': z.object({
     items: z.array(ResourceInventoryItemSchema),
     total: z.number(),
   }),
-  'GET /api/resources/summary': ResourceSummaryResponseSchema,
-  'GET /api/admin/teams': z.object({
+  'GET /user/resources/summary': ResourceSummaryResponseSchema,
+  'GET /user/admin/teams': z.object({
     teams: z.array(TeamSchema),
   }),
-  'GET /api/admin/team/members': z.object({
+  'GET /user/admin/team/members': z.object({
     members: z.array(TeamMemberSchema),
   }),
-  'GET /api/admin/team/accounts': z.object({
+  'GET /user/admin/team/accounts': z.object({
     accountIds: z.array(z.string()),
   }),
-  'POST /api/admin/team': z.object({
+  'POST /user/admin/team': z.object({
     success: z.boolean(),
     team: TeamSchema,
   }),
-  'DELETE /api/admin/team': MessageResponseSchema,
-  'PUT /api/admin/team/name': MessageResponseSchema,
-  'POST /api/admin/team/member': MessageResponseSchema,
-  'DELETE /api/admin/team/member': MessageResponseSchema,
-  'PUT /api/admin/team/member/role': MessageResponseSchema,
-  'POST /api/admin/team/account': MessageResponseSchema,
-  'DELETE /api/admin/team/account': MessageResponseSchema,
-  'POST /api/admin/maintenance/cleanup-orphaned': CleanupOrphanedDataResponseSchema,
+  'DELETE /user/admin/team': MessageResponseSchema,
+  'PUT /user/admin/team/name': MessageResponseSchema,
+  'POST /user/admin/team/member': MessageResponseSchema,
+  'DELETE /user/admin/team/member': MessageResponseSchema,
+  'PUT /user/admin/team/member/role': MessageResponseSchema,
+  'POST /user/admin/team/account': MessageResponseSchema,
+  'DELETE /user/admin/team/account': MessageResponseSchema,
+  'POST /user/admin/maintenance/cleanup-orphaned': CleanupOrphanedDataResponseSchema,
 } as const;
 
 export {

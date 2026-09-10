@@ -4,13 +4,13 @@ import { getRequestInputSchema, validateRequestInput } from '@/schema';
 
 describe('Request input schemas', () => {
   it('finds schemas by method and pathname', () => {
-    const request = new Request('https://access-bridge.example.com/api/user/favorites', { method: 'POST' });
+    const request = new Request('https://access-bridge.example.com/user/favorites', { method: 'POST' });
 
     expect(getRequestInputSchema(request)).toBeDefined();
   });
 
   it('returns a sanitized body for valid input', async () => {
-    const request = new Request('https://access-bridge.example.com/api/user/favorites', { method: 'POST' });
+    const request = new Request('https://access-bridge.example.com/user/favorites', { method: 'POST' });
 
     await expect(validateRequestInput(request, { awsAccountId: '123456789012', ignored: true })).resolves.toEqual({
       awsAccountId: '123456789012',
@@ -18,13 +18,13 @@ describe('Request input schemas', () => {
   });
 
   it('rejects invalid body data', async () => {
-    const request = new Request('https://access-bridge.example.com/api/user/favorites', { method: 'POST' });
+    const request = new Request('https://access-bridge.example.com/user/favorites', { method: 'POST' });
 
     await expect(validateRequestInput(request, { awsAccountId: 'not-an-account' })).rejects.toBeInstanceOf(BadRequestError);
   });
 
   it('rejects invalid query data', async () => {
-    const request = new Request('https://access-bridge.example.com/api/resources?limit=not-a-number', { method: 'GET' });
+    const request = new Request('https://access-bridge.example.com/user/resources?limit=not-a-number', { method: 'GET' });
 
     await expect(validateRequestInput(request, {})).rejects.toBeInstanceOf(BadRequestError);
   });
@@ -42,7 +42,7 @@ describe('Request input schemas', () => {
   });
 
   it('accepts role session duration seconds in role config', async () => {
-    const request = new Request('https://access-bridge.example.com/api/admin/role/config', { method: 'PUT' });
+    const request = new Request('https://access-bridge.example.com/user/admin/role/config', { method: 'PUT' });
 
     await expect(
       validateRequestInput(request, {
@@ -58,7 +58,7 @@ describe('Request input schemas', () => {
   });
 
   it('rejects out-of-range role session duration seconds', async () => {
-    const request = new Request('https://access-bridge.example.com/api/admin/role/config', { method: 'PUT' });
+    const request = new Request('https://access-bridge.example.com/user/admin/role/config', { method: 'PUT' });
 
     await expect(
       validateRequestInput(request, {

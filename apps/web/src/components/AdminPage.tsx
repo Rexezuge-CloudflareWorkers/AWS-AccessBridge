@@ -188,7 +188,7 @@ function CredentialsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleAddCredentials = async () => {
     if (!isCredFormValid) return;
 
-    const result = await apiFetch('/api/admin/credentials', {
+    const result = await apiFetch('/user/admin/credentials', {
       method: 'POST',
       body: {
         principalArn: credForm.principalArn,
@@ -209,7 +209,7 @@ function CredentialsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleAddRelation = async () => {
     if (!isRelationFormValid) return;
 
-    const result = await apiFetch('/api/admin/credentials/relationship', {
+    const result = await apiFetch('/user/admin/credentials/relationship', {
       method: 'POST',
       body: {
         principalArn: relationForm.principalArn,
@@ -228,7 +228,7 @@ function CredentialsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleRemoveRelation = async () => {
     if (!isRemoveRelationFormValid) return;
 
-    const result = await apiFetch('/api/admin/credentials/relationship', {
+    const result = await apiFetch('/user/admin/credentials/relationship', {
       method: 'DELETE',
       body: {
         principalArn: relationForm.principalArn,
@@ -324,7 +324,7 @@ function AccessTab({ showMessage }: { showMessage: (type: 'success' | 'error', t
   const handleGrantAccess = async () => {
     if (!isFormValid) return;
 
-    const result = await apiFetch('/api/admin/access', {
+    const result = await apiFetch('/user/admin/access', {
       method: 'POST',
       body: {
         userEmail: accessForm.userEmail || undefined,
@@ -344,7 +344,7 @@ function AccessTab({ showMessage }: { showMessage: (type: 'success' | 'error', t
   const handleRevokeAccess = async () => {
     if (!isFormValid) return;
 
-    const result = await apiFetch('/api/admin/access', {
+    const result = await apiFetch('/user/admin/access', {
       method: 'DELETE',
       body: {
         userEmail: accessForm.userEmail || undefined,
@@ -409,7 +409,7 @@ function AccountsTab({ showMessage }: { showMessage: (type: 'success' | 'error',
   const handleSetNickname = async () => {
     if (!isSetNicknameValid) return;
 
-    const result = await apiFetch('/api/admin/account/nickname', {
+    const result = await apiFetch('/user/admin/account/nickname', {
       method: 'PUT',
       body: {
         awsAccountId: nicknameForm.awsAccountId,
@@ -428,7 +428,7 @@ function AccountsTab({ showMessage }: { showMessage: (type: 'success' | 'error',
   const handleRemoveNickname = async () => {
     if (!isRemoveNicknameValid) return;
 
-    const result = await apiFetch('/api/admin/account/nickname', {
+    const result = await apiFetch('/user/admin/account/nickname', {
       method: 'DELETE',
       body: {
         awsAccountId: nicknameForm.awsAccountId,
@@ -489,7 +489,7 @@ function RoleConfigTab({ showMessage }: { showMessage: (type: 'success' | 'error
   const handleSetConfig = async () => {
     if (!isSetConfigValid) return;
 
-    const result = await apiFetch('/api/admin/role/config', {
+    const result = await apiFetch('/user/admin/role/config', {
       method: 'PUT',
       body: {
         awsAccountId: configForm.awsAccountId,
@@ -513,7 +513,7 @@ function RoleConfigTab({ showMessage }: { showMessage: (type: 'success' | 'error
   const handleDeleteConfig = async () => {
     if (!isDeleteConfigValid) return;
 
-    const result = await apiFetch('/api/admin/role/config', {
+    const result = await apiFetch('/user/admin/role/config', {
       method: 'DELETE',
       body: {
         awsAccountId: configForm.awsAccountId,
@@ -599,7 +599,7 @@ function SpendAlertsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleCreateAlert = async () => {
     if (!isCreateValid) return;
 
-    const result = await apiFetch<{ alert?: { id?: string } }>('/api/admin/cost/alerts', {
+    const result = await apiFetch<{ alert?: { id?: string } }>('/user/admin/costs/alerts', {
       method: 'POST',
       body: {
         awsAccountId: createForm.awsAccountId,
@@ -619,7 +619,7 @@ function SpendAlertsTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleDeleteAlert = async () => {
     if (!isDeleteValid) return;
 
-    const result = await apiFetch('/api/admin/cost/alerts', {
+    const result = await apiFetch('/user/admin/costs/alerts', {
       method: 'DELETE',
       body: { alertId: deleteAlertId.trim() },
     });
@@ -719,7 +719,7 @@ function DataCollectionTab({ showMessage }: { showMessage: (type: 'success' | 'e
     if (enableForm.costEnabled) collectionTypes.push('cost');
     if (enableForm.resourceEnabled) collectionTypes.push('resource');
 
-    const result = await apiFetch('/api/admin/collection/config', {
+    const result = await apiFetch('/user/admin/collection/config', {
       method: 'POST',
       body: {
         principalArn: enableForm.principalArn,
@@ -738,7 +738,7 @@ function DataCollectionTab({ showMessage }: { showMessage: (type: 'success' | 'e
   const handleDisableCollection = async () => {
     if (!isDisableValid) return;
 
-    const result = await apiFetch('/api/admin/collection/config', {
+    const result = await apiFetch('/user/admin/collection/config', {
       method: 'DELETE',
       body: {
         principalArn: disableForm.principalArn,
@@ -868,7 +868,7 @@ function MaintenanceTab({ showMessage }: { showMessage: (type: 'success' | 'erro
   const handleRunCleanup = async () => {
     if (!confirmed) return;
 
-    const result = await apiFetch<CleanupResult>('/api/admin/maintenance/cleanup-orphaned', {
+    const result = await apiFetch<CleanupResult>('/user/admin/maintenance/cleanup-orphaned', {
       method: 'POST',
     });
 

@@ -1,6 +1,5 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
-import { UnauthorizedError, InternalServerError } from '@/error';
-import { INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@/constants';
+import { UnauthorizedError } from '@/error';
 
 class EmailValidationUtil {
   public static async getAuthenticatedUserEmail(
@@ -8,16 +7,6 @@ class EmailValidationUtil {
     teamDomain?: string | undefined,
     policyAud?: string | undefined,
   ): Promise<string> {
-    // Check if this is an internal call
-    const url: URL = new URL(request.url);
-    if (url.hostname === SELF_WORKER_BASE_HOSTNAME) {
-      const internalEmail: string | null = request.headers.get(INTERNAL_USER_EMAIL_HEADER);
-      if (internalEmail) {
-        return internalEmail;
-      }
-      throw new InternalServerError('Internal call missing required user email header.');
-    }
-
     const token = request.headers.get('cf-access-jwt-assertion');
     if (!token) {
       throw new UnauthorizedError('No Cloudflare Access JWT token provided in request headers.');

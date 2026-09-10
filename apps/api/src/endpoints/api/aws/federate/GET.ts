@@ -176,6 +176,8 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
         },
       },
     },
+    // Registered on both surfaces: /user/aws/* (Cloudflare Access JWT)
+    // and /api/aws/* (Bearer PAT or HMAC-signed internal calls).
     security: [
       {
         CloudflareAccess: [],
