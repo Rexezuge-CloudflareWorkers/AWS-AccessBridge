@@ -12,16 +12,23 @@ function createExecutionContext(): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
-function createEnv(overrides: Partial<TestEnv> = {}): Env {
-  const mockDb = {
-    prepare: () => ({
-      bind: () => ({
-        run: async () => ({ success: true }),
-      }),
+function createRouteDb(): unknown {
+  const chain = {
+    bind: () => ({
+      run: async () => ({ success: true }),
+      first: async () => null,
+      all: async () => ({ results: [] }),
     }),
   };
   return {
-    AccessBridgeDB: mockDb,
+    withSession: () => createRouteDb(),
+    prepare: () => chain,
+  };
+}
+
+function createEnv(overrides: Partial<TestEnv> = {}): Env {
+  return {
+    AccessBridgeDB: createRouteDb(),
     ...overrides,
   } as unknown as Env;
 }
@@ -73,6 +80,43 @@ describe('AccessBridgeWorker', () => {
 
       expect(response.status).toBe(401);
       expect(response.headers.get('content-type')).toContain('application/json');
+    });
+  });
+
+  describe('user/api split', () => {
+    it('GET /user/me without auth returns 401 JSON, never SPA HTML', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/user/me'),
+        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      await expect(response.json()).resolves.toEqual({
+        Exception: {
+          Type: 'Unauthorized',
+          Message: 'No Cloudflare Access JWT token provided in request headers.',
+        },
+      });
+    });
+
+    it('GET /user/me in demo mode returns JSON user info (route wins over SPA catch-all)', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/user/me'),
+        createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      const body = (await response.json()) as { email: string; isSuperAdmin: boolean; demoMode: boolean };
+      expect(body.demoMode).toBe(true);
+      expect(typeof body.email).toBe('string');
     });
   });
 });
