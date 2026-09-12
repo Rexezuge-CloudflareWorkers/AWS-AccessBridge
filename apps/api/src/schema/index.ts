@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BadRequestError } from '@/error';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { RequestInputSchemas } from './input';
 import type { RequestInputSchema } from './input';
 

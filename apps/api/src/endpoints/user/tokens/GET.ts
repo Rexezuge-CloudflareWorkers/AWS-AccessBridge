@@ -1,7 +1,7 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@/dao';
-import type { UserAccessTokenMetadata } from '@/model';
+import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
+import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model';
 
 class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensResponse, ListTokensEnv> {
   schema = {
@@ -39,15 +39,15 @@ class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensRes
                     {
                       tokenId: 'tok_abc123def456',
                       name: 'CI/CD Pipeline',
-                      createdAt: 1704067200,
-                      expiresAt: 1711929600,
-                      lastUsedAt: 1704153600,
+                      createdAt: 1_704_067_200,
+                      expiresAt: 1_711_929_600,
+                      lastUsedAt: 1_704_153_600,
                     },
                     {
                       tokenId: 'tok_xyz789ghi012',
                       name: 'CLI Access',
-                      createdAt: 1704153600,
-                      expiresAt: 1735689600,
+                      createdAt: 1_704_153_600,
+                      expiresAt: 1_735_689_600,
                       lastUsedAt: 0,
                     },
                   ],

@@ -1,1 +1,1 @@
-export * from '@aws-access-bridge/shared/src/schema/output';
+export * from '@aws-access-bridge/shared/schema/output';

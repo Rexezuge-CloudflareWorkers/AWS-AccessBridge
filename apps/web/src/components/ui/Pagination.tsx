@@ -19,15 +19,17 @@ interface PaginationProps {
   variant?: 'full' | 'compact';
 }
 
-export default function Pagination({ currentPage, totalPages, onPageChange, variant = 'full' }: PaginationProps) {
-  if (totalPages <= 1) return null;
-
-  const btn = (disabled: boolean): React.CSSProperties => ({
+function btn(disabled: boolean): React.CSSProperties {
+  return {
     ...paginationBtnStyle,
     background: '#1e2433',
     opacity: disabled ? 0.4 : 1,
     cursor: disabled ? 'default' : 'pointer',
-  });
+  };
+}
+
+export default function Pagination({ currentPage, totalPages, onPageChange, variant = 'full' }: PaginationProps) {
+  if (totalPages <= 1) return null;
 
   if (variant === 'compact') {
     return (
@@ -61,7 +63,13 @@ export default function Pagination({ currentPage, totalPages, onPageChange, vari
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
         className="text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ padding: '6px 10px', background: '#252d3d', borderRadius: '6px', border: 'none', cursor: currentPage === 1 ? 'default' : 'pointer' }}
+        style={{
+          padding: '6px 10px',
+          background: '#252d3d',
+          borderRadius: '6px',
+          border: 'none',
+          cursor: currentPage === 1 ? 'default' : 'pointer',
+        }}
       >
         Prev
       </button>

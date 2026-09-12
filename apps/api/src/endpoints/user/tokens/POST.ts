@@ -1,10 +1,10 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@/dao';
-import { BadRequestError } from '@/error';
-import { UserAccessTokenMetadata } from '@/model';
-import { DEFAULT_MAX_TOKEN_EXPIRY_DAYS, DEFAULT_MAX_TOKENS_PER_USER } from '@/constants';
-import { TimestampUtil, UUIDUtil } from '@/utils';
+import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model';
+import { DEFAULT_MAX_TOKEN_EXPIRY_DAYS, DEFAULT_MAX_TOKENS_PER_USER } from '@aws-access-bridge/backend-runtime/config';
+import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
 
 class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateTokenResponse, CreateTokenEnv> {
   schema = {
@@ -102,8 +102,8 @@ interface CreateTokenResponse extends IResponse {
 }
 
 interface CreateTokenEnv extends IEnv {
-  MAX_TOKENS_PER_USER?: string | undefined;
-  MAX_TOKEN_EXPIRY_DAYS?: string | undefined;
+  MAX_TOKENS_PER_USER?: string;
+  MAX_TOKEN_EXPIRY_DAYS?: string;
 }
 
 export { CreateTokenRoute };

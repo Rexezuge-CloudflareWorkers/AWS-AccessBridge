@@ -21,7 +21,7 @@ export const proxyToApi: PagesFunction<PagesProxyEnv> = async ({ request, env })
     headers.set(FORWARDED_FOR_HEADER, clientIp);
   }
 
-  const proxyRequest: Request = new Request(originalUrl.toString(), {
+  const proxyRequest: Request = new Request(originalUrl.href, {
     method: request.method,
     headers,
     body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,

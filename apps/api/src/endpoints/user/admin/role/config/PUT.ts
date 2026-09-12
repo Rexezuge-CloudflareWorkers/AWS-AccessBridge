@@ -1,5 +1,5 @@
-import { RoleConfigsDAO, AwsAccountsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { RoleConfigsDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -49,7 +49,7 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
                   'Optional target role session duration in seconds. AWS supports 900 through 43200 seconds; chained role sessions are capped at 3600 seconds.',
                 example: 3600,
                 minimum: 900,
-                maximum: 43200,
+                maximum: 43_200,
               },
             },
           },
@@ -62,7 +62,7 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
                 roleName: 'DeveloperRole',
                 destinationPath: '/ec2/home',
                 destinationRegion: 'us-west-2',
-                roleSessionDurationSeconds: 14400,
+                roleSessionDurationSeconds: 14_400,
               },
             },
             's3-console-config': {

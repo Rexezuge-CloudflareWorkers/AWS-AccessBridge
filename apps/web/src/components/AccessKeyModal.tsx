@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
 import { exportEnv } from '@aws-access-bridge/shared';
@@ -73,6 +74,7 @@ const modalStyles = {
 };
 
 export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionToken, expiration, onClose }: Props) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async (text: string) => {
@@ -89,8 +91,8 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    globalThis.addEventListener('keydown', handleEsc);
+    return () => globalThis.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
   if (typeof document === 'undefined') return null;
@@ -105,13 +107,13 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
     >
       <div className="animate-fade-in" style={modalStyles.card}>
         <h2 className="font-bold" style={modalStyles.title}>
-          Access Keys
+          {t('modal.accessKeysTitle', 'Access Keys')}
         </h2>
         <pre className="text-sm font-mono" style={{ ...modalStyles.preBlock, whiteSpace: 'pre-wrap' }}>
           export AWS_ACCESS_KEY_ID="{accessKeyId}"<br />
           export AWS_SECRET_ACCESS_KEY="{secretAccessKey}"<br />
           export AWS_SESSION_TOKEN="{sessionToken}"<br />
-          <span style={{ color: '#6b7280' }}># Expiration: {expiration}</span>
+          <span style={{ color: '#6b7280' }}># {t('modal.expiresLabel', 'Expires: {{expiration}}', { expiration })}</span>
         </pre>
         <div style={modalStyles.btnRow}>
           <button
@@ -121,7 +123,7 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
             onMouseLeave={(e) => (e.currentTarget.style.background = copied ? '#16a34a' : '#2563eb')}
             onClick={() => copyToClipboard(exportEnv(accessKeyId, secretAccessKey, sessionToken))}
           >
-            {copied ? 'Copied!' : 'Copy All'}
+            {copied ? t('modal.copied', 'Copied!') : t('modal.copyAll', 'Copy All')}
           </button>
           <button
             className="font-medium"
@@ -130,7 +132,7 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
             onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
             onClick={onClose}
           >
-            Close
+            {t('common.close', 'Close')}
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserMetadataDAO } from '@/dao/UserMetadataDAO';
-import { DatabaseError } from '@/error';
+import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 
 describe('UserMetadataDAO', () => {
   let mockDb: D1Database;
@@ -92,6 +92,32 @@ describe('UserMetadataDAO', () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'update failed' } as unknown as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await expect(dao.getOrCreateFederationUsername('user@example.com')).rejects.toThrow(DatabaseError);
+    });
+  });
+
+  describe('preferredLanguage', () => {
+    it('returns the stored language', async () => {
+      vi.mocked(mockStmt.first).mockResolvedValue({ preferred_language: 'de' });
+      const dao = new UserMetadataDAO(mockDb);
+      await expect(dao.getPreferredLanguage('user@example.com')).resolves.toBe('de');
+    });
+
+    it('returns null when unset', async () => {
+      vi.mocked(mockStmt.first).mockResolvedValue(null);
+      const dao = new UserMetadataDAO(mockDb);
+      await expect(dao.getPreferredLanguage('user@example.com')).resolves.toBeNull();
+    });
+
+    it('updates the stored language', async () => {
+      const dao = new UserMetadataDAO(mockDb);
+      await dao.updatePreferredLanguage('user@example.com', 'ja');
+      expect(mockStmt.bind).toHaveBeenCalledWith('ja', 'user@example.com');
+    });
+
+    it('throws DatabaseError when update fails', async () => {
+      vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'update failed' } as unknown as D1Result);
+      const dao = new UserMetadataDAO(mockDb);
+      await expect(dao.updatePreferredLanguage('user@example.com', 'ja')).rejects.toThrow(DatabaseError);
     });
   });
 });

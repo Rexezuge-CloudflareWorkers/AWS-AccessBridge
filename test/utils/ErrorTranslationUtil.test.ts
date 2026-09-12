@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ErrorTranslationUtil } from '@/utils/ErrorTranslationUtil';
-import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError } from '@/error';
-import { HTTPException } from '@/utils';
+import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
+import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { HTTPException } from 'hono/http-exception';
 
 describe('ErrorTranslationUtil', () => {
   describe('toHTTPException', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateHMACSignature, verifyHMACSignature, hashBody } from '@/crypto/hmac';
+import { generateHMACSignature, verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
 
 describe('HMAC Crypto', () => {
   const secret = 'test-hmac-secret-key';

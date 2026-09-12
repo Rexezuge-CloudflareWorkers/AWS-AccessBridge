@@ -33,10 +33,18 @@ function splitSql(sql: string): string[] {
   return statements;
 }
 
+function isCommentOnly(statement: string): boolean {
+  const codeLines: string[] = statement
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('--'));
+  return codeLines.length === 0;
+}
+
 export async function applyMigrations(db: D1Database): Promise<void> {
   const statements = splitSql(__INTEGRATION_MIGRATION_SQL__);
   for (const stmt of statements) {
-    if (stmt.length === 0) continue;
+    if (stmt.length === 0 || isCommentOnly(stmt)) continue;
     await db.prepare(stmt).run();
   }
 }

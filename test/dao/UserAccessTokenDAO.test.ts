@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserAccessTokenDAO } from '@/dao/UserAccessTokenDAO';
-import { DatabaseError } from '@/error';
+import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 
 describe('UserAccessTokenDAO', () => {
   let mockDb: D1Database;

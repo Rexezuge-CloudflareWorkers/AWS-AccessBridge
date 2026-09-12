@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserFavoriteAccountsDAO } from '@/dao/UserFavoriteAccountsDAO';
-import { DatabaseError } from '@/error';
+import { UserFavoriteAccountsDAO } from '@aws-access-bridge/backend-data/dao/UserFavoriteAccountsDAO';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 
 describe('UserFavoriteAccountsDAO', () => {
   let mockDb: D1Database;

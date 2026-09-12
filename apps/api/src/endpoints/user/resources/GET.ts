@@ -1,7 +1,7 @@
-import { AssumableRolesDAO, ResourceInventoryDAO } from '@/dao';
+import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { ResourceInventoryItem } from '@/model';
+import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 
 class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListResourcesResponse, IEnv> {
   schema = {
@@ -22,7 +22,7 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
         in: 'query' as const,
         required: false,
         description: 'Filter by AWS Account ID (must be an account the user has access to)',
-        schema: { type: 'string' as const, pattern: '^\\d{12}$', example: '123456789012' },
+        schema: { type: 'string' as const, pattern: String.raw`^\d{12}$`, example: '123456789012' },
       },
       {
         name: 'search',
@@ -88,7 +88,7 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
                       awsAccountId: '123456789012',
                       region: 'us-east-1',
                       metadata: { instanceType: 't3.medium', state: 'running' },
-                      collectedAt: 1704067200,
+                      collectedAt: 1_704_067_200,
                     },
                   ],
                   total: 12,
@@ -166,12 +166,10 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
       Math.max(parseInt(url.searchParams.get('offset') || '0'), 0),
     );
     const rolesByAccountEntries: Array<[string, string[]]> = await Promise.all(
-      accountIds.map(
-        async (accountId): Promise<[string, string[]]> => [
-          accountId,
-          await assumableRolesDAO.getRolesByUserAndAccount(userEmail, accountId),
-        ],
-      ),
+      accountIds.map(async (accountId): Promise<[string, string[]]> => [
+        accountId,
+        await assumableRolesDAO.getRolesByUserAndAccount(userEmail, accountId),
+      ]),
     );
 
     return { items, total, rolesByAccount: Object.fromEntries(rolesByAccountEntries) };

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CredentialsDAO } from '@/dao/CredentialsDAO';
-import { DatabaseError, InternalServerError, UnauthorizedError } from '@/error';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
+import { DatabaseError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 describe('CredentialsDAO', () => {
   let mockDb: D1Database;

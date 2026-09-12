@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CredentialCacheConfigDAO } from '@/dao/CredentialCacheConfigDAO';
-import { DatabaseError } from '@/error';
+import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 
 describe('CredentialCacheConfigDAO', () => {
   let mockDb: D1Database;

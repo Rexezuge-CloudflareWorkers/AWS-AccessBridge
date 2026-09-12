@@ -1,8 +1,8 @@
-import { CredentialsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@/constants';
+import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class StoreCredentialRoute extends IAdminActivityAPIRoute<StoreCredentialRequest, StoreCredentialResponse, StoreCredentialEnv> {
   schema = {
@@ -51,6 +51,7 @@ class StoreCredentialRoute extends IAdminActivityAPIRoute<StoreCredentialRequest
                 principalArn: 'arn:aws:iam::123456789012:role/MyRole',
                 accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
               },
             },
@@ -192,7 +193,7 @@ interface StoreCredentialRequest extends IRequest {
   principalArn: string;
   accessKeyId: string;
   secretAccessKey: string;
-  sessionToken?: string | undefined;
+  sessionToken?: string;
 }
 
 interface StoreCredentialResponse extends IResponse {
@@ -201,7 +202,7 @@ interface StoreCredentialResponse extends IResponse {
 }
 
 interface StoreCredentialEnv extends IAdminEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }
 

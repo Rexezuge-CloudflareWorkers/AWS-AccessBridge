@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Badge background -->
+  <rect x="1.5" y="1.5" width="29" height="29" rx="7" fill="#0f1b2d" stroke="#ff9900" stroke-width="1.5"/>
+  <!-- Bridge deck -->
+  <path d="M6 17h20" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/>
+  <!-- Bridge arch -->
+  <path d="M8 17c2.5-6 5.5-9 8-9s5.5 3 8 9" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/>
+  <!-- Arch suspenders -->
+  <path d="M12.5 13.5v3.5M16 12v5M19.5 13.5v3.5" stroke="#ff9900" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Pillars -->
+  <path d="M8 17v5M24 17v5" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/>
+  <!-- Water waves -->
+  <path d="M8 25.5c1.5-1.2 3-1.2 4.5 0s3 1.2 4.5 0 3-1.2 4.5 0 2 1 2.5.7" stroke="#6ea8fe" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

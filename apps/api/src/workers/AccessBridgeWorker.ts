@@ -1,4 +1,4 @@
-import { AbstractEntrypointWorker } from '@/base';
+import { AbstractEntrypointWorker } from '@aws-access-bridge/backend-runtime/base';
 import { fromHono, HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
 import {
@@ -11,6 +11,7 @@ import {
   ListAssumablesRoute,
   SearchAccountsRoute,
   GetCurrentUserRoute,
+  UpdateCurrentUserRoute,
   GrantAccessRoute,
   RevokeAccessRoute,
   SetAccountNicknameRoute,
@@ -49,10 +50,12 @@ import {
   RemoveTeamAccountRoute,
   ListTeamAccountsRoute,
   CleanupOrphanedDataRoute,
+  ListTaskRunsRoute,
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { DEFAULT_SERVE_SPA_FROM_WORKER, DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@/constants';
+import { DEFAULT_SERVE_SPA_FROM_WORKER } from '@aws-access-bridge/backend-runtime/config';
+import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -93,18 +96,18 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     // SPA catch-all: serve embedded index.html for frontend page routes only.
     // API surfaces (/user/* JSON, /api/* JSON) must never fall through to HTML.
     app.get('*', (c) => {
-      const env = c.env as Env & { SERVE_SPA_FROM_WORKER?: string | undefined };
+      const env = c.env as Env & { SERVE_SPA_FROM_WORKER?: string };
       const serveSpaFromWorker: boolean = (env.SERVE_SPA_FROM_WORKER || DEFAULT_SERVE_SPA_FROM_WORKER) === 'true';
       if (!serveSpaFromWorker) {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
       if (
+        path === '/docs' ||
+        path === '/redocs' ||
         path.startsWith('/user/') ||
         path.startsWith('/api/') ||
         path.startsWith('/openapi.') ||
-        path === '/docs' ||
-        path === '/redocs' ||
         /\.\w+$/.test(path)
       ) {
         return c.notFound();
@@ -125,6 +128,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     openapi.get('/user/assumables', ListAssumablesRoute);
     openapi.get('/user/assumables/search', SearchAccountsRoute);
     openapi.get('/user/me', GetCurrentUserRoute);
+    openapi.put('/user/me', UpdateCurrentUserRoute);
     openapi.post('/user/favorites', FavoriteAccountRoute);
     openapi.delete('/user/favorites', UnfavoriteAccountRoute);
     openapi.post('/user/assumable/hidden', HideRoleRoute);
@@ -176,6 +180,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
 
     // Maintenance operations
     openapi.post('/user/admin/maintenance/cleanup-orphaned', CleanupOrphanedDataRoute);
+    openapi.get('/user/admin/maintenance/task-runs', ListTaskRunsRoute);
   }
 
   private registerApiRoutes(openapi: AppRouter): void {
@@ -190,7 +195,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     return this.app.fetch(request, env, ctx);
   }
 
-  protected async onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  protected onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const cronTasksId: DurableObjectId = env.CRON_TASKS.idFromName(DURABLE_OBJECT_NAMESPACE_GLOBAL);
     const cronTasksStub = env.CRON_TASKS.get(cronTasksId);
     const cronTasksRequest: Request = new Request(DURABLE_OBJECT_CRON_TASKS_RUN_URL, {
@@ -213,6 +218,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
           console.error('Failed to invoke CronTasksWorker:', err);
         }),
     );
+    return Promise.resolve();
   }
 }
 

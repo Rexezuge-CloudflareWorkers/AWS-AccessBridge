@@ -7,7 +7,7 @@ import {
   DatabaseError,
   DefaultInternalServerError,
   IServiceError,
-} from '@/error';
+} from '@aws-access-bridge/backend-errors';
 
 describe('Service Errors', () => {
   describe('BadRequestError', () => {

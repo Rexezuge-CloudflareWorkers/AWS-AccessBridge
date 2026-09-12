@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserMetadataDAO } from '@/dao';
+import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 
 class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCurrentUserResponse, GetCurrentUserEnv> {
   schema = {
@@ -33,6 +33,11 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
                   description: 'Whether the application is running in demo mode',
                   example: false,
                 },
+                preferredLanguage: {
+                  type: 'string' as const,
+                  description: 'Preferred SPA locale tag (e.g., en, de); null when unset',
+                  example: 'en',
+                },
               },
             },
             examples: {
@@ -42,6 +47,7 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
                   email: 'john.doe@company.com',
                   isSuperAdmin: false,
                   demoMode: false,
+                  preferredLanguage: 'en',
                 },
               },
               'admin-user': {
@@ -125,15 +131,17 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(env.AccessBridgeDB);
 
-    const [_, isSuperAdmin]: [void, boolean] = await Promise.all([
+    const [, isSuperAdmin, preferredLanguage]: [void, boolean, string | null] = await Promise.all([
       userMetadataDAO.ensureUserEmailExists(userEmail),
       userMetadataDAO.isSuperAdmin(userEmail),
+      userMetadataDAO.getPreferredLanguage(userEmail),
     ]);
 
     return {
       email: userEmail,
       isSuperAdmin,
       demoMode,
+      preferredLanguage,
     };
   }
 }
@@ -144,6 +152,7 @@ interface GetCurrentUserResponse extends IResponse {
   email: string;
   isSuperAdmin: boolean;
   demoMode: boolean;
+  preferredLanguage: string | null;
 }
 
 type GetCurrentUserEnv = IEnv;

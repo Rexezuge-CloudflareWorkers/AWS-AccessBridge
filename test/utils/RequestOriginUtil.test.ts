@@ -6,8 +6,8 @@ import {
   FORWARDED_FOR_HEADER,
   FORWARDED_HOST_HEADER,
   FORWARDED_PROTO_HEADER,
-} from '@/constants';
-import { RequestOriginUtil } from '@/utils/RequestOriginUtil';
+} from '@aws-access-bridge/shared/constants';
+import { RequestOriginUtil } from '@aws-access-bridge/shared/utils/RequestOriginUtil';
 
 function withCloudflareMetadata(request: Request): Request {
   Object.defineProperty(request, 'cf', {

@@ -1,7 +1,7 @@
-import { TeamsDAO } from '@/dao';
+import { TeamsDAO } from '@aws-access-bridge/backend-data/dao';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { Team } from '@/model';
+import type { Team } from '@aws-access-bridge/shared/model';
 
 class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse, IAdminEnv> {
   schema = {
@@ -39,13 +39,13 @@ class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse,
                       id: '00000000-0000-0000-0000-000000000000',
                       name: 'Default',
                       createdBy: 'system',
-                      createdAt: 1700000000,
+                      createdAt: 1_700_000_000,
                     },
                     {
                       id: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
                       name: 'Platform Engineering',
                       createdBy: 'admin@example.com',
-                      createdAt: 1704067200,
+                      createdAt: 1_704_067_200,
                     },
                   ],
                 },

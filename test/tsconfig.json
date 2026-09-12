@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "vite/client"],
+    "paths": {
+      "@/*": ["../apps/api/src/*"],
+      "@aws-access-bridge/background": ["../apps/background/src"],
+      "@aws-access-bridge/background/*": ["../apps/background/src/*"],
+      "@aws-access-bridge/backend-data": ["../packages/backend-data/src"],
+      "@aws-access-bridge/backend-data/*": ["../packages/backend-data/src/*"],
+      "@aws-access-bridge/backend-errors": ["../packages/backend-errors/src"],
+      "@aws-access-bridge/backend-errors/*": ["../packages/backend-errors/src/*"],
+      "@aws-access-bridge/backend-runtime": ["../packages/backend-runtime/src"],
+      "@aws-access-bridge/backend-runtime/*": ["../packages/backend-runtime/src/*"],
+      "@aws-access-bridge/backend-services": ["../packages/backend-services/src"],
+      "@aws-access-bridge/backend-services/*": ["../packages/backend-services/src/*"],
+      "@aws-access-bridge/shared": ["../packages/shared/src"],
+      "@aws-access-bridge/shared/*": ["../packages/shared/src/*"]
+    }
+  },
+  "include": ["**/*.ts", "../worker-configuration.d.ts", "../packages/backend-runtime/src/env.d.ts"]
+}

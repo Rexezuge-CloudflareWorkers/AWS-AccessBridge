@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BaseUrlUtil } from '@/utils/BaseUrlUtil';
-import { InternalServerError } from '@/error';
+import { BaseUrlUtil } from '@aws-access-bridge/backend-services/aws/BaseUrlUtil';
+import { InternalServerError } from '@aws-access-bridge/backend-errors';
 import {
   CF_CONNECTING_IP_HEADER,
   CF_RAY_HEADER,
@@ -9,7 +9,7 @@ import {
   FORWARDED_PROTO_HEADER,
   INTERNAL_BASE_URL_HEADER,
   SELF_WORKER_BASE_HOSTNAME,
-} from '@/constants';
+} from '@aws-access-bridge/shared/constants';
 
 function withCloudflareMetadata(request: Request): Request {
   Object.defineProperty(request, 'cf', {

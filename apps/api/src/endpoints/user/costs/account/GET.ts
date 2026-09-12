@@ -1,8 +1,8 @@
-import { AssumableRolesDAO, CostDataDAO } from '@/dao';
-import { BadRequestError, ForbiddenError } from '@/error';
+import { AssumableRolesDAO, CostDataDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { CostData } from '@/model';
+import type { CostData } from '@aws-access-bridge/shared/model';
 
 class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAccountCostResponse, GetAccountCostEnv> {
   schema = {
@@ -16,7 +16,7 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
         in: 'query' as const,
         required: true,
         description: 'AWS Account ID to retrieve cost data for (12 digits)',
-        schema: { type: 'string' as const, pattern: '^\\d{12}$', example: '123456789012' },
+        schema: { type: 'string' as const, pattern: String.raw`^\d{12}$`, example: '123456789012' },
       },
       {
         name: 'startDate',
@@ -79,17 +79,17 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
                       periodStart: '2024-01-15',
                       totalCost: 48.52,
                       currency: 'USD',
-                      serviceBreakdown: { 'Amazon EC2': 32.1, 'Amazon S3': 8.42, 'AWS Lambda': 8.0 },
+                      serviceBreakdown: { 'Amazon EC2': 32.1, 'Amazon S3': 8.42, 'AWS Lambda': 8 },
                     },
                     {
                       awsAccountId: '123456789012',
                       periodStart: '2024-01-16',
                       totalCost: 51.23,
                       currency: 'USD',
-                      serviceBreakdown: { 'Amazon EC2': 35.0, 'Amazon S3': 8.23, 'AWS Lambda': 8.0 },
+                      serviceBreakdown: { 'Amazon EC2': 35, 'Amazon S3': 8.23, 'AWS Lambda': 8 },
                     },
                   ],
-                  serviceBreakdown: { 'Amazon EC2': 67.1, 'Amazon S3': 16.65, 'AWS Lambda': 16.0 },
+                  serviceBreakdown: { 'Amazon EC2': 67.1, 'Amazon S3': 16.65, 'AWS Lambda': 16 },
                   total: 99.75,
                 },
               },
@@ -191,8 +191,8 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
     const roles: string[] = await assumableRolesDAO.getRolesByUserAndAccount(userEmail, awsAccountId);
     if (roles.length === 0) throw new ForbiddenError('You do not have access to this account.');
 
-    const endDate: string = url.searchParams.get('endDate') || new Date().toISOString().split('T')[0];
-    const startDate: string = url.searchParams.get('startDate') || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    const endDate: string = url.searchParams.get('endDate') || new Date().toISOString().split('T', 1)[0];
+    const startDate: string = url.searchParams.get('startDate') || new Date(Date.now() - 30 * 86_400_000).toISOString().split('T', 1)[0];
 
     const costDataDAO: CostDataDAO = new CostDataDAO(env.AccessBridgeDB);
     const costData: CostData[] = await costDataDAO.getCostDataByAccount(awsAccountId, startDate, endDate);

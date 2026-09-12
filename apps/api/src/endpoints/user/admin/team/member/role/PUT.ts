@@ -1,5 +1,5 @@
-import { TeamMembersDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 

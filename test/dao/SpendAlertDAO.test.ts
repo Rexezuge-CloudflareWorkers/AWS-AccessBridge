@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SpendAlertDAO } from '@/dao/SpendAlertDAO';
+import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao/SpendAlertDAO';
 
 describe('SpendAlertDAO', () => {
   let mockDb: D1Database;

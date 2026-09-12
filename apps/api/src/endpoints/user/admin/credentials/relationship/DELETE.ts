@@ -1,8 +1,8 @@
-import { CredentialsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@/constants';
+import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   RemoveCredentialRelationshipRequest,
@@ -199,7 +199,7 @@ class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     }
 
     // Basic ARN validation
-    const arnPattern = /^arn:aws:iam::[0-9]{12}:(role|user)\/.+$/;
+    const arnPattern = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
     if (!arnPattern.test(request.principalArn)) {
       throw new BadRequestError('Invalid principal ARN format.');
     }
@@ -227,7 +227,7 @@ interface RemoveCredentialRelationshipResponse extends IResponse {
 }
 
 interface RemoveCredentialRelationshipEnv extends IAdminEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }
 

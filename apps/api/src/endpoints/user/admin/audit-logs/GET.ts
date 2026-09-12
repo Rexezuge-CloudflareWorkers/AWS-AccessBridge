@@ -1,8 +1,8 @@
-import { AuditLogDAO } from '@/dao/AuditLogDAO';
-import type { AuditLogQueryFilters } from '@/dao/AuditLogDAO';
+import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
+import type { AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { AuditLog } from '@/model';
+import type { AuditLog } from '@aws-access-bridge/shared/model';
 
 class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, ListAuditLogsResponse, ListAuditLogsEnv> {
   schema = {
@@ -30,14 +30,14 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
         in: 'query' as const,
         required: false,
         description: 'Filter logs after this Unix timestamp (seconds)',
-        schema: { type: 'integer' as const, example: 1704067200 },
+        schema: { type: 'integer' as const, example: 1_704_067_200 },
       },
       {
         name: 'endTime',
         in: 'query' as const,
         required: false,
         description: 'Filter logs before this Unix timestamp (seconds)',
-        schema: { type: 'integer' as const, example: 1704153600 },
+        schema: { type: 'integer' as const, example: 1_704_153_600 },
       },
       {
         name: 'limit',
@@ -96,7 +96,7 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
                       statusCode: 200,
                       ipAddress: '203.0.113.1',
                       userAgent: 'Mozilla/5.0',
-                      timestamp: 1704067200,
+                      timestamp: 1_704_067_200,
                     },
                     {
                       id: 41,
@@ -107,7 +107,7 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
                       statusCode: 200,
                       ipAddress: '198.51.100.5',
                       userAgent: 'Mozilla/5.0',
-                      timestamp: 1704066000,
+                      timestamp: 1_704_066_000,
                     },
                   ],
                   total: 128,

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AccessBridgeWorker } from '@/workers/AccessBridgeWorker';
 
 type TestEnv = Env & {
-  SERVE_SPA_FROM_WORKER?: string | undefined;
+  SERVE_SPA_FROM_WORKER?: string;
 };
 
 function createExecutionContext(): ExecutionContext {

@@ -1,8 +1,8 @@
-import { TeamMembersDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { TeamMember } from '@/model';
+import type { TeamMember } from '@aws-access-bridge/shared/model';
 
 class ListTeamMembersRoute extends IAdminActivityAPIRoute<IRequest, ListTeamMembersResponse, IAdminEnv> {
   schema = {
@@ -49,13 +49,13 @@ class ListTeamMembersRoute extends IAdminActivityAPIRoute<IRequest, ListTeamMemb
                       teamId: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
                       userEmail: 'admin@example.com',
                       role: 'admin',
-                      addedAt: 1704067200,
+                      addedAt: 1_704_067_200,
                     },
                     {
                       teamId: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
                       userEmail: 'developer@example.com',
                       role: 'member',
-                      addedAt: 1704153600,
+                      addedAt: 1_704_153_600,
                     },
                   ],
                 },

@@ -1,5 +1,5 @@
-import { AwsAccountsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -165,7 +165,7 @@ class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
       throw new BadRequestError('Missing required fields.');
     }
 
-    if (!/^[0-9]{12}$/.test(request.awsAccountId)) {
+    if (!/^\d{12}$/.test(request.awsAccountId)) {
       throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
     }
 

@@ -1,4 +1,10 @@
-export { CredentialCacheRefreshTask } from './CredentialCacheRefreshTask';
+export { AbstractPruningTask, DEFAULT_PRUNE_BATCH_SIZE } from './AbstractPruningTask';
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
+export { BackgroundTaskRunPruningTask } from './BackgroundTaskRunPruningTask';
 export { CostDataCollectionTask } from './CostDataCollectionTask';
+export { CredentialCacheRefreshTask } from './CredentialCacheRefreshTask';
 export { ResourceInventoryCollectionTask } from './ResourceInventoryCollectionTask';
+export { IScheduledTask } from './IScheduledTask';
+export type { IEnv, TaskRunSummary } from './IScheduledTask';
+export { CRON_TASK_DEFINITIONS, tasksForPhase } from './TaskRegistry';
+export type { CronPhase, TaskDefinition } from './TaskRegistry';

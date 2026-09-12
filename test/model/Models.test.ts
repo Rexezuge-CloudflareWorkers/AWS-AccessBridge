@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { AccessableAccount, AccessableAccountInternal } from '@/model/AccessableAccount';
-import type { AccessKeys, AccessKeysWithExpiration } from '@/model/AccessKeys';
-import type { Credential, CredentialInternal } from '@/model/Credential';
-import type { CredentialCache } from '@/model/CredentialCache';
-import type { CredentialChain } from '@/model/CredentialChain';
-import type { UserAccessToken, UserAccessTokenMetadata } from '@/model/UserAccessToken';
-import type { UserMetadata, UserMetadataInternal } from '@/model/UserMetadata';
-import type { RoleConfig, RoleConfigInternal } from '@/model/RoleConfig';
-import type { AssumableAccount, AssumableAccountsMap } from '@/model/AssumableAccount';
+import type { AccessableAccount, AccessableAccountInternal } from '@aws-access-bridge/shared/model/AccessableAccount';
+import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model/AccessKeys';
+import type { Credential, CredentialInternal } from '@aws-access-bridge/shared/model/Credential';
+import type { CredentialCache } from '@aws-access-bridge/shared/model/CredentialCache';
+import type { CredentialChain } from '@aws-access-bridge/shared/model/CredentialChain';
+import type { UserAccessToken, UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
+import type { UserMetadata, UserMetadataInternal } from '@aws-access-bridge/shared/model/UserMetadata';
+import type { RoleConfig, RoleConfigInternal } from '@aws-access-bridge/shared/model/RoleConfig';
+import type { AssumableAccount, AssumableAccountsMap } from '@aws-access-bridge/shared/model/AssumableAccount';
 
 describe('Model Types', () => {
   describe('AccessableAccount', () => {

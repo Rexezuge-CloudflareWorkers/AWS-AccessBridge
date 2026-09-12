@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TeamAccountsDAO } from '@/dao/TeamAccountsDAO';
+import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao/TeamAccountsDAO';
 
 describe('TeamAccountsDAO', () => {
   let mockDb: D1Database;

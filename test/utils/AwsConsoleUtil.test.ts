@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AwsConsoleUtil } from '@/utils/AwsConsoleUtil';
+import { AwsConsoleUtil } from '@aws-access-bridge/backend-services/aws/AwsConsoleUtil';
 
 describe('AwsConsoleUtil', () => {
   describe('getLoginUrl', () => {

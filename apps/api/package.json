@@ -7,8 +7,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-access-bridge/backend-core": "workspace:*",
     "@aws-access-bridge/background": "workspace:*",
+    "@aws-access-bridge/backend-data": "workspace:*",
+    "@aws-access-bridge/backend-errors": "workspace:*",
+    "@aws-access-bridge/backend-runtime": "workspace:*",
+    "@aws-access-bridge/backend-services": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
     "@opennextjs/cloudflare": "^1.20.4",
     "aws4fetch": "^1.0.20",

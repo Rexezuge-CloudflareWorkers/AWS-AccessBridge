@@ -1,60 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
+import { isUnauthorized } from '../lib/api';
+import { listResources, loadSummary, getConsoleDestination } from '../services/resourceService';
+import type { ConsoleDestination, ResourceItem, ResourceSummary } from '../services/resourceService';
 
-interface ResourceItem {
-  awsAccountId: string;
-  region: string;
-  resourceType: string;
-  resourceId: string;
-  resourceName: string;
-  state: string;
-  metadata: Record<string, string>;
+function stateColor(state: string): string {
+  if (['running', 'active', 'Active', 'available'].includes(state)) return '#4ade80';
+  if (['stopped', 'inactive'].includes(state)) return '#f87171';
+  return '#facc15';
 }
 
-interface ResourceSummary {
-  totalResources: number;
-  byType: Record<string, number>;
-  byAccount: Record<string, Record<string, number>>;
-}
-
-interface ConsoleDestination {
-  path: string;
-  region?: string;
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  ec2: 'EC2 Instances',
-  s3: 'S3 Buckets',
-  lambda: 'Lambda Functions',
-  rds: 'RDS Databases',
-  dynamodb: 'DynamoDB Tables',
-};
-
-const getConsoleDestination = (resource: ResourceItem): ConsoleDestination | null => {
-  const region: string | undefined = resource.region && resource.region !== 'global' ? resource.region : undefined;
-  switch (resource.resourceType) {
-    case 'ec2':
-      return { path: `ec2/home#InstanceDetails:instanceId=${encodeURIComponent(resource.resourceId)}`, region };
-    case 's3':
-      return { path: `s3/buckets/${encodeURIComponent(resource.resourceName || resource.resourceId)}`, region };
-    case 'lambda':
-      return { path: `lambda/home#/functions/${encodeURIComponent(resource.resourceName || resource.resourceId)}`, region };
-    case 'rds':
-      return { path: `rds/home#database:id=${encodeURIComponent(resource.resourceId)};is-cluster=false`, region };
-    case 'dynamodb':
-      return {
-        path: `dynamodbv2/home#table?name=${encodeURIComponent(resource.resourceName || resource.resourceId.split(':').pop() || resource.resourceId)}`,
-        region,
-      };
-    default:
-      return null;
-  }
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  ec2: 'resources.typeEc2',
+  s3: 'resources.typeS3',
+  lambda: 'resources.typeLambda',
+  rds: 'resources.typeRds',
+  dynamodb: 'resources.typeDynamodb',
 };
 
 export default function ResourceInventory() {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<ResourceSummary | null>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -67,53 +36,41 @@ export default function ResourceInventory() {
   const pageSize = 25;
 
   useEffect(() => {
-    fetch('/user/resources/summary')
-      .then((r) => (r.ok ? r.json() : null))
+    loadSummary()
       .then((data) => {
-        if (data) setSummary(data as ResourceSummary);
-      });
+        if (data) setSummary(data);
+      })
+      .catch(() => undefined);
   }, []);
 
-  const fetchResources = useCallback(async () => {
-    setIsLoading(true);
-    const params = new URLSearchParams();
-    if (filterType) params.set('type', filterType);
-    if (searchQuery.trim()) params.set('search', searchQuery.trim());
-    params.set('limit', pageSize.toString());
-    params.set('offset', (page * pageSize).toString());
-
-    try {
-      const res = await fetch(`/user/resources?${params.toString()}`);
-      if (res.ok) {
-        const data = (await res.json()) as { items: ResourceItem[]; total: number; rolesByAccount: Record<string, string[]> };
+  useEffect(() => {
+    listResources({ filterType, searchQuery, pageSize, page })
+      .then((data) => {
         setResources(data.items);
         setTotal(data.total);
         setRolesByAccount(data.rolesByAccount || {});
         setSelectedRoles((previous) => {
           const next: Record<string, string> = { ...previous };
-          for (const [accountId, roles] of Object.entries(data.rolesByAccount || {})) {
-            if (roles.length > 0 && (!next[accountId] || !roles.includes(next[accountId]))) {
+          const byAccount = data.rolesByAccount || {};
+          for (const [accountId, roles] of Object.entries(byAccount)) {
+            if (roles.length > 0 && (next[accountId] === undefined || !roles.includes(next[accountId]))) {
               next[accountId] = roles[0];
             }
           }
           return next;
         });
-      }
-    } finally {
-      setIsLoading(false);
-    }
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (isUnauthorized(err)) {
+          globalThis.location.reload();
+          return;
+        }
+        setIsLoading(false);
+      });
   }, [filterType, searchQuery, page]);
 
-  useEffect(() => {
-    fetchResources();
-  }, [fetchResources]);
-
   const totalPages = Math.ceil(total / pageSize);
-  const stateColor = (state: string): string => {
-    if (['running', 'active', 'Active', 'available'].includes(state)) return '#4ade80';
-    if (['stopped', 'inactive'].includes(state)) return '#f87171';
-    return '#facc15';
-  };
 
   const handleOpenResource = (resource: ResourceItem) => {
     const role: string | undefined = selectedRoles[resource.awsAccountId] || rolesByAccount[resource.awsAccountId]?.[0];
@@ -154,7 +111,7 @@ export default function ResourceInventory() {
               {summary.totalResources}
             </p>
             <p className="text-xs" style={{ color: '#9ca3af', marginTop: '4px' }}>
-              Total
+              {t('resources.total', 'Total')}
             </p>
           </div>
           {Object.entries(summary.byType).map(([type, count]) => (
@@ -171,7 +128,7 @@ export default function ResourceInventory() {
                 {count}
               </p>
               <p className="text-xs" style={{ color: '#9ca3af', marginTop: '4px' }}>
-                {TYPE_LABELS[type] || type}
+                {t(TYPE_LABEL_KEYS[type] ?? 'resources.typeLabel', type)}
               </p>
             </div>
           ))}
@@ -192,7 +149,7 @@ export default function ResourceInventory() {
       >
         <div>
           <label className="text-xs font-medium" style={{ display: 'block', color: '#9ca3af', marginBottom: '6px' }}>
-            Type
+            {t('resources.typeLabel', 'Type')}
           </label>
           <select
             value={filterType}
@@ -210,7 +167,7 @@ export default function ResourceInventory() {
               outline: 'none',
             }}
           >
-            <option value="">All Types</option>
+            <option value="">{t('resources.allTypes', 'All Types')}</option>
             <option value="ec2">EC2</option>
             <option value="s3">S3</option>
             <option value="lambda">Lambda</option>
@@ -220,7 +177,7 @@ export default function ResourceInventory() {
         </div>
         <div style={{ flex: 1, minWidth: '200px' }}>
           <label className="text-xs font-medium" style={{ display: 'block', color: '#9ca3af', marginBottom: '6px' }}>
-            Search
+            {t('resources.searchLabel', 'Search')}
           </label>
           <input
             type="text"
@@ -229,7 +186,7 @@ export default function ResourceInventory() {
               setSearchQuery(e.target.value);
               setPage(0);
             }}
-            placeholder="Search by name or ID"
+            placeholder={t('resources.searchPlaceholder', 'Search by name or ID')}
             className="text-sm"
             style={{
               width: '100%',
@@ -244,7 +201,7 @@ export default function ResourceInventory() {
           />
         </div>
         <span className="text-sm" style={{ color: '#6b7280', paddingBottom: '2px' }}>
-          {total} results
+          {t('resources.resultsCount', '{{total}} results', { total })}
         </span>
       </div>
 
@@ -274,10 +231,10 @@ export default function ResourceInventory() {
             />
           </svg>
           <p className="text-lg" style={{ color: '#d1d5db', marginBottom: '8px' }}>
-            No resources found.
+            {t('resources.emptyTitle', 'No resources found.')}
           </p>
           <p className="text-sm" style={{ color: '#6b7280' }}>
-            Enable resource collection for your accounts in the Admin panel.
+            {t('resources.emptyHint', 'Enable resource collection for your accounts in the Admin panel.')}
           </p>
         </div>
       ) : (
@@ -295,37 +252,37 @@ export default function ResourceInventory() {
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  Type
+                  {t('resources.typeHeader', 'Type')}
                 </th>
                 <th
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  Name
+                  {t('resources.nameHeader', 'Name')}
                 </th>
                 <th
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  Account
+                  {t('resources.accountHeader', 'Account')}
                 </th>
                 <th
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  Region
+                  {t('resources.regionHeader', 'Region')}
                 </th>
                 <th
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  State
+                  {t('resources.stateHeader', 'State')}
                 </th>
                 <th
                   className="text-xs uppercase tracking-wider font-medium"
                   style={{ textAlign: 'left', padding: '12px', color: '#9ca3af', background: '#252d3d' }}
                 >
-                  Open
+                  {t('resources.openHeader', 'Open')}
                 </th>
               </tr>
             </thead>
@@ -364,7 +321,7 @@ export default function ResourceInventory() {
                           disabled={accountRoles.length === 0}
                           onChange={(e) => setSelectedRoles((previous) => ({ ...previous, [r.awsAccountId]: e.target.value }))}
                           className="text-xs"
-                          aria-label={`Role for ${r.resourceName || r.resourceId}`}
+                          aria-label={t('resources.roleForResource', 'Role for {{name}}', { name: r.resourceName || r.resourceId })}
                           style={{
                             maxWidth: '150px',
                             padding: '7px 8px',
@@ -377,7 +334,7 @@ export default function ResourceInventory() {
                           }}
                         >
                           {accountRoles.length === 0 ? (
-                            <option value="">No role</option>
+                            <option value="">{t('resources.noRole', 'No role')}</option>
                           ) : (
                             accountRoles.map((role) => (
                               <option key={role} value={role}>
@@ -391,7 +348,11 @@ export default function ResourceInventory() {
                           onClick={() => handleOpenResource(r)}
                           disabled={!canOpen}
                           className="text-xs font-medium"
-                          title={canOpen ? 'Open resource in AWS Console' : 'No console destination available'}
+                          title={
+                            canOpen
+                              ? t('resources.openConsole', 'Open in AWS Console')
+                              : t('resources.selectRoleFirst', 'Select a role first')
+                          }
                           style={{
                             padding: '8px 12px',
                             background: canOpen ? '#2563eb' : '#374151',

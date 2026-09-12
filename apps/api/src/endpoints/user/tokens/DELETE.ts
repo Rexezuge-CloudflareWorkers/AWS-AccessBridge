@@ -1,7 +1,7 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 
 class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteTokenResponse, DeleteTokenEnv> {
   schema = {

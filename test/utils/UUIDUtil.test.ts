@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UUIDUtil } from '@/utils/UUIDUtil';
+import { UUIDUtil } from '@aws-access-bridge/shared/utils/UUIDUtil';
 
 describe('UUIDUtil', () => {
   describe('getRandomUUID', () => {

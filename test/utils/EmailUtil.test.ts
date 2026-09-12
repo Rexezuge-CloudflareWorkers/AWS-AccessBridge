@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EmailUtil } from '@/utils/EmailUtil';
+import { EmailUtil } from '@aws-access-bridge/shared/utils/EmailUtil';
 
 describe('EmailUtil', () => {
   describe('extractUsername', () => {

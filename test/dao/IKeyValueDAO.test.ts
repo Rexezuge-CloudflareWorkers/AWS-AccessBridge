@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { KV_NAMESPACE_DELIMITER } from '@/constants';
+import { KV_NAMESPACE_DELIMITER } from '@aws-access-bridge/backend-data/constants/kv';
 
 // We test the protected methods via a concrete subclass
 class TestKeyValueDAO {

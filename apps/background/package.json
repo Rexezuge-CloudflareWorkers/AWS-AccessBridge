@@ -14,7 +14,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-access-bridge/backend-core": "workspace:*"
+    "@aws-access-bridge/backend-data": "workspace:*",
+    "@aws-access-bridge/backend-errors": "workspace:*",
+    "@aws-access-bridge/backend-runtime": "workspace:*",
+    "@aws-access-bridge/backend-services": "workspace:*",
+    "@aws-access-bridge/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

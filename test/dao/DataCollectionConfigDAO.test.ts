@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DataCollectionConfigDAO } from '@/dao/DataCollectionConfigDAO';
+import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
 
 describe('DataCollectionConfigDAO', () => {
   let mockDb: D1Database;
