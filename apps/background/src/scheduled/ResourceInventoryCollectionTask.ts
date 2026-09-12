@@ -1,13 +1,13 @@
-import { CredentialsDAO, DataCollectionConfigDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
-import { AssumeRoleUtil, AwsApiUtil, ArnUtil } from '@aws-access-bridge/backend-services/aws';
+import { DataCollectionConfigDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
+import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
+import { CollectorRegistry, type ResourceDiscoveryItem } from '@aws-access-bridge/backend-services/aws/collectors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
-import type { CredentialChain, AccessKeys, AccessKeysWithExpiration, ResourceInventoryItem } from '@aws-access-bridge/shared/model';
-import type { ResourceDiscoveryItem } from '@aws-access-bridge/backend-services/aws/AwsApiUtil';
+import type { AccessKeys, ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
-const RESOURCE_COLLECTION_INTERVAL_HOURS: number = 2;
 const MAX_ACCOUNTS_PER_COLLECTION: number = 2;
 
 class ResourceInventoryCollectionTask extends IScheduledTask<ResourceInventoryCollectionTaskEnv> {
@@ -20,7 +20,8 @@ class ResourceInventoryCollectionTask extends IScheduledTask<ResourceInventoryCo
     env: ResourceInventoryCollectionTaskEnv,
     _ctx: ExecutionContext,
   ): Promise<TaskRunSummary> {
-    const cutoffTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds() - RESOURCE_COLLECTION_INTERVAL_HOURS * 3600;
+    const intervalHours: number = ConfigurationManager.resource.getCollectionIntervalHours(env);
+    const cutoffTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds() - intervalHours * 3600;
     const dataCollectionConfigDAO: DataCollectionConfigDAO = new DataCollectionConfigDAO(env.AccessBridgeDB);
     const principalArns: string[] = await dataCollectionConfigDAO.getPrincipalArnsNeedingCollection(
       'resource',
@@ -30,57 +31,30 @@ class ResourceInventoryCollectionTask extends IScheduledTask<ResourceInventoryCo
 
     if (principalArns.length === 0) return { itemsProcessed: 0, itemsFailed: 0, summary: 'No accounts due for collection' };
 
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
+    const credentialService = CredentialServiceFactory.create(env);
+    const collectors = CollectorRegistry.getAll();
     const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
 
     let collectedCount: number = 0;
     let failedCount: number = 0;
     for (const principalArn of principalArns) {
       try {
-        const credentialChain: CredentialChain = await credentialsDAO.getCredentialChainByPrincipalArn(principalArn);
-        let credential: AccessKeys = {
-          accessKeyId: credentialChain.accessKeyId,
-          secretAccessKey: credentialChain.secretAccessKey,
-          sessionToken: credentialChain.sessionToken,
-        };
-
-        for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
-          const roleArn: string = credentialChain.principalArns[i];
-          const assumed: AccessKeysWithExpiration = await AssumeRoleUtil.assumeRole(roleArn, credential, 'AccessBridge-ResourceCollection');
-          credential = assumed;
-        }
+        const { credentials }: { credentials: AccessKeys } = await credentialService.resolveLeafCredentials(
+          principalArn,
+          'AccessBridge-ResourceCollection',
+        );
 
         const accountId: string = ArnUtil.getAccountIdFromArn(principalArn);
         const collectedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
 
-        // Collect from multiple services
+        // Collect from every registered collector; one provider failing must not fail the account.
         const allItems: ResourceDiscoveryItem[] = [];
-        try {
-          allItems.push(...(await AwsApiUtil.describeInstances(credential)));
-        } catch (e) {
-          console.warn('EC2 collection failed:', e);
-        }
-        try {
-          allItems.push(...(await AwsApiUtil.listBuckets(credential)));
-        } catch (e) {
-          console.warn('S3 collection failed:', e);
-        }
-        try {
-          allItems.push(...(await AwsApiUtil.listFunctions(credential)));
-        } catch (e) {
-          console.warn('Lambda collection failed:', e);
-        }
-        try {
-          allItems.push(...(await AwsApiUtil.describeDBInstances(credential)));
-        } catch (e) {
-          console.warn('RDS collection failed:', e);
-        }
-        try {
-          allItems.push(...(await AwsApiUtil.listTables(credential)));
-        } catch (e) {
-          console.warn('DynamoDB collection failed:', e);
+        for (const collector of collectors.values()) {
+          try {
+            allItems.push(...(await collector.collect(credentials)));
+          } catch (e) {
+            console.warn(`${collector.resourceType} collection failed:`, e);
+          }
         }
 
         for (const item of allItems) {
@@ -98,8 +72,8 @@ class ResourceInventoryCollectionTask extends IScheduledTask<ResourceInventoryCo
         }
 
         // Clean stale resources
-        for (const type of ['ec2', 's3', 'lambda', 'rds', 'dynamodb']) {
-          await resourceDAO.deleteStaleResources(accountId, type, collectedAt);
+        for (const resourceType of collectors.keys()) {
+          await resourceDAO.deleteStaleResources(accountId, resourceType, collectedAt);
         }
 
         await dataCollectionConfigDAO.updateLastCollectedTime(principalArn, 'resource');
@@ -120,8 +94,10 @@ class ResourceInventoryCollectionTask extends IScheduledTask<ResourceInventoryCo
 
 interface ResourceInventoryCollectionTaskEnv extends IEnv {
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
+  RESOURCE_COLLECTION_INTERVAL_HOURS?: string;
   AccessBridgeDB: D1Database;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  AccessBridgeKV: KVNamespace;
 }
 
 export { ResourceInventoryCollectionTask };

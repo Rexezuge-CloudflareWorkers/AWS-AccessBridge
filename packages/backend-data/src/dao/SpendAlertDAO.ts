@@ -1,13 +1,8 @@
 import type { SpendAlert, SpendAlertInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class SpendAlertDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class SpendAlertDAO extends BaseDAO {
   public async createAlert(awsAccountId: string, thresholdAmount: number, periodType: string, createdBy: string): Promise<SpendAlert> {
     const alertId: string = UUIDUtil.getRandomUUID();
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();

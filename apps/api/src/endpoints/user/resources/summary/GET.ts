@@ -1,4 +1,4 @@
-import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
+import { ResourceServiceFactory } from '@aws-access-bridge/backend-services/resource';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -100,22 +100,7 @@ class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryReques
     cxt: ActivityContext<IEnv>,
   ): Promise<GetResourceSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
-
-    const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
-    const counts: Record<string, Record<string, number>> = await resourceDAO.getResourceCounts(accountIds);
-
-    let totalResources: number = 0;
-    const byType: Record<string, number> = {};
-    for (const accountCounts of Object.values(counts)) {
-      for (const [type, count] of Object.entries(accountCounts)) {
-        byType[type] = (byType[type] || 0) + count;
-        totalResources += count;
-      }
-    }
-
-    return { totalResources, byType, byAccount: counts };
+    return ResourceServiceFactory.create(env).getSummary(userEmail);
   }
 }
 

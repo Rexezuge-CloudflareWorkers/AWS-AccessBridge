@@ -1,5 +1,4 @@
-import { RoleConfigsDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -259,15 +258,7 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
     env: SetRoleConfigEnv,
     _cxt: ActivityContext<SetRoleConfigEnv>,
   ): Promise<SetRoleConfigResponse> {
-    if (!request.awsAccountId || !request.roleName) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(env.AccessBridgeDB);
-    const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(env.AccessBridgeDB);
-
-    await accountsDAO.ensureAccountExists(request.awsAccountId);
-    await roleConfigsDAO.setRoleConfig(
+    await AccountServiceFactory.create(env).setRoleConfig(
       request.awsAccountId,
       request.roleName,
       request.destinationPath,

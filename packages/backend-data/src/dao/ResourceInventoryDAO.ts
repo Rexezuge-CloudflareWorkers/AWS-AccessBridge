@@ -1,12 +1,7 @@
 import type { ResourceInventoryItem, ResourceInventoryItemInternal } from '@aws-access-bridge/shared/model';
+import { BaseDAO } from './BaseDAO';
 
-class ResourceInventoryDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class ResourceInventoryDAO extends BaseDAO {
   public async upsertResource(item: ResourceInventoryItem): Promise<void> {
     await this.database
       .prepare(

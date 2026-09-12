@@ -1,12 +1,7 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { BaseDAO } from './BaseDAO';
 
-class UserFavoriteAccountsDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class UserFavoriteAccountsDAO extends BaseDAO {
   public async favoriteAccount(userEmail: string, awsAccountId: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare(

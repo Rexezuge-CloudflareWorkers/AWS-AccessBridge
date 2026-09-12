@@ -1,5 +1,4 @@
-import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -143,8 +142,7 @@ class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, 
   };
 
   protected async handleAdminRequest(request: AddTeamAccountRequest, env: IAdminEnv): Promise<AddTeamAccountResponse> {
-    if (!request.teamId || !request.awsAccountId) throw new BadRequestError('Missing required fields.');
-    await new TeamAccountsDAO(env.AccessBridgeDB).addAccountToTeam(request.teamId, request.awsAccountId);
+    await TeamServiceFactory.create(env).addAccount(request.teamId, request.awsAccountId);
     return { success: true, message: 'Account added to team.' };
   }
 }

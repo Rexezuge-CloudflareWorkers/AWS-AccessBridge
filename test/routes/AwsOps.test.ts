@@ -4,28 +4,24 @@ import { GenerateConsoleUrlRoute } from '@/endpoints/api/aws/console/POST';
 import { FederateRoute } from '@/endpoints/api/aws/federate/GET';
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
-import { EnhancedCredentialsDAO } from '@aws-access-bridge/backend-data/dao/EnhancedCredentialsDAO';
 import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
-import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws/AssumeRoleUtil';
-import { AwsConsoleUtil } from '@aws-access-bridge/backend-services/aws/AwsConsoleUtil';
+import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
+import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsCacheDAO');
+vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
-vi.mock('@aws-access-bridge/backend-data/dao/EnhancedCredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/RoleConfigsDAO');
-vi.mock('@aws-access-bridge/backend-services/aws/AssumeRoleUtil');
-vi.mock('@aws-access-bridge/backend-services/aws/AwsConsoleUtil', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@aws-access-bridge/backend-services/aws/AwsConsoleUtil')>();
-  return {
-    ...mod,
-    AwsConsoleUtil: class extends mod.AwsConsoleUtil {
-      static override getSigninToken = vi.fn();
-    },
-  };
+vi.mock('@aws-access-bridge/backend-services/aws/sts');
+vi.mock('@aws-access-bridge/backend-services/aws/console', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@aws-access-bridge/backend-services/aws/console')>();
+  mod.ConsoleService.prototype.getSigninToken = vi.fn();
+  return mod;
 });
 vi.mock('@aws-access-bridge/backend-services/aws/InternalRequestHelper');
 
@@ -48,15 +44,21 @@ describe('AssumeRoleRoute', () => {
   it('assumes a single-hop chain and returns credentials', async () => {
     vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
     vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
-    vi.mocked(EnhancedCredentialsDAO.prototype.getCredentialChainToFirstCachedPrincipal).mockResolvedValue({
-      principalArns: [PRINCIPAL, 'arn:aws:iam::123456789012:user/base'],
-      accessKeyId: 'AKIA',
-      secretAccessKey: 'secret',
-      sessionToken: 'token',
+    vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
+      if (arn === PRINCIPAL) {
+        return { principalArn: PRINCIPAL, assumedBy: 'arn:aws:iam::123456789012:user/base' };
+      }
+      return {
+        principalArn: 'arn:aws:iam::123456789012:user/base',
+        assumedBy: '',
+        accessKeyId: 'AKIA',
+        secretAccessKey: 'secret',
+        sessionToken: 'token',
+      };
     });
     vi.mocked(UserMetadataDAO.prototype.getOrCreateFederationUsername).mockResolvedValue('federated-user');
     vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockResolvedValue(undefined);
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue({
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue({
       accessKeyId: 'ASIA',
       secretAccessKey: 'shh',
       sessionToken: 'tok',
@@ -64,7 +66,7 @@ describe('AssumeRoleRoute', () => {
     });
     const c = createRouteContext({ method: 'POST', body: { principalArn: PRINCIPAL }, env: secretsEnv() });
     await new AssumeRoleRoute({} as never).handle(c as never);
-    expect(AssumeRoleUtil.assumeRole).toHaveBeenCalled();
+    expect(StsService.prototype.assumeRole).toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ accessKeyId: 'ASIA', sessionToken: 'tok' }));
   });
 
@@ -81,14 +83,14 @@ describe('GenerateConsoleUrlRoute', () => {
   });
 
   it('returns a console login URL with region', async () => {
-    vi.mocked(AwsConsoleUtil.getSigninToken).mockResolvedValue('signin-token');
+    vi.mocked(ConsoleService.prototype.getSigninToken).mockResolvedValue('signin-token');
     const c = createRouteContext({
       method: 'POST',
       body: { accessKeyId: 'AKIA', secretAccessKey: 's', destinationRegion: 'eu-west-1' },
       env: secretsEnv(),
     });
     await new GenerateConsoleUrlRoute({} as never).handle(c as never);
-    expect(AwsConsoleUtil.getSigninToken).toHaveBeenCalledWith('AKIA', 's', undefined);
+    expect(ConsoleService.prototype.getSigninToken).toHaveBeenCalledWith('AKIA', 's', undefined);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining('signin.aws.amazon.com') }));
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TokenAuthUtil } from '@aws-access-bridge/backend-services/auth/TokenAuthUtil';
+import { TokenService } from '@aws-access-bridge/backend-services/auth';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
-import { AwsConsoleUtil } from '@aws-access-bridge/backend-services/aws/AwsConsoleUtil';
+import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
 import { UnauthorizedError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { buildPrincipalArn, exportEnv } from '@aws-access-bridge/shared/utils/aws';
@@ -10,7 +10,11 @@ vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
 
 const mockFetch = vi.fn();
 
-describe('TokenAuthUtil', () => {
+function tokenService() {
+  return new TokenService({ AccessBridgeDB: {} as never });
+}
+
+describe('TokenService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -18,17 +22,17 @@ describe('TokenAuthUtil', () => {
   it('returns the user email for valid tokens and touches last-used', async () => {
     vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
     vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
-    await expect(TokenAuthUtil.authenticateWithPAT('token', {})).resolves.toBe('user@example.com');
+    await expect(tokenService().authenticateWithPAT('token')).resolves.toBe('user@example.com');
     expect(UserAccessTokenDAO.prototype.updateLastUsedByToken).toHaveBeenCalledWith('token');
   });
 
   it('throws UnauthorizedError for invalid tokens', async () => {
     vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue(undefined);
-    await expect(TokenAuthUtil.authenticateWithPAT('bad', {})).rejects.toThrow(UnauthorizedError);
+    await expect(tokenService().authenticateWithPAT('bad')).rejects.toThrow(UnauthorizedError);
   });
 });
 
-describe('AwsConsoleUtil', () => {
+describe('ConsoleService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', mockFetch);
@@ -40,21 +44,21 @@ describe('AwsConsoleUtil', () => {
 
   it('returns the signin token on success', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ SigninToken: 'tok', Expiration: 'x' }) });
-    await expect(AwsConsoleUtil.getSigninToken('AKIA', 'secret')).resolves.toBe('tok');
+    await expect(new ConsoleService().getSigninToken('AKIA', 'secret')).resolves.toBe('tok');
   });
 
   it('throws UnauthorizedError on 400', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({}) });
-    await expect(AwsConsoleUtil.getSigninToken('bad', 'bad')).rejects.toThrow(UnauthorizedError);
+    await expect(new ConsoleService().getSigninToken('bad', 'bad')).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws InternalServerError on other failures', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) });
-    await expect(AwsConsoleUtil.getSigninToken('AKIA', 'secret')).rejects.toThrow(InternalServerError);
+    await expect(new ConsoleService().getSigninToken('AKIA', 'secret')).rejects.toThrow(InternalServerError);
   });
 
   it('builds login URLs with issuer and destination', () => {
-    const url = AwsConsoleUtil.getLoginUrl('tok', 'https://example.com', 'https://console.aws.amazon.com/ec2');
+    const url = new ConsoleService().getLoginUrl('tok', 'https://example.com', 'https://console.aws.amazon.com/ec2');
     expect(url).toContain('Action=login');
     expect(url).toContain('SigninToken=tok');
     expect(url).toContain(encodeURIComponent('https://console.aws.amazon.com/ec2'));

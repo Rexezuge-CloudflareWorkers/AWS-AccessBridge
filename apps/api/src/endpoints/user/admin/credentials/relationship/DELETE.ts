@@ -1,8 +1,6 @@
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   RemoveCredentialRelationshipRequest,
@@ -194,21 +192,7 @@ class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: RemoveCredentialRelationshipEnv,
     _cxt: ActivityContext<RemoveCredentialRelationshipEnv>,
   ): Promise<RemoveCredentialRelationshipResponse> {
-    if (!request.principalArn) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    // Basic ARN validation
-    const arnPattern = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
-    if (!arnPattern.test(request.principalArn)) {
-      throw new BadRequestError('Invalid principal ARN format.');
-    }
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
-
-    await credentialsDAO.removeCredential(request.principalArn);
+    await CredentialServiceFactory.create(env).removeCredential(request.principalArn);
 
     return {
       success: true,

@@ -289,6 +289,26 @@ export default tseslint.config(
       ],
     },
   },
+  // Layer 5: apps/api routes — compose backend-services, never DAOs directly
+  // (type-only DAO imports for filters/models and D1 constants in the base route stay allowed)
+  {
+    files: ['apps/api/src/endpoints/**/*.{ts,js}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@aws-access-bridge/backend-data/dao', '@aws-access-bridge/backend-data/dao/*'],
+              allowTypeImports: true,
+              message:
+                'route classes must not import DAOs directly; add a method to the owning @aws-access-bridge/backend-services domain service and call it via its factory',
+            },
+          ],
+        },
+      ],
+    },
+  },
 
   // --- Test file overrides (must be last to override plugin rules) ---
   {

@@ -1,5 +1,5 @@
-import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
-import type { AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
+import { AuditServiceFactory } from '@aws-access-bridge/backend-services/audit';
+import type { AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { AuditLog } from '@aws-access-bridge/shared/model';
@@ -197,8 +197,8 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
     const limit: number = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50'), 1), 200);
     const offset: number = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
 
-    const auditLogDAO: AuditLogDAO = new AuditLogDAO(env.AccessBridgeDB);
-    const { logs, total } = await auditLogDAO.query(filters, limit, offset);
+    const auditService = AuditServiceFactory.create(env);
+    const { logs, total } = await auditService.queryLogs(filters, limit, offset);
     return { logs, total };
   }
 }

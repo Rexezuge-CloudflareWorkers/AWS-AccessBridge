@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 
 class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest, UpdateCurrentUserResponse, UpdateCurrentUserEnv> {
   schema = {
@@ -78,10 +78,10 @@ class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest,
     cxt: ActivityContext<UpdateCurrentUserEnv>,
   ): Promise<UpdateCurrentUserResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(env.AccessBridgeDB);
-    await userMetadataDAO.ensureUserEmailExists(userEmail);
-    const preferredLanguage: string | null = request.preferredLanguage?.trim() || null;
-    await userMetadataDAO.updatePreferredLanguage(userEmail, preferredLanguage);
+    const preferredLanguage: string | null = await UserServiceFactory.create(env).updatePreferredLanguage(
+      userEmail,
+      request.preferredLanguage ?? null,
+    );
     return { success: true, preferredLanguage };
   }
 }

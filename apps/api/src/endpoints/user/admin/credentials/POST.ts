@@ -1,8 +1,6 @@
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class StoreCredentialRoute extends IAdminActivityAPIRoute<StoreCredentialRequest, StoreCredentialResponse, StoreCredentialEnv> {
   schema = {
@@ -172,15 +170,12 @@ class StoreCredentialRoute extends IAdminActivityAPIRoute<StoreCredentialRequest
     env: StoreCredentialEnv,
     _cxt: ActivityContext<StoreCredentialEnv>,
   ): Promise<StoreCredentialResponse> {
-    if (!request.principalArn || !request.accessKeyId || !request.secretAccessKey) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
-
-    await credentialsDAO.storeCredential(request.principalArn, request.accessKeyId, request.secretAccessKey, request.sessionToken);
+    await CredentialServiceFactory.create(env).storeCredential(
+      request.principalArn,
+      request.accessKeyId,
+      request.secretAccessKey,
+      request.sessionToken,
+    );
 
     return {
       success: true,

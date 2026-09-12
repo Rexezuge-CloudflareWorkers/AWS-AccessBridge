@@ -1,10 +1,4 @@
-import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
-import { CostDataDAO } from '@aws-access-bridge/backend-data/dao/CostDataDAO';
-import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
-import { ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao/ResourceInventoryDAO';
-import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
-import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao/SpendAlertDAO';
-import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao/TeamAccountsDAO';
+import { MaintenanceServiceFactory, type OrphanCleanupResult } from '@aws-access-bridge/backend-services/maintenance';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -142,29 +136,8 @@ class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
     env: CleanupOrphanedDataEnv,
     _cxt: ActivityContext<CleanupOrphanedDataEnv>,
   ): Promise<CleanupOrphanedDataResponse> {
-    const db: D1DatabaseSession = env.AccessBridgeDB;
-
-    const dataCollectionConfig: number = await new DataCollectionConfigDAO(db).deleteOrphaned();
-    const roleConfigs: number = await new RoleConfigsDAO(db).deleteOrphaned();
-    const teamAccounts: number = await new TeamAccountsDAO(db).deleteOrphaned();
-    const spendAlerts: number = await new SpendAlertDAO(db).deleteOrphaned();
-    const costData: number = await new CostDataDAO(db).deleteOrphaned();
-    const resourceInventory: number = await new ResourceInventoryDAO(db).deleteOrphaned();
-    const awsAccounts: number = await new AwsAccountsDAO(db).deleteOrphaned();
-
-    const deletedCounts: DeletedCounts = {
-      dataCollectionConfig,
-      roleConfigs,
-      teamAccounts,
-      spendAlerts,
-      costData,
-      resourceInventory,
-      awsAccounts,
-    };
-    const totalDeleted: number =
-      dataCollectionConfig + roleConfigs + teamAccounts + spendAlerts + costData + resourceInventory + awsAccounts;
-
-    return { deletedCounts, totalDeleted };
+    const result: OrphanCleanupResult = await MaintenanceServiceFactory.create(env).cleanupOrphanedData();
+    return { deletedCounts: result.deletedCounts, totalDeleted: result.totalDeleted };
   }
 }
 

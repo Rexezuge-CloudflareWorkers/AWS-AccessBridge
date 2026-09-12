@@ -1,13 +1,8 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class CredentialCacheConfigDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class CredentialCacheConfigDAO extends BaseDAO {
   public async create(principalArn: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare('INSERT INTO credential_cache_config (principal_arn) VALUES (?)')

@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from './IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from './IActivityAPIRoute';
-import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { MethodNotAllowedError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 abstract class IAdminActivityAPIRoute<
@@ -17,8 +17,7 @@ abstract class IAdminActivityAPIRoute<
       throw new MethodNotAllowedError('Admin operations are disabled in demo mode.');
     }
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(env.AccessBridgeDB);
-    const isSuperAdmin: boolean = await userMetadataDAO.isSuperAdmin(userEmail);
+    const isSuperAdmin: boolean = await UserServiceFactory.create(env).isSuperAdmin(userEmail);
     if (!isSuperAdmin) {
       throw new UnauthorizedError(
         'Your account does not have permission to perform this action. Please contact an administrator if you believe this is an error.',

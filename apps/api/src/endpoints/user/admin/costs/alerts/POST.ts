@@ -1,5 +1,4 @@
-import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { SpendAlert } from '@aws-access-bridge/shared/model';
@@ -179,12 +178,8 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
     env: IAdminEnv,
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateSpendAlertResponse> {
-    if (!request.awsAccountId || !request.thresholdAmount) {
-      throw new BadRequestError('Missing required fields: awsAccountId and thresholdAmount.');
-    }
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const spendAlertDAO: SpendAlertDAO = new SpendAlertDAO(env.AccessBridgeDB);
-    const alert: SpendAlert = await spendAlertDAO.createAlert(
+    const alert = await CostServiceFactory.create(env).createAlert(
       request.awsAccountId,
       request.thresholdAmount,
       request.periodType || 'monthly',

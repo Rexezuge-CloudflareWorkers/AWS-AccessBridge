@@ -54,7 +54,7 @@ import {
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { DEFAULT_SERVE_SPA_FROM_WORKER } from '@aws-access-bridge/backend-runtime/config';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 
 type AppRouter = HonoOpenAPIRouterType<{
@@ -96,8 +96,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     // SPA catch-all: serve embedded index.html for frontend page routes only.
     // API surfaces (/user/* JSON, /api/* JSON) must never fall through to HTML.
     app.get('*', (c) => {
-      const env = c.env as Env & { SERVE_SPA_FROM_WORKER?: string };
-      const serveSpaFromWorker: boolean = (env.SERVE_SPA_FROM_WORKER || DEFAULT_SERVE_SPA_FROM_WORKER) === 'true';
+      const serveSpaFromWorker: boolean = ConfigurationManager.spa.isServeFromWorker(c.env);
       if (!serveSpaFromWorker) {
         return c.notFound();
       }
@@ -119,11 +118,23 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
   }
 
   private registerUserRoutes(openapi: AppRouter): void {
+    this.registerAwsRoutes(openapi);
+    this.registerUserAccountRoutes(openapi);
+    this.registerAdminAccountRoutes(openapi);
+    this.registerCostRoutes(openapi);
+    this.registerResourceRoutes(openapi);
+    this.registerTeamRoutes(openapi);
+    this.registerMaintenanceRoutes(openapi);
+  }
+
+  private registerAwsRoutes(openapi: AppRouter): void {
     // AWS operations (browser flows, Cloudflare Access)
     openapi.post('/user/aws/console', GenerateConsoleUrlRoute);
     openapi.post('/user/aws/assume-role', AssumeRoleRoute);
     openapi.get('/user/aws/federate', FederateRoute);
+  }
 
+  private registerUserAccountRoutes(openapi: AppRouter): void {
     // User operations
     openapi.get('/user/assumables', ListAssumablesRoute);
     openapi.get('/user/assumables/search', SearchAccountsRoute);
@@ -136,7 +147,9 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     openapi.post('/user/tokens', CreateTokenRoute);
     openapi.delete('/user/tokens', DeleteTokenRoute);
     openapi.get('/user/tokens', ListTokensRoute);
+  }
 
+  private registerAdminAccountRoutes(openapi: AppRouter): void {
     // Admin operations
     openapi.post('/user/admin/credentials', StoreCredentialRoute);
     openapi.post('/user/admin/credentials/relationship', StoreCredentialRelationshipRoute);
@@ -151,7 +164,9 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     openapi.post('/user/admin/credentials/test-chain', TestCredentialChainRoute);
     openapi.post('/user/admin/account/roles', ListAccountRolesRoute);
     openapi.get('/user/admin/audit-logs', ListAuditLogsRoute);
+  }
 
+  private registerCostRoutes(openapi: AppRouter): void {
     // Cost operations
     openapi.get('/user/costs/summary', GetCostSummaryRoute);
     openapi.get('/user/costs/account', GetAccountCostRoute);
@@ -160,11 +175,15 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     openapi.delete('/user/admin/costs/alerts', DeleteSpendAlertRoute);
     openapi.post('/user/admin/collection/config', EnableDataCollectionRoute);
     openapi.delete('/user/admin/collection/config', DisableDataCollectionRoute);
+  }
 
+  private registerResourceRoutes(openapi: AppRouter): void {
     // Resource operations
     openapi.get('/user/resources', ListResourcesRoute);
     openapi.get('/user/resources/summary', GetResourceSummaryRoute);
+  }
 
+  private registerTeamRoutes(openapi: AppRouter): void {
     // Team operations
     openapi.post('/user/admin/team', CreateTeamRoute);
     openapi.delete('/user/admin/team', DeleteTeamRoute);
@@ -177,7 +196,9 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     openapi.post('/user/admin/team/account', AddTeamAccountRoute);
     openapi.delete('/user/admin/team/account', RemoveTeamAccountRoute);
     openapi.get('/user/admin/team/accounts', ListTeamAccountsRoute);
+  }
 
+  private registerMaintenanceRoutes(openapi: AppRouter): void {
     // Maintenance operations
     openapi.post('/user/admin/maintenance/cleanup-orphaned', CleanupOrphanedDataRoute);
     openapi.get('/user/admin/maintenance/task-runs', ListTaskRunsRoute);

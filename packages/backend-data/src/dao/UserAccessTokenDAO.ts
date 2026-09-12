@@ -2,14 +2,9 @@ import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenInternal } from '@aws-access-bridge/shared/model';
 import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class UserAccessTokenDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class UserAccessTokenDAO extends BaseDAO {
   public async create(tokenId: string, userEmail: string, token: string, name: string, expiresAt: number): Promise<void> {
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database

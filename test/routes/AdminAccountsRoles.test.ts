@@ -8,16 +8,16 @@ import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsD
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
-import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws/AssumeRoleUtil';
-import { AwsApiUtil } from '@aws-access-bridge/backend-services/aws/AwsApiUtil';
+import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
+import { IamService } from '@aws-access-bridge/backend-services/aws/iam';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/RoleConfigsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
-vi.mock('@aws-access-bridge/backend-services/aws/AssumeRoleUtil');
-vi.mock('@aws-access-bridge/backend-services/aws/AwsApiUtil');
+vi.mock('@aws-access-bridge/backend-services/aws/sts');
+vi.mock('@aws-access-bridge/backend-services/aws/iam');
 
 function adminEnv() {
   vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(true);
@@ -70,20 +70,20 @@ describe('admin roles discovery route', () => {
       secretAccessKey: 'secret',
       sessionToken: 'token',
     });
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue({
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue({
       accessKeyId: 'ASIA',
       secretAccessKey: 'shh',
       sessionToken: 'tok',
       expiration: '2025-01-01T00:00:00Z',
     });
-    vi.mocked(AwsApiUtil.listRoles).mockResolvedValue([{ roleName: 'Dev', arn: 'arn:aws:iam::123456789012:role/Dev', description: '' }]);
+    vi.mocked(IamService.prototype.listRoles).mockResolvedValue([{ roleName: 'Dev', arn: 'arn:aws:iam::123456789012:role/Dev', description: '' }]);
     const c = createRouteContext({
       method: 'POST',
       body: { principalArn: 'arn:aws:iam::123456789012:role/Dev' },
       env: adminEnv(),
     });
     await new ListAccountRolesRoute({} as never).handle(c as never);
-    expect(AwsApiUtil.listRoles).toHaveBeenCalled();
+    expect(IamService.prototype.listRoles).toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ roles: expect.any(Array) }));
   });
 });

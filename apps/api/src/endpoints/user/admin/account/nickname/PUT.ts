@@ -1,5 +1,4 @@
-import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -177,32 +176,13 @@ class SetAccountNicknameRoute extends IAdminActivityAPIRoute<SetAccountNicknameR
     env: SetAccountNicknameEnv,
     _cxt: ActivityContext<SetAccountNicknameEnv>,
   ): Promise<SetAccountNicknameResponse> {
-    if (!request.awsAccountId || !request.nickname) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    if (!/^\d{12}$/.test(request.awsAccountId)) {
-      throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
-    }
-
-    if (request.nickname.trim().length === 0) {
-      throw new BadRequestError('Nickname cannot be empty.');
-    }
-
-    if (request.nickname.length > 255) {
-      throw new BadRequestError('Nickname cannot exceed 255 characters.');
-    }
-
-    const accountsDAO = new AwsAccountsDAO(env.AccessBridgeDB);
-
-    await accountsDAO.ensureAccountExists(request.awsAccountId);
-    await accountsDAO.setAccountNickname(request.awsAccountId, request.nickname.trim());
+    const { accountId, nickname } = await AccountServiceFactory.create(env).setNickname(request.awsAccountId, request.nickname);
 
     return {
       success: true,
       message: 'Account nickname set successfully',
-      accountId: request.awsAccountId,
-      nickname: request.nickname.trim(),
+      accountId,
+      nickname,
     };
   }
 }

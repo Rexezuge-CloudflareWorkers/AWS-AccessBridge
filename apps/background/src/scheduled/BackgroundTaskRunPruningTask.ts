@@ -1,5 +1,5 @@
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
-import { DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS } from '@aws-access-bridge/backend-runtime/config';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { AbstractPruningTask } from './AbstractPruningTask';
 import type { IEnv } from './IScheduledTask';
 
@@ -9,7 +9,7 @@ class BackgroundTaskRunPruningTask extends AbstractPruningTask<BackgroundTaskRun
   }
 
   protected getRetentionDays(env: BackgroundTaskRunPruningTaskEnv): number {
-    return Number(env.BACKGROUND_TASK_RUN_RETENTION_DAYS || DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS);
+    return ConfigurationManager.processing.getTaskRunRetentionDays(env);
   }
 
   protected async pruneBatch(db: D1Database, cutoffTimestamp: number, batchSize: number): Promise<number> {

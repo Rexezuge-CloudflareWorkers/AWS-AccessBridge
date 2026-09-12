@@ -1,4 +1,4 @@
-import { UserFavoriteAccountsDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -50,11 +50,7 @@ class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, Fav
     cxt: ActivityContext<FavoriteAccountEnv>,
   ): Promise<FavoriteAccountResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const favoritesDAO: UserFavoriteAccountsDAO = new UserFavoriteAccountsDAO(env.AccessBridgeDB);
-    const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(env.AccessBridgeDB);
-
-    await accountsDAO.ensureAccountExists(request.awsAccountId);
-    await favoritesDAO.favoriteAccount(userEmail, request.awsAccountId);
+    await UserServiceFactory.create(env).favoriteAccount(userEmail, request.awsAccountId);
     return { success: true };
   }
 }

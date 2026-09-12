@@ -1,4 +1,4 @@
-import { TeamsDAO } from '@aws-access-bridge/backend-data/dao';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
@@ -116,7 +116,7 @@ class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse,
   };
 
   protected async handleAdminRequest(_request: IRequest, env: IAdminEnv): Promise<ListTeamsResponse> {
-    const teams: Team[] = await new TeamsDAO(env.AccessBridgeDB).listTeams();
+    const teams: Team[] = await TeamServiceFactory.create(env).listTeams();
     return { teams };
   }
 }

@@ -1,4 +1,4 @@
-import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
+import { MaintenanceServiceFactory } from '@aws-access-bridge/backend-services/maintenance';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
@@ -157,8 +157,7 @@ class ListTaskRunsRoute extends IAdminActivityAPIRoute<ListTaskRunsRequest, List
     const status: string | undefined = url.searchParams.get('status') || undefined;
     const limit: number = Math.min(Math.max(Number(url.searchParams.get('limit') || '50'), 1), 200);
 
-    const backgroundTaskRunDAO: BackgroundTaskRunDAO = new BackgroundTaskRunDAO(env.AccessBridgeDB);
-    const runs: BackgroundTaskRun[] = await backgroundTaskRunDAO.listRuns({ taskType, status, limit });
+    const runs: BackgroundTaskRun[] = await MaintenanceServiceFactory.create(env).listTaskRuns({ taskType, status, limit });
     return { runs };
   }
 }

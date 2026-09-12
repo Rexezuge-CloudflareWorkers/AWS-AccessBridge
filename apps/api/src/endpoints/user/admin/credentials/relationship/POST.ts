@@ -1,8 +1,6 @@
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class StoreCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   StoreCredentialRelationshipRequest,
@@ -211,24 +209,7 @@ class StoreCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: StoreCredentialRelationshipEnv,
     _cxt: ActivityContext<StoreCredentialRelationshipEnv>,
   ): Promise<StoreCredentialRelationshipResponse> {
-    if (!request.principalArn || !request.assumedBy) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    // Basic ARN validation
-    const arnPattern = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
-    if (!arnPattern.test(request.principalArn)) {
-      throw new BadRequestError('Invalid principal ARN format.');
-    }
-    if (!arnPattern.test(request.assumedBy)) {
-      throw new BadRequestError('Invalid assumedBy ARN format.');
-    }
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
-
-    await credentialsDAO.storeCredentialRelationship(request.principalArn, request.assumedBy);
+    await CredentialServiceFactory.create(env).storeCredentialRelationship(request.principalArn, request.assumedBy);
 
     return {
       success: true,

@@ -1,5 +1,4 @@
-import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -224,12 +223,7 @@ class DeleteRoleConfigRoute extends IAdminActivityAPIRoute<DeleteRoleConfigReque
     env: DeleteRoleConfigEnv,
     _cxt: ActivityContext<DeleteRoleConfigEnv>,
   ): Promise<DeleteRoleConfigResponse> {
-    if (!request.awsAccountId || !request.roleName) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(env.AccessBridgeDB);
-    await roleConfigsDAO.deleteRoleConfig(request.awsAccountId, request.roleName);
+    await AccountServiceFactory.create(env).deleteRoleConfig(request.awsAccountId, request.roleName);
 
     return {
       success: true,

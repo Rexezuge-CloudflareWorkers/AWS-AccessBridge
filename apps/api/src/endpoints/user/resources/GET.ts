@@ -1,4 +1,4 @@
-import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
+import { ResourceServiceFactory } from '@aws-access-bridge/backend-services/resource';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
@@ -149,30 +149,13 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
 
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    let accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
-
-    const filterAccountId: string | null = url.searchParams.get('accountId');
-    if (filterAccountId && accountIds.includes(filterAccountId)) {
-      accountIds = [filterAccountId];
-    }
-
-    const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
-    const { items, total } = await resourceDAO.searchResources(
-      accountIds,
-      url.searchParams.get('search') || undefined,
-      url.searchParams.get('type') || undefined,
-      Math.min(parseInt(url.searchParams.get('limit') || '50'), 200),
-      Math.max(parseInt(url.searchParams.get('offset') || '0'), 0),
-    );
-    const rolesByAccountEntries: Array<[string, string[]]> = await Promise.all(
-      accountIds.map(async (accountId): Promise<[string, string[]]> => [
-        accountId,
-        await assumableRolesDAO.getRolesByUserAndAccount(userEmail, accountId),
-      ]),
-    );
-
-    return { items, total, rolesByAccount: Object.fromEntries(rolesByAccountEntries) };
+    return ResourceServiceFactory.create(env).searchResources(userEmail, {
+      search: url.searchParams.get('search') || undefined,
+      type: url.searchParams.get('type') || undefined,
+      limit: parseInt(url.searchParams.get('limit') || '50'),
+      offset: parseInt(url.searchParams.get('offset') || '0'),
+      accountId: url.searchParams.get('accountId') || undefined,
+    });
   }
 }
 

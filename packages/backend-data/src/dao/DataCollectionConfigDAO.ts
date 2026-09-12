@@ -1,12 +1,7 @@
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class DataCollectionConfigDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class DataCollectionConfigDAO extends BaseDAO {
   public async create(principalArn: string, collectionType: string): Promise<void> {
     await this.database
       .prepare(

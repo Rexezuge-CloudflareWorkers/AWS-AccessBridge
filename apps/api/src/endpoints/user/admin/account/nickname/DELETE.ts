@@ -1,5 +1,4 @@
-import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -161,23 +160,12 @@ class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
     env: RemoveAccountNicknameEnv,
     _cxt: ActivityContext<RemoveAccountNicknameEnv>,
   ): Promise<RemoveAccountNicknameResponse> {
-    if (!request.awsAccountId) {
-      throw new BadRequestError('Missing required fields.');
-    }
-
-    if (!/^\d{12}$/.test(request.awsAccountId)) {
-      throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
-    }
-
-    const accountsDAO = new AwsAccountsDAO(env.AccessBridgeDB);
-
-    await accountsDAO.ensureAccountExists(request.awsAccountId);
-    await accountsDAO.removeAccountNickname(request.awsAccountId);
+    const { accountId } = await AccountServiceFactory.create(env).removeNickname(request.awsAccountId);
 
     return {
       success: true,
       message: 'Account nickname removed successfully',
-      accountId: request.awsAccountId,
+      accountId,
     };
   }
 }

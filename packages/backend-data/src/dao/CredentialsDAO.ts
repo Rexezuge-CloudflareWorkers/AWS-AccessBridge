@@ -1,15 +1,14 @@
 import { DatabaseError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { Credential, CredentialChain, CredentialInternal } from '@aws-access-bridge/shared/model';
 import { decryptDataOptional, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
+import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import { EncryptedDAO } from './BaseDAO';
 
-class CredentialsDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-  protected readonly masterKey: string;
+class CredentialsDAO extends EncryptedDAO {
   protected readonly principalTrustChainLimit: number;
 
-  constructor(database: D1Database | D1DatabaseSession, masterKey: string, principalTrustChainLimit: number) {
-    this.database = database;
-    this.masterKey = masterKey;
+  constructor(database: D1Queryable, masterKey: string, principalTrustChainLimit: number) {
+    super(database, masterKey);
     this.principalTrustChainLimit = principalTrustChainLimit;
   }
 

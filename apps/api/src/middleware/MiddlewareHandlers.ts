@@ -1,4 +1,3 @@
-import { AUDIT_ACTIONS } from '@aws-access-bridge/backend-services/audit/AuditActions';
 import {
   DEMO_USER_EMAIL,
   DEFAULT_DEMO_MODE,
@@ -6,14 +5,12 @@ import {
   INTERNAL_USER_EMAIL_HEADER,
   SELF_WORKER_BASE_HOSTNAME,
 } from '@aws-access-bridge/shared/constants';
-import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
 import { Context, Next } from 'hono';
 import { HMACHandler } from './HMACHandler';
 import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
-import { EmailValidationUtil } from '@aws-access-bridge/backend-services/auth/EmailValidationUtil';
+import { AccessAuthServiceFactory, TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+import { AuditServiceFactory } from '@aws-access-bridge/backend-services/audit';
 import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
-import { RequestOriginUtil } from '@aws-access-bridge/shared/utils/RequestOriginUtil';
-import { TokenAuthUtil } from '@aws-access-bridge/backend-services/auth/TokenAuthUtil';
 
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 type AuthenticatedEnv = Env & {
@@ -39,14 +36,7 @@ function hasInternalHeadersFor(headers: Headers): boolean {
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   const env: AuthenticatedEnv = c.env as AuthenticatedEnv;
-  if ((env.DEMO_MODE || DEFAULT_DEMO_MODE) === 'true') {
-    return DEMO_USER_EMAIL;
-  }
-  // Local-only bypass for integration tests and `wrangler dev`. Never set in production.
-  if (env.DEV_AUTH_EMAIL) {
-    return env.DEV_AUTH_EMAIL;
-  }
-  return await EmailValidationUtil.getAuthenticatedUserEmail(c.req.raw, env.TEAM_DOMAIN, env.POLICY_AUD);
+  return AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(c.req.raw);
 }
 
 function isInternalRequest(c: RequestContext): boolean {
@@ -72,7 +62,7 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
   const authHeader: string | undefined = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token: string = authHeader.slice(7);
-    return await TokenAuthUtil.authenticateWithPAT(token, env.AccessBridgeDB);
+    return TokenServiceFactory.create(env).authenticateWithPAT(token);
   }
   throw new UnauthorizedError('No personal access token provided in request headers.');
 }
@@ -88,18 +78,10 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
     throw error;
   } finally {
     try {
-      const method: string = c.req.method;
-      const url: URL = new URL(c.req.url);
-      const path: string = url.pathname;
-      const action: string = AUDIT_ACTIONS[`${method}:${path}`] || `${method}:${path}`;
       const userEmail: string = c.get('AuthenticatedUserEmailAddress') || 'unknown';
-      const ipAddress: string | undefined = RequestOriginUtil.getClientIpAddress(c.req.raw, c.env);
-      const userAgentHeader: string | undefined = c.req.header('User-Agent');
-
-      const auditLogDAO: AuditLogDAO = new AuditLogDAO(c.env.AccessBridgeDB);
-      c.executionCtx.waitUntil(
-        auditLogDAO.create(userEmail, action, method, path, statusCode, undefined, undefined, ipAddress, userAgentHeader),
-      );
+      const auditService = AuditServiceFactory.create({ AccessBridgeDB: c.env.AccessBridgeDB });
+      const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env);
+      c.executionCtx.waitUntil(auditService.record(event));
     } catch {
       console.warn('Failed to write audit log');
     }

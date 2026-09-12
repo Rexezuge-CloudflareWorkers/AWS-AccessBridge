@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
+import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model';
 
 class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensResponse, ListTokensEnv> {
@@ -113,8 +113,7 @@ class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensRes
     cxt: ActivityContext<ListTokensEnv>,
   ): Promise<ListTokensResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const userAccessTokenDAO: UserAccessTokenDAO = new UserAccessTokenDAO(env.AccessBridgeDB);
-    const tokens: UserAccessTokenMetadata[] = await userAccessTokenDAO.getByUserEmail(userEmail);
+    const tokens: UserAccessTokenMetadata[] = await TokenServiceFactory.create(env).listTokens(userEmail);
     return { tokens };
   }
 }

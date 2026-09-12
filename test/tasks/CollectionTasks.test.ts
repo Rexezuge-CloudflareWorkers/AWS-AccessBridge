@@ -9,8 +9,8 @@ import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsD
 import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
-import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws/AssumeRoleUtil';
-import { AwsApiUtil } from '@aws-access-bridge/backend-services/aws/AwsApiUtil';
+import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
+import { CostExplorerService } from '@aws-access-bridge/backend-services/aws/ce';
 
 vi.mock('@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CostDataDAO');
@@ -19,8 +19,28 @@ vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsCacheDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
-vi.mock('@aws-access-bridge/backend-services/aws/AssumeRoleUtil');
-vi.mock('@aws-access-bridge/backend-services/aws/AwsApiUtil');
+vi.mock('@aws-access-bridge/backend-services/aws/sts');
+vi.mock('@aws-access-bridge/backend-services/aws/ce');
+
+const { stubCollectors } = vi.hoisted(() => {
+  const makeCollector = (resourceType: string) => ({ resourceType, collect: vi.fn().mockResolvedValue([]) });
+  return {
+    stubCollectors: new Map([
+      ['ec2', makeCollector('ec2')],
+      ['s3', makeCollector('s3')],
+      ['lambda', makeCollector('lambda')],
+      ['rds', makeCollector('rds')],
+      ['dynamodb', makeCollector('dynamodb')],
+    ]),
+  };
+});
+
+vi.mock('@aws-access-bridge/backend-services/aws/collectors', () => ({
+  CollectorRegistry: {
+    get: vi.fn(),
+    getAll: () => stubCollectors,
+  },
+}));
 
 function createEvent(): ScheduledController {
   return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => undefined };
@@ -58,8 +78,8 @@ describe('CostDataCollectionTask', () => {
       'arn:aws:iam::123456789012:role/Dev',
     ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue(ASSUMED);
-    vi.mocked(AwsApiUtil.getCostAndUsage).mockResolvedValue([
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockResolvedValue([
       { accountId: '', periodStart: '2025-01-01', periodEnd: '2025-01-02', totalCost: 1, currency: 'USD', serviceBreakdown: {} },
     ]);
     vi.mocked(CostDataDAO.prototype.upsertCostData).mockResolvedValue(undefined);
@@ -68,7 +88,7 @@ describe('CostDataCollectionTask', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
 
     await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
-    expect(AwsApiUtil.getCostAndUsage).toHaveBeenCalledTimes(1);
+    expect(CostExplorerService.prototype.getCostAndUsage).toHaveBeenCalledTimes(1);
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
       'run-1',
       expect.objectContaining({ itemsProcessed: 1, itemsFailed: 0 }),
@@ -96,7 +116,7 @@ describe('CostDataCollectionTask', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
 
     await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
-    expect(AwsApiUtil.getCostAndUsage).not.toHaveBeenCalled();
+    expect(CostExplorerService.prototype.getCostAndUsage).not.toHaveBeenCalled();
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
       'run-3',
       expect.objectContaining({ itemsProcessed: 0, itemsFailed: 0 }),
@@ -107,6 +127,9 @@ describe('CostDataCollectionTask', () => {
 describe('ResourceInventoryCollectionTask', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const collector of stubCollectors.values()) {
+      vi.mocked(collector.collect).mockResolvedValue([]);
+    }
   });
 
   it('collects resources and cleans stale rows', async () => {
@@ -114,14 +137,10 @@ describe('ResourceInventoryCollectionTask', () => {
       'arn:aws:iam::123456789012:role/Dev',
     ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue(ASSUMED);
-    vi.mocked(AwsApiUtil.describeInstances).mockResolvedValue([
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(stubCollectors.get('ec2')!.collect).mockResolvedValue([
       { resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} },
     ]);
-    vi.mocked(AwsApiUtil.listBuckets).mockResolvedValue([]);
-    vi.mocked(AwsApiUtil.listFunctions).mockResolvedValue([]);
-    vi.mocked(AwsApiUtil.describeDBInstances).mockResolvedValue([]);
-    vi.mocked(AwsApiUtil.listTables).mockResolvedValue([]);
     vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
     vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
@@ -146,7 +165,7 @@ describe('CredentialCacheRefreshTask', () => {
   it('refreshes due principals and summarizes', async () => {
     vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     vi.mocked(CredentialsCacheDAO.prototype.storeCachedCredential).mockResolvedValue(undefined);
     vi.mocked(CredentialCacheConfigDAO.prototype.updateLastCachedTime).mockResolvedValue(undefined);
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-5');

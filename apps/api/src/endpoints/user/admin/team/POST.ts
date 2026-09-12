@@ -1,5 +1,4 @@
-import { TeamsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
@@ -158,9 +157,7 @@ class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTe
     env: IAdminEnv,
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateTeamResponse> {
-    if (!request.teamName?.trim()) throw new BadRequestError('Missing required field: teamName.');
-    const teamsDAO: TeamsDAO = new TeamsDAO(env.AccessBridgeDB);
-    const team: Team = await teamsDAO.createTeam(request.teamName.trim(), this.getAuthenticatedUserEmailAddress(cxt));
+    const team = await TeamServiceFactory.create(env).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
     return { success: true, team };
   }
 }

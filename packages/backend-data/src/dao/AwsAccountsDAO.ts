@@ -1,12 +1,7 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { BaseDAO } from './BaseDAO';
 
-class AwsAccountsDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class AwsAccountsDAO extends BaseDAO {
   public async ensureAccountExists(awsAccountId: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare('INSERT OR IGNORE INTO aws_accounts (aws_account_id) VALUES (?)')
