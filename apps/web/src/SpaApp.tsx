@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { syncHtmlLang } from './lib/locale';
+import LanguageSelector from './components/LanguageSelector';
 import AccountList from './components/AccountList';
 import AdminPage from './components/AdminPage';
 import CostDashboard from './components/CostDashboard';
@@ -24,15 +27,16 @@ const VIEW_TO_PATH: Record<View, string> = {
 };
 
 function parseRoute(): { view: View; adminTab?: string } {
-  const path: string = window.location.pathname.replace(/\/$/, '') || '/';
+  const path: string = globalThis.location.pathname.replace(/\/$/, '') || '/';
   if (path === '/admin' || path.startsWith('/admin/')) {
-    const tab: string | undefined = path.split('/')[2] || undefined;
+    const tab: string | undefined = path.split('/', 3)[2] || undefined;
     return { view: 'admin', adminTab: tab };
   }
   return { view: PATH_TO_VIEW[path] ?? 'accounts' };
 }
 
 export default function SpaApp() {
+  const { t, i18n } = useTranslation();
   const { isAuthorized, isSuperAdmin, isDemoMode, userEmail } = useAuth();
   const [currentView, setCurrentView] = useState<View>(() => parseRoute().view);
   const [adminTab, setAdminTab] = useState<string | undefined>(() => parseRoute().adminTab);
@@ -41,11 +45,11 @@ export default function SpaApp() {
   const [searchTerm, setSearchTerm] = useState('');
   const [pageSize, setPageSize] = useState(() => {
     const saved = localStorage.getItem('aws-access-bridge-page-size');
-    return saved ? parseInt(saved, 10) : 10;
+    return saved ? Math.trunc(Number(saved)) : 10;
   });
   const [currentPage, setCurrentPage] = useState(() => {
     const saved = sessionStorage.getItem('aws-access-bridge-current-page');
-    return saved ? parseInt(saved, 10) : 1;
+    return saved ? Math.trunc(Number(saved)) : 1;
   });
   const [totalAccounts, setTotalAccounts] = useState(0);
 
@@ -58,6 +62,10 @@ export default function SpaApp() {
   }, [pageSize]);
 
   useEffect(() => {
+    syncHtmlLang(i18n.resolvedLanguage ?? 'en');
+  }, [i18n.resolvedLanguage]);
+
+  useEffect(() => {
     sessionStorage.setItem('aws-access-bridge-current-page', currentPage.toString());
   }, [currentPage]);
 
@@ -65,7 +73,7 @@ export default function SpaApp() {
     setCurrentView(view);
     setAdminTab(view === 'admin' ? tab : undefined);
     const path: string = view === 'admin' && tab ? `/admin/${tab}` : VIEW_TO_PATH[view];
-    if (window.location.pathname !== path) {
+    if (globalThis.location.pathname !== path) {
       history.pushState(null, '', path);
     }
   }, []);
@@ -83,8 +91,8 @@ export default function SpaApp() {
       setCurrentView(route.view);
       setAdminTab(route.adminTab);
     };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    globalThis.addEventListener('popstate', onPopState);
+    return () => globalThis.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
@@ -101,7 +109,7 @@ export default function SpaApp() {
     return (
       <div className="bg-gray-900 min-h-screen text-white flex items-center justify-center">
         <div className="text-center">
-          <Spinner size={48} label="Loading..." />
+          <Spinner size={48} label={t('nav.loading', 'Loading...')} />
         </div>
       </div>
     );
@@ -115,7 +123,7 @@ export default function SpaApp() {
     <div className="bg-gray-900 min-h-screen text-white">
       {isDemoMode && (
         <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-center py-2 font-semibold text-sm sticky top-0 z-50 shadow-md">
-          Demo Mode — Data shown is for demonstration purposes only. Admin operations are disabled.
+          {t('nav.demoBanner', 'Demo Mode — Data shown is for demonstration purposes only. Admin operations are disabled.')}
         </div>
       )}
       <SpaNavbar isSuperAdmin={isSuperAdmin} currentView={currentView} setCurrentView={navigateTo} userEmail={userEmail} />
@@ -125,18 +133,18 @@ export default function SpaApp() {
             <AdminPage activeTab={adminTab} onTabChange={handleAdminTabChange} />
           ) : currentView === 'costs' ? (
             <div>
-              <h2 className="text-2xl font-bold mb-6 text-gray-100">Cost Analytics</h2>
+              <h2 className="text-2xl font-bold mb-6 text-gray-100">{t('nav.costsHeading', 'Cost Analytics')}</h2>
               <CostDashboard />
             </div>
           ) : currentView === 'resources' ? (
             <div>
-              <h2 className="text-2xl font-bold mb-6 text-gray-100">Resource Inventory</h2>
+              <h2 className="text-2xl font-bold mb-6 text-gray-100">{t('nav.resourcesHeading', 'Resource Inventory')}</h2>
               <ResourceInventory />
             </div>
           ) : (
             <>
               <div className="flex items-center mb-6 gap-4">
-                <h2 className="text-2xl font-bold flex-shrink-0 text-gray-100">AWS Accounts</h2>
+                <h2 className="text-2xl font-bold flex-shrink-0 text-gray-100">{t('nav.accountsHeading', 'AWS Accounts')}</h2>
                 <div className="flex-1 relative">
                   <svg
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -148,7 +156,7 @@ export default function SpaApp() {
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search by account id or nickname"
+                    placeholder={t('nav.searchPlaceholder', 'Search by account id or nickname')}
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -181,7 +189,7 @@ export default function SpaApp() {
                         d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
                       />
                     </svg>
-                    Filters
+                    {t('nav.filters', 'Filters')}
                   </button>
                   {filterOpen && (
                     <div
@@ -199,7 +207,7 @@ export default function SpaApp() {
                             }}
                             className="mr-2.5 rounded"
                           />
-                          Include Hidden
+                          {t('nav.includeHidden', 'Include Hidden')}
                         </label>
                       </div>
                     </div>
@@ -210,7 +218,7 @@ export default function SpaApp() {
                 {!searchTerm.trim() && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-400">Per page:</label>
+                      <label className="text-sm text-gray-400">{t('nav.perPage', 'Per page:')}</label>
                       <select
                         value={pageSize}
                         onChange={(e) => setPageSize(Number(e.target.value))}
@@ -226,8 +234,11 @@ export default function SpaApp() {
                     {totalAccounts > 0 && (
                       <>
                         <div className="text-sm text-gray-500">
-                          {Math.min((currentPage - 1) * pageSize + 1, totalAccounts)}&ndash;
-                          {Math.min(currentPage * pageSize, totalAccounts)} of {totalAccounts}
+                          {t('nav.showingOf', '{{from}}–{{to}} of {{total}}', {
+                            from: Math.min((currentPage - 1) * pageSize + 1, totalAccounts),
+                            to: Math.min(currentPage * pageSize, totalAccounts),
+                            total: totalAccounts,
+                          })}
                         </div>
                         <Pagination
                           currentPage={currentPage}
@@ -266,6 +277,13 @@ function SpaNavbar({
   setCurrentView: (view: View) => void;
   userEmail: string;
 }) {
+  const { t } = useTranslation();
+  const viewLabels: Record<View, string> = {
+    accounts: t('nav.accounts', 'Accounts'),
+    costs: t('nav.costs', 'Costs'),
+    resources: t('nav.resources', 'Resources'),
+    admin: t('nav.admin', 'Admin'),
+  };
   return (
     <nav
       className="text-white flex justify-between items-center"
@@ -286,17 +304,18 @@ function SpaNavbar({
         <div style={{ display: 'flex', gap: '4px', background: 'rgba(30,36,51,0.5)', padding: '4px', borderRadius: '8px' }}>
           {(['accounts', 'costs', 'resources'] as const).map((view) => (
             <NavTab key={view} active={currentView === view} onClick={() => setCurrentView(view)}>
-              {view.charAt(0).toUpperCase() + view.slice(1)}
+              {viewLabels[view]}
             </NavTab>
           ))}
           {isSuperAdmin && (
             <NavTab active={currentView === 'admin'} onClick={() => setCurrentView('admin')}>
-              Admin
+              {viewLabels.admin}
             </NavTab>
           )}
         </div>
       </div>
       <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <LanguageSelector />
         {isSuperAdmin && (
           <span
             style={{
@@ -308,7 +327,7 @@ function SpaNavbar({
               fontWeight: 500,
             }}
           >
-            ADMIN
+            {t('nav.adminBadge', 'ADMIN')}
           </span>
         )}
         <span style={{ color: '#9ca3af' }}>{userEmail}</span>
@@ -333,7 +352,7 @@ function NavTab({ active, onClick, children }: { active: boolean; onClick: () =>
         cursor: 'pointer',
         transition: 'all 0.15s',
         background: active ? '#2563eb' : hovered ? 'rgba(55,65,81,0.5)' : 'transparent',
-        color: active ? '#fff' : hovered ? '#fff' : '#9ca3af',
+        color: active || hovered ? '#fff' : '#9ca3af',
       }}
     >
       {children}

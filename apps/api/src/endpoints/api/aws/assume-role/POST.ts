@@ -1,10 +1,18 @@
-import { AssumableRolesDAO, CredentialsCacheDAO, UserMetadataDAO, EnhancedCredentialsDAO, RoleConfigsDAO } from '@/dao';
-import { AccessKeysWithExpiration, CredentialCache, CredentialChain, RoleConfig } from '@/model';
-import { ArnUtil, AssumeRoleUtil, TimestampUtil } from '@/utils';
+import {
+  AssumableRolesDAO,
+  CredentialsCacheDAO,
+  UserMetadataDAO,
+  EnhancedCredentialsDAO,
+  RoleConfigsDAO,
+} from '@aws-access-bridge/backend-data/dao';
+import { AccessKeysWithExpiration, CredentialCache, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
+import { ArnUtil, AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws';
+import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { BadRequestError } from '@/error';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT, INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@/constants';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
+import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-access-bridge/shared/constants';
 
 class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleResponse, AssumeRoleEnv> {
   schema = {
@@ -25,7 +33,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
                 type: 'string' as const,
                 minLength: 20,
                 maxLength: 2048,
-                pattern: '^arn:aws:iam::\\d{12}:role\\/[\\w+=,.@-]+$',
+                pattern: String.raw`^arn:aws:iam::\d{12}:role\/[\w+=,.@-]+$`,
                 description: 'AWS IAM Role ARN in format: arn:aws:iam::123456789012:role/RoleName',
                 example: 'arn:aws:iam::123456789012:role/MyRole',
               },
@@ -90,6 +98,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
                 value: {
                   accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                   secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                  // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                   sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
                   expiration: '2024-01-15T14:30:00.000Z',
                 },
@@ -337,7 +346,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
     startIndex: number,
     credentials: AccessKeysWithExpiration,
     userId: string,
-    roleSessionDurationSeconds?: number | undefined,
+    roleSessionDurationSeconds?: number,
   ): Promise<AccessKeysWithExpiration> {
     let newCredentials: AccessKeysWithExpiration = credentials;
     for (let i = startIndex; i >= 0; --i) {
@@ -367,12 +376,12 @@ interface AssumeRoleRequest extends IRequest {
 interface AssumeRoleResponse extends IResponse {
   accessKeyId: string;
   secretAccessKey: string;
-  sessionToken?: string | undefined;
-  expiration?: string | undefined;
+  sessionToken?: string;
+  expiration?: string;
 }
 
 interface AssumeRoleEnv extends IEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeKV: KVNamespace;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }

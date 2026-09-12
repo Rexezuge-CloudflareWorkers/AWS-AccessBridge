@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateAESGCMKey, encryptData, decryptData, decryptDataOptional } from '@/crypto/aes-gcm';
+import { generateAESGCMKey, encryptData, decryptData, decryptDataOptional } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 describe('AES-GCM Crypto', () => {
   describe('generateAESGCMKey', () => {

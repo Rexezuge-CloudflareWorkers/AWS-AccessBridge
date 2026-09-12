@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
-    "lib": ["ES2021"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
     "module": "ES2022",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
@@ -14,23 +14,20 @@
     "strict": true,
     "skipLibCheck": true,
     "paths": {
-      "@/base": ["../../packages/backend-core/src/base/index.ts"],
-      "@/base/*": ["../../packages/backend-core/src/base/*"],
-      "@/constants": ["../../packages/backend-core/src/constants/index.ts"],
-      "@/constants/*": ["../../packages/backend-core/src/constants/*"],
-      "@/crypto": ["../../packages/backend-core/src/crypto/index.ts"],
-      "@/crypto/*": ["../../packages/backend-core/src/crypto/*"],
-      "@/dao": ["../../packages/backend-core/src/dao/index.ts"],
-      "@/dao/*": ["../../packages/backend-core/src/dao/*"],
-      "@/error": ["../../packages/backend-core/src/error/index.ts"],
-      "@/error/*": ["../../packages/backend-core/src/error/*"],
-      "@/model": ["../../packages/backend-core/src/model/index.ts"],
-      "@/model/*": ["../../packages/backend-core/src/model/*"],
-      "@/utils": ["../../packages/backend-core/src/utils/index.ts"],
-      "@/utils/*": ["../../packages/backend-core/src/utils/*"],
-      "@/*": ["./src/*"]
+      "@aws-access-bridge/background": ["./src"],
+      "@aws-access-bridge/background/*": ["./src/*"],
+      "@aws-access-bridge/backend-data": ["../../packages/backend-data/src"],
+      "@aws-access-bridge/backend-data/*": ["../../packages/backend-data/src/*"],
+      "@aws-access-bridge/backend-errors": ["../../packages/backend-errors/src"],
+      "@aws-access-bridge/backend-errors/*": ["../../packages/backend-errors/src/*"],
+      "@aws-access-bridge/backend-runtime": ["../../packages/backend-runtime/src"],
+      "@aws-access-bridge/backend-runtime/*": ["../../packages/backend-runtime/src/*"],
+      "@aws-access-bridge/backend-services": ["../../packages/backend-services/src"],
+      "@aws-access-bridge/backend-services/*": ["../../packages/backend-services/src/*"],
+      "@aws-access-bridge/shared": ["../../packages/shared/src"],
+      "@aws-access-bridge/shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["../../worker-configuration.d.ts", "src/**/*.ts"],
+  "include": ["../../worker-configuration.d.ts", "../../packages/backend-runtime/src/env.d.ts", "src/**/*.ts"],
   "exclude": ["node_modules"]
 }

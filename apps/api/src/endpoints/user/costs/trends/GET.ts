@@ -1,7 +1,7 @@
-import { AssumableRolesDAO, CostDataDAO } from '@/dao';
+import { AssumableRolesDAO, CostDataDAO } from '@aws-access-bridge/backend-data/dao';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { CostData } from '@/model';
+import type { CostData } from '@aws-access-bridge/shared/model';
 
 class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCostTrendsResponse, GetCostTrendsEnv> {
   schema = {
@@ -48,9 +48,9 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
                 summary: 'Six months of cost trends',
                 value: {
                   months: [
-                    { period: '2024-01', total: 2150.0, byAccount: { '123456789012': 1200.0, '987654321098': 950.0 } },
-                    { period: '2024-02', total: 2340.5, byAccount: { '123456789012': 1300.5, '987654321098': 1040.0 } },
-                    { period: '2024-03', total: 1980.25, byAccount: { '123456789012': 1100.25, '987654321098': 880.0 } },
+                    { period: '2024-01', total: 2150, byAccount: { '123456789012': 1200, '987654321098': 950 } },
+                    { period: '2024-02', total: 2340.5, byAccount: { '123456789012': 1300.5, '987654321098': 1040 } },
+                    { period: '2024-03', total: 1980.25, byAccount: { '123456789012': 1100.25, '987654321098': 880 } },
                   ],
                 },
               },
@@ -118,8 +118,8 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
 
     if (accountIds.length === 0) return { months: [] };
 
-    const endDate: string = new Date().toISOString().split('T')[0];
-    const startDate: string = new Date(Date.now() - months * 30 * 86400000).toISOString().split('T')[0];
+    const endDate: string = new Date().toISOString().split('T', 1)[0];
+    const startDate: string = new Date(Date.now() - months * 30 * 86_400_000).toISOString().split('T', 1)[0];
 
     const costDataDAO: CostDataDAO = new CostDataDAO(env.AccessBridgeDB);
     const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
@@ -127,8 +127,8 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
     // Aggregate by month
     const monthlyData: Record<string, { total: number; byAccount: Record<string, number> }> = {};
     for (const data of costData) {
-      const month: string = data.periodStart.substring(0, 7); // YYYY-MM
-      if (!monthlyData[month]) monthlyData[month] = { total: 0, byAccount: {} };
+      const month: string = data.periodStart.slice(0, 7); // YYYY-MM
+      if (monthlyData[month] === undefined) monthlyData[month] = { total: 0, byAccount: {} };
       monthlyData[month].total += data.totalCost;
       monthlyData[month].byAccount[data.awsAccountId] = (monthlyData[month].byAccount[data.awsAccountId] || 0) + data.totalCost;
     }

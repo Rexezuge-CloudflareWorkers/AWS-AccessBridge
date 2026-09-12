@@ -1,10 +1,10 @@
-import { AwsAccountsDAO } from '@/dao/AwsAccountsDAO';
-import { CostDataDAO } from '@/dao/CostDataDAO';
-import { DataCollectionConfigDAO } from '@/dao/DataCollectionConfigDAO';
-import { ResourceInventoryDAO } from '@/dao/ResourceInventoryDAO';
-import { RoleConfigsDAO } from '@/dao/RoleConfigsDAO';
-import { SpendAlertDAO } from '@/dao/SpendAlertDAO';
-import { TeamAccountsDAO } from '@/dao/TeamAccountsDAO';
+import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
+import { CostDataDAO } from '@aws-access-bridge/backend-data/dao/CostDataDAO';
+import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
+import { ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao/ResourceInventoryDAO';
+import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
+import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao/SpendAlertDAO';
+import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao/TeamAccountsDAO';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 

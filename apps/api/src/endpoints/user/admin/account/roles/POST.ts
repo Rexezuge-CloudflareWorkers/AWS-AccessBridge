@@ -1,11 +1,10 @@
-import { AwsClient } from 'aws4fetch';
-import { CredentialsDAO } from '@/dao';
-import { AssumeRoleUtil } from '@/utils';
-import { BadRequestError, InternalServerError } from '@/error';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { AssumeRoleUtil, AwsApiUtil } from '@aws-access-bridge/backend-services/aws';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@/model';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@/constants';
+import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
+import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesRequest, ListAccountRolesResponse, ListAccountRolesEnv> {
   schema = {
@@ -185,50 +184,7 @@ class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesReque
     }
 
     // Call IAM ListRoles with the assumed credentials
-    const iamClient: AwsClient = new AwsClient({
-      service: 'iam',
-      region: 'us-east-1',
-      accessKeyId: credential.accessKeyId,
-      secretAccessKey: credential.secretAccessKey,
-      sessionToken: credential.sessionToken,
-    });
-
-    const queryParams: URLSearchParams = new URLSearchParams({
-      Action: 'ListRoles',
-      Version: '2010-05-08',
-      MaxItems: '100',
-    });
-
-    const url: string = `https://iam.amazonaws.com/?${queryParams.toString()}`;
-
-    const response: Response = await iamClient.fetch(url, { method: 'GET' });
-    const xmlText: string = await response.text();
-
-    if (!response.ok) {
-      if (xmlText.includes('AccessDenied') || xmlText.includes('not authorized')) {
-        throw new BadRequestError('The assumed role does not have iam:ListRoles permission. You can still manually enter role names.');
-      }
-      throw new InternalServerError(`IAM ListRoles failed: ${response.status}`);
-    }
-
-    // Parse the XML response
-    const roles: Array<{ roleName: string; arn: string; description: string }> = [];
-    const memberRegex = /<member>([\s\S]*?)<\/member>/g;
-    let memberMatch: RegExpExecArray | null;
-    while ((memberMatch = memberRegex.exec(xmlText)) !== null) {
-      const member: string = memberMatch[1];
-      const roleNameMatch: RegExpMatchArray | null = member.match(/<RoleName>([^<]+)<\/RoleName>/);
-      const arnMatch: RegExpMatchArray | null = member.match(/<Arn>([^<]+)<\/Arn>/);
-      const descMatch: RegExpMatchArray | null = member.match(/<Description>([^<]*)<\/Description>/);
-
-      if (roleNameMatch && arnMatch) {
-        roles.push({
-          roleName: roleNameMatch[1],
-          arn: arnMatch[1],
-          description: descMatch ? descMatch[1] : '',
-        });
-      }
-    }
+    const roles: Array<{ roleName: string; arn: string; description: string }> = await AwsApiUtil.listRoles(credential);
 
     return { roles };
   }
@@ -243,7 +199,7 @@ interface ListAccountRolesResponse extends IResponse {
 }
 
 interface ListAccountRolesEnv extends IAdminEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeDB: D1DatabaseSession;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { EmailValidationUtil } from '@/utils/EmailValidationUtil';
-import { UnauthorizedError } from '@/error';
-import { INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@/constants';
+import { EmailValidationUtil } from '@aws-access-bridge/backend-services/auth/EmailValidationUtil';
+import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
 
 describe('EmailValidationUtil', () => {
   describe('getAuthenticatedUserEmail', () => {

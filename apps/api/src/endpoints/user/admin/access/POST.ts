@@ -1,5 +1,5 @@
-import { AssumableRolesDAO, AwsAccountsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { AssumableRolesDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -225,7 +225,7 @@ class GrantAccessRoute extends IAdminActivityAPIRoute<GrantAccessRequest, GrantA
     cxt: ActivityContext<GrantAccessEnv>,
   ): Promise<GrantAccessResponse> {
     if (request.awsAccountId && request.roleName) {
-      if (/^[0-9]{12}$/.test(request.awsAccountId)) {
+      if (/^\d{12}$/.test(request.awsAccountId)) {
         const userEmail: string = request.userEmail || this.getAuthenticatedUserEmailAddress(cxt);
         const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
         const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(env.AccessBridgeDB);
@@ -243,7 +243,7 @@ class GrantAccessRoute extends IAdminActivityAPIRoute<GrantAccessRequest, GrantA
 }
 
 interface GrantAccessRequest extends IRequest {
-  userEmail?: string | undefined;
+  userEmail?: string;
   awsAccountId: string;
   roleName: string;
 }

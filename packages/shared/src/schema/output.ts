@@ -95,6 +95,20 @@ const UserAccessTokenMetadataSchema = z.object({
   lastUsedAt: z.number().optional(),
 });
 
+const TaskRunSchema = z.object({
+  runId: z.string(),
+  taskType: z.string(),
+  status: z.string(),
+  itemsProcessed: z.number(),
+  itemsFailed: z.number(),
+  summary: z.string().nullable(),
+  details: z.unknown(),
+  errorMessage: z.string().nullable(),
+  startedAt: z.number(),
+  completedAt: z.number().nullable(),
+  createdAt: z.number(),
+});
+
 const AssumableAccountSchema = z.object({
   roles: z.array(z.string()),
   hiddenRoles: z.array(z.string()).optional(),
@@ -172,7 +186,7 @@ const CleanupOrphanedDataResponseSchema = z.object({
 });
 
 const RouteOutputSchemas = {
-    'POST /api/aws/assume-role': AccessKeysResponseSchema,
+  'POST /api/aws/assume-role': AccessKeysResponseSchema,
   'POST /api/aws/console': ConsoleUrlResponseSchema,
   'GET /api/aws/federate': z.undefined(),
   'POST /user/aws/assume-role': AccessKeysResponseSchema,
@@ -184,6 +198,11 @@ const RouteOutputSchemas = {
     email: z.string(),
     isSuperAdmin: z.boolean(),
     demoMode: z.boolean(),
+    preferredLanguage: z.string().nullable(),
+  }),
+  'PUT /user/me': z.object({
+    success: z.boolean(),
+    preferredLanguage: z.string().nullable(),
   }),
   'POST /user/favorites': SuccessResponseSchema,
   'DELETE /user/favorites': SuccessResponseSchema,
@@ -265,6 +284,9 @@ const RouteOutputSchemas = {
   'POST /user/admin/team/account': MessageResponseSchema,
   'DELETE /user/admin/team/account': MessageResponseSchema,
   'POST /user/admin/maintenance/cleanup-orphaned': CleanupOrphanedDataResponseSchema,
+  'GET /user/admin/maintenance/task-runs': z.object({
+    runs: z.array(TaskRunSchema),
+  }),
 } as const;
 
 export {
@@ -287,6 +309,7 @@ export {
   RouteOutputSchemas,
   SpendAlertSchema,
   SuccessResponseSchema,
+  TaskRunSchema,
   TeamMemberSchema,
   TeamSchema,
   UserAccessTokenMetadataSchema,

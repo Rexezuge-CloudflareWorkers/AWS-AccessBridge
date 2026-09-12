@@ -1,11 +1,12 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from '@/endpoints/IActivityAPIRoute';
-import { BadRequestError } from '@/error';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { AssumeRoleResponse } from '@/endpoints/api/aws/assume-role/POST';
 import type { GenerateConsoleUrlRequestInternal, GenerateConsoleUrlResponse } from '@/endpoints/api/aws/console/POST';
-import { ErrorDeserializationUtil, InternalRequestHelper } from '@/utils';
-import { RoleConfigsDAO } from '@/dao';
-import { RoleConfig } from '@/model';
+import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws';
+import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error';
+import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao';
+import { RoleConfig } from '@aws-access-bridge/shared/model';
 
 class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse, FederateEnv> {
   schema = {
@@ -20,7 +21,7 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
         required: true,
         schema: {
           type: 'string' as const,
-          pattern: '^\\d{12}$',
+          pattern: String.raw`^\d{12}$`,
           description: 'AWS Account ID (12 digits)',
           example: '123456789012',
         },
@@ -193,11 +194,11 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
     const url: URL = new URL(request.raw.url);
     const awsAccountId: string | null = url.searchParams.get('awsAccountId');
     const roleName: string | null = url.searchParams.get('role');
-    const destinationPath: string | null = url.searchParams.get('destinationPath');
-    const destinationRegion: string | null = url.searchParams.get('destinationRegion');
     if (!awsAccountId || !roleName) {
       throw new BadRequestError('Missing required query parameters.');
     }
+    const destinationPath: string | null = url.searchParams.get('destinationPath');
+    const destinationRegion: string | null = url.searchParams.get('destinationRegion');
     const principalArn: string = `arn:aws:iam::${awsAccountId}:role/${roleName}`;
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const baseUrl: string = this.getBaseUrl(cxt);

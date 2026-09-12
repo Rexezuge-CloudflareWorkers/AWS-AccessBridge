@@ -1,9 +1,10 @@
 import { OpenAPIRoute } from 'chanfana';
 import { Context } from 'hono';
 import type { StatusCode } from 'hono/utils/http-status';
-import { BaseUrlUtil } from '@/utils';
-import { DefaultInternalServerError, InternalServerError, IServiceError } from '@/error';
-import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED, DEFAULT_DEMO_MODE } from '@/constants';
+import { BaseUrlUtil } from '@aws-access-bridge/backend-services/aws';
+import { DefaultInternalServerError, DatabaseError, InternalServerError, IServiceError } from '@aws-access-bridge/backend-errors';
+import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED } from '@aws-access-bridge/backend-data/constants/d1';
+import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
 import { validateRequestInput } from '@/schema';
 
 abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IResponse, TEnv extends IEnv> extends OpenAPIRoute {
@@ -19,8 +20,12 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       const request: TRequest = { ...(validatedBody as TRequest), raw: c.req.raw };
       const env: TEnv = { ...(c.env as TEnv), AccessBridgeDB: c.env.AccessBridgeDB.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) };
       const response: TResponse | ExtendedResponse<TResponse> = await this.handleRequest(request, env, c);
-      if (response && typeof response === 'object' && ('body' in response || 'statusCode' in response || 'headers' in response)) {
-        const extendedResponse: ExtendedResponse<TResponse> = response as ExtendedResponse<TResponse>;
+      if (
+        response &&
+        typeof response === 'object' &&
+        ('body' in response || 'rawBody' in response || 'statusCode' in response || 'headers' in response)
+      ) {
+        const extendedResponse: ExtendedResponse<TResponse> = response;
         const statusCode: number = extendedResponse.statusCode || 200;
         const headers: Record<string, string> = extendedResponse.headers || {};
         Object.entries(headers).forEach(([key, value]) => {
@@ -30,24 +35,14 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
         if (statusCode >= 300 && statusCode < 400) {
           return c.body(null);
         }
+        if ('rawBody' in extendedResponse) {
+          return c.body((extendedResponse.rawBody ?? null) as never);
+        }
         return c.json(extendedResponse.body);
       }
       return c.json(response);
     } catch (error: unknown) {
-      if (error instanceof IServiceError && !(error instanceof InternalServerError)) {
-        console.warn(`Responding with ${error.getErrorType()}Error: `, error.stack);
-        return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
-      }
-      if (!(error instanceof IServiceError) || error instanceof InternalServerError) {
-        console.error('Caught service error during execution: ', error);
-      }
-      console.warn('Responding with DefaultInternalServerError: ', DefaultInternalServerError);
-      return c.json(
-        {
-          Exception: { Type: DefaultInternalServerError.getErrorType(), Message: DefaultInternalServerError.getErrorMessage() },
-        },
-        DefaultInternalServerError.getErrorCode(),
-      );
+      return this.toErrorResponse(error, c);
     }
   }
 
@@ -69,6 +64,27 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
     const env: TEnv = c.env as TEnv;
     return (env.DEMO_MODE || DEFAULT_DEMO_MODE) === 'true';
   }
+
+  protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {
+    if (error instanceof IServiceError && error.getErrorCode() < 500) {
+      console.warn(`Responding with ${error.getErrorType()}:`, error.stack);
+      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
+    }
+    if (error instanceof DatabaseError) {
+      console.error('Caught database error during execution:', error);
+      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
+    }
+    if (!(error instanceof IServiceError) || error instanceof InternalServerError) {
+      console.error('Caught service error during execution:', error);
+    }
+    console.warn('Responding with DefaultInternalServerError:', DefaultInternalServerError);
+    return c.json(
+      {
+        Exception: { Type: DefaultInternalServerError.getErrorType(), Message: DefaultInternalServerError.getErrorMessage() },
+      },
+      DefaultInternalServerError.getErrorCode(),
+    );
+  }
 }
 
 interface IRequest {
@@ -79,16 +95,17 @@ interface IRequest {
 interface IResponse {}
 
 interface ExtendedResponse<TResponse extends IResponse> {
-  body?: TResponse | undefined;
-  statusCode?: StatusCode | undefined;
-  headers?: Record<string, string> | undefined;
+  body?: TResponse;
+  rawBody?: BodyInit | null;
+  statusCode?: StatusCode;
+  headers?: Record<string, string>;
 }
 
 interface IEnv {
-  TEAM_DOMAIN?: string | undefined;
-  POLICY_AUD?: string | undefined;
-  SERVE_SPA_FROM_WORKER?: string | undefined;
-  DEMO_MODE?: string | undefined;
+  TEAM_DOMAIN?: string;
+  POLICY_AUD?: string;
+  SERVE_SPA_FROM_WORKER?: string;
+  DEMO_MODE?: string;
   Variables: {
     AuthenticatedUserEmailAddress: string;
   };

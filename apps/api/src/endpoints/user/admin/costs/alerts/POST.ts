@@ -1,8 +1,8 @@
-import { SpendAlertDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { SpendAlert } from '@/model';
+import type { SpendAlert } from '@aws-access-bridge/shared/model';
 
 class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertRequest, CreateSpendAlertResponse, IAdminEnv> {
   schema = {
@@ -21,7 +21,7 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
             properties: {
               awsAccountId: {
                 type: 'string' as const,
-                pattern: '^\\d{12}$',
+                pattern: String.raw`^\d{12}$`,
                 description: 'AWS Account ID to monitor (12 digits)',
                 example: '123456789012',
               },
@@ -29,7 +29,7 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
                 type: 'number' as const,
                 minimum: 0,
                 description: 'Spend threshold in USD that triggers the alert',
-                example: 500.0,
+                example: 500,
               },
               periodType: {
                 type: 'string' as const,
@@ -42,11 +42,11 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
           examples: {
             'monthly-alert': {
               summary: 'Monthly spend alert',
-              value: { awsAccountId: '123456789012', thresholdAmount: 1000.0, periodType: 'monthly' },
+              value: { awsAccountId: '123456789012', thresholdAmount: 1000, periodType: 'monthly' },
             },
             'daily-alert': {
               summary: 'Daily spend alert',
-              value: { awsAccountId: '987654321098', thresholdAmount: 50.0, periodType: 'daily' },
+              value: { awsAccountId: '987654321098', thresholdAmount: 50, periodType: 'daily' },
             },
           },
         },
@@ -83,10 +83,10 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
                   alert: {
                     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                     awsAccountId: '123456789012',
-                    thresholdAmount: 1000.0,
+                    thresholdAmount: 1000,
                     periodType: 'monthly',
                     createdBy: 'admin@example.com',
-                    createdAt: 1704067200,
+                    createdAt: 1_704_067_200,
                   },
                 },
               },

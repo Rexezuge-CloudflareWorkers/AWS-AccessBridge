@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiCall } from '../lib/api';
 
 interface OnboardingWizardProps {
@@ -88,6 +89,7 @@ const wizardStyles = {
 };
 
 export default function OnboardingWizard({ showMessage }: OnboardingWizardProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
 
   // Step 1: Account
@@ -131,23 +133,9 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   // Hover tracking for role labels
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (_credentialValidated) {
-      setCredentialValidated(false);
-      setValidationResult(null);
-    }
-  }, [accessKeyId, secretAccessKey, sessionToken]);
-
-  useEffect(() => {
-    if (chainConfigured) {
-      setChainConfigured(false);
-      setChainTestResult(null);
-    }
-  }, [intermediateRoleArn]);
-
   // Step 1 handlers
   const handleSaveAccount = async () => {
-    if (!/^[0-9]{12}$/.test(awsAccountId)) {
+    if (!/^\d{12}$/.test(awsAccountId)) {
       showMessage('error', 'AWS Account ID must be exactly 12 digits.');
       return;
     }
@@ -161,7 +149,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       }
     }
     setAccountSaved(true);
-    showMessage('success', 'Account configured.');
+    showMessage('success', t('onboarding.accountConfigured', 'Account configured.'));
     setIsValidating(false);
   };
 
@@ -177,7 +165,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       const d = result.data as { arn: string; accountId: string };
       setValidationResult(d);
       setCredentialValidated(true);
-      showMessage('success', `Credentials valid. Identity: ${d.arn}`);
+      showMessage('success', t('onboarding.credentialsValid', 'Credentials valid. Identity: {{identity}}', { identity: d.arn }));
     } else {
       setValidationResult(null);
       setCredentialValidated(false);
@@ -188,7 +176,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
 
   const handleStoreCredentials = async () => {
     if (!principalArn.trim()) {
-      showMessage('error', 'Principal ARN is required.');
+      showMessage('error', t('onboarding.principalRequired', 'Principal ARN is required.'));
       return;
     }
     setIsStoring(true);
@@ -200,7 +188,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     });
     if (result.ok) {
       setCredentialStored(true);
-      showMessage('success', 'Credentials stored securely.');
+      showMessage('success', t('onboarding.credentialsStored', 'Credentials stored securely.'));
     } else {
       showMessage('error', result.error!);
     }
@@ -210,7 +198,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   // Step 3 handlers
   const handleSetChain = async () => {
     if (!intermediateRoleArn.trim()) {
-      showMessage('error', 'Intermediate Role ARN is required.');
+      showMessage('error', t('onboarding.intermediateRequired', 'Intermediate Role ARN is required.'));
       return;
     }
     setIsSettingChain(true);
@@ -221,7 +209,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     if (result.ok) {
       setChainConfigured(true);
       setRoleForDiscovery(intermediateRoleArn);
-      showMessage('success', 'Credential chain configured.');
+      showMessage('success', t('onboarding.chainConfigured', 'Credential chain configured.'));
     } else {
       showMessage('error', result.error!);
     }
@@ -235,8 +223,8 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     if (result.ok) {
       const d = result.data as { success: boolean; chain: Array<{ arn: string; status: string }> };
       setChainTestResult(d.chain);
-      if (d.success) showMessage('success', 'Chain test passed!');
-      else showMessage('error', 'Chain test failed. Check results below.');
+      if (d.success) showMessage('success', t('onboarding.chainPassed', 'Chain test passed!'));
+      else showMessage('error', t('onboarding.chainFailed', 'Chain test failed. Check results below.'));
     } else {
       showMessage('error', result.error!);
     }
@@ -251,9 +239,9 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     if (result.ok) {
       const d = result.data as { roles: Array<{ roleName: string; arn: string; description: string }> };
       setDiscoveredRoles(d.roles);
-      showMessage('success', `Found ${d.roles.length} roles.`);
+      showMessage('success', t('onboarding.rolesFound', 'Found {{count}} roles.', { count: d.roles.length }));
     } else {
-      showMessage('error', result.error! + ' You can manually add role names below.');
+      showMessage('error', `${result.error} ${t('onboarding.manualHint', 'You can manually add role names below.')}`);
     }
     setIsLoading(false);
   };
@@ -295,7 +283,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     setIsLoading(false);
 
     if (failures > 0) {
-      showMessage('error', `${failures} role relationship(s) failed to save.`);
+      showMessage('error', t('onboarding.rolesSaveFailed', '{{count}} role relationship(s) failed to save.', { count: failures }));
       return false;
     }
     return true;
@@ -312,7 +300,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   const handleGrantAccess = async () => {
     const validEmails = userEmails.filter((e) => e.trim());
     if (validEmails.length === 0 || selectedRoles.size === 0) {
-      showMessage('error', 'Add at least one user email and select at least one role.');
+      showMessage('error', t('onboarding.assignRequired', 'Add at least one user email and select at least one role.'));
       return;
     }
     setIsLoading(true);
@@ -325,9 +313,18 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
     }
     if (failures === 0) {
       setAccessGranted(true);
-      showMessage('success', `Access granted to ${validEmails.length} user(s) for ${selectedRoles.size} role(s).`);
+      showMessage(
+        'success',
+        t('onboarding.accessGrantedTo', 'Access granted to {{users}} user(s) for {{roles}} role(s).', {
+          users: validEmails.length,
+          roles: selectedRoles.size,
+        }),
+      );
     } else {
-      showMessage('error', `${failures} access grant(s) failed. Check logs for details.`);
+      showMessage(
+        'error',
+        t('onboarding.accessGrantFailed', '{{count}} access grant(s) failed. Check logs for details.', { count: failures }),
+      );
     }
     setIsLoading(false);
   };
@@ -339,20 +336,20 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
 
   const getBtnPrimary = (disabled: boolean): React.CSSProperties => ({
     ...wizardStyles.btnPrimary,
-    ...(disabled ? wizardStyles.btnDisabled : {}),
+    ...(disabled && wizardStyles.btnDisabled),
   });
 
   const getBtnSuccess = (disabled: boolean): React.CSSProperties => ({
     ...wizardStyles.btnSuccess,
-    ...(disabled ? wizardStyles.btnDisabled : {}),
+    ...(disabled && wizardStyles.btnDisabled),
   });
 
   return (
     <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
       {/* Step indicator */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2.5rem' }}>
-        {STEPS.map((label, i) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? '1' : 'none' }}>
+        {STEPS.map((_, i) => (
+          <div key={STEPS[i]} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? '1' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 className="text-sm font-bold"
@@ -369,7 +366,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                   boxShadow: i === step ? '0 0 0 4px rgba(37, 99, 235, 0.2)' : 'none',
                 }}
               >
-                {i < step ? '\u2713' : i + 1}
+                {i < step ? '\u{2713}' : i + 1}
               </div>
               <span
                 className="text-sm font-medium"
@@ -378,7 +375,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                   color: i === step ? 'white' : i < step ? '#4ade80' : '#6b7280',
                 }}
               >
-                {label}
+                {t(`onboarding.step${STEPS[i]}`, STEPS[i])}
               </span>
             </div>
             {i < STEPS.length - 1 && (
@@ -399,13 +396,13 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 0 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Add AWS Account</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{t('onboarding.addAccount', 'Add AWS Account')}</h3>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Enter the 12-digit AWS Account ID and an optional nickname.
+              {t('onboarding.accountStepHint', 'Enter the 12-digit AWS Account ID and an optional nickname.')}
             </p>
             <input
               type="text"
-              placeholder="AWS Account ID (12 digits)"
+              placeholder={t('admin.accountIdPlaceholder', 'AWS Account ID (12 digits)')}
               value={awsAccountId}
               onChange={(e) => setAwsAccountId(e.target.value)}
               style={getInputStyle('accountId')}
@@ -415,7 +412,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
             />
             <input
               type="text"
-              placeholder="Nickname (optional)"
+              placeholder={t('onboarding.nicknamePlaceholder', 'Nickname (optional)')}
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               style={getInputStyle('nickname')}
@@ -424,20 +421,20 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
             />
             {accountSaved && (
               <p className="text-sm" style={{ color: '#4ade80' }}>
-                Account configured.
+                {t('onboarding.accountConfigured', 'Account configured.')}
               </p>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <button
                 onClick={handleSaveAccount}
-                disabled={isLoading || !/^[0-9]{12}$/.test(awsAccountId)}
+                disabled={isLoading || !/^\d{12}$/.test(awsAccountId)}
                 className="font-medium"
-                style={getBtnPrimary(isLoading || !/^[0-9]{12}$/.test(awsAccountId))}
+                style={getBtnPrimary(isLoading || !/^\d{12}$/.test(awsAccountId))}
               >
-                {isLoading ? 'Saving...' : 'Save Account'}
+                {isLoading ? t('onboarding.saving', 'Saving...') : t('onboarding.saveAccount', 'Save Account')}
               </button>
               <button onClick={() => setStep(1)} disabled={!accountSaved} className="font-medium" style={getBtnSuccess(!accountSaved)}>
-                Next
+                {t('onboarding.next', 'Next')}
               </button>
             </div>
           </div>
@@ -448,13 +445,15 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 1 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Store Credentials</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>
+              {t('onboarding.storeCredentials', 'Store Credentials')}
+            </h3>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Enter IAM credentials. Validate first to confirm they work, then store them securely.
+              {t('onboarding.credentialsStepHint', 'Enter IAM credentials. Validate first to confirm they work, then store them securely.')}
             </p>
             <input
               type="text"
-              placeholder="Principal ARN (e.g., arn:aws:iam::123456789012:user/username)"
+              placeholder={t('admin.principalArnExample', 'Principal ARN (e.g., arn:aws:iam::123456789012:user/username)')}
               value={principalArn}
               onChange={(e) => setPrincipalArn(e.target.value)}
               style={getInputStyle('principalArn')}
@@ -463,39 +462,54 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
             />
             <input
               type="text"
-              placeholder="Access Key ID"
+              placeholder={t('admin.accessKeyPlaceholder', 'Access Key ID')}
               value={accessKeyId}
-              onChange={(e) => setAccessKeyId(e.target.value)}
+              onChange={(e) => {
+                setAccessKeyId(e.target.value);
+                setCredentialValidated(false);
+                setValidationResult(null);
+              }}
               style={getInputStyle('accessKeyId')}
               onFocus={() => setFocusedInput('accessKeyId')}
               onBlur={() => setFocusedInput(null)}
             />
             <input
               type="password"
-              placeholder="Secret Access Key"
+              placeholder={t('admin.secretKeyPlaceholder', 'Secret Access Key')}
               value={secretAccessKey}
-              onChange={(e) => setSecretAccessKey(e.target.value)}
+              onChange={(e) => {
+                setSecretAccessKey(e.target.value);
+                setCredentialValidated(false);
+                setValidationResult(null);
+              }}
               style={getInputStyle('secretAccessKey')}
               onFocus={() => setFocusedInput('secretAccessKey')}
               onBlur={() => setFocusedInput(null)}
             />
             <input
               type="password"
-              placeholder="Session Token (optional)"
+              placeholder={t('onboarding.sessionTokenPlaceholder', 'Session Token (optional)')}
               value={sessionToken}
-              onChange={(e) => setSessionToken(e.target.value)}
+              onChange={(e) => {
+                setSessionToken(e.target.value);
+                setCredentialValidated(false);
+                setValidationResult(null);
+              }}
               style={getInputStyle('sessionToken')}
               onFocus={() => setFocusedInput('sessionToken')}
               onBlur={() => setFocusedInput(null)}
             />
             {validationResult && (
               <p className="text-sm" style={{ color: '#4ade80' }}>
-                Identity: {validationResult.arn} (Account: {validationResult.accountId})
+                {t('onboarding.identityIs', 'Identity: {{arn}} (Account: {{account}})', {
+                  arn: validationResult.arn,
+                  account: validationResult.accountId,
+                })}
               </p>
             )}
             {credentialStored && (
               <p className="text-sm" style={{ color: '#4ade80' }}>
-                Credentials stored securely.
+                {t('onboarding.credentialsStored', 'Credentials stored securely.')}
               </p>
             )}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -505,7 +519,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnPrimary(isValidating || !accessKeyId || !secretAccessKey)}
               >
-                {isValidating ? 'Validating...' : 'Validate'}
+                {isValidating ? t('onboarding.validating', 'Validating...') : t('onboarding.validate', 'Validate')}
               </button>
               <button
                 onClick={handleStoreCredentials}
@@ -513,7 +527,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnSuccess(isStoring || !_credentialValidated || !principalArn || !accessKeyId || !secretAccessKey)}
               >
-                {isStoring ? 'Storing...' : 'Store Credentials'}
+                {isStoring ? t('onboarding.storing', 'Storing...') : t('onboarding.storeCredentials', 'Store Credentials')}
               </button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
@@ -524,7 +538,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
               >
-                Back
+                {t('onboarding.back', 'Back')}
               </button>
               <button
                 onClick={() => setStep(2)}
@@ -532,7 +546,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnSuccess(!credentialStored)}
               >
-                Next
+                {t('onboarding.next', 'Next')}
               </button>
             </div>
           </div>
@@ -543,22 +557,31 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 2 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Credential Chain (Optional)</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>
+              {t('onboarding.chainTitle', 'Credential Chain (Optional)')}
+            </h3>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Enter the intermediate role ARN that the credentials from Step 2 will assume. Leave empty if no chain is needed.
+              {t(
+                'onboarding.chainHintFull',
+                'Enter the intermediate role ARN that the credentials from Step 2 will assume. Leave empty if no chain is needed.',
+              )}
             </p>
             <input
               type="text"
-              placeholder="Intermediate Role ARN (role that credentials from Step 2 will assume)"
+              placeholder={t('onboarding.intermediatePlaceholder', 'Intermediate Role ARN (role that credentials from Step 2 will assume)')}
               value={intermediateRoleArn}
-              onChange={(e) => setIntermediateRoleArn(e.target.value)}
+              onChange={(e) => {
+                setIntermediateRoleArn(e.target.value);
+                setChainConfigured(false);
+                setChainTestResult(null);
+              }}
               style={getInputStyle('intermediateRoleArn')}
               onFocus={() => setFocusedInput('intermediateRoleArn')}
               onBlur={() => setFocusedInput(null)}
             />
             {chainConfigured && (
               <p className="text-sm" style={{ color: '#4ade80' }}>
-                Chain configured. Using {roleForDiscovery} for role discovery.
+                {t('onboarding.usingForDiscovery', 'Chain configured. Using {{role}} for role discovery.', { role: roleForDiscovery })}
               </p>
             )}
             {chainTestResult && (
@@ -579,7 +602,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnPrimary(isSettingChain || !intermediateRoleArn.trim())}
               >
-                {isSettingChain ? 'Setting...' : 'Set Chain'}
+                {isSettingChain ? t('onboarding.setting', 'Setting...') : t('onboarding.setChain', 'Set Chain')}
               </button>
               <button
                 onClick={handleTestChain}
@@ -587,7 +610,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnPrimary(isTestingChain || !chainConfigured)}
               >
-                {isTestingChain ? 'Testing...' : 'Test Chain'}
+                {isTestingChain ? t('onboarding.testing', 'Testing...') : t('onboarding.testChain', 'Test Chain')}
               </button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
@@ -598,10 +621,10 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
               >
-                Back
+                {t('onboarding.back', 'Back')}
               </button>
               <button onClick={() => setStep(3)} className="font-medium" style={wizardStyles.btnSuccess}>
-                Next
+                {t('onboarding.next', 'Next')}
               </button>
             </div>
           </div>
@@ -612,12 +635,14 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 3 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Discover & Select Roles</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>
+              {t('onboarding.discoverTitle', 'Discover & Select Roles')}
+            </h3>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Discover IAM roles in the account or add them manually.
+              {t('onboarding.discoverHint', 'Discover IAM roles in the account or add them manually.')}
             </p>
             <button onClick={handleDiscoverRoles} disabled={isLoading} className="font-medium" style={getBtnPrimary(isLoading)}>
-              {isLoading ? 'Discovering...' : 'Discover Roles'}
+              {isLoading ? t('onboarding.discovering', 'Discovering...') : t('onboarding.discoverRoles', 'Discover Roles')}
             </button>
             {discoveredRoles.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '256px', overflowY: 'auto' }}>
@@ -646,7 +671,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="Manually add role name"
+                placeholder={t('onboarding.manualRolePlaceholder', 'Manually add role name')}
                 value={manualRoleName}
                 onChange={(e) => setManualRoleName(e.target.value)}
                 style={getInputStyle('manualRole')}
@@ -662,11 +687,11 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnPrimary(!manualRoleName.trim())}
               >
-                Add
+                {t('onboarding.add', 'Add')}
               </button>
             </div>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              {selectedRoles.size} role(s) selected
+              {t('onboarding.rolesSelected', '{{count}} role(s) selected', { count: selectedRoles.size })}
             </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
               <button
@@ -676,7 +701,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
               >
-                Back
+                {t('onboarding.back', 'Back')}
               </button>
               <button
                 onClick={handleStep4Next}
@@ -684,7 +709,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnSuccess(selectedRoles.size === 0 || isLoading)}
               >
-                Next
+                {t('onboarding.next', 'Next')}
               </button>
             </div>
           </div>
@@ -695,15 +720,15 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 4 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Assign Users</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{t('onboarding.assignTitle', 'Assign Users')}</h3>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Enter email addresses of users to grant access to the selected roles.
+              {t('onboarding.assignHint', 'Enter email addresses of users to grant access to the selected roles.')}
             </p>
             {userEmails.map((email, i) => (
               <div key={i} style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="email"
-                  placeholder="user@example.com"
+                  placeholder={t('admin.emailPlaceholder', 'user@example.com')}
                   value={email}
                   onChange={(e) => {
                     const next = [...userEmails];
@@ -733,14 +758,17 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
               onMouseEnter={(e) => (e.currentTarget.style.color = '#93bbfd')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#60a5fa')}
             >
-              + Add another user
+              {t('onboarding.addUser', '+ Add another user')}
             </button>
             <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Granting access to: {Array.from(selectedRoles).join(', ')} in account {awsAccountId}
+              {t('onboarding.grantingTo', 'Granting access to: {{roles}} in account {{account}}', {
+                roles: Array.from(selectedRoles).join(', '),
+                account: awsAccountId,
+              })}
             </p>
             {accessGranted && (
               <p className="text-sm" style={{ color: '#4ade80' }}>
-                Access granted successfully.
+                {t('onboarding.accessGranted', 'Access granted successfully.')}
               </p>
             )}
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -750,7 +778,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 className="font-medium"
                 style={getBtnSuccess(isLoading || userEmails.every((e) => !e.trim()) || selectedRoles.size === 0)}
               >
-                {isLoading ? 'Granting...' : 'Grant Access'}
+                {isLoading ? t('onboarding.granting', 'Granting...') : t('onboarding.grantAccess', 'Grant Access')}
               </button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
@@ -761,10 +789,10 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
               >
-                Back
+                {t('onboarding.back', 'Back')}
               </button>
               <button onClick={() => setStep(5)} className="font-medium" style={wizardStyles.btnSuccess}>
-                Next
+                {t('onboarding.next', 'Next')}
               </button>
             </div>
           </div>
@@ -775,29 +803,31 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
       {step === 5 && (
         <div style={wizardStyles.card}>
           <div style={wizardStyles.cardInner}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Setup Complete</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{t('onboarding.completeTitle', 'Setup Complete')}</h3>
             <div className="text-sm" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={wizardStyles.summaryItem}>
-                <span style={{ color: '#9ca3af' }}>Account:</span> {nickname ? `${nickname} (${awsAccountId})` : awsAccountId}
+                <span style={{ color: '#9ca3af' }}>{t('onboarding.accountLabel', 'Account:')}</span>{' '}
+                {nickname ? `${nickname} (${awsAccountId})` : awsAccountId}
               </div>
               <div style={wizardStyles.summaryItem}>
-                <span style={{ color: '#9ca3af' }}>Principal:</span> {principalArn}
+                <span style={{ color: '#9ca3af' }}>{t('onboarding.principalLabel', 'Principal:')}</span> {principalArn}
               </div>
               {intermediateRoleArn && (
                 <div style={wizardStyles.summaryItem}>
-                  <span style={{ color: '#9ca3af' }}>Chain:</span> {principalArn} → {intermediateRoleArn}
+                  <span style={{ color: '#9ca3af' }}>{t('onboarding.chainLabel', 'Chain:')}</span> {principalArn} → {intermediateRoleArn}
                 </div>
               )}
               <div style={wizardStyles.summaryItem}>
-                <span style={{ color: '#9ca3af' }}>Roles:</span> {Array.from(selectedRoles).join(', ')}
+                <span style={{ color: '#9ca3af' }}>{t('onboarding.rolesLabel', 'Roles:')}</span> {Array.from(selectedRoles).join(', ')}
               </div>
               <div style={wizardStyles.summaryItem}>
-                <span style={{ color: '#9ca3af' }}>Users:</span> {userEmails.filter((e) => e.trim()).join(', ') || '(none assigned)'}
+                <span style={{ color: '#9ca3af' }}>{t('onboarding.usersLabel', 'Users:')}</span>{' '}
+                {userEmails.filter((e) => e.trim()).join(', ') || t('onboarding.noneAssigned', '(none assigned)')}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
               <button onClick={handleTestChain} disabled={isLoading} className="font-medium" style={getBtnPrimary(isLoading)}>
-                {isLoading ? 'Testing...' : 'Test Connection'}
+                {isLoading ? t('onboarding.testingConnection', 'Testing...') : t('onboarding.testConnection', 'Test Connection')}
               </button>
               <button
                 onClick={() => setStep(0)}
@@ -806,7 +836,7 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#374151')}
               >
-                Back to Start
+                {t('onboarding.backToStart', 'Back to Start')}
               </button>
             </div>
             {chainTestResult && (

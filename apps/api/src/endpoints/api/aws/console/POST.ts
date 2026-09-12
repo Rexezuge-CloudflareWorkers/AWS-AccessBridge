@@ -1,4 +1,4 @@
-import { AwsConsoleUtil } from '@/utils';
+import { AwsConsoleUtil } from '@aws-access-bridge/backend-services/aws';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -38,7 +38,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
               },
               awsAccountId: {
                 type: 'string' as const,
-                pattern: '^\\d{12}$',
+                pattern: String.raw`^\d{12}$`,
                 description: 'AWS Account ID (12 digits) - optional, used for federate URL generation',
                 example: '123456789012',
               },
@@ -74,6 +74,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
               value: {
                 accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
               },
             },
@@ -83,6 +84,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
               value: {
                 accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
                 destinationPath: 'ec2/home',
                 destinationRegion: 'us-east-1',
@@ -94,6 +96,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
               value: {
                 accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
                 awsAccountId: '123456789012',
                 roleName: 'DeveloperRole',
@@ -105,6 +108,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
               value: {
                 accessKeyId: 'ASIAI2EXAMPLE3EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
                 awsAccountId: '987654321098',
                 roleName: 'CrossAccountAdminRole',
@@ -233,16 +237,15 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
     const signinToken: string = await AwsConsoleUtil.getSigninToken(request.accessKeyId, request.secretAccessKey, request.sessionToken);
     let federateUrl: string = this.getBaseUrl(cxt);
     if (request.awsAccountId && request.roleName) {
-      federateUrl = `${federateUrl}/user/aws/federate?awsAccountId=${request.awsAccountId}&role=${request.roleName}`;
+      federateUrl += `/user/aws/federate?awsAccountId=${request.awsAccountId}&role=${request.roleName}`;
     }
-    let destination: string = 'https://console.aws.amazon.com/';
-    if (request.destinationPath) {
-      destination = `https://console.aws.amazon.com/${request.destinationPath}`;
-    }
+    let destination: string = request.destinationPath
+      ? `https://console.aws.amazon.com/${request.destinationPath}`
+      : 'https://console.aws.amazon.com/';
     if (request.destinationRegion) {
       const url: URL = new URL(destination);
       url.searchParams.set('region', request.destinationRegion);
-      destination = url.toString();
+      destination = url.href;
     }
     const loginUrl: string = AwsConsoleUtil.getLoginUrl(signinToken, federateUrl, destination);
     return {
@@ -254,11 +257,11 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
 interface GenerateConsoleUrlRequestInternal {
   accessKeyId: string;
   secretAccessKey: string;
-  sessionToken?: string | undefined;
-  awsAccountId?: string | undefined;
-  roleName?: string | undefined;
-  destinationPath?: string | undefined;
-  destinationRegion?: string | undefined;
+  sessionToken?: string;
+  awsAccountId?: string;
+  roleName?: string;
+  destinationPath?: string;
+  destinationRegion?: string;
 }
 
 interface GenerateConsoleUrlResponseInternal {

@@ -1,5 +1,5 @@
-import { AwsClient } from 'aws4fetch';
-import { BadRequestError, InternalServerError } from '@/error';
+import { AwsApiUtil } from '@aws-access-bridge/backend-services/aws';
+import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -39,6 +39,7 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
               value: {
                 accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
                 secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                // eslint-disable-next-line sonarjs/no-hardcoded-secrets -- AWS-documented EXAMPLE placeholder, not a real secret
                 sessionToken: 'AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE',
               },
             },
@@ -172,42 +173,14 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
       throw new BadRequestError('Missing required fields: accessKeyId and secretAccessKey.');
     }
 
-    const stsClient: AwsClient = new AwsClient({
-      service: 'sts',
-      region: 'us-east-1',
-      accessKeyId: request.accessKeyId,
-      secretAccessKey: request.secretAccessKey,
-      sessionToken: request.sessionToken,
-    });
-
-    const queryParams: URLSearchParams = new URLSearchParams({
-      Action: 'GetCallerIdentity',
-      Version: '2011-06-15',
-    });
-
-    const url: string = `https://sts.us-east-1.amazonaws.com/?${queryParams.toString()}`;
-
     try {
-      const response: Response = await stsClient.fetch(url, { method: 'POST' });
-      const xmlText: string = await response.text();
-
-      if (!response.ok) {
-        throw new BadRequestError(`AWS credentials are invalid: ${response.status} ${response.statusText}`);
-      }
-
-      const arnMatch: RegExpMatchArray | null = xmlText.match(/<Arn>([^<]+)<\/Arn>/);
-      const accountMatch: RegExpMatchArray | null = xmlText.match(/<Account>([^<]+)<\/Account>/);
-      const userIdMatch: RegExpMatchArray | null = xmlText.match(/<UserId>([^<]+)<\/UserId>/);
-
-      if (!arnMatch || !accountMatch || !userIdMatch) {
-        throw new InternalServerError('Failed to parse STS GetCallerIdentity response.');
-      }
+      const identity = await AwsApiUtil.validateCredentials(request.accessKeyId, request.secretAccessKey, request.sessionToken);
 
       return {
         valid: true,
-        arn: arnMatch[1],
-        accountId: accountMatch[1],
-        userId: userIdMatch[1],
+        arn: identity.arn,
+        accountId: identity.accountId,
+        userId: identity.userId,
       };
     } catch (error: unknown) {
       if (error instanceof BadRequestError || error instanceof InternalServerError) {
@@ -221,7 +194,7 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
 interface ValidateCredentialsRequest extends IRequest {
   accessKeyId: string;
   secretAccessKey: string;
-  sessionToken?: string | undefined;
+  sessionToken?: string;
 }
 
 interface ValidateCredentialsResponse extends IResponse {

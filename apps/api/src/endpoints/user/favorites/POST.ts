@@ -1,4 +1,4 @@
-import { UserFavoriteAccountsDAO, AwsAccountsDAO } from '@/dao';
+import { UserFavoriteAccountsDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 

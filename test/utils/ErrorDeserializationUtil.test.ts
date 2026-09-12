@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ErrorDeserializationUtil } from '@/utils/ErrorDeserializationUtil';
-import { BadRequestError, ForbiddenError, UnauthorizedError, InternalServerError, DatabaseError } from '@/error';
+import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error/ErrorDeserializationUtil';
+import { BadRequestError, ForbiddenError, UnauthorizedError, InternalServerError, DatabaseError } from '@aws-access-bridge/backend-errors';
 
 describe('ErrorDeserializationUtil', () => {
   describe('deserializeError', () => {

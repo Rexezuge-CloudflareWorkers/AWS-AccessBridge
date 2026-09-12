@@ -3,14 +3,12 @@ import {
   HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
   HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
   HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
-  INTERNAL_HEADER_PREFIX,
-  INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
-  INTERNAL_SIGNATURE_HEADER,
-  INTERNAL_TIMESTAMP_HEADER,
-} from '@/constants';
-import { verifyHMACSignature, hashBody } from '@/crypto/hmac';
-import { UnauthorizedError } from '@/error';
-import { TimestampUtil } from '@/utils';
+} from '@aws-access-bridge/backend-errors/constants';
+import { INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS } from '@aws-access-bridge/backend-runtime/config';
+import { INTERNAL_HEADER_PREFIX, INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
+import { verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
+import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 
 class HMACHandler {
   public static async validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
@@ -27,7 +25,7 @@ class HMACHandler {
         const method: string = c.req.method;
         const headers: Record<string, string> = {};
         for (const [key, value] of c.req.raw.headers.entries()) {
-          if (key.startsWith(INTERNAL_HEADER_PREFIX) && key !== INTERNAL_SIGNATURE_HEADER) {
+          if (key !== INTERNAL_SIGNATURE_HEADER && key.startsWith(INTERNAL_HEADER_PREFIX)) {
             headers[key] = value;
           }
         }
@@ -37,9 +35,9 @@ class HMACHandler {
           await next();
           return;
         }
-        throw new UnauthorizedError(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+        throw new UnauthorizedError(HMAC_HANDLER_ERROR_SIGNATURE_INVALID);
       }
-      throw new UnauthorizedError(HMAC_HANDLER_ERROR_SIGNATURE_INVALID);
+      throw new UnauthorizedError(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
     }
     throw new UnauthorizedError(HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS);
   }

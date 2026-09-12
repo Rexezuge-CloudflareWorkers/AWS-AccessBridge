@@ -1,5 +1,5 @@
-import { TeamAccountsDAO } from '@/dao';
-import { BadRequestError } from '@/error';
+import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -26,7 +26,7 @@ class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, 
               },
               awsAccountId: {
                 type: 'string' as const,
-                pattern: '^\\d{12}$',
+                pattern: String.raw`^\d{12}$`,
                 description: 'AWS Account ID to associate with the team (12 digits)',
                 example: '123456789012',
               },

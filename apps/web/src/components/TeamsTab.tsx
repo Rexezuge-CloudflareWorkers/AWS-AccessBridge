@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatUnixDate } from '../lib/format';
 import FocusInput from './ui/FocusInput';
 import Spinner from './ui/Spinner';
 import { apiCall } from '../lib/api';
@@ -49,8 +51,9 @@ interface TeamsTabProps {
 }
 
 export default function TeamsTab({ showMessage }: TeamsTabProps) {
+  const { t, i18n } = useTranslation();
   const [teams, setTeams] = useState<Team[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -76,8 +79,20 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
   }, [showMessage]);
 
   useEffect(() => {
-    fetchTeams();
-  }, [fetchTeams]);
+    apiCall('/user/admin/teams', 'GET')
+      .then((result) => {
+        if (result.ok && result.data) {
+          setTeams((result.data as { teams: Team[] }).teams || []);
+        } else {
+          showMessage('error', result.error || t('teams.loadError', 'Failed to load teams'));
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        showMessage('error', t('teams.loadError', 'Failed to load teams'));
+        setIsLoading(false);
+      });
+  }, [showMessage, t]);
 
   const fetchMembers = useCallback(
     async (teamId: string) => {
@@ -86,7 +101,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       if (result.ok && result.data) {
         setMembers((result.data as { members: TeamMember[] }).members || []);
       } else {
-        showMessage('error', result.error || 'Failed to load members');
+        showMessage('error', result.error || t('teams.membersLoadFailed', 'Failed to load members'));
       }
       setMembersLoading(false);
     },
@@ -100,7 +115,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       if (result.ok && result.data) {
         setAccounts((result.data as { accountIds: string[] }).accountIds || []);
       } else {
-        showMessage('error', result.error || 'Failed to load accounts');
+        showMessage('error', result.error || t('teams.accountsLoadFailed', 'Failed to load accounts'));
       }
       setAccountsLoading(false);
     },
@@ -114,8 +129,8 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       setAccounts([]);
       const team = teams.find((t) => t.teamId === teamId);
       setRenameTeamName(team?.teamName || '');
-      fetchMembers(teamId);
-      fetchAccounts(teamId);
+      void fetchMembers(teamId);
+      void fetchAccounts(teamId);
     },
     [teams, fetchMembers, fetchAccounts],
   );
@@ -124,26 +139,26 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     if (!createTeamName.trim()) return;
     const result = await apiCall('/user/admin/team', 'POST', { teamName: createTeamName.trim() });
     if (result.ok) {
-      showMessage('success', 'Team created successfully');
+      showMessage('success', t('teams.created', 'Team created successfully'));
       setCreateTeamName('');
-      fetchTeams();
+      void fetchTeams();
     } else {
-      showMessage('error', result.error || 'Failed to create team');
+      showMessage('error', result.error || t('teams.createFailed', 'Failed to create team'));
     }
   };
 
   const handleDeleteTeam = async (teamId: string) => {
     const result = await apiCall('/user/admin/team', 'DELETE', { teamId });
     if (result.ok) {
-      showMessage('success', 'Team deleted successfully');
+      showMessage('success', t('teams.deleted', 'Team deleted successfully'));
       if (selectedTeamId === teamId) {
         setSelectedTeamId(null);
         setMembers([]);
         setAccounts([]);
       }
-      fetchTeams();
+      void fetchTeams();
     } else {
-      showMessage('error', result.error || 'Failed to delete team');
+      showMessage('error', result.error || t('teams.deleteFailed', 'Failed to delete team'));
     }
   };
 
@@ -151,10 +166,10 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     if (!selectedTeamId || !renameTeamName.trim()) return;
     const result = await apiCall('/user/admin/team/name', 'PUT', { teamId: selectedTeamId, teamName: renameTeamName.trim() });
     if (result.ok) {
-      showMessage('success', 'Team renamed successfully');
-      fetchTeams();
+      showMessage('success', t('teams.renamed', 'Team renamed successfully'));
+      void fetchTeams();
     } else {
-      showMessage('error', result.error || 'Failed to rename team');
+      showMessage('error', result.error || t('teams.renameFailed', 'Failed to rename team'));
     }
   };
 
@@ -166,12 +181,12 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       role: memberRole,
     });
     if (result.ok) {
-      showMessage('success', 'Member added successfully');
+      showMessage('success', t('teams.memberAdded', 'Member added successfully'));
       setMemberEmail('');
       setMemberRole('member');
-      fetchMembers(selectedTeamId);
+      void fetchMembers(selectedTeamId);
     } else {
-      showMessage('error', result.error || 'Failed to add member');
+      showMessage('error', result.error || t('teams.memberAddFailed', 'Failed to add member'));
     }
   };
 
@@ -179,10 +194,10 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     if (!selectedTeamId) return;
     const result = await apiCall('/user/admin/team/member', 'DELETE', { teamId: selectedTeamId, userEmail: email });
     if (result.ok) {
-      showMessage('success', 'Member removed successfully');
-      fetchMembers(selectedTeamId);
+      showMessage('success', t('teams.memberRemoved', 'Member removed successfully'));
+      void fetchMembers(selectedTeamId);
     } else {
-      showMessage('error', result.error || 'Failed to remove member');
+      showMessage('error', result.error || t('teams.memberRemoveFailed', 'Failed to remove member'));
     }
   };
 
@@ -194,10 +209,10 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
       role: newRole,
     });
     if (result.ok) {
-      showMessage('success', 'Role updated successfully');
-      fetchMembers(selectedTeamId);
+      showMessage('success', t('teams.roleUpdated', 'Role updated successfully'));
+      void fetchMembers(selectedTeamId);
     } else {
-      showMessage('error', result.error || 'Failed to update role');
+      showMessage('error', result.error || t('teams.roleUpdateFailed', 'Failed to update role'));
     }
   };
 
@@ -205,11 +220,11 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     if (!selectedTeamId || !accountId.trim()) return;
     const result = await apiCall('/user/admin/team/account', 'POST', { teamId: selectedTeamId, awsAccountId: accountId.trim() });
     if (result.ok) {
-      showMessage('success', 'Account added to team');
+      showMessage('success', t('teams.accountAdded', 'Account added to team'));
       setAccountId('');
-      fetchAccounts(selectedTeamId);
+      void fetchAccounts(selectedTeamId);
     } else {
-      showMessage('error', result.error || 'Failed to add account');
+      showMessage('error', result.error || t('teams.accountAddFailed', 'Failed to add account'));
     }
   };
 
@@ -217,14 +232,12 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     if (!selectedTeamId) return;
     const result = await apiCall('/user/admin/team/account', 'DELETE', { teamId: selectedTeamId, awsAccountId });
     if (result.ok) {
-      showMessage('success', 'Account removed from team');
-      fetchAccounts(selectedTeamId);
+      showMessage('success', t('teams.accountRemoved', 'Account removed from team'));
+      void fetchAccounts(selectedTeamId);
     } else {
-      showMessage('error', result.error || 'Failed to remove account');
+      showMessage('error', result.error || t('teams.accountRemoveFailed', 'Failed to remove account'));
     }
   };
-
-  const formatTimestamp = (ts: number): string => new Date(ts * 1000).toLocaleDateString();
 
   const selectedTeam = teams.find((t) => t.teamId === selectedTeamId);
 
@@ -236,39 +249,46 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleCreateTeam();
+            void handleCreateTeam();
           }}
           style={{ display: 'flex', gap: '12px', alignItems: 'center' }}
         >
           <div style={{ flex: 1 }}>
-            <FocusInput type="text" placeholder="Team name" value={createTeamName} onChange={(e) => setCreateTeamName(e.target.value)} />
+            <FocusInput
+              type="text"
+              placeholder={t('teams.namePlaceholder', 'Team name')}
+              value={createTeamName}
+              onChange={(e) => setCreateTeamName(e.target.value)}
+            />
           </div>
           <button
             type="submit"
             disabled={!createTeamName.trim()}
             style={{
               ...styles.btnGreen,
-              opacity: !createTeamName.trim() ? 0.5 : 1,
-              cursor: !createTeamName.trim() ? 'not-allowed' : 'pointer',
+              opacity: createTeamName.trim() ? 1 : 0.5,
+              cursor: createTeamName.trim() ? 'pointer' : 'not-allowed',
             }}
             onMouseEnter={(e) => {
               if (createTeamName.trim()) e.currentTarget.style.background = '#15803d';
             }}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#16a34a')}
           >
-            Create Team
+            {t('teams.createHeading', 'Create Team')}
           </button>
         </form>
       </div>
 
       {/* Team List */}
       <div style={styles.card}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Teams</h3>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>{t('teams.title', 'Teams')}</h3>
 
         {isLoading && <Spinner size={24} />}
 
         {!isLoading && teams.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280' }}>No teams found. Create one above.</div>
+          <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280' }}>
+            {t('teams.noTeams', 'No teams found. Create one above.')}
+          </div>
         )}
 
         {!isLoading && teams.length > 0 && (
@@ -292,16 +312,16 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                 <div>
                   <div style={{ fontWeight: 500, color: '#ffffff' }}>{team.teamName}</div>
                   <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                    Created by {team.createdBy} on {formatTimestamp(team.createdAt)}
+                    Created by {team.createdBy} on {formatUnixDate(team.createdAt, i18n.resolvedLanguage ?? 'en')}
                   </div>
                 </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteTeam(team.teamId);
+                    void handleDeleteTeam(team.teamId);
                   }}
                   disabled={team.teamId === DEFAULT_TEAM_ID}
-                  title={team.teamId === DEFAULT_TEAM_ID ? 'The default team cannot be deleted' : undefined}
+                  title={team.teamId === DEFAULT_TEAM_ID ? t('teams.defaultLocked', 'The default team cannot be deleted') : undefined}
                   style={{
                     ...styles.btnSmall,
                     background: team.teamId === DEFAULT_TEAM_ID ? '#4b5563' : '#dc2626',
@@ -315,7 +335,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                     if (team.teamId !== DEFAULT_TEAM_ID) e.currentTarget.style.background = '#dc2626';
                   }}
                 >
-                  Delete
+                  {t('common.delete', 'Delete')}
                 </button>
               </div>
             ))}
@@ -328,18 +348,20 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
         <>
           {/* Rename Team */}
           <div style={styles.card}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Team Settings — {selectedTeam.teamName}</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>
+              {t('teams.settingsTitle', 'Team Settings — {{name}}', { name: selectedTeam.teamName })}
+            </h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleRenameTeam();
+                void handleRenameTeam();
               }}
               style={{ display: 'flex', gap: '12px', alignItems: 'center' }}
             >
               <div style={{ flex: 1 }}>
                 <FocusInput
                   type="text"
-                  placeholder="New team name"
+                  placeholder={t('teams.newNamePlaceholder', 'New team name')}
                   value={renameTeamName}
                   onChange={(e) => setRenameTeamName(e.target.value)}
                 />
@@ -358,25 +380,30 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                 }}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#2563eb')}
               >
-                Rename
+                {t('common.rename', 'Rename')}
               </button>
             </form>
           </div>
 
           {/* Members */}
           <div style={styles.card}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Members</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>{t('teams.membersHeading', 'Members')}</h3>
 
             {/* Add member form */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleAddMember();
+                void handleAddMember();
               }}
               style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}
             >
               <div style={{ flex: 1 }}>
-                <FocusInput type="email" placeholder="User email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} />
+                <FocusInput
+                  type="email"
+                  placeholder={t('teams.emailPlaceholder', 'User email')}
+                  value={memberEmail}
+                  onChange={(e) => setMemberEmail(e.target.value)}
+                />
               </div>
               <select
                 value={memberRole}
@@ -388,23 +415,23 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                   cursor: 'pointer',
                 }}
               >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
+                <option value="member">{t('teams.roleMember', 'Member')}</option>
+                <option value="admin">{t('teams.roleAdmin', 'Admin')}</option>
               </select>
               <button
                 type="submit"
                 disabled={!memberEmail.trim()}
                 style={{
                   ...styles.btnGreen,
-                  opacity: !memberEmail.trim() ? 0.5 : 1,
-                  cursor: !memberEmail.trim() ? 'not-allowed' : 'pointer',
+                  opacity: memberEmail.trim() ? 1 : 0.5,
+                  cursor: memberEmail.trim() ? 'pointer' : 'not-allowed',
                 }}
                 onMouseEnter={(e) => {
                   if (memberEmail.trim()) e.currentTarget.style.background = '#15803d';
                 }}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#16a34a')}
               >
-                Add Member
+                {t('teams.addMember', 'Add Member')}
               </button>
             </form>
 
@@ -412,7 +439,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
             {!membersLoading && members.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280', fontSize: '14px' }}>
-                No members yet. Add one above.
+                {t('teams.noMembers', 'No members yet. Add one above.')}
               </div>
             )}
 
@@ -421,10 +448,10 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Email</th>
-                      <th style={styles.th}>Role</th>
-                      <th style={styles.th}>Added</th>
-                      <th style={{ ...styles.th, textAlign: 'right' }}>Actions</th>
+                      <th style={styles.th}>{t('teams.emailHeader', 'Email')}</th>
+                      <th style={styles.th}>{t('teams.roleHeader', 'Role')}</th>
+                      <th style={styles.th}>{t('teams.addedHeader', 'Added')}</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>{t('teams.actionsHeader', 'Actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -445,11 +472,13 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                               outline: 'none',
                             }}
                           >
-                            <option value="member">member</option>
-                            <option value="admin">admin</option>
+                            <option value="member">{t('teams.roleMember', 'Member')}</option>
+                            <option value="admin">{t('teams.roleAdmin', 'Admin')}</option>
                           </select>
                         </td>
-                        <td style={{ ...styles.td, color: '#6b7280', fontSize: '13px' }}>{formatTimestamp(m.joinedAt)}</td>
+                        <td style={{ ...styles.td, color: '#6b7280', fontSize: '13px' }}>
+                          {formatUnixDate(m.joinedAt, i18n.resolvedLanguage ?? 'en')}
+                        </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           <button
                             onClick={() => handleRemoveMember(m.userEmail)}
@@ -457,7 +486,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                             onMouseEnter={(e) => (e.currentTarget.style.background = '#b91c1c')}
                             onMouseLeave={(e) => (e.currentTarget.style.background = '#dc2626')}
                           >
-                            Remove
+                            {t('common.remove', 'Remove')}
                           </button>
                         </td>
                       </tr>
@@ -470,20 +499,20 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
           {/* Accounts */}
           <div style={styles.card}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>AWS Accounts</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>{t('teams.accountsHeading', 'AWS Accounts')}</h3>
 
             {/* Add account form */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleAddAccount();
+                void handleAddAccount();
               }}
               style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}
             >
               <div style={{ flex: 1 }}>
                 <FocusInput
                   type="text"
-                  placeholder="AWS Account ID (12 digits)"
+                  placeholder={t('teams.accountPlaceholder', 'AWS Account ID (12 digits)')}
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
                   pattern="[0-9]{12}"
@@ -494,15 +523,15 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                 disabled={!accountId.trim()}
                 style={{
                   ...styles.btnGreen,
-                  opacity: !accountId.trim() ? 0.5 : 1,
-                  cursor: !accountId.trim() ? 'not-allowed' : 'pointer',
+                  opacity: accountId.trim() ? 1 : 0.5,
+                  cursor: accountId.trim() ? 'pointer' : 'not-allowed',
                 }}
                 onMouseEnter={(e) => {
                   if (accountId.trim()) e.currentTarget.style.background = '#15803d';
                 }}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#16a34a')}
               >
-                Add Account
+                {t('teams.addAccount', 'Add Account')}
               </button>
             </form>
 
@@ -510,7 +539,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
 
             {!accountsLoading && accounts.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280', fontSize: '14px' }}>
-                No accounts assigned yet. Add one above.
+                {t('teams.noAccounts', 'No accounts assigned yet. Add one above.')}
               </div>
             )}
 
@@ -537,7 +566,7 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#b91c1c')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = '#dc2626')}
                     >
-                      Remove
+                      {t('common.remove', 'Remove')}
                     </button>
                   </div>
                 ))}

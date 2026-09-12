@@ -1,10 +1,10 @@
-import { CredentialsDAO } from '@/dao';
-import { AssumeRoleUtil } from '@/utils';
-import { BadRequestError } from '@/error';
+import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@/model';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@/constants';
+import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
+import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class TestCredentialChainRoute extends IAdminActivityAPIRoute<
   TestCredentialChainRequest,
@@ -194,6 +194,7 @@ class TestCredentialChainRoute extends IAdminActivityAPIRoute<
     // The chain is ordered: [target, intermediate, ..., base]
     // We walk from base (last) to target (first), assuming each role
     chainResults.push({
+      // eslint-disable-next-line unicorn/prefer-at -- index access preserves `string` type; `.at()` widens to `string | undefined`
       arn: credentialChain.principalArns[credentialChain.principalArns.length - 1],
       status: 'ok (base credentials)',
     });
@@ -228,7 +229,7 @@ interface TestCredentialChainResponse extends IResponse {
 }
 
 interface TestCredentialChainEnv extends IAdminEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeDB: D1DatabaseSession;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }

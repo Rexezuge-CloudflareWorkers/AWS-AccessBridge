@@ -1,0 +1,26 @@
+{
+  "name": "@aws-access-bridge/backend-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./base": "./src/base/index.ts",
+    "./base/*": "./src/base/*.ts",
+    "./config": "./src/config/index.ts",
+    "./config/*": "./src/config/*.ts",
+    "./constants": "./src/constants/index.ts",
+    "./constants/*": "./src/constants/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-access-bridge/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "6.0.3"
+  }
+}

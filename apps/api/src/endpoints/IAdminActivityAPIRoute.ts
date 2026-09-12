@@ -1,7 +1,7 @@
 import { IActivityAPIRoute } from './IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from './IActivityAPIRoute';
-import { UserMetadataDAO } from '@/dao';
-import { MethodNotAllowedError, UnauthorizedError } from '@/error';
+import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
+import { MethodNotAllowedError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 abstract class IAdminActivityAPIRoute<
   TRequest extends IRequest,
@@ -37,4 +37,6 @@ abstract class IAdminActivityAPIRoute<
 type IAdminEnv = IEnv;
 
 export { IAdminActivityAPIRoute };
-export type { IAdminEnv, ActivityContext, IRequest, IResponse, ExtendedResponse };
+export type { IAdminEnv };
+
+export { type ActivityContext, type IRequest, type IResponse, type ExtendedResponse } from './IActivityAPIRoute';

@@ -6,6 +6,7 @@ import { FederateRoute as OriginalFederateRoute } from './api/aws/federate/GET';
 import { ListAssumablesRoute as OriginalListAssumablesRoute } from './user/assumables/GET';
 import { SearchAccountsRoute as OriginalSearchAccountsRoute } from './user/assumables/search/GET';
 import { GetCurrentUserRoute as OriginalGetCurrentUserRoute } from './user/me/GET';
+import { UpdateCurrentUserRoute as OriginalUpdateCurrentUserRoute } from './user/me/PUT';
 import { FavoriteAccountRoute as OriginalFavoriteAccountRoute } from './user/favorites/POST';
 import { UnfavoriteAccountRoute as OriginalUnfavoriteAccountRoute } from './user/favorites/DELETE';
 import { StoreCredentialRoute as OriginalStoreCredentialRoute } from './user/admin/credentials/POST';
@@ -47,6 +48,7 @@ import { AddTeamAccountRoute as OriginalAddTeamAccountRoute } from './user/admin
 import { RemoveTeamAccountRoute as OriginalRemoveTeamAccountRoute } from './user/admin/team/account/DELETE';
 import { ListTeamAccountsRoute as OriginalListTeamAccountsRoute } from './user/admin/team/accounts/GET';
 import { CleanupOrphanedDataRoute as OriginalCleanupOrphanedDataRoute } from './user/admin/maintenance/cleanup-orphaned/POST';
+import { ListTaskRunsRoute as OriginalListTaskRunsRoute } from './user/admin/maintenance/task-runs/GET';
 
 export const GenerateConsoleUrlRoute: any = OriginalGenerateConsoleUrlRoute;
 export const AssumeRoleRoute: any = OriginalAssumeRoleRoute;
@@ -54,6 +56,7 @@ export const FederateRoute: any = OriginalFederateRoute;
 export const ListAssumablesRoute: any = OriginalListAssumablesRoute;
 export const SearchAccountsRoute: any = OriginalSearchAccountsRoute;
 export const GetCurrentUserRoute: any = OriginalGetCurrentUserRoute;
+export const UpdateCurrentUserRoute: any = OriginalUpdateCurrentUserRoute;
 export const FavoriteAccountRoute: any = OriginalFavoriteAccountRoute;
 export const UnfavoriteAccountRoute: any = OriginalUnfavoriteAccountRoute;
 export const StoreCredentialRoute: any = OriginalStoreCredentialRoute;
@@ -95,3 +98,4 @@ export const AddTeamAccountRoute: any = OriginalAddTeamAccountRoute;
 export const RemoveTeamAccountRoute: any = OriginalRemoveTeamAccountRoute;
 export const ListTeamAccountsRoute: any = OriginalListTeamAccountsRoute;
 export const CleanupOrphanedDataRoute: any = OriginalCleanupOrphanedDataRoute;
+export const ListTaskRunsRoute: any = OriginalListTaskRunsRoute;

@@ -1,5 +1,5 @@
-import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-core/base';
-import { AuditLogCleanupTask, CostDataCollectionTask, CredentialCacheRefreshTask, ResourceInventoryCollectionTask } from '@/scheduled';
+import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-runtime/base';
+import { tasksForPhase } from '@aws-access-bridge/background/scheduled';
 
 const CRON_TASKS_RUN_PATH: string = '/run';
 
@@ -55,7 +55,7 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
 
   protected async readRunRequest(request: Request): Promise<CronTasksRunRequest> {
     try {
-      return (await request.json()) as CronTasksRunRequest;
+      return await request.json();
     } catch (_err: unknown) {
       console.debug(_err);
       return {};
@@ -64,10 +64,8 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
 
   protected async runScheduledTasks(event: ScheduledController): Promise<void> {
     const ctx: ExecutionContext = this.createExecutionContext();
-    await new CredentialCacheRefreshTask().handle(event, this.env, ctx);
-    await new AuditLogCleanupTask().handle(event, this.env, ctx);
-    await new CostDataCollectionTask().handle(event, this.env, ctx);
-    await new ResourceInventoryCollectionTask().handle(event, this.env, ctx);
+    await Promise.all(tasksForPhase(1).map((task) => task.handle(event, this.env, ctx)));
+    await Promise.all(tasksForPhase(2).map((task) => task.handle(event, this.env, ctx)));
   }
 }
 

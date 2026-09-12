@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatUnixTimestamp } from '../lib/format';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
 import { apiFetch } from '../lib/api';
@@ -18,6 +20,12 @@ interface AuditLog {
   detail?: string;
   ipAddress?: string;
   userAgent?: string;
+}
+
+function statusColorStyle(code: number): React.CSSProperties {
+  if (code < 300) return { color: '#4ade80' };
+  if (code < 400) return { color: '#facc15' };
+  return { color: '#f87171' };
 }
 
 interface AuditLogsTabProps {
@@ -43,9 +51,10 @@ const styles = {
 };
 
 export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTabProps) {
+  const { t, i18n } = useTranslation();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
@@ -55,40 +64,32 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
   const [filterAction, setFilterAction] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [refreshIndex, setRefreshIndex] = useState(0);
   const pageSize = 25;
 
-  const fetchLogs = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  useEffect(() => {
     const params = new URLSearchParams();
     if (filterEmail.trim()) params.set('userEmail', filterEmail.trim());
     if (filterAction.trim()) params.set('action', filterAction.trim());
     params.set('limit', pageSize.toString());
     params.set('offset', (page * pageSize).toString());
 
-    const result = await apiFetch<{ logs: AuditLog[]; total: number }>(`/user/admin/audit-logs?${params.toString()}`);
-    if (result.ok && result.data) {
-      setLogs(result.data.logs);
-      setTotal(result.data.total);
-    } else {
-      setError(result.error || 'Failed to load audit logs');
-    }
-    setIsLoading(false);
-  }, [filterEmail, filterAction, page]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-
-  const formatTimestamp = (ts: number): string => {
-    return new Date(ts * 1000).toLocaleString();
-  };
-
-  const statusColorStyle = (code: number): React.CSSProperties => {
-    if (code < 300) return { color: '#4ade80' };
-    if (code < 400) return { color: '#facc15' };
-    return { color: '#f87171' };
-  };
+    apiFetch<{ logs: AuditLog[]; total: number }>(`/user/admin/audit-logs?${params.toString()}`)
+      .then((result) => {
+        if (result.ok && result.data) {
+          setLogs(result.data.logs);
+          setTotal(result.data.total);
+          setError(null);
+        } else {
+          setError(result.error || t('audit.loadError', 'Failed to load audit logs'));
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setError(t('audit.loadError', 'Failed to load audit logs'));
+        setIsLoading(false);
+      });
+  }, [filterEmail, filterAction, page, refreshIndex, t]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -104,7 +105,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div>
             <label className="font-medium" style={{ display: 'block', fontSize: '12px', color: '#9ca3af', marginBottom: '6px' }}>
-              User Email
+              {t('audit.emailFilter', 'User Email')}
             </label>
             <input
               type="text"
@@ -113,7 +114,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                 setFilterEmail(e.target.value);
                 setPage(0);
               }}
-              placeholder="Filter by email"
+              placeholder={t('audit.emailPlaceholder', 'Filter by email')}
               className="text-sm"
               style={getInputStyle('email')}
               onFocus={() => setFocusedInput('email')}
@@ -122,7 +123,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
           </div>
           <div>
             <label className="font-medium" style={{ display: 'block', fontSize: '12px', color: '#9ca3af', marginBottom: '6px' }}>
-              Action
+              {t('audit.actionHeader', 'Action')}
             </label>
             <input
               type="text"
@@ -131,7 +132,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                 setFilterAction(e.target.value);
                 setPage(0);
               }}
-              placeholder="e.g. ASSUME_ROLE"
+              placeholder={t('audit.actionPlaceholder', 'e.g. ASSUME_ROLE')}
               className="text-sm"
               style={getInputStyle('action')}
               onFocus={() => setFocusedInput('action')}
@@ -139,16 +140,16 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
             />
           </div>
           <button
-            onClick={fetchLogs}
+            onClick={() => setRefreshIndex((i) => i + 1)}
             className="text-sm font-medium"
             style={styles.btnBlue}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#1d4ed8')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#2563eb')}
           >
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </button>
           <span className="text-sm" style={{ color: '#6b7280', marginLeft: 'auto' }}>
-            {total} total entries
+            {t('audit.totalEntries', '{{total}} total entries', { total })}
           </span>
         </div>
       </div>
@@ -163,7 +164,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
 
       {/* Empty state */}
       {!isLoading && !error && logs.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#6b7280' }}>No audit logs found.</div>
+        <div style={{ textAlign: 'center', padding: '48px 0', color: '#6b7280' }}>{t('audit.emptyTitle', 'No audit logs found.')}</div>
       )}
 
       {/* Table */}
@@ -173,19 +174,19 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
             <thead>
               <tr>
                 <th className="font-medium text-xs" style={styles.th}>
-                  Time
+                  {t('audit.timeHeader', 'Time')}
                 </th>
                 <th className="font-medium text-xs" style={styles.th}>
-                  User
+                  {t('audit.userHeader', 'User')}
                 </th>
                 <th className="font-medium text-xs" style={styles.th}>
-                  Action
+                  {t('audit.actionHeader', 'Action')}
                 </th>
                 <th className="font-medium text-xs" style={styles.th}>
-                  Method
+                  {t('audit.methodHeader', 'Method')}
                 </th>
                 <th className="font-medium text-xs" style={styles.th}>
-                  Status
+                  {t('audit.statusHeader', 'Status')}
                 </th>
                 <th className="font-medium text-xs" style={styles.th}>
                   IP
@@ -208,7 +209,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                     onMouseLeave={() => setHoveredRow(null)}
                   >
                     <td className="whitespace-nowrap" style={{ ...styles.td, color: '#d1d5db' }}>
-                      {formatTimestamp(log.timestamp)}
+                      {formatUnixTimestamp(log.timestamp, i18n.resolvedLanguage ?? 'en')}
                     </td>
                     <td style={{ ...styles.td, color: '#d1d5db' }}>
                       <div className="truncate" style={{ maxWidth: '200px' }} title={log.userEmail}>
@@ -232,14 +233,14 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                         <div className="text-xs" style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#d1d5db' }}>
                           <div>
                             <span className="font-medium" style={{ color: '#6b7280' }}>
-                              Path:
+                              {t('audit.pathLabel', 'Path:')}
                             </span>{' '}
                             <span className="font-mono">{log.path}</span>
                           </div>
                           {log.resource && (
                             <div>
                               <span className="font-medium" style={{ color: '#6b7280' }}>
-                                Resource:
+                                {t('audit.resourceLabel', 'Resource:')}
                               </span>{' '}
                               {log.resource}
                             </div>
@@ -247,7 +248,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                           {log.detail && (
                             <div>
                               <span className="font-medium" style={{ color: '#6b7280' }}>
-                                Detail:
+                                {t('audit.detailLabel', 'Detail:')}
                               </span>{' '}
                               {log.detail}
                             </div>
@@ -255,14 +256,14 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                           {log.userAgent && (
                             <div>
                               <span className="font-medium" style={{ color: '#6b7280' }}>
-                                User Agent:
+                                {t('audit.userAgentLabel', 'User Agent:')}
                               </span>{' '}
                               {log.userAgent}
                             </div>
                           )}
                           <div>
                             <span className="font-medium" style={{ color: '#6b7280' }}>
-                              Log ID:
+                              {t('audit.logIdLabel', 'Log ID:')}
                             </span>{' '}
                             <span className="font-mono">{log.logId}</span>
                           </div>

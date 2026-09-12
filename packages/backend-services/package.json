@@ -1,0 +1,34 @@
+{
+  "name": "@aws-access-bridge/backend-services",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./audit": "./src/audit/index.ts",
+    "./audit/*": "./src/audit/*.ts",
+    "./auth": "./src/auth/index.ts",
+    "./auth/*": "./src/auth/*.ts",
+    "./aws": "./src/aws/index.ts",
+    "./aws/*": "./src/aws/*.ts",
+    "./error": "./src/error/index.ts",
+    "./error/*": "./src/error/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-access-bridge/backend-data": "workspace:*",
+    "@aws-access-bridge/backend-errors": "workspace:*",
+    "@aws-access-bridge/backend-runtime": "workspace:*",
+    "@aws-access-bridge/shared": "workspace:*",
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.13.3",
+    "jose": "^6.2.11"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,12 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-interface UserMe {
-  isSuperAdmin?: boolean;
-  email?: string;
-  demoMode?: boolean;
-}
+import { applyLanguage } from '../lib/locale';
+import { loadCurrentUser } from '../services/authService';
 
 export interface AuthState {
   isAuthorized: boolean | null;
@@ -22,25 +18,19 @@ export function useAuth(): AuthState {
   const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/user/me');
-        if (response.status === 401) {
-          setIsAuthorized(false);
-        } else if (response.ok) {
-          const userData = (await response.json()) as UserMe;
-          setIsAuthorized(true);
-          setIsSuperAdmin(userData.isSuperAdmin || false);
-          setIsDemoMode(userData.demoMode || false);
-          setUserEmail(userData.email || '');
-        } else {
-          setIsAuthorized(false);
+    loadCurrentUser()
+      .then((userData) => {
+        setIsAuthorized(true);
+        setIsSuperAdmin(userData.isSuperAdmin || false);
+        setIsDemoMode(userData.demoMode || false);
+        setUserEmail(userData.email || '');
+        if (userData.preferredLanguage) {
+          void applyLanguage(userData.preferredLanguage).catch(() => undefined);
         }
-      } catch {
+      })
+      .catch(() => {
         setIsAuthorized(false);
-      }
-    };
-    checkAuth();
+      });
   }, []);
 
   return { isAuthorized, isSuperAdmin, isDemoMode, userEmail };

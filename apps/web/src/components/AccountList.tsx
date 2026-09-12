@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import AccessKeyModal from './AccessKeyModal';
 import Spinner from './ui/Spinner';
+import { isUnauthorized } from '../lib/api';
+import { assumeRoleKeys, buildFederateUrl, listAccounts, setFavorite, setRoleHidden } from '../services/accountService';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
-import { buildPrincipalArn } from '@aws-access-bridge/shared';
-
-type RoleMap = Record<string, { roles: string[]; hiddenRoles?: string[]; nickname?: string; favorite: boolean }>;
+import type { RoleMap } from '../services/accountService';
 
 interface AccountListProps {
   showHidden: boolean;
@@ -17,7 +18,142 @@ interface AccountListProps {
   setTotalAccounts: (count: number) => void;
 }
 
+interface HideDialogInfo {
+  key: string;
+  accountId: string;
+  role: string;
+  roleHidden: boolean;
+  top: number;
+  right: number;
+}
+
+interface AccountRoleRowProps {
+  accountId: string;
+  role: string;
+  roleHidden: boolean;
+  loadingKeys: string | null;
+  loadingConsole: string | null;
+  hoveredRole: string | null;
+  hoveredEye: string | null;
+  confirmKey: string | null;
+  onHoverRole: (key: string | null) => void;
+  onHoverEye: (key: string | null) => void;
+  onConsole: (accountId: string, role: string) => void;
+  onAccessKeys: (accountId: string, role: string) => void;
+  onToggleHideDialog: (info: HideDialogInfo | null) => void;
+}
+
+function AccountRoleRow({
+  accountId,
+  role,
+  roleHidden,
+  loadingKeys,
+  loadingConsole,
+  hoveredRole,
+  hoveredEye,
+  confirmKey,
+  onHoverRole,
+  onHoverEye,
+  onConsole,
+  onAccessKeys,
+  onToggleHideDialog,
+}: AccountRoleRowProps) {
+  const { t } = useTranslation();
+  const loadingKey = `${accountId}-${role}`;
+  const isLoadingKeys = loadingKeys === loadingKey;
+  const isLoadingConsole = loadingConsole === loadingKey;
+  const isHovered = hoveredRole === loadingKey;
+  const isEyeHovered = hoveredEye === loadingKey;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '6px 12px',
+        borderRadius: '8px',
+        background: isHovered ? '#252d3d' : 'transparent',
+        transition: 'background 0.15s',
+        opacity: roleHidden ? 0.55 : 1,
+      }}
+      onMouseEnter={() => onHoverRole(loadingKey)}
+      onMouseLeave={() => onHoverRole(null)}
+    >
+      <a
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          if (!isLoadingConsole) onConsole(accountId, role);
+        }}
+        className={`transition-colors ${isLoadingConsole ? 'text-gray-400 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300'}`}
+        style={{ textDecoration: 'none' }}
+      >
+        {isLoadingConsole ? t('accounts.openingConsole', 'Opening Console...') : role}
+      </a>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirmKey === loadingKey) {
+              onToggleHideDialog(null);
+              return;
+            }
+            const rect = e.currentTarget.getBoundingClientRect();
+            onToggleHideDialog({
+              key: loadingKey,
+              accountId,
+              role,
+              roleHidden,
+              top: rect.bottom + 10,
+              right: Math.max(8, window.innerWidth - rect.right - 4),
+            });
+          }}
+          onMouseEnter={() => onHoverEye(loadingKey)}
+          onMouseLeave={() => onHoverEye(null)}
+          title={roleHidden ? t('accounts.unhideRole', 'Unhide role') : t('accounts.hideRole', 'Hide role')}
+          aria-label={roleHidden ? t('accounts.unhideRole', 'Unhide role') : t('accounts.hideRole', 'Hide role')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '24px',
+            height: '24px',
+            padding: 0,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: isEyeHovered ? '#f87171' : '#6b7280',
+            transition: 'color 0.15s',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+            <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" />
+            {roleHidden && <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />}
+          </svg>
+        </button>
+        <button
+          className="text-sm"
+          style={{
+            transition: 'color 0.15s',
+            color: isLoadingKeys ? '#9ca3af' : isHovered ? '#60a5fa' : '#6b7280',
+            background: 'none',
+            border: 'none',
+            cursor: isLoadingKeys ? 'default' : 'pointer',
+          }}
+          onClick={() => onAccessKeys(accountId, role)}
+          disabled={isLoadingKeys}
+        >
+          {isLoadingKeys ? t('common.loading', 'Loading...') : t('accounts.accessKeys', 'Access Keys')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts }: AccountListProps) {
+  const { t } = useTranslation();
   const [rolesData, setRolesData] = useState<RoleMap>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [modalData, setModalData] = useState<AccessKeysResponse | null>(null);
@@ -26,59 +162,24 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
   const [loadingConsole, setLoadingConsole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAccounts = useCallback(async () => {
-    setIsLoading(true);
-
-    let url: string;
-    if (searchTerm.trim()) {
-      const params = new URLSearchParams();
-      params.set('q', searchTerm.trim());
-      if (showHidden) params.set('showHidden', 'true');
-      url = `/user/assumables/search?${params.toString()}`;
-    } else {
-      const offset = (currentPage - 1) * pageSize;
-      const params = new URLSearchParams();
-      if (showHidden) params.set('showHidden', 'true');
-      params.set('limit', pageSize.toString());
-      params.set('offset', offset.toString());
-      url = `/user/assumables?${params.toString()}`;
-    }
-
-    try {
-      const res = await fetch(url);
-      if (res.status === 401) {
-        window.location.reload();
-        return;
-      }
-      if (!res.ok) {
-        const errorData = (await res.json().catch(() => null)) as { Exception?: { Message?: string } } | null;
-        const errorMsg = errorData?.Exception?.Message || `Failed to load accounts: ${res.status} ${res.statusText}`;
-        throw new Error(errorMsg);
-      }
-
-      const data = (await res.json()) as RoleMap & { totalAccounts?: number };
-      if (data) {
-        if (searchTerm.trim()) {
-          setRolesData(data);
-          setTotalAccounts(Object.keys(data).length);
-        } else {
-          const { totalAccounts: total, ...accounts } = data;
-          setRolesData(accounts);
-          setTotalAccounts(total ?? 0);
-        }
-        setExpanded(Object.fromEntries(Object.keys(searchTerm.trim() ? data : data).map((id) => [id, false])));
-        setError(null);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load AWS accounts');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showHidden, currentPage, pageSize, searchTerm, setTotalAccounts]);
-
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    listAccounts({ showHidden, searchTerm, pageSize, currentPage })
+      .then(({ roles, total }) => {
+        setRolesData(roles);
+        setTotalAccounts(total);
+        setExpanded(Object.fromEntries(Object.keys(roles).map((id) => [id, false])));
+        setError(null);
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (isUnauthorized(err)) {
+          globalThis.location.reload();
+          return;
+        }
+        setError(err instanceof Error ? err.message : t('accounts.loadError', 'Failed to load AWS accounts'));
+        setIsLoading(false);
+      });
+  }, [showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, t]);
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -88,21 +189,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     const isFavorite = rolesData[accountId]?.favorite;
 
     try {
-      const response = await fetch('/user/favorites', {
-        method: isFavorite ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ awsAccountId: accountId }),
-      });
-
-      if (response.status === 401) {
-        window.location.reload();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to ${isFavorite ? 'unfavorite' : 'favorite'} account`);
-      }
-
+      await setFavorite(accountId, isFavorite);
       setRolesData((prev) => ({
         ...prev,
         [accountId]: {
@@ -112,7 +199,9 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
       }));
     } catch (error) {
       console.error(error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+      alert(
+        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
+      );
     }
   };
 
@@ -130,69 +219,47 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     }));
 
     try {
-      const response = await fetch('/user/assumable/hidden', {
-        method: currentlyHidden ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ awsAccountId: accountId, roleName: role }),
-      });
-
-      if (response.status === 401) {
-        window.location.reload();
-        return;
-      }
-
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => null)) as { Exception?: { Message?: string } } | null;
-        throw new Error(errorData?.Exception?.Message || `Failed to ${currentlyHidden ? 'unhide' : 'hide'} role`);
-      }
+      await setRoleHidden(accountId, role, !currentlyHidden);
     } catch (error) {
       setRolesData((prev) => ({ ...prev, [accountId]: previous }));
       console.error(error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+      alert(
+        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
+      );
     }
   };
 
   const handleAccessKeys = async (accountId: string, role: string) => {
-    const principalArn = buildPrincipalArn(accountId, role);
     const loadingKey = `${accountId}-${role}`;
 
     setLoadingKeys(loadingKey);
     try {
-      const assumeRes = await fetch('/user/aws/assume-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ principalArn }),
-      });
-
-      if (assumeRes.status === 401) {
-        window.location.reload();
-        return;
-      }
-
-      if (!assumeRes.ok) {
-        const errorText = await assumeRes.text();
-        throw new Error(`Assume role failed: ${assumeRes.status} ${errorText}`);
-      }
-
-      const creds = (await assumeRes.json()) as AccessKeysResponse;
+      const creds = await assumeRoleKeys(accountId, role);
       setModalData(creds);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        globalThis.location.reload();
+        return;
+      }
       console.error(error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+      alert(
+        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
+      );
     } finally {
       setLoadingKeys(null);
     }
   };
 
-  const handleConsole = async (accountId: string, role: string) => {
+  const handleConsole = (accountId: string, role: string): void => {
     const loadingKey = `${accountId}-${role}`;
     setLoadingConsole(loadingKey);
     try {
-      const federateUrl = `/user/aws/federate?awsAccountId=${accountId}&role=${encodeURIComponent(role)}`;
-      window.open(federateUrl, '_blank');
+      window.open(buildFederateUrl(accountId, role), '_blank');
     } catch (error) {
       console.error(error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+      alert(
+        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
+      );
     } finally {
       setLoadingConsole(null);
     }
@@ -213,7 +280,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     if (!confirmHide) return;
     const close = () => setConfirmHide(null);
     document.addEventListener('click', close);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('scroll', close, { capture: true });
     window.addEventListener('resize', close);
     return () => {
       document.removeEventListener('click', close);
@@ -224,7 +291,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
 
   return (
     <div>
-      {isLoading && <Spinner size={32} label="Loading Accounts..." padding="32px 0" />}
+      {isLoading && <Spinner size={32} label={t('accounts.loading', 'Loading Accounts...')} padding="32px 0" />}
       {!isLoading && error && (
         <div
           style={{
@@ -269,197 +336,121 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>No AWS accounts available</p>
+          <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>{t('accounts.emptyTitle', 'No AWS accounts available')}</p>
           <p style={{ fontSize: '14px', color: '#6b7280' }}>
-            You don't have access to any AWS accounts. Contact your administrator to request access.
+            {t('accounts.emptyHint', "You don't have access to any AWS accounts. Contact your administrator to request access.")}
           </p>
         </div>
       )}
       {!isLoading &&
-        Object.entries(rolesData).map(([accountId, accountData]) => (
-          <div
-            key={accountId}
-            className="animate-fade-in-up"
-            style={{
-              background: '#1e2433',
-              borderRadius: '12px',
-              padding: '16px',
-              marginTop: '12px',
-              marginBottom: '12px',
-              color: '#ffffff',
-              transition: 'background 0.15s',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div
-                className="group"
-                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}
-                onClick={() => toggleExpand(accountId)}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  className="shrink-0 group-hover:text-gray-300"
-                  style={{
-                    marginRight: '12px',
-                    color: '#6b7280',
-                    transition: 'transform 0.2s, color 0.2s',
-                    transform: expanded[accountId] ? 'rotate(90deg)' : 'rotate(0deg)',
-                  }}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
+        Object.entries(rolesData).map(([accountId, accountData]) => {
+          const allRoles: Array<{ name: string; hidden: boolean }> = [
+            ...accountData.roles.map((name) => ({ name, hidden: false })),
+            ...(accountData.hiddenRoles ?? []).map((name) => ({ name, hidden: true })),
+          ];
+          return (
+            <div
+              key={accountId}
+              className="animate-fade-in-up"
+              style={{
+                background: '#1e2433',
+                borderRadius: '12px',
+                padding: '16px',
+                marginTop: '12px',
+                marginBottom: '12px',
+                color: '#ffffff',
+                transition: 'background 0.15s',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div
+                  className="group"
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}
+                  onClick={() => toggleExpand(accountId)}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <div className="font-semibold" style={{ fontSize: '16px' }}>
-                  {accountData.nickname ? (
-                    <>
-                      <span style={{ color: '#f3f4f6' }}>{accountData.nickname}</span>{' '}
-                      <span className="font-normal" style={{ color: '#6b7280', fontSize: '14px', marginLeft: '4px' }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    className="shrink-0 group-hover:text-gray-300"
+                    style={{
+                      marginRight: '12px',
+                      color: '#6b7280',
+                      transition: 'transform 0.2s, color 0.2s',
+                      transform: expanded[accountId] ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <div className="font-semibold" style={{ fontSize: '16px' }}>
+                    {accountData.nickname ? (
+                      <>
+                        <span style={{ color: '#f3f4f6' }}>{accountData.nickname}</span>{' '}
+                        <span className="font-normal" style={{ color: '#6b7280', fontSize: '14px', marginLeft: '4px' }}>
+                          {accountId}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-mono" style={{ color: '#e5e7eb' }}>
                         {accountId}
                       </span>
-                    </>
-                  ) : (
-                    <span className="font-mono" style={{ color: '#e5e7eb' }}>
-                      {accountId}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => toggleFavorite(accountId)}
-                style={{
-                  fontSize: '20px',
-                  marginLeft: '16px',
-                  transition: 'transform 0.15s',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-                title={accountData.favorite ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                {accountData.favorite ? '\u2B50' : '\u2606'}
-              </button>
-            </div>
-            {(() => {
-              const allRoles: Array<{ name: string; hidden: boolean }> = [
-                ...accountData.roles.map((name) => ({ name, hidden: false })),
-                ...(accountData.hiddenRoles ?? []).map((name) => ({ name, hidden: true })),
-              ];
-              return (
-                <div
-                  style={{
-                    overflow: 'hidden',
-                    transition: 'max-height 0.2s ease-out, opacity 0.2s ease-out',
-                    maxHeight: expanded[accountId] ? `${allRoles.length * 44 + 16}px` : '0px',
-                    opacity: expanded[accountId] ? 1 : 0,
-                  }}
-                >
-                  <div style={{ marginLeft: '28px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {allRoles.map(({ name: role, hidden: roleHidden }) => {
-                      const loadingKey = `${accountId}-${role}`;
-                      const isLoadingKeys = loadingKeys === loadingKey;
-                      const isLoadingConsole = loadingConsole === loadingKey;
-                      const isHovered = hoveredRole === loadingKey;
-                      const isEyeHovered = hoveredEye === loadingKey;
-
-                      return (
-                        <div
-                          key={role}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            background: isHovered ? '#252d3d' : 'transparent',
-                            transition: 'background 0.15s',
-                            opacity: roleHidden ? 0.55 : 1,
-                          }}
-                          onMouseEnter={() => setHoveredRole(loadingKey)}
-                          onMouseLeave={() => setHoveredRole(null)}
-                        >
-                          <a
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (!isLoadingConsole) handleConsole(accountId, role);
-                            }}
-                            className={`transition-colors ${
-                              isLoadingConsole ? 'text-gray-400 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300'
-                            }`}
-                            style={{ textDecoration: 'none' }}
-                          >
-                            {isLoadingConsole ? 'Opening Console...' : role}
-                          </a>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirmHide?.key === loadingKey) {
-                                  setConfirmHide(null);
-                                  return;
-                                }
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setConfirmHide({
-                                  key: loadingKey,
-                                  accountId,
-                                  role,
-                                  roleHidden,
-                                  top: rect.bottom + 10,
-                                  right: Math.max(8, window.innerWidth - rect.right - 4),
-                                });
-                              }}
-                              onMouseEnter={() => setHoveredEye(loadingKey)}
-                              onMouseLeave={() => setHoveredEye(null)}
-                              title={roleHidden ? 'Unhide role' : 'Hide role'}
-                              aria-label={roleHidden ? 'Unhide role' : 'Hide role'}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '24px',
-                                height: '24px',
-                                padding: 0,
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: isEyeHovered ? '#f87171' : '#6b7280',
-                                transition: 'color 0.15s',
-                              }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
-                                <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" />
-                                {roleHidden && <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />}
-                              </svg>
-                            </button>
-                            <button
-                              className="text-sm"
-                              style={{
-                                transition: 'color 0.15s',
-                                color: isLoadingKeys ? '#9ca3af' : isHovered ? '#60a5fa' : '#6b7280',
-                                background: 'none',
-                                border: 'none',
-                                cursor: isLoadingKeys ? 'default' : 'pointer',
-                              }}
-                              onClick={() => handleAccessKeys(accountId, role)}
-                              disabled={isLoadingKeys}
-                            >
-                              {isLoadingKeys ? 'Loading...' : 'Access Keys'}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    )}
                   </div>
                 </div>
-              );
-            })()}
-          </div>
-        ))}
+                <button
+                  onClick={() => toggleFavorite(accountId)}
+                  style={{
+                    fontSize: '20px',
+                    marginLeft: '16px',
+                    transition: 'transform 0.15s',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  title={
+                    accountData.favorite
+                      ? t('accounts.removeFavorite', 'Remove from favorites')
+                      : t('accounts.addFavorite', 'Add to favorites')
+                  }
+                >
+                  {accountData.favorite ? '\u{2B50}' : '\u{2606}'}
+                </button>
+              </div>
+              <div
+                style={{
+                  overflow: 'hidden',
+                  transition: 'max-height 0.2s ease-out, opacity 0.2s ease-out',
+                  maxHeight: expanded[accountId] ? `${allRoles.length * 44 + 16}px` : '0px',
+                  opacity: expanded[accountId] ? 1 : 0,
+                }}
+              >
+                <div style={{ marginLeft: '28px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {allRoles.map(({ name: role, hidden: roleHidden }) => (
+                    <AccountRoleRow
+                      key={role}
+                      accountId={accountId}
+                      role={role}
+                      roleHidden={roleHidden}
+                      loadingKeys={loadingKeys}
+                      loadingConsole={loadingConsole}
+                      hoveredRole={hoveredRole}
+                      hoveredEye={hoveredEye}
+                      confirmKey={confirmHide?.key ?? null}
+                      onHoverRole={setHoveredRole}
+                      onHoverEye={setHoveredEye}
+                      onConsole={handleConsole}
+                      onAccessKeys={handleAccessKeys}
+                      onToggleHideDialog={setConfirmHide}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
       {modalData && <AccessKeyModal {...modalData} onClose={() => setModalData(null)} />}
 
@@ -469,7 +460,11 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
           <div
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={confirmHide.roleHidden ? 'Confirm unhide role' : 'Confirm hide role'}
+            aria-label={
+              confirmHide.roleHidden
+                ? t('accounts.confirmUnhideTitle', 'Unhide this role?')
+                : t('accounts.confirmHideTitle', 'Hide this role?')
+            }
             style={{
               position: 'fixed',
               top: confirmHide.top,
@@ -497,7 +492,9 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
               }}
             />
             <div style={{ fontSize: '12px', color: '#e5e7eb', marginBottom: '8px' }}>
-              {confirmHide.roleHidden ? 'Unhide this role?' : 'Hide this role?'}
+              {confirmHide.roleHidden
+                ? t('accounts.confirmUnhideTitle', 'Unhide this role?')
+                : t('accounts.confirmHideTitle', 'Hide this role?')}
             </div>
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
               <button
@@ -515,14 +512,14 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   const { accountId, role, roleHidden } = confirmHide;
                   setConfirmHide(null);
-                  toggleHidden(accountId, role, roleHidden);
+                  void toggleHidden(accountId, role, roleHidden);
                 }}
                 style={{
                   fontSize: '12px',
@@ -535,7 +532,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
                   fontWeight: 500,
                 }}
               >
-                {confirmHide.roleHidden ? 'Unhide' : 'Hide'}
+                {confirmHide.roleHidden ? t('accounts.unhide', 'Unhide') : t('accounts.hide', 'Hide')}
               </button>
             </div>
           </div>,

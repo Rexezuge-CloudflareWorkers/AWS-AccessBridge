@@ -8,9 +8,9 @@ import {
   FORWARDED_FOR_HEADER,
   INTERNAL_USER_EMAIL_HEADER,
   SELF_WORKER_BASE_HOSTNAME,
-} from '@/constants';
-import { UnauthorizedError } from '@/error';
-import { TokenAuthUtil } from '@/utils/TokenAuthUtil';
+} from '@aws-access-bridge/shared/constants';
+import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { TokenAuthUtil } from '@aws-access-bridge/backend-services/auth/TokenAuthUtil';
 
 const { auditLogCreateSpy, auditLogConstructorSpy, waitUntilSpy } = vi.hoisted(() => {
   return {
@@ -20,7 +20,7 @@ const { auditLogCreateSpy, auditLogConstructorSpy, waitUntilSpy } = vi.hoisted((
   };
 });
 
-vi.mock('@/dao/AuditLogDAO', () => {
+vi.mock('@aws-access-bridge/backend-data/dao/AuditLogDAO', () => {
   class MockAuditLogDAO {
     constructor(database: unknown) {
       auditLogConstructorSpy(database);
@@ -319,7 +319,11 @@ describe('MiddlewareHandlers', () => {
     it('returns a 401 response and audit log entry when authentication fails before route execution', async () => {
       const app: TestApp = createUserApp(true);
 
-      const response: Response = await app.fetch(new Request('https://worker.example.com/user/test'), createEnv(), createExecutionContext());
+      const response: Response = await app.fetch(
+        new Request('https://worker.example.com/user/test'),
+        createEnv(),
+        createExecutionContext(),
+      );
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({

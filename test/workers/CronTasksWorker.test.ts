@@ -11,7 +11,7 @@ const { taskSpies } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@/scheduled', () => {
+vi.mock('@aws-access-bridge/background/scheduled', () => {
   return {
     CredentialCacheRefreshTask: class {
       handle = taskSpies.credentialCacheRefresh;
@@ -24,6 +24,16 @@ vi.mock('@/scheduled', () => {
     },
     ResourceInventoryCollectionTask: class {
       handle = taskSpies.resourceInventoryCollection;
+    },
+    tasksForPhase: (phase: number): Array<{ handle: (...args: unknown[]) => Promise<void> }> => {
+      if (phase === 1) {
+        return [{ handle: taskSpies.credentialCacheRefresh as (...args: unknown[]) => Promise<void> }];
+      }
+      return [
+        { handle: taskSpies.auditLogCleanup as (...args: unknown[]) => Promise<void> },
+        { handle: taskSpies.costDataCollection as (...args: unknown[]) => Promise<void> },
+        { handle: taskSpies.resourceInventoryCollection as (...args: unknown[]) => Promise<void> },
+      ];
     },
   };
 });
@@ -63,7 +73,7 @@ describe('CronTasksWorker', () => {
     }
   });
 
-  it('runs the scheduled tasks in order', async () => {
+  it('runs phase 1 before phase 2 tasks', async () => {
     const env: Env = createEnv();
     const worker: CronTasksWorker = new CronTasksWorker(createDurableObjectState(), env);
 
@@ -77,10 +87,6 @@ describe('CronTasksWorker', () => {
     expect(taskSpies.resourceInventoryCollection).toHaveBeenCalledOnce();
     expect(taskSpies.credentialCacheRefresh.mock.invocationCallOrder[0]).toBeLessThan(
       taskSpies.auditLogCleanup.mock.invocationCallOrder[0],
-    );
-    expect(taskSpies.auditLogCleanup.mock.invocationCallOrder[0]).toBeLessThan(taskSpies.costDataCollection.mock.invocationCallOrder[0]);
-    expect(taskSpies.costDataCollection.mock.invocationCallOrder[0]).toBeLessThan(
-      taskSpies.resourceInventoryCollection.mock.invocationCallOrder[0],
     );
 
     const scheduledEvent: ScheduledController = taskSpies.credentialCacheRefresh.mock.calls[0][0];

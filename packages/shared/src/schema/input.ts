@@ -23,8 +23,8 @@ import {
 } from './common';
 
 interface RequestInputSchema {
-  body?: ZodTypeAny | undefined;
-  query?: ZodTypeAny | undefined;
+  body?: ZodTypeAny;
+  query?: ZodTypeAny;
 }
 
 type RequestSchemaMap = Record<string, RequestInputSchema>;
@@ -63,7 +63,7 @@ const GenerateConsoleUrlBodySchema = AwsCredentialsBodySchema.extend({
   destinationPath: AwsDestinationPathSchema,
   destinationRegion: AwsRegionSchema,
 }).refine(
-  (input: { awsAccountId?: string | undefined; roleName?: string | undefined }): boolean =>
+  (input: { awsAccountId?: string; roleName?: string }): boolean =>
     (!input.awsAccountId && !input.roleName) || Boolean(input.awsAccountId && input.roleName),
   {
     message: 'awsAccountId and roleName must be provided together.',
@@ -76,6 +76,10 @@ const FavoriteAccountBodySchema = z.object({
 });
 
 const HiddenRoleBodySchema = AccountRoleBodySchema;
+
+const UpdateCurrentUserBodySchema = z.object({
+  preferredLanguage: nonEmptyStringSchema('preferredLanguage', 12).nullish(),
+});
 
 const CreateTokenBodySchema = z.object({
   name: nonEmptyStringSchema('name', 128),
@@ -168,8 +172,7 @@ const AccountCostQuerySchema = z
     endDate: isoDateQuerySchema('endDate').optional(),
   })
   .refine(
-    (input: { startDate?: string | undefined; endDate?: string | undefined }): boolean =>
-      !input.startDate || !input.endDate || input.startDate <= input.endDate,
+    (input: { startDate?: string; endDate?: string }): boolean => !input.startDate || !input.endDate || input.startDate <= input.endDate,
     {
       message: 'startDate must be on or before endDate.',
       path: ['startDate'],
@@ -198,7 +201,7 @@ const AuditLogsQuerySchema = z
     offset: nonNegativeIntegerQuerySchema('offset').optional(),
   })
   .refine(
-    (input: { startTime?: number | undefined; endTime?: number | undefined }): boolean =>
+    (input: { startTime?: number; endTime?: number }): boolean =>
       input.startTime === undefined || input.endTime === undefined || input.startTime <= input.endTime,
     {
       message: 'startTime must be less than or equal to endTime.',
@@ -208,6 +211,12 @@ const AuditLogsQuerySchema = z
 
 const TeamIdQuerySchema = z.object({
   teamId: UuidSchema,
+});
+
+const TaskRunsQuerySchema = z.object({
+  taskType: nonEmptyStringSchema('taskType', 128).optional(),
+  status: nonEmptyStringSchema('status', 32).optional(),
+  limit: positiveIntegerQuerySchema('limit', 200).optional(),
 });
 
 const RequestInputSchemas = {
@@ -223,6 +232,7 @@ const RequestInputSchemas = {
   'GET /user/assumables/search': { query: SearchAssumablesQuerySchema },
   'POST /user/favorites': { body: FavoriteAccountBodySchema },
   'DELETE /user/favorites': { body: FavoriteAccountBodySchema },
+  'PUT /user/me': { body: UpdateCurrentUserBodySchema },
   'POST /user/assumable/hidden': { body: HiddenRoleBodySchema },
   'DELETE /user/assumable/hidden': { body: HiddenRoleBodySchema },
   'POST /user/tokens': { body: CreateTokenBodySchema },
@@ -241,6 +251,7 @@ const RequestInputSchemas = {
   'POST /user/admin/credentials/test-chain': { body: PrincipalArnBodySchema },
   'POST /user/admin/account/roles': { body: PrincipalArnBodySchema },
   'GET /user/admin/audit-logs': { query: AuditLogsQuerySchema },
+  'GET /user/admin/maintenance/task-runs': { query: TaskRunsQuerySchema },
 
   'GET /user/costs/account': { query: AccountCostQuerySchema },
   'GET /user/costs/trends': { query: CostTrendsQuerySchema },
@@ -292,7 +303,9 @@ export {
   TeamAccountBodySchema,
   TeamIdBodySchema,
   TeamIdQuerySchema,
+  TaskRunsQuerySchema,
   TeamMemberBodySchema,
+  UpdateCurrentUserBodySchema,
   UpdateTeamMemberRoleBodySchema,
   UpdateTeamNameBodySchema,
 };

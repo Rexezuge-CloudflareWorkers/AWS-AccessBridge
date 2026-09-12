@@ -1,21 +1,26 @@
-import { CredentialCacheConfigDAO, CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-core/dao';
-import { AssumeRoleUtil, TimestampUtil } from '@aws-access-bridge/backend-core/utils';
-import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/backend-core/model';
+import { CredentialCacheConfigDAO, CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws';
+import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
-import type { IEnv } from './IScheduledTask';
+import type { IEnv, TaskRunSummary } from './IScheduledTask';
 import {
-  CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME,
   CREDENTIAL_REFRESH_INTERVAL_MINUTES,
   DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT,
   NUMBER_OF_CREDENTIALS_TO_REFRESH,
-} from '@aws-access-bridge/backend-core/constants';
+} from '@aws-access-bridge/backend-runtime/config';
+import { CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 
 class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTaskEnv> {
+  protected override getTaskType(): string {
+    return 'credential-cache-refresh';
+  }
+
   protected async handleScheduledTask(
     _event: ScheduledController,
     env: CredentialCacheRefreshTaskEnv,
     _ctx: ExecutionContext,
-  ): Promise<void> {
+  ): Promise<TaskRunSummary> {
     const cutoffTime: number = TimestampUtil.subtractMinutes(
       TimestampUtil.getCurrentUnixTimestampInSeconds(),
       CREDENTIAL_REFRESH_INTERVAL_MINUTES,
@@ -29,6 +34,7 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
       NUMBER_OF_CREDENTIALS_TO_REFRESH,
       cutoffTime,
     );
+    let refreshedCount: number = 0;
     for (const principalArn of principalArns) {
       const credentialChain: CredentialChain = await credentialsDAO.getCredentialChainByPrincipalArn(principalArn);
       let credential: AccessKeys = {
@@ -55,15 +61,17 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
             credentialsCacheDAO.storeCachedCredential(credentialCache),
             credentialCacheConfigDAO.updateLastCachedTime(principalArn),
           ]);
+          refreshedCount += 1;
         }
         credential = assumedCredentials;
       }
     }
+    return { itemsProcessed: refreshedCount, itemsFailed: 0, summary: `Refreshed ${refreshedCount} cached credentials` };
   }
 }
 
 interface CredentialCacheRefreshTaskEnv extends IEnv {
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string | undefined;
+  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeDB: D1Database;
   AccessBridgeKV: KVNamespace;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;

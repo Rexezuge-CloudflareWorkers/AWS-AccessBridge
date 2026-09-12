@@ -1,7 +1,7 @@
-import { AssumableRolesDAO } from '@/dao';
+import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
-import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { AssumableAccountsMap } from '@/model';
+import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
+import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 
 class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, SearchAccountsResponse, SearchAccountsEnv> {
   schema = {
@@ -194,7 +194,7 @@ class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, Searc
 
 type SearchAccountsRequest = IRequest;
 
-type SearchAccountsResponse = IResponse & AssumableAccountsMap;
+type SearchAccountsResponse = AssumableAccountsMap;
 
 type SearchAccountsEnv = IEnv;
 
