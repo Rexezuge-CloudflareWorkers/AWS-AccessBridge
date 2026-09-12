@@ -1,8 +1,30 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
 
-class EmailValidationUtil {
-  public static async getAuthenticatedUserEmail(request: Request, teamDomain?: string, policyAud?: string): Promise<string> {
+interface AccessAuthEnv {
+  TEAM_DOMAIN?: string;
+  POLICY_AUD?: string;
+  DEV_AUTH_EMAIL?: string;
+  DEMO_MODE?: string;
+}
+
+class AccessAuthService {
+  constructor(private readonly env: AccessAuthEnv) {}
+
+  public async getAuthenticatedUserEmail(request: Request): Promise<string> {
+    if (ConfigurationManager.auth.isDemoMode(this.env)) {
+      return DEMO_USER_EMAIL;
+    }
+    // Local-only bypass for integration tests and `wrangler dev`. Never set in production.
+    if (this.env.DEV_AUTH_EMAIL) {
+      return this.env.DEV_AUTH_EMAIL;
+    }
+    return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+  }
+
+  public static async verifyAccessJwt(request: Request, teamDomain?: string, policyAud?: string): Promise<string> {
     const token = request.headers.get('cf-access-jwt-assertion');
     if (!token) {
       throw new UnauthorizedError('No Cloudflare Access JWT token provided in request headers.');
@@ -43,4 +65,11 @@ class EmailValidationUtil {
   }
 }
 
-export { EmailValidationUtil };
+class AccessAuthServiceFactory {
+  public static create(env: AccessAuthEnv): AccessAuthService {
+    return new AccessAuthService(env);
+  }
+}
+
+export { AccessAuthService, AccessAuthServiceFactory };
+export type { AccessAuthEnv };

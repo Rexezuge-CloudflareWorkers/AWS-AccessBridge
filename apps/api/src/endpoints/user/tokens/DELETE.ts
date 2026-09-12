@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
+import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 
 class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteTokenResponse, DeleteTokenEnv> {
@@ -54,8 +54,7 @@ class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteToken
   ): Promise<DeleteTokenResponse> {
     if (request.tokenId) {
       const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-      const userAccessTokenDAO: UserAccessTokenDAO = new UserAccessTokenDAO(env.AccessBridgeDB);
-      await userAccessTokenDAO.delete(request.tokenId, userEmail);
+      await TokenServiceFactory.create(env).deleteToken(request.tokenId, userEmail);
       return { success: true };
     }
     throw new BadRequestError('Token ID is required');

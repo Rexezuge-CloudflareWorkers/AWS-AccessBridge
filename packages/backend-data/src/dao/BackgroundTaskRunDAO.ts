@@ -1,6 +1,7 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { BackgroundTaskRun, BackgroundTaskRunInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
 interface StartTaskRunInput {
   taskType: string;
@@ -19,13 +20,7 @@ interface ListTaskRunsOptions {
   limit?: number;
 }
 
-class BackgroundTaskRunDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class BackgroundTaskRunDAO extends BaseDAO {
   public async startRun(input: StartTaskRunInput): Promise<string> {
     const runId: string = UUIDUtil.getRandomUUID();
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();

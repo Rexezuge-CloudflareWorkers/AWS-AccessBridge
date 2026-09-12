@@ -1,10 +1,6 @@
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import { AssumeRoleUtil, AwsApiUtil } from '@aws-access-bridge/backend-services/aws';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesRequest, ListAccountRolesResponse, ListAccountRolesEnv> {
   schema = {
@@ -160,33 +156,7 @@ class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesReque
     env: ListAccountRolesEnv,
     _cxt: ActivityContext<ListAccountRolesEnv>,
   ): Promise<ListAccountRolesResponse> {
-    if (!request.principalArn) {
-      throw new BadRequestError('Missing required field: principalArn.');
-    }
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
-
-    // Resolve credential chain and assume roles
-    const credentialChain: CredentialChain = await credentialsDAO.getCredentialChainByPrincipalArn(request.principalArn);
-
-    let credential: AccessKeys = {
-      accessKeyId: credentialChain.accessKeyId,
-      secretAccessKey: credentialChain.secretAccessKey,
-      sessionToken: credentialChain.sessionToken,
-    };
-
-    for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
-      const roleArn: string = credentialChain.principalArns[i];
-      const assumed: AccessKeysWithExpiration = await AssumeRoleUtil.assumeRole(roleArn, credential, 'AccessBridge-RoleDiscovery');
-      credential = assumed;
-    }
-
-    // Call IAM ListRoles with the assumed credentials
-    const roles: Array<{ roleName: string; arn: string; description: string }> = await AwsApiUtil.listRoles(credential);
-
-    return { roles };
+    return AccountServiceFactory.create(env).listAccountRoles(request.principalArn);
   }
 }
 

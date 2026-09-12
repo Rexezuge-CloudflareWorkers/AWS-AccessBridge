@@ -1,4 +1,4 @@
-import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
@@ -133,7 +133,7 @@ class ListTeamAccountsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamAcc
   ): Promise<ListTeamAccountsResponse> {
     const teamId: string | null = new URL(cxt.req.url).searchParams.get('teamId');
     if (!teamId) throw new BadRequestError('Missing required parameter: teamId.');
-    const accountIds: string[] = await new TeamAccountsDAO(env.AccessBridgeDB).getAccountsByTeam(teamId);
+    const accountIds: string[] = await TeamServiceFactory.create(env).listAccounts(teamId);
     return { accountIds };
   }
 }

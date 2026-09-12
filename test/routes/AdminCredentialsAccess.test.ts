@@ -10,16 +10,14 @@ import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsD
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
 import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
-import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws/AssumeRoleUtil';
-import { AwsApiUtil } from '@aws-access-bridge/backend-services/aws/AwsApiUtil';
+import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
-vi.mock('@aws-access-bridge/backend-services/aws/AssumeRoleUtil');
-vi.mock('@aws-access-bridge/backend-services/aws/AwsApiUtil');
+vi.mock('@aws-access-bridge/backend-services/aws/sts');
 
 function adminEnv() {
   vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(true);
@@ -70,8 +68,8 @@ describe('admin credentials routes', () => {
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
-  it('POST /user/admin/credentials/validate delegates to AwsApiUtil', async () => {
-    vi.mocked(AwsApiUtil.validateCredentials).mockResolvedValue({ arn: USER_ARN, accountId: '123456789012', userId: 'AIDA' });
+  it('POST /user/admin/credentials/validate delegates to StsService', async () => {
+    vi.mocked(StsService.prototype.validateCredentials).mockResolvedValue({ arn: USER_ARN, accountId: '123456789012', userId: 'AIDA' });
     const c = createRouteContext({
       method: 'POST',
       body: { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
@@ -88,7 +86,7 @@ describe('admin credentials routes', () => {
       secretAccessKey: 'secret',
       sessionToken: 'token',
     });
-    vi.mocked(AssumeRoleUtil.assumeRole).mockResolvedValue({
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue({
       accessKeyId: 'ASIA',
       secretAccessKey: 'shh',
       sessionToken: 'tok',
@@ -96,7 +94,7 @@ describe('admin credentials routes', () => {
     });
     const c = createRouteContext({ method: 'POST', body: { principalArn: ROLE_ARN }, env: adminEnv() });
     await new TestCredentialChainRoute({} as never).handle(c as never);
-    expect(AssumeRoleUtil.assumeRole).toHaveBeenCalledTimes(1);
+    expect(StsService.prototype.assumeRole).toHaveBeenCalledTimes(1);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ chain: expect.any(Array) }));
   });
 });

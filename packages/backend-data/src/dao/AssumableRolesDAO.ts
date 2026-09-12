@@ -1,13 +1,8 @@
 import { DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
+import { BaseDAO } from './BaseDAO';
 
-class AssumableRolesDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class AssumableRolesDAO extends BaseDAO {
   /**
    * Retrieves a list of role names that the specified user can assume within the given AWS account.
    * @param userEmail The email address of the user.

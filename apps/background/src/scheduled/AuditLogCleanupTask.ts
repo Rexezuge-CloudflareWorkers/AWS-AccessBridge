@@ -1,5 +1,5 @@
 import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
-import { DEFAULT_AUDIT_LOG_RETENTION_DAYS } from '@aws-access-bridge/backend-runtime/config';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { AbstractPruningTask } from './AbstractPruningTask';
 import type { IEnv } from './IScheduledTask';
 
@@ -9,7 +9,7 @@ class AuditLogCleanupTask extends AbstractPruningTask<AuditLogCleanupTaskEnv> {
   }
 
   protected getRetentionDays(env: AuditLogCleanupTaskEnv): number {
-    return Number(env.AUDIT_LOG_RETENTION_DAYS || DEFAULT_AUDIT_LOG_RETENTION_DAYS);
+    return ConfigurationManager.audit.getRetentionDays(env);
   }
 
   protected async pruneBatch(db: D1Database, cutoffTimestamp: number, batchSize: number): Promise<number> {

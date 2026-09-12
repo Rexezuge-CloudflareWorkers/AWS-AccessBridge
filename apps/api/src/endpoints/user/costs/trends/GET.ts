@@ -1,7 +1,6 @@
-import { AssumableRolesDAO, CostDataDAO } from '@aws-access-bridge/backend-data/dao';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { CostData } from '@aws-access-bridge/shared/model';
 
 class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCostTrendsResponse, GetCostTrendsEnv> {
   schema = {
@@ -112,36 +111,7 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
     const months: number = Math.min(parseInt(url.searchParams.get('months') || '6'), 12);
-
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
-
-    if (accountIds.length === 0) return { months: [] };
-
-    const endDate: string = new Date().toISOString().split('T', 1)[0];
-    const startDate: string = new Date(Date.now() - months * 30 * 86_400_000).toISOString().split('T', 1)[0];
-
-    const costDataDAO: CostDataDAO = new CostDataDAO(env.AccessBridgeDB);
-    const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
-
-    // Aggregate by month
-    const monthlyData: Record<string, { total: number; byAccount: Record<string, number> }> = {};
-    for (const data of costData) {
-      const month: string = data.periodStart.slice(0, 7); // YYYY-MM
-      if (monthlyData[month] === undefined) monthlyData[month] = { total: 0, byAccount: {} };
-      monthlyData[month].total += data.totalCost;
-      monthlyData[month].byAccount[data.awsAccountId] = (monthlyData[month].byAccount[data.awsAccountId] || 0) + data.totalCost;
-    }
-
-    const result = Object.entries(monthlyData)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, data]) => ({
-        period,
-        total: Math.round(data.total * 100) / 100,
-        byAccount: data.byAccount,
-      }));
-
-    return { months: result };
+    return CostServiceFactory.create(env).getTrends(userEmail, months);
   }
 }
 

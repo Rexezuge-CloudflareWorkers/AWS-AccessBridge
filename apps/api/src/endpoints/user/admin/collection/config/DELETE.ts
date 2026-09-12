@@ -1,5 +1,4 @@
-import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -146,11 +145,7 @@ class DisableDataCollectionRoute extends IAdminActivityAPIRoute<DisableDataColle
   };
 
   protected async handleAdminRequest(request: DisableDataCollectionRequest, env: IAdminEnv): Promise<DisableDataCollectionResponse> {
-    if (!request.principalArn || !request.collectionType) {
-      throw new BadRequestError('Missing required fields: principalArn and collectionType.');
-    }
-    const dao: DataCollectionConfigDAO = new DataCollectionConfigDAO(env.AccessBridgeDB);
-    await dao.delete(request.principalArn, request.collectionType);
+    await CostServiceFactory.create(env).disableCollection(request.principalArn, request.collectionType);
     return { success: true, message: 'Data collection disabled.' };
   }
 }

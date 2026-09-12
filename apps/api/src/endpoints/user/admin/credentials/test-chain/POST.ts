@@ -1,10 +1,6 @@
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import { AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
-import type { CredentialChain, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
 
 class TestCredentialChainRoute extends IAdminActivityAPIRoute<
   TestCredentialChainRequest,
@@ -172,50 +168,8 @@ class TestCredentialChainRoute extends IAdminActivityAPIRoute<
     env: TestCredentialChainEnv,
     _cxt: ActivityContext<TestCredentialChainEnv>,
   ): Promise<TestCredentialChainResponse> {
-    if (!request.principalArn) {
-      throw new BadRequestError('Missing required field: principalArn.');
-    }
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsDAO: CredentialsDAO = new CredentialsDAO(env.AccessBridgeDB, masterKey, principalTrustChainLimit);
-
-    const credentialChain: CredentialChain = await credentialsDAO.getCredentialChainByPrincipalArn(request.principalArn);
-
-    const chainResults: Array<{ arn: string; status: string }> = [];
-    let allSuccess: boolean = true;
-
-    let credential: AccessKeys = {
-      accessKeyId: credentialChain.accessKeyId,
-      secretAccessKey: credentialChain.secretAccessKey,
-      sessionToken: credentialChain.sessionToken,
-    };
-
-    // The chain is ordered: [target, intermediate, ..., base]
-    // We walk from base (last) to target (first), assuming each role
-    chainResults.push({
-      // eslint-disable-next-line unicorn/prefer-at -- index access preserves `string` type; `.at()` widens to `string | undefined`
-      arn: credentialChain.principalArns[credentialChain.principalArns.length - 1],
-      status: 'ok (base credentials)',
-    });
-
-    for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
-      const roleArn: string = credentialChain.principalArns[i];
-      try {
-        const assumed: AccessKeysWithExpiration = await AssumeRoleUtil.assumeRole(roleArn, credential, 'AccessBridge-ChainTest');
-        credential = assumed;
-        chainResults.push({ arn: roleArn, status: 'ok' });
-      } catch (error: unknown) {
-        allSuccess = false;
-        chainResults.push({
-          arn: roleArn,
-          status: `failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        });
-        break;
-      }
-    }
-
-    return { success: allSuccess, chain: chainResults };
+    const { success, chain } = await CredentialServiceFactory.create(env).testChain(request.principalArn);
+    return { success, chain };
   }
 }
 

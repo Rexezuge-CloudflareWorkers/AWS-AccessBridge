@@ -1,14 +1,9 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { AuditLog, AuditLogInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class AuditLogDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class AuditLogDAO extends BaseDAO {
   public async create(
     userEmail: string,
     action: string,

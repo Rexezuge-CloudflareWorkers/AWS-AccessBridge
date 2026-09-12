@@ -1,5 +1,5 @@
-import { AssumableRolesDAO, CostDataDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import type { CostData } from '@aws-access-bridge/shared/model';
@@ -187,31 +187,10 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
     const awsAccountId: string | null = url.searchParams.get('awsAccountId');
     if (!awsAccountId) throw new BadRequestError('Missing required parameter: awsAccountId.');
 
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    const roles: string[] = await assumableRolesDAO.getRolesByUserAndAccount(userEmail, awsAccountId);
-    if (roles.length === 0) throw new ForbiddenError('You do not have access to this account.');
+    const endDate: string | undefined = url.searchParams.get('endDate') || undefined;
+    const startDate: string | undefined = url.searchParams.get('startDate') || undefined;
 
-    const endDate: string = url.searchParams.get('endDate') || new Date().toISOString().split('T', 1)[0];
-    const startDate: string = url.searchParams.get('startDate') || new Date(Date.now() - 30 * 86_400_000).toISOString().split('T', 1)[0];
-
-    const costDataDAO: CostDataDAO = new CostDataDAO(env.AccessBridgeDB);
-    const costData: CostData[] = await costDataDAO.getCostDataByAccount(awsAccountId, startDate, endDate);
-
-    let total: number = 0;
-    const serviceBreakdown: Record<string, number> = {};
-    for (const data of costData) {
-      total += data.totalCost;
-      for (const [service, amount] of Object.entries(data.serviceBreakdown)) {
-        serviceBreakdown[service] = (serviceBreakdown[service] || 0) + amount;
-      }
-    }
-
-    return {
-      awsAccountId,
-      dailyCosts: costData,
-      serviceBreakdown,
-      total: Math.round(total * 100) / 100,
-    };
+    return CostServiceFactory.create(env).getAccountCost(userEmail, awsAccountId, startDate, endDate);
   }
 }
 

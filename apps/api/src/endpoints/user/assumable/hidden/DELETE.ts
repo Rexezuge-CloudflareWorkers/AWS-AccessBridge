@@ -1,4 +1,4 @@
-import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -167,10 +167,7 @@ class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleRes
     cxt: ActivityContext<UnhideRoleEnv>,
   ): Promise<UnhideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const rolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-
-    await rolesDAO.verifyUserHasAccessToRole(userEmail, request.awsAccountId, request.roleName);
-    await rolesDAO.unhideRole(userEmail, request.awsAccountId, request.roleName);
+    await UserServiceFactory.create(env).unhideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

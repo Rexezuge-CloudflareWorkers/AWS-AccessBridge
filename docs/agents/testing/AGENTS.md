@@ -10,6 +10,10 @@ Current thresholds (`vitest.config.mts`): **statements 75 / branches 65 / functi
 
 - DAO tests: `createMockDb()` returning `prepare().bind().run/first/all` chain with shared `vi.fn()` refs.
 - Services with DAOs: `vi.mock('@aws-access-bridge/backend-data/dao')`.
+- AWS clients: `vi.mock('@aws-access-bridge/backend-services/aws/sts')` then `vi.mocked(StsService.prototype.assumeRole)`; same for `CostExplorerService`, `IamService`, `ConsoleService` (partial-mock the module and override only `getSigninToken` to keep URL builders real).
+- Collector registry: `vi.mock('@aws-access-bridge/backend-services/aws/collectors')` with a `CollectorRegistry.getAll` returning hoisted stub collectors (`{ resourceType, collect: vi.fn() }`); `createCollectorRegistry(overrides)` covers service-level override tests.
+- `TokenService`/`AccessAuthService`: `vi.spyOn(TokenService.prototype, 'authenticateWithPAT')`; `AccessAuthService.verifyAccessJwt` is pure-static for JWT cases, instance `getAuthenticatedUserEmail` for demo/dev bypass.
+- Audit: mock `@aws-access-bridge/backend-data/dao/AuditLogDAO` (observed through `AuditService` → `AuditLogObserver`); pass stub `IAuditObserver`s to isolate fan-out.
 - Crypto: `vi.mock('@aws-access-bridge/backend-data/crypto')`.
 - Cron tasks in worker tests: `vi.mock('@aws-access-bridge/background/scheduled')` with `tasksForPhase` phase stubs.
 - Use `vi.hoisted()` for mocks referenced across `vi.mock` factories.

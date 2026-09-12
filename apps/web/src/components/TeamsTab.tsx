@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixDate } from '../lib/format';
+import { DEFAULT_TEAM_ID } from '../lib/constants';
 import FocusInput from './ui/FocusInput';
 import Spinner from './ui/Spinner';
 import { apiCall } from '../lib/api';
@@ -29,8 +30,6 @@ const styles = {
   th: thStyle,
   td: tdStyle,
 };
-
-const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
 
 interface Team {
   teamId: string;

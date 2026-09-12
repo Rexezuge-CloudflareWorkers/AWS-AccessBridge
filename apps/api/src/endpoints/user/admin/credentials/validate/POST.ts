@@ -1,5 +1,4 @@
-import { AwsApiUtil } from '@aws-access-bridge/backend-services/aws';
-import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -169,25 +168,18 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
     _env: ValidateCredentialsEnv,
     _cxt: ActivityContext<ValidateCredentialsEnv>,
   ): Promise<ValidateCredentialsResponse> {
-    if (!request.accessKeyId || !request.secretAccessKey) {
-      throw new BadRequestError('Missing required fields: accessKeyId and secretAccessKey.');
-    }
+    const identity = await CredentialServiceFactory.create(_env).validateCredentials(
+      request.accessKeyId,
+      request.secretAccessKey,
+      request.sessionToken,
+    );
 
-    try {
-      const identity = await AwsApiUtil.validateCredentials(request.accessKeyId, request.secretAccessKey, request.sessionToken);
-
-      return {
-        valid: true,
-        arn: identity.arn,
-        accountId: identity.accountId,
-        userId: identity.userId,
-      };
-    } catch (error: unknown) {
-      if (error instanceof BadRequestError || error instanceof InternalServerError) {
-        throw error;
-      }
-      throw new BadRequestError(`Failed to validate credentials: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    return {
+      valid: true,
+      arn: identity.arn,
+      accountId: identity.accountId,
+      userId: identity.userId,
+    };
   }
 }
 

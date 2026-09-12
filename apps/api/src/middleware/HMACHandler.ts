@@ -4,7 +4,7 @@ import {
   HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
   HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
 } from '@aws-access-bridge/backend-errors/constants';
-import { INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS } from '@aws-access-bridge/backend-runtime/config';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { INTERNAL_HEADER_PREFIX, INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
 import { verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
@@ -17,7 +17,7 @@ class HMACHandler {
     if (signature && timestamp) {
       const now: number = TimestampUtil.getCurrentUnixTimestampInMilliseconds();
       const requestTime: number = parseInt(timestamp);
-      if (Math.abs(now - requestTime) <= INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS) {
+      if (Math.abs(now - requestTime) <= ConfigurationManager.internal.getRequestTimeWindowMs(c.env)) {
         const clonedRequest = c.req.raw.clone();
         const body: string = await clonedRequest.text();
         const bodyHash: string = await hashBody(body);

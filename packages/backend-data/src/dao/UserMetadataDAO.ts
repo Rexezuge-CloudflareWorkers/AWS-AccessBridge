@@ -1,13 +1,8 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { UserMetadataInternal } from '@aws-access-bridge/shared/model';
+import { BaseDAO } from './BaseDAO';
 
-class UserMetadataDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class UserMetadataDAO extends BaseDAO {
   public async ensureUserEmailExists(userEmail: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare('INSERT OR IGNORE INTO user_metadata (user_email) VALUES (?)')

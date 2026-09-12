@@ -1,5 +1,4 @@
-import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -143,8 +142,7 @@ class RemoveTeamAccountRoute extends IAdminActivityAPIRoute<RemoveTeamAccountReq
   };
 
   protected async handleAdminRequest(request: RemoveTeamAccountRequest, env: IAdminEnv): Promise<RemoveTeamAccountResponse> {
-    if (!request.teamId || !request.awsAccountId) throw new BadRequestError('Missing required fields.');
-    await new TeamAccountsDAO(env.AccessBridgeDB).removeAccountFromTeam(request.teamId, request.awsAccountId);
+    await TeamServiceFactory.create(env).removeAccount(request.teamId, request.awsAccountId);
     return { success: true, message: 'Account removed from team.' };
   }
 }

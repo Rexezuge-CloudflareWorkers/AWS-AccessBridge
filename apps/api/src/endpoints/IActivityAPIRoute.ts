@@ -20,27 +20,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       const request: TRequest = { ...(validatedBody as TRequest), raw: c.req.raw };
       const env: TEnv = { ...(c.env as TEnv), AccessBridgeDB: c.env.AccessBridgeDB.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) };
       const response: TResponse | ExtendedResponse<TResponse> = await this.handleRequest(request, env, c);
-      if (
-        response &&
-        typeof response === 'object' &&
-        ('body' in response || 'rawBody' in response || 'statusCode' in response || 'headers' in response)
-      ) {
-        const extendedResponse: ExtendedResponse<TResponse> = response;
-        const statusCode: number = extendedResponse.statusCode || 200;
-        const headers: Record<string, string> = extendedResponse.headers || {};
-        Object.entries(headers).forEach(([key, value]) => {
-          c.header(key, value);
-        });
-        c.status(statusCode as StatusCode);
-        if (statusCode >= 300 && statusCode < 400) {
-          return c.body(null);
-        }
-        if ('rawBody' in extendedResponse) {
-          return c.body((extendedResponse.rawBody ?? null) as never);
-        }
-        return c.json(extendedResponse.body);
-      }
-      return c.json(response);
+      return this.toResponse(response, c);
     } catch (error: unknown) {
       return this.toErrorResponse(error, c);
     }
@@ -51,6 +31,34 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
     env: TEnv,
     cxt: ActivityContext<TEnv>,
   ): Promise<TResponse | ExtendedResponse<TResponse>>;
+
+  protected toResponse(response: TResponse | ExtendedResponse<TResponse>, c: ActivityContext<TEnv>) {
+    if (
+      response &&
+      typeof response === 'object' &&
+      ('body' in response || 'rawBody' in response || 'statusCode' in response || 'headers' in response)
+    ) {
+      const extendedResponse: ExtendedResponse<TResponse> = response;
+      const statusCode: number = extendedResponse.statusCode || 200;
+      const headers: Record<string, string> = extendedResponse.headers || {};
+      Object.entries(headers).forEach(([key, value]) => {
+        c.header(key, value);
+      });
+      c.status(statusCode as StatusCode);
+      if (statusCode >= 300 && statusCode < 400) {
+        return c.body(null);
+      }
+      if ('rawBody' in extendedResponse) {
+        return c.body((extendedResponse.rawBody ?? null) as never);
+      }
+      return c.json(extendedResponse.body);
+    }
+    return c.json(response);
+  }
+
+  protected getQueryParam(request: IRequest, name: string): string | undefined {
+    return new URL(request.raw.url).searchParams.get(name) ?? undefined;
+  }
 
   protected getAuthenticatedUserEmailAddress(c: ActivityContext<TEnv>): string {
     return c.get('AuthenticatedUserEmailAddress');

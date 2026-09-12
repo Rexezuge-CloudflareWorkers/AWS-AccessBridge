@@ -1,4 +1,4 @@
-import { AwsConsoleUtil } from '@aws-access-bridge/backend-services/aws';
+import { ConsoleService } from '@aws-access-bridge/backend-services/aws';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -234,20 +234,11 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
     _env: GenerateConsoleUrlEnv,
     cxt: ActivityContext<GenerateConsoleUrlEnv>,
   ): Promise<GenerateConsoleUrlResponse> {
-    const signinToken: string = await AwsConsoleUtil.getSigninToken(request.accessKeyId, request.secretAccessKey, request.sessionToken);
-    let federateUrl: string = this.getBaseUrl(cxt);
-    if (request.awsAccountId && request.roleName) {
-      federateUrl += `/user/aws/federate?awsAccountId=${request.awsAccountId}&role=${request.roleName}`;
-    }
-    let destination: string = request.destinationPath
-      ? `https://console.aws.amazon.com/${request.destinationPath}`
-      : 'https://console.aws.amazon.com/';
-    if (request.destinationRegion) {
-      const url: URL = new URL(destination);
-      url.searchParams.set('region', request.destinationRegion);
-      destination = url.href;
-    }
-    const loginUrl: string = AwsConsoleUtil.getLoginUrl(signinToken, federateUrl, destination);
+    const consoleService: ConsoleService = new ConsoleService();
+    const signinToken: string = await consoleService.getSigninToken(request.accessKeyId, request.secretAccessKey, request.sessionToken);
+    const federateUrl: string = consoleService.buildIssuerUrl(this.getBaseUrl(cxt), request.awsAccountId, request.roleName);
+    const destination: string = consoleService.buildDestination(request.destinationPath, request.destinationRegion);
+    const loginUrl: string = consoleService.getLoginUrl(signinToken, federateUrl, destination);
     return {
       url: loginUrl,
     };

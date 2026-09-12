@@ -1,5 +1,4 @@
-import { SpendAlertDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -136,9 +135,7 @@ class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertReque
   };
 
   protected async handleAdminRequest(request: DeleteSpendAlertRequest, env: IAdminEnv): Promise<DeleteSpendAlertResponse> {
-    if (!request.alertId) throw new BadRequestError('Missing required field: alertId.');
-    const spendAlertDAO: SpendAlertDAO = new SpendAlertDAO(env.AccessBridgeDB);
-    await spendAlertDAO.deleteAlert(request.alertId);
+    await CostServiceFactory.create(env).deleteAlert(request.alertId);
     return { success: true, message: 'Alert deleted.' };
   }
 }

@@ -1,13 +1,8 @@
 import type { TeamMember, TeamMemberInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class TeamMembersDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class TeamMembersDAO extends BaseDAO {
   public async addMember(teamId: string, userEmail: string, role: string = 'member'): Promise<void> {
     const joinedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     await this.database

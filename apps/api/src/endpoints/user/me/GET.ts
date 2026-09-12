@@ -1,6 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 
 class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCurrentUserResponse, GetCurrentUserEnv> {
   schema = {
@@ -129,19 +129,13 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
   ): Promise<GetCurrentUserResponse> {
     const demoMode: boolean = this.isDemoMode(cxt);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(env.AccessBridgeDB);
-
-    const [, isSuperAdmin, preferredLanguage]: [void, boolean, string | null] = await Promise.all([
-      userMetadataDAO.ensureUserEmailExists(userEmail),
-      userMetadataDAO.isSuperAdmin(userEmail),
-      userMetadataDAO.getPreferredLanguage(userEmail),
-    ]);
+    const currentUser = await UserServiceFactory.create(env).getCurrentUser(userEmail);
 
     return {
-      email: userEmail,
-      isSuperAdmin,
+      email: currentUser.email,
+      isSuperAdmin: currentUser.isSuperAdmin,
       demoMode,
-      preferredLanguage,
+      preferredLanguage: currentUser.preferredLanguage,
     };
   }
 }

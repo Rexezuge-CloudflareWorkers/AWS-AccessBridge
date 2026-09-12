@@ -1,13 +1,8 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { RoleConfig, RoleConfigInternal } from '@aws-access-bridge/shared/model';
+import { BaseDAO } from './BaseDAO';
 
-class RoleConfigsDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class RoleConfigsDAO extends BaseDAO {
   public async getRoleConfig(awsAccountId: string, roleName: string): Promise<RoleConfig | undefined> {
     const result: RoleConfigInternal | null = await this.database
       .prepare(

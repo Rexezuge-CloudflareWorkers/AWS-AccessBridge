@@ -1,7 +1,7 @@
-import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
-import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
+import type { AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
 
 class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListAssumablesResponse, ListAssumablesEnv> {
   schema = {
@@ -212,19 +212,13 @@ class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListA
     cxt: ActivityContext<ListAssumablesEnv>,
   ): Promise<ListAssumablesResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
     const url: URL = new URL(request.raw.url);
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
     const limitParam: string | null = url.searchParams.get('limit');
     const offsetParam: string | null = url.searchParams.get('offset');
     const limit: number = limitParam ? Math.max(1, Math.min(200, Math.trunc(Number(limitParam)))) : 50;
     const offset: number = offsetParam ? Math.max(0, Math.trunc(Number(offsetParam))) : 0;
-    const totalAccounts: number = await assumableRolesDAO.getTotalAccountsCount(userEmail, showHidden);
-    const assumableAccountsMap: AssumableAccountsMap = await assumableRolesDAO.getAllRolesByUserEmail(userEmail, showHidden, limit, offset);
-    return {
-      ...assumableAccountsMap,
-      totalAccounts: totalAccounts,
-    };
+    return UserServiceFactory.create(env).listAssumables(userEmail, { showHidden, limit, offset });
   }
 }
 

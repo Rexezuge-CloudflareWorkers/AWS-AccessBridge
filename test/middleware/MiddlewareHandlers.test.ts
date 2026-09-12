@@ -10,7 +10,7 @@ import {
   SELF_WORKER_BASE_HOSTNAME,
 } from '@aws-access-bridge/shared/constants';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
-import { TokenAuthUtil } from '@aws-access-bridge/backend-services/auth/TokenAuthUtil';
+import { TokenService } from '@aws-access-bridge/backend-services/auth';
 
 const { auditLogCreateSpy, auditLogConstructorSpy, waitUntilSpy } = vi.hoisted(() => {
   return {
@@ -250,7 +250,7 @@ describe('MiddlewareHandlers', () => {
 
     it('rejects bearer tokens on the user surface (strict split: PAT is /api/* only)', async () => {
       const app: TestApp = createUserApp();
-      const authenticateWithPATSpy = vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
+      const authenticateWithPATSpy = vi.spyOn(TokenService.prototype, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
 
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/user/test', {
@@ -363,7 +363,7 @@ describe('MiddlewareHandlers', () => {
 
     it('authenticates bearer tokens via PAT lookup', async () => {
       const app: TestApp = createApiApp();
-      const authenticateWithPATSpy = vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
+      const authenticateWithPATSpy = vi.spyOn(TokenService.prototype, 'authenticateWithPAT').mockResolvedValue('pat@example.com');
 
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/api/test', {
@@ -377,12 +377,12 @@ describe('MiddlewareHandlers', () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ email: 'pat@example.com' });
-      expect(authenticateWithPATSpy).toHaveBeenCalledWith('test-token', { mock: true });
+      expect(authenticateWithPATSpy).toHaveBeenCalledWith('test-token');
     });
 
     it('returns a 401 response when PAT authentication fails', async () => {
       const app: TestApp = createApiApp();
-      vi.spyOn(TokenAuthUtil, 'authenticateWithPAT').mockRejectedValue(new UnauthorizedError('PAT rejected'));
+      vi.spyOn(TokenService.prototype, 'authenticateWithPAT').mockRejectedValue(new UnauthorizedError('PAT rejected'));
 
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/api/test', {

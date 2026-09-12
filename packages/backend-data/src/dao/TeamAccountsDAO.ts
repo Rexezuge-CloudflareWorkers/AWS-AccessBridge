@@ -1,10 +1,6 @@
-class TeamAccountsDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
+import { BaseDAO } from './BaseDAO';
 
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class TeamAccountsDAO extends BaseDAO {
   public async addAccountToTeam(teamId: string, awsAccountId: string): Promise<void> {
     await this.database
       .prepare('INSERT OR IGNORE INTO team_accounts (team_id, aws_account_id) VALUES (?, ?)')

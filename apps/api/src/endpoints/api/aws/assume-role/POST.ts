@@ -1,18 +1,7 @@
-import {
-  AssumableRolesDAO,
-  CredentialsCacheDAO,
-  UserMetadataDAO,
-  EnhancedCredentialsDAO,
-  RoleConfigsDAO,
-} from '@aws-access-bridge/backend-data/dao';
-import { AccessKeysWithExpiration, CredentialCache, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
-import { ArnUtil, AssumeRoleUtil } from '@aws-access-bridge/backend-services/aws';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { AssumeRoleServiceFactory } from '@aws-access-bridge/backend-services/aws';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import { DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT } from '@aws-access-bridge/backend-runtime/config';
-import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-access-bridge/shared/constants';
 
 class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleResponse, AssumeRoleEnv> {
   schema = {
@@ -257,115 +246,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
     }
 
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const accountId: string = ArnUtil.getAccountIdFromArn(request.principalArn);
-    const roleName: string = ArnUtil.getRoleNameFromArn(request.principalArn);
-
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    await assumableRolesDAO.verifyUserHasAccessToRole(userEmail, accountId, roleName);
-    const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(env.AccessBridgeDB);
-    const roleConfig: RoleConfig | undefined = await roleConfigsDAO.getRoleConfig(accountId, roleName);
-
-    const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
-    const principalTrustChainLimit: number = parseInt(env.PRINCIPAL_TRUST_CHAIN_LIMIT || DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT);
-    const credentialsCacheDAO: CredentialsCacheDAO = new CredentialsCacheDAO(env.AccessBridgeKV, masterKey);
-    const credentialsDAO: EnhancedCredentialsDAO = new EnhancedCredentialsDAO(
-      env.AccessBridgeDB,
-      masterKey,
-      principalTrustChainLimit,
-      credentialsCacheDAO,
-    );
-    const credentialChain: CredentialChain = await credentialsDAO.getCredentialChainToFirstCachedPrincipal(request.principalArn);
-
-    const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(env.AccessBridgeDB);
-    const userId: string = await userMetadataDAO.getOrCreateFederationUsername(userEmail);
-
-    const { startIndex, credentials } = await this.findClosestCachedCredential(credentialsCacheDAO, credentialChain);
-
-    return await this.assumeRoleChain(
-      credentialsCacheDAO,
-      credentialChain,
-      startIndex,
-      credentials,
-      userId,
-      roleConfig?.roleSessionDurationSeconds,
-    );
-  }
-
-  /**
-   * Finds the closest cached credential to the target role in the credential chain.
-   * Searches from index 1 (first intermediate role) towards the base IAM user to find
-   * the most recent cached intermediate credential that can be reused.
-   *
-   * @param credentialsCacheDAO - DAO for accessing cached credentials
-   * @param credentialChain - The complete credential chain from target role (index 0) to base IAM user (highest index)
-   * @returns Object containing the starting index for role assumption and the credentials to start with.
-   *          If no cached credential is found, returns base IAM user credentials and starts from index 1.
-   *          If cached credential is found at index i, returns cached credentials and starts from index i-1.
-   */
-  private async findClosestCachedCredential(
-    credentialsCacheDAO: CredentialsCacheDAO,
-    credentialChain: CredentialChain,
-  ): Promise<{ startIndex: number; credentials: AccessKeysWithExpiration }> {
-    let startIndex: number = credentialChain.principalArns.length - 2;
-    let credentials: AccessKeysWithExpiration = {
-      accessKeyId: credentialChain.accessKeyId,
-      secretAccessKey: credentialChain.secretAccessKey,
-    };
-    // Check cache from first intermediate role towards base IAM user to find closest cached credential
-    for (let i: number = 1; i < credentialChain.principalArns.length; ++i) {
-      const cachedCredential: CredentialCache | undefined = await credentialsCacheDAO.getCachedCredential(credentialChain.principalArns[i]);
-      if (cachedCredential) {
-        startIndex = i - 1; // Start assuming from the role before the cached one (closer to target)
-        credentials = {
-          accessKeyId: cachedCredential.accessKeyId,
-          secretAccessKey: cachedCredential.secretAccessKey,
-          sessionToken: cachedCredential.sessionToken,
-        };
-        break;
-      }
-    }
-    return { startIndex, credentials };
-  }
-
-  /**
-   * Assumes roles in the credential chain starting from the given index and working towards the target role.
-   * Iterates from startIndex down to 0 (target role), caching intermediate role credentials for future use.
-   * Only caches intermediate roles (i > 0), excluding both the target role and base IAM user credentials.
-   *
-   * @param credentialsCacheDAO - DAO for storing cached credentials
-   * @param credentialChain - The complete credential chain from target role (index 0) to base IAM user (highest index)
-   * @param startIndex - Index to start role assumption from (decrements towards target at index 0)
-   * @param credentials - Starting credentials (either base IAM user or cached intermediate role)
-   * @param userId - User ID for role session naming
-   * @param roleSessionDurationSeconds - Optional duration for the final target role session
-   * @returns Final credentials for the target role (index 0)
-   */
-  private async assumeRoleChain(
-    credentialsCacheDAO: CredentialsCacheDAO,
-    credentialChain: CredentialChain,
-    startIndex: number,
-    credentials: AccessKeysWithExpiration,
-    userId: string,
-    roleSessionDurationSeconds?: number,
-  ): Promise<AccessKeysWithExpiration> {
-    let newCredentials: AccessKeysWithExpiration = credentials;
-    for (let i = startIndex; i >= 0; --i) {
-      const roleArn: string = credentialChain.principalArns[i];
-      const sessionName: string = i > 0 ? INTERMEDIATE_ROLE_SESSION_NAME : `${ROLE_SESSION_NAME_PREFIX}${userId}`;
-      const durationSeconds: number | undefined = i === 0 ? roleSessionDurationSeconds : undefined;
-      newCredentials = await AssumeRoleUtil.assumeRole(roleArn, newCredentials, sessionName, durationSeconds);
-      // Cache intermediate credentials (not target role, not base IAM user)
-      if (i > 0 && newCredentials.expiration) {
-        await credentialsCacheDAO.storeCachedCredential({
-          principalArn: roleArn,
-          accessKeyId: newCredentials.accessKeyId,
-          secretAccessKey: newCredentials.secretAccessKey,
-          sessionToken: newCredentials.sessionToken!,
-          expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(newCredentials.expiration),
-        });
-      }
-    }
-    return newCredentials;
+    return AssumeRoleServiceFactory.create(env).assumeRoleForUser(userEmail, request.principalArn);
   }
 }
 

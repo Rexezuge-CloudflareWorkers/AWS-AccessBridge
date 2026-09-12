@@ -1,13 +1,8 @@
 import type { CostData, CostDataInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { BaseDAO } from './BaseDAO';
 
-class CostDataDAO {
-  protected readonly database: D1Database | D1DatabaseSession;
-
-  constructor(database: D1Database | D1DatabaseSession) {
-    this.database = database;
-  }
-
+class CostDataDAO extends BaseDAO {
   public async upsertCostData(data: CostData): Promise<void> {
     await this.database
       .prepare(

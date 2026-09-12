@@ -1,4 +1,4 @@
-import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
@@ -185,10 +185,7 @@ class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, Searc
     }
 
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    const matchingAccounts: AssumableAccountsMap = await assumableRolesDAO.searchAccountsByQuery(userEmail, query.trim(), showHidden);
-
-    return matchingAccounts;
+    return UserServiceFactory.create(env).searchAccounts(userEmail, query, showHidden);
   }
 }
 

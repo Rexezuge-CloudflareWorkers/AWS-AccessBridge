@@ -1,10 +1,6 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model';
-import { DEFAULT_MAX_TOKEN_EXPIRY_DAYS, DEFAULT_MAX_TOKENS_PER_USER } from '@aws-access-bridge/backend-runtime/config';
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
 
 class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateTokenResponse, CreateTokenEnv> {
   schema = {
@@ -65,27 +61,7 @@ class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateToken
     cxt: ActivityContext<CreateTokenEnv>,
   ): Promise<CreateTokenResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const userAccessTokenDAO: UserAccessTokenDAO = new UserAccessTokenDAO(env.AccessBridgeDB);
-    const maxTokens: number = parseInt(env.MAX_TOKENS_PER_USER || DEFAULT_MAX_TOKENS_PER_USER);
-    const maxExpiryInDays: number = parseInt(env.MAX_TOKEN_EXPIRY_DAYS || DEFAULT_MAX_TOKEN_EXPIRY_DAYS);
-    const existingTokens: UserAccessTokenMetadata[] = await userAccessTokenDAO.getByUserEmail(userEmail);
-    if (existingTokens.length < maxTokens) {
-      const expiresInDays: number = request.expiresInDays || maxExpiryInDays;
-      if (expiresInDays <= maxExpiryInDays) {
-        const tokenId: string = UUIDUtil.getRandomUUID();
-        const token: string = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
-        const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), expiresInDays);
-        await userAccessTokenDAO.create(tokenId, userEmail, token, request.name, expiresAt);
-        return {
-          tokenId,
-          token,
-          name: request.name,
-          expiresAt,
-        };
-      }
-      throw new BadRequestError(`Token expiry cannot exceed ${maxExpiryInDays} days`);
-    }
-    throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
+    return TokenServiceFactory.create(env).createToken(userEmail, request.name, request.expiresInDays);
   }
 }
 

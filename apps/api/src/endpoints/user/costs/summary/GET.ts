@@ -1,7 +1,6 @@
-import { AssumableRolesDAO, CostDataDAO } from '@aws-access-bridge/backend-data/dao';
+import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import type { CostData } from '@aws-access-bridge/shared/model';
 
 class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCostSummaryResponse, GetCostSummaryEnv> {
   schema = {
@@ -98,34 +97,7 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
     cxt: ActivityContext<GetCostSummaryEnv>,
   ): Promise<GetCostSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
-
-    if (accountIds.length === 0) return { accounts: {}, grandTotal: 0 };
-
-    const endDate: string = new Date().toISOString().split('T', 1)[0];
-    const startDate: string = new Date(Date.now() - 30 * 86_400_000).toISOString().split('T', 1)[0];
-
-    const costDataDAO: CostDataDAO = new CostDataDAO(env.AccessBridgeDB);
-    const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
-
-    const accounts: Record<string, { totalCost: number; currency: string }> = {};
-    let grandTotal: number = 0;
-
-    for (const data of costData) {
-      if (accounts[data.awsAccountId] === undefined) {
-        accounts[data.awsAccountId] = { totalCost: 0, currency: data.currency };
-      }
-      accounts[data.awsAccountId].totalCost += data.totalCost;
-      grandTotal += data.totalCost;
-    }
-
-    // Round totals
-    for (const accountId in accounts) {
-      accounts[accountId].totalCost = Math.round(accounts[accountId].totalCost * 100) / 100;
-    }
-
-    return { accounts, grandTotal: Math.round(grandTotal * 100) / 100 };
+    return CostServiceFactory.create(env).getSummary(userEmail);
   }
 }
 

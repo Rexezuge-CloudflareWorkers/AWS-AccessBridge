@@ -1,5 +1,4 @@
-import { TeamsDAO } from '@aws-access-bridge/backend-data/dao';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 
@@ -143,8 +142,7 @@ class UpdateTeamNameRoute extends IAdminActivityAPIRoute<UpdateTeamNameRequest, 
   };
 
   protected async handleAdminRequest(request: UpdateTeamNameRequest, env: IAdminEnv): Promise<UpdateTeamNameResponse> {
-    if (!request.teamId || !request.teamName?.trim()) throw new BadRequestError('Missing required fields.');
-    await new TeamsDAO(env.AccessBridgeDB).updateTeamName(request.teamId, request.teamName.trim());
+    await TeamServiceFactory.create(env).updateTeamName(request.teamId, request.teamName);
     return { success: true, message: 'Team name updated.' };
   }
 }

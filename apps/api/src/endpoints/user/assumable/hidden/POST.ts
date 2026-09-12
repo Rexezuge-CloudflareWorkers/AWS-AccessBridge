@@ -1,4 +1,4 @@
-import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao';
+import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 
@@ -163,10 +163,7 @@ class HideRoleRoute extends IActivityAPIRoute<HideRoleRequest, HideRoleResponse,
 
   protected async handleRequest(request: HideRoleRequest, env: HideRoleEnv, cxt: ActivityContext<HideRoleEnv>): Promise<HideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const rolesDAO: AssumableRolesDAO = new AssumableRolesDAO(env.AccessBridgeDB);
-
-    await rolesDAO.verifyUserHasAccessToRole(userEmail, request.awsAccountId, request.roleName);
-    await rolesDAO.hideRole(userEmail, request.awsAccountId, request.roleName);
+    await UserServiceFactory.create(env).hideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

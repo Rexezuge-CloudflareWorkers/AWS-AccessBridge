@@ -5,8 +5,8 @@ import type { AssumeRoleResponse } from '@/endpoints/api/aws/assume-role/POST';
 import type { GenerateConsoleUrlRequestInternal, GenerateConsoleUrlResponse } from '@/endpoints/api/aws/console/POST';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws';
 import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error';
-import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao';
-import { RoleConfig } from '@aws-access-bridge/shared/model';
+import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+import type { RoleConfig } from '@aws-access-bridge/shared/model';
 
 class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse, FederateEnv> {
   schema = {
@@ -202,8 +202,7 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
     const principalArn: string = `arn:aws:iam::${awsAccountId}:role/${roleName}`;
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const baseUrl: string = this.getBaseUrl(cxt);
-    const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(env.AccessBridgeDB);
-    const roleConfig: RoleConfig | undefined = await roleConfigsDAO.getRoleConfig(awsAccountId, roleName);
+    const roleConfig: RoleConfig | undefined = await AccountServiceFactory.create(env).getRoleConfig(awsAccountId, roleName);
     const hmacSecret: string = await env.INTERNAL_HMAC_SECRET.get();
     const internalRequestHelper: InternalRequestHelper = new InternalRequestHelper(env.SELF, hmacSecret);
     const assumeRoleResponse: Response = await internalRequestHelper.makeRequest(

@@ -11,20 +11,22 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 
 ## Required vars (no defaults)
 
-`POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`EmailValidationUtil`). No default; requests fail without them.
+`POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). No default; requests fail without them.
 
 ## Local-only (no default, not in `ConfigurationDefaults.ts`)
 
 `DEV_AUTH_EMAIL` — bypasses Cloudflare Access locally.
 
-## Optional vars (defaults in `ConfigurationDefaults.ts`)
+## Optional vars (defaults in `ConfigurationDefaults.ts`, read via `ConfigurationManager` namespaces)
 
-| Group     | Vars (default)                                                                 |
-| --------- | ------------------------------------------------------------------------------ |
-| Tokens    | `MAX_TOKENS_PER_USER` (`5`), `MAX_TOKEN_EXPIRY_DAYS` (`90`)                    |
-| Chains    | `PRINCIPAL_TRUST_CHAIN_LIMIT` (`3`)                                            |
-| Retention | `AUDIT_LOG_RETENTION_DAYS` (`90`), `BACKGROUND_TASK_RUN_RETENTION_DAYS` (`30`) |
-| SPA       | `SERVE_SPA_FROM_WORKER` (`false`)                                              |
-| Misc      | `DEMO_MODE` (`false`)                                                          |
+| Group      | Vars (default)                                                                                                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tokens     | `MAX_TOKENS_PER_USER` (`5`), `MAX_TOKEN_EXPIRY_DAYS` (`90`) — `ConfigurationManager.token`                                                                                                                 |
+| Credential | `PRINCIPAL_TRUST_CHAIN_LIMIT` (`3`), `CREDENTIAL_EXPIRY_BUFFER_MINUTES` (`5`), `NUMBER_OF_CREDENTIALS_TO_REFRESH` (`10`), `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (`45`) — `ConfigurationManager.credential` |
+| Collection | `COST_COLLECTION_INTERVAL_HOURS` (`6`), `COST_LOOKBACK_DAYS` (`30`), `RESOURCE_COLLECTION_INTERVAL_HOURS` (`2`) — `ConfigurationManager.costs` / `.resource`                                               |
+| Retention  | `AUDIT_LOG_RETENTION_DAYS` (`90`), `BACKGROUND_TASK_RUN_RETENTION_DAYS` (`30`), `PRUNE_BATCH_SIZE` (`500`) — `ConfigurationManager.audit` / `.processing`                                                  |
+| SPA        | `SERVE_SPA_FROM_WORKER` (`false`) — `ConfigurationManager.spa`                                                                                                                                             |
+| Internal   | `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` (`1000`) — `ConfigurationManager.internal`                                                                                                               |
+| Misc       | `DEMO_MODE` (`false`) — `ConfigurationManager.auth`                                                                                                                                                        |
 
-Add new env vars in `ConfigurationDefaults.ts`, not inline.
+Add new env vars in `ConfigurationDefaults.ts` + a `ConfigurationManager` namespace getter, not inline. Never `parseInt(env.X || DEFAULT)` at call sites.
