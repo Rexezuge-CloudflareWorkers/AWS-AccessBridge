@@ -1,0 +1,24 @@
+{
+  "name": "@aws-access-bridge/provider-clients",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./aws": "./src/aws/index.ts",
+    "./aws/*": "./src/aws/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-access-bridge/backend-errors": "workspace:*",
+    "@aws-access-bridge/shared": "workspace:*",
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "6.0.3"
+  }
+}

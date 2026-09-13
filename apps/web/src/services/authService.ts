@@ -1,4 +1,4 @@
-import { readJson } from '../lib/api';
+import { apiRequest } from '../lib/api';
 
 interface CurrentUser {
   email?: string;
@@ -8,22 +8,11 @@ interface CurrentUser {
 }
 
 async function loadCurrentUser(): Promise<CurrentUser> {
-  const response = await fetch('/user/me');
-  if (!response.ok) {
-    throw new Error(`Authentication check failed: ${response.status}`);
-  }
-  return readJson<CurrentUser>(response);
+  return apiRequest<CurrentUser>('/user/me');
 }
 
 async function updatePreferredLanguage(preferredLanguage: string | null): Promise<void> {
-  const response = await fetch('/user/me', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ preferredLanguage }),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to save language preference: ${response.status}`);
-  }
+  await apiRequest<void>('/user/me', { method: 'PUT', body: { preferredLanguage } });
 }
 
 export type { CurrentUser };

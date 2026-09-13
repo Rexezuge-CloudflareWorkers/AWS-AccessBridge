@@ -1,21 +1,21 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import type { AwsClientFactory } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
-import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
+import { BaseAwsCollector } from './BaseAwsCollector';
+import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
 
-class RdsCollector implements IAwsResourceCollector {
-  public readonly resourceType = 'rds';
-  private readonly clientFactory: AwsClientFactory;
+class RdsCollector extends BaseAwsCollector {
+  public override readonly resourceType = 'rds';
 
   constructor(clientFactory: AwsClientFactory = defaultAwsClientFactory) {
-    this.clientFactory = clientFactory;
+    super(clientFactory);
   }
 
   public async describeDBInstances(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
     return this.collect(accessKeys, region);
   }
 
-  public async collect(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
+  protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     const client = this.clientFactory({ service: 'rds', region, keys: accessKeys });
 
     const params: URLSearchParams = new URLSearchParams({ Action: 'DescribeDBInstances', Version: '2014-10-31' });

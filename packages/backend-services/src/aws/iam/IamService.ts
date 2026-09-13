@@ -1,62 +1,24 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
-import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
-import type { AwsClientFactory } from '../../http';
-import { defaultAwsClientFactory } from '../sts';
+import { IamClient, defaultAwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
+import type { AwsClientFactory, DiscoveredRole } from '@aws-access-bridge/provider-clients/aws';
 
-interface DiscoveredRole {
-  roleName: string;
-  arn: string;
-  description: string;
-}
-
+/**
+ * Domain IAM service (Layer 3). Delegates raw discovery to
+ * `provider-clients` `IamClient` (Layer 2).
+ */
 class IamService {
-  private readonly clientFactory: AwsClientFactory;
+  private readonly client: IamClient;
 
   constructor(clientFactory: AwsClientFactory = defaultAwsClientFactory) {
-    this.clientFactory = clientFactory;
+    this.client = new IamClient(clientFactory);
   }
 
   public async listRoles(accessKeys: AccessKeys): Promise<DiscoveredRole[]> {
-    const iamClient = this.clientFactory({ service: 'iam', region: 'us-east-1', keys: accessKeys });
-
-    const queryParams: URLSearchParams = new URLSearchParams({
-      Action: 'ListRoles',
-      Version: '2010-05-08',
-      MaxItems: '100',
-    });
-
-    const url: string = `https://iam.amazonaws.com/?${queryParams.toString()}`;
-    const response: Response = await iamClient.fetch(url, { method: 'GET' });
-    const xmlText: string = await response.text();
-
-    if (!response.ok) {
-      if (xmlText.includes('AccessDenied') || xmlText.includes('not authorized')) {
-        throw new BadRequestError('The assumed role does not have iam:ListRoles permission. You can still manually enter role names.');
-      }
-      throw new InternalServerError(`IAM ListRoles failed: ${response.status}`);
-    }
-
-    const roles: DiscoveredRole[] = [];
-    const memberRegex = /<member>([\s\S]*?)<\/member>/g;
-    let memberMatch: RegExpExecArray | null;
-    while ((memberMatch = memberRegex.exec(xmlText)) !== null) {
-      const member: string = memberMatch[1];
-      const roleNameMatch: RegExpMatchArray | null = /<RoleName>([^<]+)<\/RoleName>/.exec(member);
-      const arnMatch: RegExpMatchArray | null = /<Arn>([^<]+)<\/Arn>/.exec(member);
-      const descMatch: RegExpMatchArray | null = /<Description>([^<]*)<\/Description>/.exec(member);
-
-      if (roleNameMatch && arnMatch) {
-        roles.push({
-          roleName: roleNameMatch[1],
-          arn: arnMatch[1],
-          description: descMatch ? descMatch[1] : '',
-        });
-      }
-    }
-
-    return roles;
+    return this.client.listRoles(accessKeys);
   }
 }
 
 export { IamService };
-export type { DiscoveredRole };
+
+
+export {type DiscoveredRole} from '@aws-access-bridge/provider-clients/aws';

@@ -11,7 +11,9 @@
     "./config": "./src/config/index.ts",
     "./config/*": "./src/config/*.ts",
     "./constants": "./src/constants/index.ts",
-    "./constants/*": "./src/constants/*.ts"
+    "./constants/*": "./src/constants/*.ts",
+    "./di": "./src/di/index.ts",
+    "./di/*": "./src/di/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

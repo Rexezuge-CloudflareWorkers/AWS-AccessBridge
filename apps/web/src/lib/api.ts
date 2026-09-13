@@ -56,8 +56,7 @@ function isUnauthorized(error: unknown): boolean {
 
 export { ApiError, readErrorMessage, throwForResponse, isUnauthorized };
 
-export async function apiFetch<T>(url: string, options?: { method?: string; body?: unknown }): Promise<ApiResult<T>> {
-  const method: string = options?.method ?? 'GET';
+export async function apiFetch<T>(url: string, options?: { method?: string; body?: unknown }): Promise<ApiResult<T>> {  const method: string = options?.method ?? 'GET';
   try {
     const init: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
     if (options?.body !== undefined) {
@@ -97,4 +96,31 @@ export async function apiCall(
     return { ok: true, data: result.data ?? {} };
   }
   return { ok: false, error: result.error };
+}
+
+/**
+ * Canonical typed request helper (thrown-`ApiError` model).
+ * Previously two parallel error models coexisted (`ApiResult{ok,error}`
+ * via `apiFetch`/`apiCall` vs thrown `ApiError` via `throwForResponse` +
+ * `readJson`, with `authService` throwing plain `Error`). New code uses
+ * this; `apiFetch`/`apiCall` remain for backwards compatibility.
+ */
+export async function apiRequest<T>(url: string, options?: { method?: string; body?: unknown }): Promise<T> {
+  const method: string = options?.method ?? 'GET';
+  const init: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
+  if (options?.body !== undefined) {
+    init.body = JSON.stringify(options.body);
+  }
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    await throwForResponse(response, `Request failed: ${method} ${url}`);
+  }
+  if (response.status === 204) {
+    return {} as T;
+  }
+  const text = await response.text();
+  if (!text) {
+    return {} as T;
+  }
+  return JSON.parse(text) as T;
 }

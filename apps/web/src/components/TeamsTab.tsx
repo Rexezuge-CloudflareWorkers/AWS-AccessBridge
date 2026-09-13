@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixDate } from '../lib/format';
 import { DEFAULT_TEAM_ID } from '../lib/constants';
 import FocusInput from './ui/FocusInput';
 import Spinner from './ui/Spinner';
-import { apiCall } from '../lib/api';
+import { useTeams } from '../hooks/useTeams';
 import {
   cardStyle,
   inputStyle,
@@ -31,33 +31,31 @@ const styles = {
   td: tdStyle,
 };
 
-interface Team {
-  teamId: string;
-  teamName: string;
-  createdBy: string;
-  createdAt: number;
-}
-
-interface TeamMember {
-  teamId: string;
-  userEmail: string;
-  role: string;
-  joinedAt: number;
-}
-
 interface TeamsTabProps {
   showMessage: (type: 'success' | 'error', text: string) => void;
 }
 
 export default function TeamsTab({ showMessage }: TeamsTabProps) {
   const { t, i18n } = useTranslation();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [accounts, setAccounts] = useState<string[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [accountsLoading, setAccountsLoading] = useState(false);
+  const notifyError = (message: string) => showMessage('error', message);
+  const {
+    teams,
+    isLoading,
+    selectedTeamId,
+    members,
+    accounts,
+    membersLoading,
+    accountsLoading,
+    selectTeam: selectTeamInHook,
+    createTeam: createTeamInHook,
+    deleteTeam: deleteTeamInHook,
+    renameTeam: renameTeamInHook,
+    addMember: addMemberInHook,
+    removeMember: removeMemberInHook,
+    updateMemberRole: updateMemberRoleInHook,
+    addAccount: addAccountInHook,
+    removeAccount: removeAccountInHook,
+  } = useTeams(notifyError);
 
   // Forms
   const [createTeamName, setCreateTeamName] = useState('');
@@ -66,179 +64,96 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
   const [memberRole, setMemberRole] = useState('member');
   const [accountId, setAccountId] = useState('');
 
-  const fetchTeams = useCallback(async () => {
-    setIsLoading(true);
-    const result = await apiCall('/user/admin/teams', 'GET');
-    if (result.ok && result.data) {
-      setTeams((result.data as { teams: Team[] }).teams || []);
-    } else {
-      showMessage('error', result.error || 'Failed to load teams');
-    }
-    setIsLoading(false);
-  }, [showMessage]);
-
-  useEffect(() => {
-    apiCall('/user/admin/teams', 'GET')
-      .then((result) => {
-        if (result.ok && result.data) {
-          setTeams((result.data as { teams: Team[] }).teams || []);
-        } else {
-          showMessage('error', result.error || t('teams.loadError', 'Failed to load teams'));
-        }
-        setIsLoading(false);
-      })
-      .catch(() => {
-        showMessage('error', t('teams.loadError', 'Failed to load teams'));
-        setIsLoading(false);
-      });
-  }, [showMessage, t]);
-
-  const fetchMembers = useCallback(
-    async (teamId: string) => {
-      setMembersLoading(true);
-      const result = await apiCall(`/user/admin/team/members?teamId=${teamId}`, 'GET');
-      if (result.ok && result.data) {
-        setMembers((result.data as { members: TeamMember[] }).members || []);
-      } else {
-        showMessage('error', result.error || t('teams.membersLoadFailed', 'Failed to load members'));
-      }
-      setMembersLoading(false);
-    },
-    [showMessage],
-  );
-
-  const fetchAccounts = useCallback(
-    async (teamId: string) => {
-      setAccountsLoading(true);
-      const result = await apiCall(`/user/admin/team/accounts?teamId=${teamId}`, 'GET');
-      if (result.ok && result.data) {
-        setAccounts((result.data as { accountIds: string[] }).accountIds || []);
-      } else {
-        showMessage('error', result.error || t('teams.accountsLoadFailed', 'Failed to load accounts'));
-      }
-      setAccountsLoading(false);
-    },
-    [showMessage],
-  );
-
-  const selectTeam = useCallback(
-    (teamId: string) => {
-      setSelectedTeamId(teamId);
-      setMembers([]);
-      setAccounts([]);
-      const team = teams.find((t) => t.teamId === teamId);
-      setRenameTeamName(team?.teamName || '');
-      void fetchMembers(teamId);
-      void fetchAccounts(teamId);
-    },
-    [teams, fetchMembers, fetchAccounts],
-  );
+  const selectTeam = (teamId: string) => {
+    selectTeamInHook(teamId);
+    const team = teams.find((tm) => tm.teamId === teamId);
+    setRenameTeamName(team?.teamName ?? '');
+  };
 
   const handleCreateTeam = async () => {
     if (!createTeamName.trim()) return;
-    const result = await apiCall('/user/admin/team', 'POST', { teamName: createTeamName.trim() });
-    if (result.ok) {
+    try {
+      await createTeamInHook(createTeamName.trim());
       showMessage('success', t('teams.created', 'Team created successfully'));
       setCreateTeamName('');
-      void fetchTeams();
-    } else {
-      showMessage('error', result.error || t('teams.createFailed', 'Failed to create team'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.createFailed', 'Failed to create team'));
     }
   };
 
   const handleDeleteTeam = async (teamId: string) => {
-    const result = await apiCall('/user/admin/team', 'DELETE', { teamId });
-    if (result.ok) {
+    try {
+      await deleteTeamInHook(teamId);
       showMessage('success', t('teams.deleted', 'Team deleted successfully'));
-      if (selectedTeamId === teamId) {
-        setSelectedTeamId(null);
-        setMembers([]);
-        setAccounts([]);
-      }
-      void fetchTeams();
-    } else {
-      showMessage('error', result.error || t('teams.deleteFailed', 'Failed to delete team'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.deleteFailed', 'Failed to delete team'));
     }
   };
 
   const handleRenameTeam = async () => {
     if (!selectedTeamId || !renameTeamName.trim()) return;
-    const result = await apiCall('/user/admin/team/name', 'PUT', { teamId: selectedTeamId, teamName: renameTeamName.trim() });
-    if (result.ok) {
+    try {
+      await renameTeamInHook(selectedTeamId, renameTeamName.trim());
       showMessage('success', t('teams.renamed', 'Team renamed successfully'));
-      void fetchTeams();
-    } else {
-      showMessage('error', result.error || t('teams.renameFailed', 'Failed to rename team'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.renameFailed', 'Failed to rename team'));
     }
   };
 
   const handleAddMember = async () => {
     if (!selectedTeamId || !memberEmail.trim()) return;
-    const result = await apiCall('/user/admin/team/member', 'POST', {
-      teamId: selectedTeamId,
-      userEmail: memberEmail.trim(),
-      role: memberRole,
-    });
-    if (result.ok) {
+    try {
+      await addMemberInHook(selectedTeamId, memberEmail.trim(), memberRole);
       showMessage('success', t('teams.memberAdded', 'Member added successfully'));
       setMemberEmail('');
       setMemberRole('member');
-      void fetchMembers(selectedTeamId);
-    } else {
-      showMessage('error', result.error || t('teams.memberAddFailed', 'Failed to add member'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.memberAddFailed', 'Failed to add member'));
     }
   };
 
   const handleRemoveMember = async (email: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/user/admin/team/member', 'DELETE', { teamId: selectedTeamId, userEmail: email });
-    if (result.ok) {
+    try {
+      await removeMemberInHook(selectedTeamId, email);
       showMessage('success', t('teams.memberRemoved', 'Member removed successfully'));
-      void fetchMembers(selectedTeamId);
-    } else {
-      showMessage('error', result.error || t('teams.memberRemoveFailed', 'Failed to remove member'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.memberRemoveFailed', 'Failed to remove member'));
     }
   };
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/user/admin/team/member/role', 'PUT', {
-      teamId: selectedTeamId,
-      userEmail: email,
-      role: newRole,
-    });
-    if (result.ok) {
+    try {
+      await updateMemberRoleInHook(selectedTeamId, email, newRole);
       showMessage('success', t('teams.roleUpdated', 'Role updated successfully'));
-      void fetchMembers(selectedTeamId);
-    } else {
-      showMessage('error', result.error || t('teams.roleUpdateFailed', 'Failed to update role'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.roleUpdateFailed', 'Failed to update role'));
     }
   };
 
   const handleAddAccount = async () => {
     if (!selectedTeamId || !accountId.trim()) return;
-    const result = await apiCall('/user/admin/team/account', 'POST', { teamId: selectedTeamId, awsAccountId: accountId.trim() });
-    if (result.ok) {
+    try {
+      await addAccountInHook(selectedTeamId, accountId.trim());
       showMessage('success', t('teams.accountAdded', 'Account added to team'));
       setAccountId('');
-      void fetchAccounts(selectedTeamId);
-    } else {
-      showMessage('error', result.error || t('teams.accountAddFailed', 'Failed to add account'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.accountAddFailed', 'Failed to add account'));
     }
   };
 
   const handleRemoveAccount = async (awsAccountId: string) => {
     if (!selectedTeamId) return;
-    const result = await apiCall('/user/admin/team/account', 'DELETE', { teamId: selectedTeamId, awsAccountId });
-    if (result.ok) {
+    try {
+      await removeAccountInHook(selectedTeamId, awsAccountId);
       showMessage('success', t('teams.accountRemoved', 'Account removed from team'));
-      void fetchAccounts(selectedTeamId);
-    } else {
-      showMessage('error', result.error || t('teams.accountRemoveFailed', 'Failed to remove account'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('teams.accountRemoveFailed', 'Failed to remove account'));
     }
   };
 
-  const selectedTeam = teams.find((t) => t.teamId === selectedTeamId);
+  const selectedTeam = teams.find((tm) => tm.teamId === selectedTeamId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

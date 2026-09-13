@@ -254,6 +254,36 @@ export default tseslint.config(
       ],
     },
   },
+  // Layer 2: provider-clients — only shared and backend-errors (raw AWS, no DAOs/services)
+  {
+    files: ['packages/provider-clients/**/*.{ts,js}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@aws-access-bridge/backend-data', '@aws-access-bridge/backend-data/*'],
+              message: 'provider-clients must not import DAOs from backend-data',
+            },
+            {
+              group: ['@aws-access-bridge/backend-runtime', '@aws-access-bridge/backend-runtime/*'],
+              message: 'provider-clients must not import from backend-runtime',
+            },
+            {
+              group: ['@aws-access-bridge/backend-services', '@aws-access-bridge/backend-services/*'],
+              message: 'provider-clients must not import from backend-services (higher layer)',
+            },
+            { group: ['@aws-access-bridge/api', '@aws-access-bridge/api/*'], message: 'provider-clients must not import from apps/api' },
+            {
+              group: ['@aws-access-bridge/background', '@aws-access-bridge/background/*'],
+              message: 'provider-clients must not import from apps/background',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Layer 3: backend-services — cannot import apps
   {
     files: ['packages/backend-services/**/*.{ts,js}'],
@@ -283,6 +313,10 @@ export default tseslint.config(
             {
               group: ['aws4fetch'],
               message: 'apps/api must not import aws4fetch directly; use @aws-access-bridge/backend-services instead',
+            },
+            {
+              group: ['@aws-access-bridge/provider-clients', '@aws-access-bridge/provider-clients/*'],
+              message: 'apps/api must not import provider-clients directly; use @aws-access-bridge/backend-services instead',
             },
           ],
         },

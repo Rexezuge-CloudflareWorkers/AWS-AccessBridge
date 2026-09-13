@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
-import { isUnauthorized } from '../lib/api';
-import { listResources, loadSummary, getConsoleDestination } from '../services/resourceService';
-import type { ConsoleDestination, ResourceItem, ResourceSummary } from '../services/resourceService';
+import { getConsoleDestination } from '../services/resourceService';
+import type { ConsoleDestination, ResourceItem } from '../services/resourceService';
+import { useResources } from '../hooks/useResources';
 
 function stateColor(state: string): string {
   if (['running', 'active', 'Active', 'available'].includes(state)) return '#4ade80';
@@ -24,51 +23,22 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
 
 export default function ResourceInventory() {
   const { t } = useTranslation();
-  const [summary, setSummary] = useState<ResourceSummary | null>(null);
-  const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [rolesByAccount, setRolesByAccount] = useState<Record<string, string[]>>({});
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [filterType, setFilterType] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const pageSize = 25;
-
-  useEffect(() => {
-    loadSummary()
-      .then((data) => {
-        if (data) setSummary(data);
-      })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    listResources({ filterType, searchQuery, pageSize, page })
-      .then((data) => {
-        setResources(data.items);
-        setTotal(data.total);
-        setRolesByAccount(data.rolesByAccount || {});
-        setSelectedRoles((previous) => {
-          const next: Record<string, string> = { ...previous };
-          const byAccount = data.rolesByAccount || {};
-          for (const [accountId, roles] of Object.entries(byAccount)) {
-            if (roles.length > 0 && (next[accountId] === undefined || !roles.includes(next[accountId]))) {
-              next[accountId] = roles[0];
-            }
-          }
-          return next;
-        });
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (isUnauthorized(err)) {
-          globalThis.location.reload();
-          return;
-        }
-        setIsLoading(false);
-      });
-  }, [filterType, searchQuery, page]);
+  const {
+    summary,
+    resources,
+    total,
+    rolesByAccount,
+    selectedRoles,
+    setSelectedRoles,
+    isLoading,
+    filterType,
+    setFilterType,
+    searchQuery,
+    setSearchQuery,
+    page,
+    setPage,
+    pageSize,
+  } = useResources();
 
   const totalPages = Math.ceil(total / pageSize);
 

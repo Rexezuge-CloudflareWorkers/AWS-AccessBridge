@@ -1,21 +1,21 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import type { AwsClientFactory } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
-import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
+import { BaseAwsCollector } from './BaseAwsCollector';
+import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
 
-class DynamoDbCollector implements IAwsResourceCollector {
-  public readonly resourceType = 'dynamodb';
-  private readonly clientFactory: AwsClientFactory;
+class DynamoDbCollector extends BaseAwsCollector {
+  public override readonly resourceType = 'dynamodb';
 
   constructor(clientFactory: AwsClientFactory = defaultAwsClientFactory) {
-    this.clientFactory = clientFactory;
+    super(clientFactory);
   }
 
   public async listTables(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
     return this.collect(accessKeys, region);
   }
 
-  public async collect(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
+  protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     const client = this.clientFactory({ service: 'dynamodb', region, keys: accessKeys });
 
     const response: Response = await client.fetch(`https://dynamodb.${region}.amazonaws.com/`, {
@@ -32,13 +32,11 @@ class DynamoDbCollector implements IAwsResourceCollector {
       return [];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await response.json();
+    const data: { TableNames?: string[] } = (await response.json());
     const items: ResourceDiscoveryItem[] = [];
-    const tableNames = data.TableNames || [];
+    const tableNames: string[] = data.TableNames ?? [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const tableName of tableNames as any[]) {
+    for (const tableName of tableNames) {
       items.push({
         resourceType: 'dynamodb',
         resourceId: `${region}:${tableName}`,

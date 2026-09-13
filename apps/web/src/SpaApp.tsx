@@ -1,45 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { syncHtmlLang } from './lib/locale';
-import LanguageSelector from './components/LanguageSelector';
 import AccountList from './components/AccountList';
 import AdminPage from './components/AdminPage';
 import CostDashboard from './components/CostDashboard';
 import ResourceInventory from './components/ResourceInventory';
+import SpaNavbar from './components/SpaNavbar';
 import Unauthorized from './components/Unauthorized';
 import Spinner from './components/ui/Spinner';
 import Pagination from './components/ui/Pagination';
 import { useAuth } from './hooks/useAuth';
-
-type View = 'accounts' | 'costs' | 'resources' | 'admin';
-
-const PATH_TO_VIEW: Record<string, View> = {
-  '/': 'accounts',
-  '/costs': 'costs',
-  '/resources': 'resources',
-};
-
-const VIEW_TO_PATH: Record<View, string> = {
-  accounts: '/',
-  costs: '/costs',
-  resources: '/resources',
-  admin: '/admin',
-};
-
-function parseRoute(): { view: View; adminTab?: string } {
-  const path: string = globalThis.location.pathname.replace(/\/$/, '') || '/';
-  if (path === '/admin' || path.startsWith('/admin/')) {
-    const tab: string | undefined = path.split('/', 3)[2] || undefined;
-    return { view: 'admin', adminTab: tab };
-  }
-  return { view: PATH_TO_VIEW[path] ?? 'accounts' };
-}
+import { useRouter, type View } from './hooks/useRouter';
 
 export default function SpaApp() {
   const { t, i18n } = useTranslation();
   const { isAuthorized, isSuperAdmin, isDemoMode, userEmail } = useAuth();
-  const [currentView, setCurrentView] = useState<View>(() => parseRoute().view);
-  const [adminTab, setAdminTab] = useState<string | undefined>(() => parseRoute().adminTab);
+  const { currentView, adminTab, navigateTo } = useRouter();
   const [showHidden, setShowHidden] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,14 +45,12 @@ export default function SpaApp() {
     sessionStorage.setItem('aws-access-bridge-current-page', currentPage.toString());
   }, [currentPage]);
 
-  const navigateTo = useCallback((view: View, tab?: string) => {
-    setCurrentView(view);
-    setAdminTab(view === 'admin' ? tab : undefined);
-    const path: string = view === 'admin' && tab ? `/admin/${tab}` : VIEW_TO_PATH[view];
-    if (globalThis.location.pathname !== path) {
-      history.pushState(null, '', path);
-    }
-  }, []);
+  const navigateToView = useCallback(
+    (view: View) => {
+      navigateTo(view);
+    },
+    [navigateTo],
+  );
 
   const handleAdminTabChange = useCallback(
     (tab: string) => {
@@ -84,16 +58,6 @@ export default function SpaApp() {
     },
     [navigateTo],
   );
-
-  useEffect(() => {
-    const onPopState = () => {
-      const route = parseRoute();
-      setCurrentView(route.view);
-      setAdminTab(route.adminTab);
-    };
-    globalThis.addEventListener('popstate', onPopState);
-    return () => globalThis.removeEventListener('popstate', onPopState);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -126,7 +90,7 @@ export default function SpaApp() {
           {t('nav.demoBanner', 'Demo Mode — Data shown is for demonstration purposes only. Admin operations are disabled.')}
         </div>
       )}
-      <SpaNavbar isSuperAdmin={isSuperAdmin} currentView={currentView} setCurrentView={navigateTo} userEmail={userEmail} />
+      <SpaNavbar isSuperAdmin={isSuperAdmin} currentView={currentView} setCurrentView={navigateToView} userEmail={userEmail} />
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div key={currentView} className="animate-fade-in-up">
           {currentView === 'admin' && isSuperAdmin ? (
@@ -263,99 +227,5 @@ export default function SpaApp() {
         </div>
       </div>
     </div>
-  );
-}
-
-function SpaNavbar({
-  isSuperAdmin,
-  currentView,
-  setCurrentView,
-  userEmail,
-}: {
-  isSuperAdmin: boolean;
-  currentView: View;
-  setCurrentView: (view: View) => void;
-  userEmail: string;
-}) {
-  const { t } = useTranslation();
-  const viewLabels: Record<View, string> = {
-    accounts: t('nav.accounts', 'Accounts'),
-    costs: t('nav.costs', 'Costs'),
-    resources: t('nav.resources', 'Resources'),
-    admin: t('nav.admin', 'Admin'),
-  };
-  return (
-    <nav
-      className="text-white flex justify-between items-center"
-      style={{
-        padding: '12px 24px',
-        background: 'rgba(17, 24, 39, 0.95)',
-        backdropFilter: 'blur(8px)',
-        borderBottom: '1px solid #1e2433',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.025em' }}>
-          <span style={{ color: '#60a5fa' }}>AWS</span> AccessBridge
-        </div>
-        <div style={{ display: 'flex', gap: '4px', background: 'rgba(30,36,51,0.5)', padding: '4px', borderRadius: '8px' }}>
-          {(['accounts', 'costs', 'resources'] as const).map((view) => (
-            <NavTab key={view} active={currentView === view} onClick={() => setCurrentView(view)}>
-              {viewLabels[view]}
-            </NavTab>
-          ))}
-          {isSuperAdmin && (
-            <NavTab active={currentView === 'admin'} onClick={() => setCurrentView('admin')}>
-              {viewLabels.admin}
-            </NavTab>
-          )}
-        </div>
-      </div>
-      <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <LanguageSelector />
-        {isSuperAdmin && (
-          <span
-            style={{
-              background: 'rgba(245,158,11,0.15)',
-              color: '#fbbf24',
-              padding: '2px 10px',
-              borderRadius: '9999px',
-              fontSize: '12px',
-              fontWeight: 500,
-            }}
-          >
-            {t('nav.adminBadge', 'ADMIN')}
-          </span>
-        )}
-        <span style={{ color: '#9ca3af' }}>{userEmail}</span>
-      </div>
-    </nav>
-  );
-}
-
-function NavTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '6px 16px',
-        borderRadius: '6px',
-        fontSize: '14px',
-        fontWeight: 500,
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-        background: active ? '#2563eb' : hovered ? 'rgba(55,65,81,0.5)' : 'transparent',
-        color: active || hovered ? '#fff' : '#9ca3af',
-      }}
-    >
-      {children}
-    </button>
   );
 }
