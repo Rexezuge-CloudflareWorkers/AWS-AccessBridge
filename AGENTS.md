@@ -43,15 +43,15 @@ pnpm exec wrangler deploy
 
 ```
 Layer 0: shared, backend-errors          — zero @aws-access-bridge/* deps
-Layer 1: backend-runtime                 → layer 0 only
-Layer 2: backend-data                    → layer 0 only
-Layer 3: backend-services                → layers 0–2 (not apps)
+Layer 1: backend-runtime (+ di/)         → layer 0 only
+Layer 2: backend-data, provider-clients  → layer 0 only
+Layer 3: backend-services (+ composition/) → layers 0–2 (not apps)
 (no Layer 4 by design)
-Layer 5: apps/background                 → layers 0–3
-         apps/api                        → layers 0–3 + background (NOT aws4fetch directly)
+Layer 5: apps/background                 → layers 0–3 (provider-clients OK)
+         apps/api                        → layers 0–3 + background (NOT aws4fetch/provider-clients directly)
 ```
 
-Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 blocks `apps/api → aws4fetch`; route AWS SDK usage through `@aws-access-bridge/backend-services`).
+Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 blocks `apps/api → aws4fetch` and `apps/api → provider-clients`; route AWS SDK usage through `@aws-access-bridge/backend-services`).
 
 ## Index
 

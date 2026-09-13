@@ -1,43 +1,38 @@
 import { AuditLogDAO, type AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { AuditLog } from '@aws-access-bridge/shared/model';
-import { RequestOriginUtil } from '@aws-access-bridge/shared/utils';
-import { AUDIT_ACTIONS } from './AuditActions';
-import { AuditEventBuilder, type AuditEvent } from './AuditEventBuilder';
-import { AuditLogObserver, type IAuditObserver } from './AuditObserver';
+import { type AuditEvent } from './AuditEventBuilder';
+import { type IAuditObserver } from './AuditObserver';
+import { AuditObserverRegistry } from './AuditObserverRegistry';
+import { AuditPayloadBuilder } from './AuditPayloadBuilder';
 
 interface AuditServiceEnv {
   AccessBridgeDB: D1Queryable;
 }
 
 class AuditService {
-  private readonly observers: IAuditObserver[];
+  private readonly registry: AuditObserverRegistry;
 
   constructor(
     private readonly env: AuditServiceEnv,
     observers?: IAuditObserver[],
   ) {
-    this.observers = observers ?? [new AuditLogObserver(env.AccessBridgeDB)];
+    this.registry =
+      observers === undefined
+        ? AuditObserverRegistry.withDefaults(env.AccessBridgeDB as never)
+        : AuditObserverRegistry.withObservers(observers);
   }
 
   public static resolveAction(method: string, path: string): string {
-    return AUDIT_ACTIONS[`${method}:${path}`] || `${method}:${path}`;
+    return AuditPayloadBuilder.resolveAction(method, path);
   }
 
   public buildRequestEvent(request: Request, userEmail: string, statusCode: number, envForOrigin?: unknown): AuditEvent {
-    const method: string = request.method;
-    const path: string = new URL(request.url).pathname;
-    return AuditEventBuilder.create()
-      .userEmail(userEmail)
-      .action(AuditService.resolveAction(method, path))
-      .request(method, path)
-      .status(statusCode)
-      .network(RequestOriginUtil.getClientIpAddress(request, envForOrigin), request.headers.get('User-Agent') ?? undefined)
-      .build();
+    return AuditPayloadBuilder.fromRequest(request, userEmail, statusCode, envForOrigin);
   }
 
   public async record(event: AuditEvent): Promise<void> {
-    await Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
+    await this.registry.notifyAll(event);
   }
 
   public async queryLogs(

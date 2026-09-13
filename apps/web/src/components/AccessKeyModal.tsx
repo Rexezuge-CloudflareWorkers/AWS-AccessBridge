@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
-import { exportEnv } from '@aws-access-bridge/shared';
+import { formatShellExport } from '../lib/shellExport';
 
 interface Props extends AccessKeysResponse {
   onClose: () => void;
@@ -121,7 +121,7 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
             style={modalStyles.btnCopy(copied)}
             onMouseEnter={(e) => (e.currentTarget.style.background = copied ? '#15803d' : '#1d4ed8')}
             onMouseLeave={(e) => (e.currentTarget.style.background = copied ? '#16a34a' : '#2563eb')}
-            onClick={() => copyToClipboard(exportEnv(accessKeyId, secretAccessKey, sessionToken))}
+            onClick={() => copyToClipboard(formatShellExport(accessKeyId, secretAccessKey, sessionToken))}
           >
             {copied ? t('modal.copied', 'Copied!') : t('modal.copyAll', 'Copy All')}
           </button>

@@ -1,5 +1,8 @@
 import { DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
+import { mapRowsToAssumableMap } from './AssumableRolesMapper';
+import type { AssumableRoleRow } from './AssumableRolesMapper';
+import { buildListRolesQuery, buildSearchRolesQuery, hiddenFilterClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
 class AssumableRolesDAO extends BaseDAO {
@@ -48,7 +51,7 @@ class AssumableRolesDAO extends BaseDAO {
    * @returns The total number of unique accounts.
    */
   public async getTotalAccountsCount(userEmail: string, showHidden: boolean): Promise<number> {
-    const hiddenFilter: string = showHidden ? '' : 'AND (ar.hidden IS NULL OR ar.hidden = FALSE)';
+    const hiddenFilter: string = hiddenFilterClause(showHidden);
     const countResult: D1Result<GetTotalAccountsCountInternal> = await this.database
       .prepare(
         `SELECT COUNT(DISTINCT ar.aws_account_id) as total_accounts
@@ -74,40 +77,12 @@ class AssumableRolesDAO extends BaseDAO {
     limit: number = 50,
     offset: number = 0,
   ): Promise<AssumableAccountsMap> {
-    const hiddenFilter: string = showHidden ? '' : 'AND (ar.hidden IS NULL OR ar.hidden = FALSE)';
-    const results: D1Result<GetAllRolesByUserEmailInternal> = await this.database
-      .prepare(
-        `SELECT ar.aws_account_id, ar.role_name, ar.hidden, aa.aws_account_nickname,
-                CASE WHEN ufa.aws_account_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
-         FROM assumable_roles ar
-         LEFT JOIN aws_accounts aa ON ar.aws_account_id = aa.aws_account_id
-         LEFT JOIN user_favorite_accounts ufa ON ar.aws_account_id = ufa.aws_account_id AND ufa.user_email = ?
-         WHERE ar.user_email = ? ${hiddenFilter}
-         ORDER BY is_favorite DESC,
-                  CASE WHEN aa.aws_account_nickname IS NOT NULL THEN 0 ELSE 1 END,
-                  COALESCE(aa.aws_account_nickname, ar.aws_account_id)
-         LIMIT ? OFFSET ?`,
-      )
+    const results: D1Result<AssumableRoleRow> = await this.database
+      .prepare(buildListRolesQuery(showHidden))
       .bind(userEmail, userEmail, limit, offset)
-      .all<GetAllRolesByUserEmailInternal>();
+      .all<AssumableRoleRow>();
     if (results && results.results) {
-      const roleMap: AssumableAccountsMap = {};
-      for (const row of results.results) {
-        if (roleMap[row.aws_account_id] === undefined) {
-          roleMap[row.aws_account_id] = {
-            roles: [],
-            hiddenRoles: [],
-            nickname: row.aws_account_nickname || undefined,
-            favorite: row.is_favorite === 1,
-          };
-        }
-        if (row.hidden === 1) {
-          roleMap[row.aws_account_id].hiddenRoles!.push(row.role_name);
-        } else {
-          roleMap[row.aws_account_id].roles.push(row.role_name);
-        }
-      }
-      return roleMap;
+      return mapRowsToAssumableMap(results.results);
     }
     return {};
   }
@@ -225,40 +200,12 @@ class AssumableRolesDAO extends BaseDAO {
    * @returns A map of matching AWS account IDs to objects containing roles and account nickname.
    */
   public async searchAccountsByQuery(userEmail: string, query: string, showHidden: boolean = false): Promise<AssumableAccountsMap> {
-    const hiddenFilter: string = showHidden ? '' : 'AND (ar.hidden IS NULL OR ar.hidden = FALSE)';
-    const results: D1Result<GetAllRolesByUserEmailInternal> = await this.database
-      .prepare(
-        `SELECT ar.aws_account_id, ar.role_name, ar.hidden, aa.aws_account_nickname,
-                CASE WHEN ufa.aws_account_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
-         FROM assumable_roles ar
-         LEFT JOIN aws_accounts aa ON ar.aws_account_id = aa.aws_account_id
-         LEFT JOIN user_favorite_accounts ufa ON ar.aws_account_id = ufa.aws_account_id AND ufa.user_email = ?
-         WHERE ar.user_email = ? ${hiddenFilter}
-           AND (ar.aws_account_id LIKE ? OR aa.aws_account_nickname LIKE ?)
-         ORDER BY is_favorite DESC,
-                  CASE WHEN aa.aws_account_nickname IS NOT NULL THEN 0 ELSE 1 END,
-                  COALESCE(aa.aws_account_nickname, ar.aws_account_id)`,
-      )
+    const results: D1Result<AssumableRoleRow> = await this.database
+      .prepare(buildSearchRolesQuery(showHidden))
       .bind(userEmail, userEmail, `%${query}%`, `%${query}%`)
-      .all<GetAllRolesByUserEmailInternal>();
+      .all<AssumableRoleRow>();
     if (results && results.results) {
-      const roleMap: AssumableAccountsMap = {};
-      for (const row of results.results) {
-        if (roleMap[row.aws_account_id] === undefined) {
-          roleMap[row.aws_account_id] = {
-            roles: [],
-            hiddenRoles: [],
-            nickname: row.aws_account_nickname || undefined,
-            favorite: row.is_favorite === 1,
-          };
-        }
-        if (row.hidden === 1) {
-          roleMap[row.aws_account_id].hiddenRoles!.push(row.role_name);
-        } else {
-          roleMap[row.aws_account_id].roles.push(row.role_name);
-        }
-      }
-      return roleMap;
+      return mapRowsToAssumableMap(results.results);
     }
     return {};
   }
@@ -266,14 +213,6 @@ class AssumableRolesDAO extends BaseDAO {
 
 interface GetRolesByUserAndAccountInternal {
   role_name: string;
-}
-
-interface GetAllRolesByUserEmailInternal {
-  aws_account_id: string;
-  role_name: string;
-  hidden: number | null;
-  aws_account_nickname: string | null;
-  is_favorite: number;
 }
 
 interface GetTotalAccountsCountInternal {

@@ -3,6 +3,7 @@ export * from './auth';
 export * from './access';
 export * from './account';
 export * from './aws';
+export * from './composition';
 export * from './cost';
 export * from './credential';
 export * from './error';

@@ -1,5 +1,12 @@
 export { BaseDAO, EncryptedDAO } from './BaseDAO';
 export { AssumableRolesDAO } from './AssumableRolesDAO';
+export { mapRowsToAssumableMap } from './AssumableRolesMapper';
+export type { AssumableRoleRow } from './AssumableRolesMapper';
+export {
+  buildListRolesQuery,
+  buildSearchRolesQuery,
+  hiddenFilterClause,
+} from './AssumableRolesQueries';
 export { AwsAccountsDAO } from './AwsAccountsDAO';
 export { BackgroundTaskRunDAO } from './BackgroundTaskRunDAO';
 export { CredentialCacheConfigDAO } from './CredentialCacheConfigDAO';

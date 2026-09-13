@@ -2,7 +2,7 @@
 
 Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS.md`.
 
-- Root package `@aws-access-bridge/monorepo`, pnpm workspaces (`apps/*`, `packages/*`).
+- Root package `@aws-access-bridge/monorepo`, pnpm workspaces (`apps/*`, `packages/*`): `shared`, `backend-errors` (Layer 0); `backend-runtime` incl. `di/` (`Container`, `ServiceContext`) (Layer 1); `backend-data`, `provider-clients` (raw AWS STS/CE/IAM + signed-fetch; Layer 2); `backend-services` incl. `composition/` (`Tokens`, `createRequestScope`) (Layer 3).
 - `apps/web/vite.config.ts` proxies `/api` + `/user` → `http://localhost:8787` in dev; `closeBundle` embeds `dist/index.html` into `apps/api/src/generated/spa-shell.ts` (`SPA_HTML`) on build.
 - `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Materialized by `scripts/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, `$minimumVersion` fork-staleness check).
 - The Worker serves the SPA only from its page-route catch-all (`AccessBridgeWorker`: `/user/*` JSON and `/api/*` JSON never fall through to HTML) so API routes aren't intercepted by the assets handler.

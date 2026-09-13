@@ -1,11 +1,9 @@
 import { OpenAPIRoute } from 'chanfana';
 import { Context } from 'hono';
 import type { StatusCode } from 'hono/utils/http-status';
-import { BaseUrlUtil } from '@aws-access-bridge/backend-services/aws';
 import { DefaultInternalServerError, DatabaseError, InternalServerError, IServiceError } from '@aws-access-bridge/backend-errors';
-import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED } from '@aws-access-bridge/backend-data/constants/d1';
-import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
 import { validateRequestInput } from '@/schema';
+import { getQueryParam, getRequestBaseUrl, isDemoModeEnv, withUnconstrainedD1Session } from './route-helpers';
 
 abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IResponse, TEnv extends IEnv> extends OpenAPIRoute {
   async handle(c: ActivityContext<TEnv>) {
@@ -18,7 +16,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       }
       const validatedBody: unknown = await validateRequestInput(c.req.raw, body);
       const request: TRequest = { ...(validatedBody as TRequest), raw: c.req.raw };
-      const env: TEnv = { ...(c.env as TEnv), AccessBridgeDB: c.env.AccessBridgeDB.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) };
+      const env: TEnv = withUnconstrainedD1Session({ ...(c.env as TEnv) });
       const response: TResponse | ExtendedResponse<TResponse> = await this.handleRequest(request, env, c);
       return this.toResponse(response, c);
     } catch (error: unknown) {
@@ -57,7 +55,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
   }
 
   protected getQueryParam(request: IRequest, name: string): string | undefined {
-    return new URL(request.raw.url).searchParams.get(name) ?? undefined;
+    return getQueryParam(request.raw, name);
   }
 
   protected getAuthenticatedUserEmailAddress(c: ActivityContext<TEnv>): string {
@@ -65,12 +63,11 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
   }
 
   protected getBaseUrl(c: ActivityContext<TEnv>): string {
-    return BaseUrlUtil.getBaseUrl(c.req.raw, c.env);
+    return getRequestBaseUrl(c.req.raw, c.env);
   }
 
   protected isDemoMode(c: ActivityContext<TEnv>): boolean {
-    const env: TEnv = c.env as TEnv;
-    return (env.DEMO_MODE || DEFAULT_DEMO_MODE) === 'true';
+    return isDemoModeEnv(c.env);
   }
 
   protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {

@@ -1,21 +1,31 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import type { AwsClientFactory } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
-import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
+import { BaseAwsCollector } from './BaseAwsCollector';
+import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
 
-class LambdaCollector implements IAwsResourceCollector {
-  public readonly resourceType = 'lambda';
-  private readonly clientFactory: AwsClientFactory;
+interface LambdaListResponse {
+  Functions?: Array<{
+    FunctionArn?: string;
+    FunctionName?: string;
+    State?: string;
+    Runtime?: string;
+    MemorySize?: number;
+  }>;
+}
+
+class LambdaCollector extends BaseAwsCollector {
+  public override readonly resourceType = 'lambda';
 
   constructor(clientFactory: AwsClientFactory = defaultAwsClientFactory) {
-    this.clientFactory = clientFactory;
+    super(clientFactory);
   }
 
   public async listFunctions(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
     return this.collect(accessKeys, region);
   }
 
-  public async collect(accessKeys: AccessKeys, region: string = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
+  protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     const client = this.clientFactory({ service: 'lambda', region, keys: accessKeys });
 
     const response: Response = await client.fetch(`https://lambda.${region}.amazonaws.com/2015-03-31/functions`);
@@ -25,20 +35,20 @@ class LambdaCollector implements IAwsResourceCollector {
       return [];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await response.json();
+    const data: LambdaListResponse = (await response.json());
     const items: ResourceDiscoveryItem[] = [];
-    const functions = data.Functions || [];
+    const functions = data.Functions ?? [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const fn of functions as any[]) {
+    for (const fn of functions) {
+      const resourceId: string = fn.FunctionArn ?? fn.FunctionName ?? 'unknown';
+      const resourceName: string = fn.FunctionName ?? resourceId;
       items.push({
         resourceType: 'lambda',
-        resourceId: fn.FunctionArn || fn.FunctionName,
-        resourceName: fn.FunctionName,
-        state: fn.State || 'Active',
+        resourceId,
+        resourceName,
+        state: fn.State ?? 'Active',
         region,
-        metadata: { runtime: fn.Runtime || '', memorySize: String(fn.MemorySize || '') },
+        metadata: { runtime: fn.Runtime ?? '', memorySize: String(fn.MemorySize ?? '') },
       });
     }
 

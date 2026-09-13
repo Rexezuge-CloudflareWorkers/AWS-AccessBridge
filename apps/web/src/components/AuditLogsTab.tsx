@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { formatUnixTimestamp } from '../lib/format';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
-import { apiFetch } from '../lib/api';
+import { queryAuditLogs } from '../services/auditService';
 import { cardStyle, tableCardStyle, inputStyle, btnBlueStyle, thStyle, tdStyle } from './ui/theme';
 
 interface AuditLog {
@@ -68,21 +68,16 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
   const pageSize = 25;
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (filterEmail.trim()) params.set('userEmail', filterEmail.trim());
-    if (filterAction.trim()) params.set('action', filterAction.trim());
-    params.set('limit', pageSize.toString());
-    params.set('offset', (page * pageSize).toString());
-
-    apiFetch<{ logs: AuditLog[]; total: number }>(`/user/admin/audit-logs?${params.toString()}`)
+    queryAuditLogs({
+      userEmail: filterEmail.trim() || undefined,
+      action: filterAction.trim() || undefined,
+      limit: pageSize,
+      offset: page * pageSize,
+    })
       .then((result) => {
-        if (result.ok && result.data) {
-          setLogs(result.data.logs);
-          setTotal(result.data.total);
-          setError(null);
-        } else {
-          setError(result.error || t('audit.loadError', 'Failed to load audit logs'));
-        }
+        setLogs(result.logs);
+        setTotal(result.total);
+        setError(null);
         setIsLoading(false);
       })
       .catch(() => {

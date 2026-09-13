@@ -76,33 +76,6 @@ class ConfigurationManager {
   public static readonly spa = {
     isServeFromWorker: (env: unknown): boolean => EnvParser.boolean(env, 'SERVE_SPA_FROM_WORKER', DEFAULT_SERVE_SPA_FROM_WORKER),
   };
-
-  // ─── Flat API (delegates to namespace groups) ────────────
-
-  public static getTrustChainLimit(env: unknown): number {
-    return this.credential.getTrustChainLimit(env);
-  }
-  public static getMaxTokensPerUser(env: unknown): number {
-    return this.token.getMaxPerUser(env);
-  }
-  public static getMaxTokenExpiryDays(env: unknown): number {
-    return this.token.getMaxExpiryDays(env);
-  }
-  public static getAuditLogRetentionDays(env: unknown): number {
-    return this.audit.getRetentionDays(env);
-  }
-  public static getBackgroundTaskRunRetentionDays(env: unknown): number {
-    return this.processing.getTaskRunRetentionDays(env);
-  }
-  public static isDemoMode(env: unknown): boolean {
-    return this.auth.isDemoMode(env);
-  }
-  public static isServeSpaFromWorker(env: unknown): boolean {
-    return this.spa.isServeFromWorker(env);
-  }
-  public static getInternalRequestTimeWindowMs(env: unknown): number {
-    return this.internal.getRequestTimeWindowMs(env);
-  }
 }
 
 export { ConfigurationManager };

@@ -3,7 +3,7 @@ import {
   HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
   HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
   HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
-} from '@aws-access-bridge/backend-errors/constants';
+} from '@aws-access-bridge/shared/constants';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { INTERNAL_HEADER_PREFIX, INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
 import { verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';

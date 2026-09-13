@@ -10,6 +10,7 @@ const backendDataSrcPath = fileURLToPath(new URL('../../packages/backend-data/sr
 const backendErrorsSrcPath = fileURLToPath(new URL('../../packages/backend-errors/src', import.meta.url));
 const backendRuntimeSrcPath = fileURLToPath(new URL('../../packages/backend-runtime/src', import.meta.url));
 const backendServicesSrcPath = fileURLToPath(new URL('../../packages/backend-services/src', import.meta.url));
+const providerClientsSrcPath = fileURLToPath(new URL('../../packages/provider-clients/src', import.meta.url));
 const sharedSrcPath = fileURLToPath(new URL('../../packages/shared/src', import.meta.url));
 
 const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
@@ -55,6 +56,7 @@ export default defineConfig({
       { find: '@aws-access-bridge/backend-errors', replacement: backendErrorsSrcPath },
       { find: '@aws-access-bridge/backend-runtime', replacement: backendRuntimeSrcPath },
       { find: '@aws-access-bridge/backend-services', replacement: backendServicesSrcPath },
+      { find: '@aws-access-bridge/provider-clients', replacement: providerClientsSrcPath },
       { find: '@aws-access-bridge/shared', replacement: sharedSrcPath },
       { find: /^@\//, replacement: `${apiSrcPath}/` },
     ],

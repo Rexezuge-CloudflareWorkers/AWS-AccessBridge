@@ -15,6 +15,12 @@ abstract class IScheduledTask<TEnv extends IEnv> {
     return null;
   }
 
+  // Factory-Method seam (Otter `IScheduledTask.createTaskRunDAO` precedent):
+  // tests override this to inject a stub DAO without D1.
+  protected createTaskRunDAO(db: D1Database): BackgroundTaskRunDAO {
+    return new BackgroundTaskRunDAO(db);
+  }
+
   public async handle(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const tEnv = env as unknown as TEnv;
     const taskType = this.getTaskType();
@@ -23,7 +29,7 @@ abstract class IScheduledTask<TEnv extends IEnv> {
 
     let runId: string | undefined;
     if (taskType && db) {
-      const dao = new BackgroundTaskRunDAO(db);
+      const dao = this.createTaskRunDAO(db);
       runId = await dao.startRun({ taskType }).catch((error: unknown) => {
         console.warn(`[${this.constructor.name}] Failed to start task run record:`, error);
         return undefined;
@@ -33,7 +39,7 @@ abstract class IScheduledTask<TEnv extends IEnv> {
     try {
       const result = await this.handleScheduledTask(event, tEnv, ctx);
       if (runId && db) {
-        const dao = new BackgroundTaskRunDAO(db);
+        const dao = this.createTaskRunDAO(db);
         await dao.succeedRun(runId, result ?? { itemsProcessed: 0, itemsFailed: 0 }).catch((error: unknown) => {
           console.warn(`[${this.constructor.name}] Failed to mark task run succeeded:`, error);
         });
@@ -41,7 +47,7 @@ abstract class IScheduledTask<TEnv extends IEnv> {
     } catch (error: unknown) {
       console.error(`[${this.constructor.name}] Uncaught error:`, error);
       if (runId && db) {
-        const dao = new BackgroundTaskRunDAO(db);
+        const dao = this.createTaskRunDAO(db);
         await dao.failRun(runId, String(error)).catch((recordError: unknown) => {
           console.warn(`[${this.constructor.name}] Failed to mark task run failed:`, recordError);
         });

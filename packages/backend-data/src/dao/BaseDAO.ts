@@ -16,6 +16,34 @@ abstract class BaseDAO {
     return executeD1WithRetry(operation, context);
   }
 
+  protected findRowById<T>(table: string, idColumn: string, idValue: string, columns = '*'): Promise<T | null> {
+    return BaseDAO.findById<T>(this.database, table, idColumn, idValue, columns);
+  }
+
+  protected deleteRowsOlderThan(
+    table: string,
+    timeColumn: string,
+    cutoff: number | string,
+    limit: number,
+    idColumn: string,
+  ): Promise<number> {
+    return BaseDAO.deleteOlderThan(this.database, table, timeColumn, cutoff, limit, idColumn);
+  }
+
+  // Generic orphan-row delete for the 7× `deleteOrphaned(): Promise<number>`
+  // implementations (AwsAccounts/RoleConfigs/CostData/DataCollectionConfig/
+  // TeamAccounts/ResourceInventory/SpendAlertDAO shared shape).
+  protected deleteOrphanedRows(
+    table: string,
+    orphanCondition: string,
+    binds: unknown[] = [],
+  ): Promise<D1Result> {
+    return this.withRetry(
+      () => this.database.prepare(`DELETE FROM ${table} WHERE ${orphanCondition}`).bind(...binds).run(),
+      `delete orphaned rows from ${table}`,
+    );
+  }
+
   // Generic row lookup by primary key. Table/column identifiers are allow-listed
   // to keep dynamic SQL safe; values always go through bindings.
   protected static async findById<T>(db: D1Queryable, table: string, idColumn: string, idValue: string, columns = '*'): Promise<T | null> {
