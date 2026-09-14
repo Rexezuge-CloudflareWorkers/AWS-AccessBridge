@@ -76,6 +76,21 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
       Variables: { AuthenticatedUserEmailAddress: string };
     }>();
 
+    // Canonical app entry is /user/ (protected by Cloudflare Access).
+    // Navigating here triggers the Zero Trust login flow when the user has
+    // no valid session (mirrors Otter MailOtterWorker).
+    app.get('/', (c) => c.redirect('/user/'));
+    app.get('/user', (c) => c.redirect('/user/' + new URL(c.req.url).search));
+    // Legacy page routes (pre-/user/ canonical) redirect to preserve bookmarks.
+    // Pages live under /user/app/* so they never collide with /user/* JSON
+    // API routes (e.g. GET /user/resources, GET /user/admin/teams).
+    app.get('/costs', (c) => c.redirect('/user/app/costs' + new URL(c.req.url).search));
+    app.get('/resources', (c) => c.redirect('/user/app/resources' + new URL(c.req.url).search));
+    app.get('/admin', (c) => c.redirect('/user/app/admin' + new URL(c.req.url).search));
+    app.get('/admin/*', (c) =>
+      c.redirect('/user/app/admin/' + new URL(c.req.url).pathname.slice('/admin/'.length) + new URL(c.req.url).search),
+    );
+
     // Middleware Handlers
     // Cloudflare Access protects the human surface (/user/*) only.
     // The programmatic surface (/api/*) authenticates via Bearer PAT
@@ -93,22 +108,17 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     this.registerUserRoutes(openapi);
     this.registerApiRoutes(openapi);
 
-    // SPA catch-all: serve embedded index.html for frontend page routes only.
-    // API surfaces (/user/* JSON, /api/* JSON) must never fall through to HTML.
+    // SPA catch-all: serve embedded index.html for the protected /user/ page
+    // routes only (mirrors Otter). API surfaces (/user/* JSON, /api/* JSON)
+    // match registered routes or 401 in auth middleware first and never fall
+    // through to HTML; everything else returns 404.
     app.get('*', (c) => {
       const serveSpaFromWorker: boolean = ConfigurationManager.spa.isServeFromWorker(c.env);
       if (!serveSpaFromWorker) {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (
-        path === '/docs' ||
-        path === '/redocs' ||
-        path.startsWith('/user/') ||
-        path.startsWith('/api/') ||
-        path.startsWith('/openapi.') ||
-        /\.\w+$/.test(path)
-      ) {
+      if (!path.startsWith('/user/')) {
         return c.notFound();
       }
       return c.html(SPA_HTML);
