@@ -12,7 +12,7 @@ Scope: `apps/api/**`. Parent index: `../../AGENTS.md`.
 
 ## Auth
 
-- `/user/*` — Cloudflare Access. `AccessAuthService.getAuthenticatedUserEmail` reads the `cf-access-jwt-assertion` header, verifies via `jose` against `{TEAM_DOMAIN}/cdn-cgi/access/certs` with audience `POLICY_AUD`, extracts `payload.email`.
+- `/user/*` — Cloudflare Access. `AccessAuthService.getAuthenticatedUserEmail` resolves in order: `DEMO_MODE` → `DEV_AUTH_EMAIL` (local-only) → JWT verification via `jose` against `{TEAM_DOMAIN}/cdn-cgi/access/certs` with audience `POLICY_AUD` (reads the `cf-access-jwt-assertion` header, extracts `payload.email`) → platform-verified `ctx.access.getIdentity()` fallback when `TEAM_DOMAIN`/`POLICY_AUD` are unset (Worker-level Access, same-account one-click deploys). Explicit vars always win over the fallback when set. Never trust the spoofable `Cf-Access-Authenticated-User-Email` request header (locked by tests).
 - `DEV_AUTH_EMAIL` (no default, local-only) bypasses Access and returns directly. `DEMO_MODE=true` bypasses with `demo@example.com`.
 - `/api/*` — Bearer PAT (`TokenService.authenticateWithPAT`) or HMAC-signed internal self-calls (`X-Internal-*` + `X-Internal-User-Email` after `hmacValidation()`).
 - Request/response auditing via `AuditService` (Observer fan-out) in `activityAudit()`.

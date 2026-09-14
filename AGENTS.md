@@ -6,11 +6,17 @@ Guidance for agents working in AWS-AccessBridge. `CLAUDE.md` is a symbolic link 
 
 AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace (`@aws-access-bridge/monorepo`, `packageManager: pnpm@11.2.2`).
 
-- **Core**: Cloudflare Zero Trust on `/user/*` (JWT `cf-access-jwt-assertion`); programmatic access under `/api/*` via Bearer PATs or HMAC-signed internal self-calls; users assume AWS roles across accounts and mint temporary Console URLs. See `apps/api/AGENTS.md`.
+- **Core**: Cloudflare Zero Trust on `/user/*` (JWT `cf-access-jwt-assertion` verified against `POLICY_AUD`/`TEAM_DOMAIN`, with platform `ctx.access` fallback when vars are unset); programmatic access under `/api/*` via Bearer PATs or HMAC-signed internal self-calls; users assume AWS roles across accounts and mint temporary Console URLs. See `apps/api/AGENTS.md`.
 - **Credentials**: encrypted IAM credentials with multi-hop assumption chains (up to `PRINCIPAL_TRUST_CHAIN_LIMIT`), KV credential caching. See `docs/agents/features/credential-chains/AGENTS.md`.
 - **Analytics**: Cost Explorer collection with spend alerts; EC2/S3/Lambda/RDS/DynamoDB inventory. See `docs/agents/features/cost-analytics/AGENTS.md` and `docs/agents/features/resource-inventory/AGENTS.md`.
 - **Teams**: multi-tenant team workspaces scoping AWS accounts. See `docs/agents/features/teams/AGENTS.md`.
 - **Assume-role flows**: browser + programmatic + federate fan-out. See `docs/agents/features/assume-role/AGENTS.md`.
+- **Governance**: every `/user/*` + `/api/*` call is audit-logged with configurable retention; orphan cleanup + background task-run visibility (`GET /user/admin/maintenance/task-runs`). See `apps/api/AGENTS.md` and `apps/background/AGENTS.md`.
+- **Onboarding**: 6-step admin Setup Wizard (Account → Credentials → Chain → Roles → Users → Summary) with credential validation, chain testing, and IAM role discovery. See `apps/web/AGENTS.md`.
+- **Background**: cron Durable Object `CronTasksWorker` on `*/10 * * * *` — phase 1 credential-cache refresh, phase 2 audit prune + task prune + cost/resource collection. See `apps/background/AGENTS.md` and `docs/agents/runtime/AGENTS.md`.
+- **i18n**: 12 web locales + backend `preferredLanguage` (`GET|PUT /user/me`) > `localStorage` > `navigator` > `en`; Title Case, no ALL-CAPS. See `apps/web/AGENTS.md`.
+- **Web entry**: canonical `/user/` (Zero Trust login trigger), pages under `/user/app/*` (never collide with `/user/*` JSON), legacy `/costs|/resources|/admin/*` redirects, `SERVE_SPA_FROM_WORKER` gating. See `apps/web/AGENTS.md` and `apps/api/AGENTS.md`.
+- **DI**: per-request composition root (`composition/Tokens` + `createRequestScope`, `scope.get()`); legacy `*Factory.create(env)` calls are migrating toward it. See `packages/backend-services/AGENTS.md`.
 
 ## Cloudflare Documentation
 
@@ -24,6 +30,7 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 - Product refs: `/workers/`, `/kv/`, `/r2/`, `/d1/`, `/durable-objects/`, `/queues/`, `/vectorize/`, `/workers-ai/`, `/agents/`
 - Error 1102 = CPU/memory exceeded; see `/workers/platform/limits/`.
 - Durable Objects: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
+- Worker-level Access (`ctx.access.getIdentity()`, no JWT parsing): https://developers.cloudflare.com/workers/configuration/cloudflare-access/ — this is the `POLICY_AUD`/`TEAM_DOMAIN`-less fallback in `AccessAuthService`.
 
 ## Commands
 
@@ -31,27 +38,29 @@ Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. Type-
 
 ```bash
 pnpm install
-pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
-pnpm --filter @aws-access-bridge/web build   # only web has a build script
-pnpm --filter @aws-access-bridge/web dev     # vite dev server
-pnpm run typegen   # after changing wrangler bindings
-pnpm exec wrangler dev
-pnpm exec wrangler deploy
+pnpm run checks   # shorthand for: pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
+pnpm --filter @aws-access-bridge/web run build   # only web has a build script
+pnpm --filter @aws-access-bridge/web run dev     # vite dev server
+pnpm run typegen   # after changing wrangler bindings (also runs via postinstall)
+# No committed wrangler.jsonc — materialize it first from apps/api/wrangler.template.jsonc
+# (scripts/prepare-wrangler-config.ts, also run by CI), then from the repo root:
+pnpm exec wrangler dev --config ./wrangler.jsonc
+pnpm exec wrangler deploy --config ./wrangler.jsonc
 ```
 
 ## Import Direction
 
 ```
 Layer 0: shared, backend-errors          — zero @aws-access-bridge/* deps
-Layer 1: backend-runtime (+ di/)         → layer 0 only
-Layer 2: backend-data, provider-clients  → layer 0 only
+Layer 1: backend-runtime (+ di/)         → layer 0 only (lint additionally tolerates provider-clients; don't rely on it)
+Layer 2: backend-data, provider-clients  → layer 0 only (lint additionally tolerates backend-data → provider-clients; don't rely on it)
 Layer 3: backend-services (+ composition/) → layers 0–2 (not apps)
 (no Layer 4 by design)
-Layer 5: apps/background                 → layers 0–3 (provider-clients OK)
-         apps/api                        → layers 0–3 + background (NOT aws4fetch/provider-clients directly)
+Layer 5: apps/background                 → layers 0–3 via backend-services (no direct provider-clients dep)
+         apps/api                        → layers 0–3 + background (NOT aws4fetch/provider-clients directly; endpoints/** also NOT backend-data/dao except type-only)
 ```
 
-Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 blocks `apps/api → aws4fetch` and `apps/api → provider-clients`; route AWS SDK usage through `@aws-access-bridge/backend-services`).
+Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 blocks `apps/api → aws4fetch` and `apps/api → provider-clients`; route AWS SDK usage through `@aws-access-bridge/backend-services`. `apps/api/src/endpoints/**` additionally blocks `backend-data/dao` value imports).
 
 ## Index
 
@@ -82,6 +91,7 @@ Update the scoped sub-guide (not this index) as part of any change that adds, re
 - Env vars, bindings → `docs/agents/runtime/AGENTS.md`
 - Tests, thresholds, mocks → `docs/agents/testing/AGENTS.md`
 - Top-level features → `docs/agents/features/*/AGENTS.md` + one-line Overview touch-up here
+- `shared`, `backend-errors`, `backend-runtime`, `provider-clients` (no scoped guide) → document the change in the closest consumer guide (`backend-services` for domain use, `runtime` for bindings/env, `testing` for mocks) instead of this index
 
 ## Commit Policy
 

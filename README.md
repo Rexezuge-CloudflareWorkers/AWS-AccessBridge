@@ -17,7 +17,7 @@ Managing IAM access across many AWS accounts is painful:
 - You want **fine-grained control** over which person can see which role in which account.
 - You want **visibility** into cost, resources, and who-did-what — without wiring up five different AWS services.
 
-AWS AccessBridge is a single Cloudflare Worker that gives your team a web UI for exactly that. It uses your Cloudflare Zero Trust login, stores AWS credentials encrypted in Cloudflare D1, and hands out short-lived session credentials on demand.
+AWS AccessBridge is a pnpm monorepo deploying a Cloudflare Worker API, a cron Durable Object, and a Vite React SPA. It uses your Cloudflare Zero Trust login, stores AWS credentials encrypted in Cloudflare D1, and hands out short-lived session credentials on demand.
 
 ---
 
@@ -27,8 +27,10 @@ AWS AccessBridge is a single Cloudflare Worker that gives your team a web UI for
 
 - **One-click AWS Console sign-in** — pick an account, pick a role, land in the Console with temporary credentials.
 - **Programmatic credentials** — get short-lived `access_key_id` / `secret_access_key` / `session_token` for the CLI or SDKs.
+- **Federated sign-in** — fan-out Console/credential flows through a single federate endpoint.
 - **Multi-hop role chains** — chain credentials across accounts (base IAM user → intermediate role → target role) up to your configured chain depth.
 - **Per-user role visibility** — control exactly which roles each user can see and assume, and let users hide roles they don't want cluttering their view.
+- **Account search** — server-side search across assumable accounts and roles.
 - **Favorites** — users can pin their most-used accounts to the top.
 - **Personal access tokens** — users can mint scoped PATs for use in scripts and CI.
 
@@ -42,24 +44,26 @@ AWS AccessBridge is a single Cloudflare Worker that gives your team a web UI for
 
 - **Cost dashboard** — daily/weekly/monthly spend by account, trend charts, and total-spend cards powered by AWS Cost Explorer.
 - **Spend alerts** — configurable thresholds that notify when an account crosses a dollar limit.
-- **Resource inventory** — paginated, filterable view of EC2 instances, S3 buckets, Lambda functions, and RDS databases across every connected account, refreshed in the background.
+- **Resource inventory** — paginated, filterable view of EC2 instances, S3 buckets, Lambda functions, RDS databases, and DynamoDB tables across every connected account, refreshed in the background.
+- **Per-account collection toggles** — enable or disable cost/resource collection per account.
 
 ### Admin & Governance
 
 - **Guided onboarding wizard** — a 6-step in-app flow (Account → Credentials → Chain → Roles → Users → Summary) that walks a new admin through their first account and first user grant.
 - **Credential validation & chain testing** — verify credentials and simulate a full assumption chain before you grant access.
-- **IAM role discovery** — list all IAM roles in a connected account so you can pick assumable ones from a dropdown instead of typing ARNs.
+- **IAM role discovery** — list all IAM roles in a connected account so you can pick assumable ones from a dropdown instead of typing ARNs (requires `iam:ListRoles` on the assumed role; falls back to manual entry without it).
 - **Account nicknames** — give AWS account IDs human-friendly names.
-- **Role configs** — per-role default Console deep-link path and region.
-- **Audit log viewer** — filterable, paginated view of every API action taken through AccessBridge, with configurable retention.
-- **Maintenance** — one-click purge of orphaned rows in satellite tables (cost data, spend alerts, resource inventory, role configs, team memberships) left behind when an account or credential is removed.
+- **Role configs** — per-role default Console deep-link path, region, and session duration (900–43200s, chained sessions capped at 3600s).
+- **Audit log viewer** — filterable, paginated view of every `/user/*` and `/api/*` action taken through AccessBridge, with configurable retention.
+- **Maintenance** — one-click purge of orphaned rows left behind when an account or credential is removed (collection configs, role configs, team accounts, spend alerts, cost data, resource inventory, AWS accounts), plus background task-run visibility.
+- **Language preferences** — 12-locale UI with per-user `preferredLanguage` (profile setting wins over browser detection).
 
 ### Security
 
-- **Cloudflare Zero Trust** enforces identity at the edge — AccessBridge never handles passwords or OIDC directly.
+- **Cloudflare Zero Trust** enforces identity at the edge — AccessBridge never handles passwords or OIDC directly. `POLICY_AUD`/`TEAM_DOMAIN` JWT verification is used when set; otherwise the platform-verified Worker-level Access identity (`ctx.access`) is used.
 - **AES-GCM encryption** for all stored AWS credentials, with the key held in Cloudflare Secrets Store.
 - **HMAC-signed internal requests** between worker components, with a 1-second timestamp window to block replay.
-- **Every API call is audit-logged** automatically and retained for the period you configure.
+- **Every `/user/*` and `/api/*` call is audit-logged** automatically and retained for the period you configure (`/docs`, `/openapi.json`, and health-check routes bypass auditing).
 - **Demo mode** flag disables all admin write operations — safe for public demo deployments.
 
 ---
@@ -71,7 +75,7 @@ Deployment has two halves: standing up the Cloudflare side (where the app lives)
 ### Prerequisites
 
 - **Cloudflare account** with Workers, Durable Objects, D1, KV, Secrets Store, and Zero Trust enabled
-- **Node.js 18+** (CI uses Node 24)
+- **Node.js 24** (matching CI) and **pnpm 11.2.2** (`packageManager: pnpm@11.2.2`)
 - **AWS account(s)** where you want to grant access
 - Your own domain on Cloudflare (recommended, for Zero Trust-protected routes)
 
@@ -86,24 +90,24 @@ Use this path the first time you deploy, or if you don't want to use GitHub Acti
 ```bash
 git clone https://github.com/<your-username>/AWS-AccessBridge.git
 cd AWS-AccessBridge
-npm install
-npx wrangler login
+pnpm install
+pnpm exec wrangler login
 ```
 
 Verify you're authenticated with the right account:
 
 ```bash
-npx wrangler whoami
+pnpm exec wrangler whoami
 ```
 
 ### Step 2. Create the Cloudflare resources
 
-AccessBridge needs one D1 database, one KV namespace, and one Secrets Store with two secrets inside it. The Durable Object namespace for cron processing is created automatically from `wrangler.jsonc` on deploy.
+AccessBridge needs one D1 database, one KV namespace, and one Secrets Store with two secrets inside it. The Durable Object namespace (`CRON_TASKS`), the `SELF` service binding for federate fan-out, and the `*/10 * * * *` cron trigger are created from `wrangler.jsonc` on deploy.
 
 **D1 database:**
 
 ```bash
-npx wrangler d1 create aws-access-bridge-db
+pnpm exec wrangler d1 create aws-access-bridge-db
 ```
 
 Copy the `database_id` from the output.
@@ -111,26 +115,28 @@ Copy the `database_id` from the output.
 **KV namespace (for credential cache):**
 
 ```bash
-npx wrangler kv namespace create AccessBridgeKV
+pnpm exec wrangler kv namespace create aws-access-bridge-kv
 ```
 
-Copy the `id` from the output.
+Copy the `id` from the output. (The deploy script also accepts namespaces titled `aws-access-bridge-AccessBridgeKV` or `AccessBridgeKV` for the `AccessBridgeKV` binding.)
 
 **Secrets Store + two secrets:**
 
 ```bash
-npx wrangler secrets-store store create aws-access-bridge-secrets
+pnpm exec wrangler secrets-store store create default --remote
 ```
 
-Copy the store ID. You can generate the two secret values automatically by running the project's setup script (recommended) — see Step 3.
+Copy the store ID (or let the deploy script find/create the store named `default` automatically). You can generate the two secret values automatically by running the project's setup script (recommended) — see Step 3.
 
 ### Step 3. Create `wrangler.jsonc`
 
 Copy the template and fill in the IDs from Step 2:
 
 ```bash
-cp wrangler.jsonc.template wrangler.jsonc
+cp apps/api/wrangler.template.jsonc wrangler.jsonc
 ```
+
+(`wrangler.jsonc` is gitignored. A second template, `apps/web/wrangler.template.jsonc`, is only used for the optional Cloudflare Pages deployment — see the CI/CD guide.)
 
 Open `wrangler.jsonc` and replace every placeholder (the `0000…` strings) with the real IDs:
 
@@ -138,10 +144,10 @@ Open `wrangler.jsonc` and replace every placeholder (the `0000…` strings) with
 - `kv_namespaces[0].id` → your KV ID
 - Both `secrets_store_secrets[*].store_id` → your Secrets Store ID
 
-Then generate and upload the two secrets in one go:
+Then generate and upload the two secrets in one go (requires `wrangler.jsonc` to exist first — the script reads the store IDs from it):
 
 ```bash
-npx tsx scripts/init-secrets.ts
+pnpm exec tsx scripts/init-secrets.ts
 ```
 
 This script reads `wrangler.jsonc`, detects the two expected secrets (`aws-access-bridge-aes-encryption-key`, `aws-access-bridge-internal-hmac-secret`), generates cryptographically strong values for each, and uploads them to the store. Re-running it is a no-op — it skips any secret that already exists.
@@ -150,11 +156,11 @@ If you'd rather generate the secrets yourself:
 
 ```bash
 # AES-GCM 256-bit key (base64)
-openssl rand -base64 32 | npx wrangler secrets-store secret create <STORE_ID> \
+openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
   --name aws-access-bridge-aes-encryption-key --scopes workers --remote
 
 # HMAC secret (base64)
-openssl rand -base64 32 | npx wrangler secrets-store secret create <STORE_ID> \
+openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
   --name aws-access-bridge-internal-hmac-secret --scopes workers --remote
 ```
 
@@ -170,9 +176,9 @@ openssl rand -base64 32 | npx wrangler secrets-store secret create <STORE_ID> \
    - **Include**: the emails, email domains, or IdP groups that should be allowed in.
 4. Save the application.
 
-**If your worker and your domain live in the same Cloudflare account** (the common case), you're done — AccessBridge infers the Zero Trust team and application audience automatically at runtime. You do **not** need to set `POLICY_AUD` or `TEAM_DOMAIN`.
+**If your worker and your domain live in the same Cloudflare account** (the common case) **and you enable Worker-level Access on the worker** (Workers & Pages → your worker → Settings → Domains & Routes → Enable Cloudflare Access), you're done — AccessBridge uses the platform-verified identity (`ctx.access`) automatically at runtime. You do **not** need to set `POLICY_AUD` or `TEAM_DOMAIN`.
 
-**If your worker lives in a different Cloudflare account from the domain owner** (e.g. you're serving a customer's domain via [Cloudflare for SaaS](https://developers.cloudflare.com/cloudflare-for-saas/)), the worker can't infer the owning account's Zero Trust config, so you must set both explicitly:
+**Otherwise — self-hosted Access applications, or any cross-account setup** (e.g. serving a customer's domain via [Cloudflare for SaaS](https://developers.cloudflare.com/cloudflare-for-saas/)) — the worker verifies the Access JWT itself, so you must set both vars explicitly:
 
 1. On the Zero Trust application overview, copy the **Application Audience (AUD) tag**.
 2. Note the owning account's **team domain** (e.g. `https://acme.cloudflareaccess.com`).
@@ -186,10 +192,12 @@ openssl rand -base64 32 | npx wrangler secrets-store secret create <STORE_ID> \
    }
    ```
 
+When the vars are set they always take precedence; when unset, requests authenticate via the Worker-level Access identity.
+
 ### Step 5. Apply database migrations
 
 ```bash
-npx wrangler d1 migrations apply --remote aws-access-bridge-db
+pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
 ```
 
 You should see the squashed migration file apply cleanly. Re-running is safe.
@@ -197,10 +205,12 @@ You should see the squashed migration file apply cleanly. Re-running is safe.
 ### Step 6. Build and deploy
 
 ```bash
-npm run deploy
+pnpm --filter @aws-access-bridge/web run build
+pnpm exec wrangler deploy --dry-run
+pnpm exec wrangler deploy
 ```
 
-`npm run deploy` chains: prettier → lint → `vite build` → `wrangler deploy --dry-run` → `wrangler deploy`. If anything fails, nothing is deployed.
+The web build embeds `dist/index.html` into the API worker (`apps/api/src/generated/spa-shell.ts`), so build the SPA before deploying. (`pnpm run typegen` regenerates `worker-configuration.d.ts` after binding changes; it also runs via `postinstall`.) If anything fails, nothing is deployed.
 
 When it succeeds, wrangler prints the deployed URL (either `*.workers.dev` or your custom route). Visit it — you should hit Cloudflare Zero Trust first, then land in AccessBridge.
 
@@ -209,7 +219,7 @@ When it succeeds, wrangler prints the deployed URL (either `*.workers.dev` or yo
 The first user to sign in is just a normal user — you need to promote yourself once:
 
 ```bash
-npx wrangler d1 execute aws-access-bridge-db --remote --command \
+pnpm exec wrangler d1 execute aws-access-bridge-db --remote --command \
   "INSERT INTO user_metadata (user_email, is_superadmin) VALUES ('you@example.com', 1) \
    ON CONFLICT(user_email) DO UPDATE SET is_superadmin = 1;"
 ```
@@ -220,7 +230,7 @@ Refresh the app and you'll see the **Admin** tab appear. From there, open **Setu
 
 ## Deployment Guide — GitHub Actions (CI/CD)
 
-The repo ships with a deploy workflow at `.github/workflows/deploy-cloudflare-worker.yml` that runs on every push to `main`. This is the recommended path for forks — push to your fork's main and your worker redeploys automatically.
+The repo ships a `Continuous Deployment` workflow at `.github/workflows/continuous-deployment.yml` (plus `continuous-integration.yml` for typecheck, lint, unit, integration, and web-build checks). The deployment runs after CI succeeds on `main` — this is the recommended path for forks. (It can also be triggered manually via **Actions → Continuous Deployment → Run workflow**, or via `repository_dispatch`.)
 
 ### One-time setup for your fork
 
@@ -242,27 +252,30 @@ The repo ships with a deploy workflow at `.github/workflows/deploy-cloudflare-wo
    - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
 
 5. **Add a GitHub Variable** (not a secret — `Settings → Secrets and variables → Actions → Variables`):
-   - `WRANGLER_JSONC` — paste the **entire contents** of your local `wrangler.jsonc` here.
+   - `WRANGLER_JSONC` — paste the **entire contents** of your local `wrangler.jsonc` here. If empty, the workflow falls back to `apps/api/wrangler.template.jsonc` and provisions the resources itself.
 
    The workflow writes this out to `wrangler.jsonc` at the start of each run (since `wrangler.jsonc` itself is gitignored).
 
-6. **Push to `main`**. The `Deploy Cloudflare Worker` workflow kicks off automatically and will:
-   - Validate that `WRANGLER_JSONC`'s `$version` is at least the template's `$minimumVersion`
+6. **Push to `main`**. Once CI passes, the `Continuous Deployment` workflow kicks off automatically and will:
+   - Prepare the Wrangler config via `scripts/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, applies `WRANGLER_PATCH_JSON` / `WRANGLER_VARS_PATCH_JSON`, provisions missing D1/KV/Secrets Store resources)
    - Initialize any missing secrets via `scripts/init-secrets.ts`
-   - Apply pending D1 migrations to your remote database
-   - Build the Vite SPA
-   - Hide the OpenNext config files (so wrangler doesn't OOM trying to build the Next.js path on the CI runner)
-   - Run `wrangler deploy`
+   - Apply pending D1 migrations to your remote database (`AccessBridgeDB` binding)
+   - Build the Vite SPA (`pnpm --filter @aws-access-bridge/web build`)
+   - Hide any stray OpenNext/Next.js config files (defensive — the repo has none; without that step wrangler would delegate to the OpenNext build)
+   - Run `wrangler deploy --dry-run`, then `wrangler deploy` (each step retried up to 3 times)
 
-You can also trigger the workflow manually via **Actions → Deploy Cloudflare Worker → Run workflow**.
+A second job, `deploy-pages`, runs only when the `CLOUDFLARE_PAGES_PROJECT_NAME` variable is set — it builds the SPA and deploys it to Cloudflare Pages with the `API_WORKER` service binding (from `apps/web/wrangler.template.jsonc`).
 
 ### Keeping `WRANGLER_JSONC` up to date
 
-The template evolves (new bindings, new vars). If CI fails with a "version below minimum" error, update the `$version` and any new fields in your `WRANGLER_JSONC` GitHub variable to match the latest `wrangler.jsonc.template`.
+The template evolves (new bindings, new vars). If CI reports a version error, update your `WRANGLER_JSONC` GitHub variable to match the latest `apps/api/wrangler.template.jsonc`. (The `$version`/`$minimumVersion` staleness check only fires when the template declares a `$minimumVersion` — currently commented out, so the check passes through.)
 
 ## Continuous Deployment Variables
 
-GitHub Actions deployments can patch Worker `vars` without replacing the whole Wrangler configuration. Set the repository variable `WRANGLER_VARS_PATCH_JSON` to a JSON object of string values. The deployment merges it into top-level `vars` after loading `WRANGLER_JSONC` or `apps/api/wrangler.template.jsonc`.
+GitHub Actions deployments can patch the Wrangler configuration without replacing the whole file. Set these repository variables (`Settings → Secrets and variables → Actions → Variables`):
+
+- `WRANGLER_PATCH_JSON` — a JSON object merged into the **top level** of `wrangler.jsonc` (e.g. routes, placement).
+- `WRANGLER_VARS_PATCH_JSON` — a JSON object of string values merged into top-level **`vars`** (e.g. Zero Trust config without touching secrets):
 
 ```json
 {
@@ -271,7 +284,7 @@ GitHub Actions deployments can patch Worker `vars` without replacing the whole W
 }
 ```
 
-Do not put secrets in `WRANGLER_VARS_PATCH_JSON`; use GitHub secrets, Wrangler secrets, or Cloudflare Secrets Store for sensitive values.
+Do not put secrets in either patch variable; use GitHub secrets, Wrangler secrets, or Cloudflare Secrets Store for sensitive values.
 
 ---
 
@@ -341,17 +354,28 @@ After the first account, you can repeat for additional accounts from the same Ad
 
 ## Environment Variables
 
-All of these live in `wrangler.jsonc` under `vars`.
+All of these live in `wrangler.jsonc` under `vars`. Defaults come from `packages/backend-runtime/src/config/ConfigurationDefaults.ts` and are read via `ConfigurationManager` namespaces.
 
-| Variable                      | Purpose                                                                                                                                                                           | Default   |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `POLICY_AUD`                  | Zero Trust Application Audience tag. **Optional** — only required when the worker and domain are in different Cloudflare accounts (Cloudflare for SaaS). Auto-inferred otherwise. | —         |
-| `TEAM_DOMAIN`                 | Zero Trust team domain (e.g. `https://acme.cloudflareaccess.com`). **Optional** — same conditions as `POLICY_AUD`.                                                                | —         |
-| `MAX_TOKENS_PER_USER`         | How many active Personal Access Tokens a user can hold.                                                                                                                           | `5`       |
-| `MAX_TOKEN_EXPIRY_DAYS`       | Max expiry a user can set on a PAT.                                                                                                                                               | `90`      |
-| `PRINCIPAL_TRUST_CHAIN_LIMIT` | Max depth of role assumption chain.                                                                                                                                               | `3`       |
-| `AUDIT_LOG_RETENTION_DAYS`    | How long to keep audit log entries.                                                                                                                                               | `90`      |
-| `DEMO_MODE`                   | When `"true"`, all admin write operations are blocked. Safe for public demos.                                                                                                     | `"false"` |
+| Variable                                          | Purpose                                                                                                                                                                                            | Default   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `POLICY_AUD`                                      | Zero Trust Application Audience tag. **Optional when Worker-level Access is enabled** (platform identity is used instead); required for self-hosted or cross-account (Cloudflare for SaaS) setups. | —         |
+| `TEAM_DOMAIN`                                     | Zero Trust team domain (e.g. `https://acme.cloudflareaccess.com`). **Optional** — same conditions as `POLICY_AUD`.                                                                                 | —         |
+| `MAX_TOKENS_PER_USER`                             | How many active Personal Access Tokens a user can hold.                                                                                                                                            | `5`       |
+| `MAX_TOKEN_EXPIRY_DAYS`                           | Max expiry a user can set on a PAT.                                                                                                                                                                | `90`      |
+| `PRINCIPAL_TRUST_CHAIN_LIMIT`                     | Max depth of role assumption chain.                                                                                                                                                                | `3`       |
+| `AUDIT_LOG_RETENTION_DAYS`                        | How long to keep audit log entries.                                                                                                                                                                | `90`      |
+| `BACKGROUND_TASK_RUN_RETENTION_DAYS`              | How long to keep background task-run records.                                                                                                                                                      | `30`      |
+| `PRUNE_BATCH_SIZE`                                | Rows deleted per prune batch.                                                                                                                                                                      | `500`     |
+| `CREDENTIAL_EXPIRY_BUFFER_MINUTES`                | Treat cached credentials expiring within this window as stale.                                                                                                                                     | `5`       |
+| `NUMBER_OF_CREDENTIALS_TO_REFRESH`                | Max cached credentials refreshed per cycle.                                                                                                                                                        | `10`      |
+| `CREDENTIAL_REFRESH_INTERVAL_MINUTES`             | Background refresh interval for stale cached credentials.                                                                                                                                          | `45`      |
+| `COST_COLLECTION_INTERVAL_HOURS`                  | Background Cost Explorer collection interval.                                                                                                                                                      | `6`       |
+| `COST_LOOKBACK_DAYS`                              | Days of cost history fetched per collection.                                                                                                                                                       | `30`      |
+| `RESOURCE_COLLECTION_INTERVAL_HOURS`              | Background resource inventory collection interval.                                                                                                                                                 | `2`       |
+| `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` | HMAC timestamp replay window for internal self-calls.                                                                                                                                              | `1000`    |
+| `SERVE_SPA_FROM_WORKER`                           | When `"true"`, the Worker serves the SPA from `/user/` page routes.                                                                                                                                | `"false"` |
+| `DEMO_MODE`                                       | When `"true"`, all admin write operations are blocked. Safe for public demos.                                                                                                                      | `"false"` |
+| `DEV_AUTH_EMAIL`                                  | Local-only auth bypass (never set in production).                                                                                                                                                  | —         |
 
 ---
 
@@ -364,7 +388,7 @@ After the first deploy, a few quick health checks:
 curl -I https://<your-worker-url>/
 
 # Are there any errors in the worker log tail?
-npx wrangler tail
+pnpm exec wrangler tail
 
 # Is the scheduled handler delegating to the cron Durable Object?
 curl "https://<your-worker-url>/__scheduled?cron=*/10+*+*+*+*"
@@ -375,11 +399,11 @@ open https://<your-worker-url>/docs
 
 ## Troubleshooting
 
-- **"Unauthorized" on every request** — if your worker and domain are in different Cloudflare accounts (Cloudflare for SaaS), make sure `POLICY_AUD` and `TEAM_DOMAIN` are set and match the owning account's Zero Trust application. If they're in the same account, these vars should be unset so auto-inference kicks in.
+- **"Unauthorized" on every request** — if you use a self-hosted Access application or a cross-account setup (Cloudflare for SaaS), make sure `POLICY_AUD` and `TEAM_DOMAIN` are set and match the owning account's Zero Trust application. If you rely on Worker-level Access instead, make sure it is enabled on the worker — with the vars unset, requests authenticate via the platform identity.
 - **Admin tab is missing** — you haven't been promoted to superadmin yet. See Step 7 of the manual guide.
-- **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `wrangler.jsonc.template` and bump the `$version` field.
-- **`wrangler deploy` OOMs in CI** — make sure the workflow's "Prepare for Deploy" step is hiding `open-next.config.ts` and `next.config.ts`. Without that, wrangler delegates to the OpenNext Next.js build which needs 2GB+ RAM.
-- **Credentials cached forever after rotating an IAM key** — the credential cache refresh task runs every 10 minutes inside the cron Durable Object. You can force it via `GET /__scheduled?cron=*/10+*+*+*+*`.
+- **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync (note: the check only fires when the template declares `$minimumVersion`).
+- **`wrangler deploy` OOMs in CI** — the workflow hides stray `open-next.config.ts` / `next.config.ts` files before deploying so wrangler doesn't delegate to the OpenNext Next.js build (the repo currently ships neither file, so this is defensive).
+- **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45). You can force a cycle via `GET /__scheduled?cron=*/10+*+*+*+*`.
 
 ---
 
@@ -394,20 +418,22 @@ _(More screenshots in the [assets repo](https://github.com/Rexezuge-CloudflareWo
 ## Running Locally
 
 ```bash
-npm run dev          # Vite dev server for the frontend
-npx wrangler dev     # Local Cloudflare Workers runtime for the backend
+pnpm --filter @aws-access-bridge/web run dev   # Vite dev server for the frontend (proxies /api + /user → localhost:8787)
+pnpm exec wrangler dev --config ./wrangler.jsonc   # Local Cloudflare Workers runtime for the backend
 ```
 
-Useful scripts:
+Useful scripts (see root `package.json` and `apps/web/package.json`):
 
-| Command            | What it does                                            |
-| ------------------ | ------------------------------------------------------- |
-| `npm run build`    | Format, lint, and build the SPA with Vite               |
-| `npm run deploy`   | Build + `wrangler deploy --dry-run` + `wrangler deploy` |
-| `npm run test`     | Run the vitest test suite                               |
-| `npm run tsc`      | Type-check frontend and backend tsconfigs               |
-| `npm run lint`     | ESLint autofix                                          |
-| `npm run prettier` | Prettier format                                         |
+| Command                                          | What it does                                                 |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `pnpm run checks`                                | Typecheck all workspaces + lint + unit + integration         |
+| `pnpm -r typecheck`                              | Type-check every workspace                                   |
+| `pnpm run lint`                                  | ESLint autofix (`--fix --quiet`)                             |
+| `pnpm run prettier`                              | Prettier format                                              |
+| `pnpm run test` / `pnpm run test:coverage`       | Run the vitest suite, optionally with coverage               |
+| `pnpm run test:integration`                      | Run the Workers integration suite                            |
+| `pnpm --filter @aws-access-bridge/web run build` | Build the SPA with Vite (also embeds it into the API worker) |
+| `pnpm run typegen`                               | Regenerate `worker-configuration.d.ts` from the API template |
 
 ---
 
@@ -421,7 +447,7 @@ Useful scripts:
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. Make changes, add tests, and run `npm run build` (runs prettier + lint + Vite build). Use `npm run deploy` to also dry-run wrangler before shipping.
+2. Make changes, add tests, and run `pnpm run checks` (typecheck + lint + unit + integration). Build the SPA with `pnpm --filter @aws-access-bridge/web run build` before shipping UI changes.
 3. Open a pull request.
 
 ## License
@@ -430,4 +456,4 @@ Useful scripts:
 
 ## Support
 
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/Rexezuge/AWS-AccessBridge).
+For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/Rexezuge-CloudflareWorkers/AWS-AccessBridge).

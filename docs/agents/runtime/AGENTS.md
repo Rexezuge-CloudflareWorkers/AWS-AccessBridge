@@ -4,14 +4,14 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 
 - Root package `@aws-access-bridge/monorepo`, pnpm workspaces (`apps/*`, `packages/*`): `shared`, `backend-errors` (Layer 0); `backend-runtime` incl. `di/` (`Container`, `ServiceContext`) (Layer 1); `backend-data`, `provider-clients` (raw AWS STS/CE/IAM + signed-fetch; Layer 2); `backend-services` incl. `composition/` (`Tokens`, `createRequestScope`) (Layer 3).
 - `apps/web/vite.config.ts` proxies `/api` + `/user` → `http://localhost:8787` in dev; `closeBundle` embeds `dist/index.html` into `apps/api/src/generated/spa-shell.ts` (`SPA_HTML`) on build.
-- `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Materialized by `scripts/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, `$minimumVersion` fork-staleness check, `WRANGLER_PATCH_JSON` top-level merge + `WRANGLER_VARS_PATCH_JSON` vars merge).
+- `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Materialized by `scripts/prepare-wrangler-config.ts` (writes `WRANGLER_JSONC` or falls back to copying the template; fills `000…` placeholder IDs, `$minimumVersion` fork-staleness check, `WRANGLER_PATCH_JSON` top-level merge + `WRANGLER_VARS_PATCH_JSON` vars merge, auto-provisions missing D1/KV/Secrets Store resources).
 - The Worker serves the SPA only from its page-route catch-all (`AccessBridgeWorker`: `/user/*` JSON and `/api/*` JSON never fall through to HTML) so API routes aren't intercepted by the assets handler.
 - Worker bindings: D1 `AccessBridgeDB`, KV `AccessBridgeKV`, Secrets Store `AES_ENCRYPTION_KEY_SECRET` / `INTERNAL_HMAC_SECRET`, DO `CRON_TASKS`, service binding `SELF`, cron `*/10 * * * *`. Binding source of truth: `packages/backend-runtime/src/env.d.ts` (checked in) + generated root `worker-configuration.d.ts` (`pnpm run typegen`).
 - `functions/[[path]].ts` — Pages catch-all proxy → `API_WORKER.fetch()` with `X-Forwarded-*` headers.
 
-## Required vars (no defaults)
+## Auth vars (JWT config optional with Worker-level Access)
 
-`POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). No default; requests fail without them.
+`POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). Set both for self-hosted Access applications and cross-account (Cloudflare for SaaS) setups — explicit vars always win. When both are unset, requests authenticate via the platform-verified Worker-level Access identity (`ctx.access.getIdentity()`, threaded through `MiddlewareHandlers.authenticateUserIdentity`); enable one-click Access on the worker for same-account deploys that omit the vars.
 
 ## Local-only (no default, not in `ConfigurationDefaults.ts`)
 
