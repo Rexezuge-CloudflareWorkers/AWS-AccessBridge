@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { syncHtmlLang } from './lib/locale';
 import AccountList from './components/AccountList';
 import AdminPage from './components/AdminPage';
 import CostDashboard from './components/CostDashboard';
@@ -11,10 +10,14 @@ import Spinner from './components/ui/Spinner';
 import Pagination from './components/ui/Pagination';
 import { useAuth } from './hooks/useAuth';
 import { useRouter, type View } from './hooks/useRouter';
+import { useSpaLanguage } from './hooks/useSpaLanguage';
+import { useToast } from './hooks/useToast';
 
 export default function SpaApp() {
-  const { t, i18n } = useTranslation();
-  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail } = useAuth();
+  const { t } = useTranslation();
+  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail, user, setUser } = useAuth();
+  const { message: toastMessage, showMessage, dismiss: dismissToast } = useToast();
+  const { language, languageStatus, languagePending, handleLanguageChange } = useSpaLanguage({ user, setUser, showMessage });
   const { currentView, adminTab, navigateTo } = useRouter();
   const [showHidden, setShowHidden] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -36,10 +39,6 @@ export default function SpaApp() {
   useEffect(() => {
     localStorage.setItem('aws-access-bridge-page-size', pageSize.toString());
   }, [pageSize]);
-
-  useEffect(() => {
-    syncHtmlLang(i18n.resolvedLanguage ?? 'en');
-  }, [i18n.resolvedLanguage]);
 
   useEffect(() => {
     sessionStorage.setItem('aws-access-bridge-current-page', currentPage.toString());
@@ -85,12 +84,28 @@ export default function SpaApp() {
 
   return (
     <div className="bg-gray-900 min-h-screen text-white">
+      {toastMessage && (
+        <div className="text-center py-2 font-semibold text-sm sticky top-0 z-50 shadow-md bg-red-600 text-white">
+          {toastMessage.text}{' '}
+          <button onClick={dismissToast} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff' }}>
+            ✕
+          </button>
+        </div>
+      )}
       {isDemoMode && (
         <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-center py-2 font-semibold text-sm sticky top-0 z-50 shadow-md">
           {t('nav.demoBanner', 'Demo Mode — Data shown is for demonstration purposes only. Admin operations are disabled.')}
         </div>
       )}
-      <SpaNavbar isSuperAdmin={isSuperAdmin} currentView={currentView} setCurrentView={navigateToView} userEmail={userEmail} />
+      <SpaNavbar
+        isSuperAdmin={isSuperAdmin}
+        currentView={currentView}
+        setCurrentView={navigateToView}
+        userEmail={userEmail}
+        language={languageStatus === 'error' ? 'unknown' : language}
+        onLanguageChange={handleLanguageChange}
+        languageDisabled={languagePending || languageStatus !== 'ready'}
+      />
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div key={currentView} className="animate-fade-in-up">
           {currentView === 'admin' && isSuperAdmin ? (

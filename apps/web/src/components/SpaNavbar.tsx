@@ -10,6 +10,9 @@ interface SpaNavbarProps {
   currentView: View;
   setCurrentView: (view: View) => void;
   userEmail: string;
+  language: string;
+  onLanguageChange: (lng: string) => void;
+  languageDisabled?: boolean;
 }
 
 function NavTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -39,7 +42,15 @@ function NavTab({ active, onClick, children }: { active: boolean; onClick: () =>
 /**
  * Top navbar extracted from `SpaApp.tsx`. Pure presentational shell.
  */
-export default function SpaNavbar({ isSuperAdmin, currentView, setCurrentView, userEmail }: SpaNavbarProps) {
+export default function SpaNavbar({
+  isSuperAdmin,
+  currentView,
+  setCurrentView,
+  userEmail,
+  language,
+  onLanguageChange,
+  languageDisabled,
+}: SpaNavbarProps) {
   const { t } = useTranslation();
   const viewLabels: Record<View, string> = {
     accounts: t('nav.accounts', 'Accounts'),
@@ -78,7 +89,7 @@ export default function SpaNavbar({ isSuperAdmin, currentView, setCurrentView, u
         </div>
       </div>
       <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <LanguageSelector />
+        <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
         {isSuperAdmin && (
           <span
             style={{

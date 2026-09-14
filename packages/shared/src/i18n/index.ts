@@ -1,3 +1,4 @@
+import { LocaleUtil } from '../utils/LocaleUtil';
 import type { BackendStrings } from './BackendStrings';
 import { enStrings } from './locales/en';
 import { deStrings } from './locales/de';
@@ -27,12 +28,11 @@ const LOCALE_BUNDLES: Record<string, BackendStrings> = {
   'zh-TW': zhTWStrings,
 };
 
-function getBackendStrings(locale: string): BackendStrings {
-  const normalized: string = locale.toLowerCase().split('-', 1)[0] ?? 'en';
-  const match = Object.entries(LOCALE_BUNDLES).find(([tag]) => tag.toLowerCase() === normalized);
-  return match?.[1] ?? enStrings;
+function getBackendStrings(locale: string | null | undefined): BackendStrings {
+  const normalized = LocaleUtil.normalize(locale);
+  return LOCALE_BUNDLES[normalized] ?? enStrings;
 }
 
-export type { BackendStrings, SupportedLocale } from './BackendStrings';
+export type { BackendStrings } from './BackendStrings';
 export { formatBackendString } from './BackendStrings';
 export { getBackendStrings };

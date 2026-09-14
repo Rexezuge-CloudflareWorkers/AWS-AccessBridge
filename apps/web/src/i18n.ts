@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { LocaleUtil } from '@aws-access-bridge/shared';
 import en from './locales/en/translation.json';
 
 export const SUPPORTED_LANGUAGES = ['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja', 'zh-CN', 'zh-TW', 'ko'] as const;
@@ -12,27 +13,8 @@ const baseResources = {
   en: { translation: en },
 } as const;
 
-function canonicalizeTag(tag: string): string {
-  const normalized = tag.trim().replaceAll('_', '-');
-  const parts = normalized.split('-').filter(Boolean);
-  if (parts.length === 0) return 'en';
-  const language = (parts[0] ?? 'en').toLowerCase();
-  if (parts.length === 1) return language;
-  const rest = parts.slice(1).map((part: string) => (part.length === 2 ? part.toUpperCase() : part.toLowerCase()));
-  return [language, ...rest].join('-');
-}
-
 export function normalizeLanguage(tag: string | null | undefined): SupportedLanguage {
-  if (!tag || typeof tag !== 'string') return 'en';
-  const canonical = canonicalizeTag(tag);
-  if ((SUPPORTED_LANGUAGES as readonly string[]).includes(canonical)) {
-    return canonical as SupportedLanguage;
-  }
-  const base = canonical.split('-', 1)[0]?.toLowerCase() ?? 'en';
-  if (base === 'zh') return 'zh-CN';
-  const match = (SUPPORTED_LANGUAGES as readonly string[]).find((l) => l.toLowerCase() === base);
-  if (match) return match as SupportedLanguage;
-  return 'en';
+  return LocaleUtil.normalize(tag);
 }
 
 export function detectInitialLanguage(): SupportedLanguage {

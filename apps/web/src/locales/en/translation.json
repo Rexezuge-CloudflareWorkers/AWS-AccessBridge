@@ -10,12 +10,15 @@
     "filters": "Filters",
     "includeHidden": "Include Hidden",
     "language": "Language",
+    "languageLoadFailed": "Unable To Load Language.",
+    "languageSaveFailed": "Unable To Save Language.",
     "loading": "Loading...",
     "perPage": "Per page:",
     "resources": "Resources",
     "resourcesHeading": "Resource Inventory",
     "searchPlaceholder": "Search by account id or nickname",
-    "showingOf": "{{from}}–{{to}} of {{total}}"
+    "showingOf": "{{from}}–{{to}} of {{total}}",
+    "unknownLanguage": "Unknown"
   },
   "auth": {
     "authenticate": "Authenticate with Cloudflare Zero Trust",

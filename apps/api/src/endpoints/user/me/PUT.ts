@@ -1,6 +1,8 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+import { LocaleUtil } from '@aws-access-bridge/shared/utils';
 
 class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest, UpdateCurrentUserResponse, UpdateCurrentUserEnv> {
   schema = {
@@ -78,16 +80,24 @@ class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest,
     cxt: ActivityContext<UpdateCurrentUserEnv>,
   ): Promise<UpdateCurrentUserResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const preferredLanguage: string | null = await UserServiceFactory.create(env).updatePreferredLanguage(
-      userEmail,
-      request.preferredLanguage ?? null,
-    );
+    const raw = request.preferredLanguage ?? null;
+    // Null/empty clears the preference; non-empty tags must be supported.
+    if (raw !== null && typeof raw === 'string' && raw.trim() !== '') {
+      const candidate = raw.trim().toLowerCase();
+      const englishAliases = ['en', 'en-us', 'en_us', 'en-gb', 'en_gb'];
+      if (!LocaleUtil.isSupported(raw) && LocaleUtil.normalize(raw) === 'en' && !englishAliases.includes(candidate)) {
+        throw new BadRequestError('Unsupported language.');
+      }
+    } else if (raw !== null && typeof raw !== 'string') {
+      throw new BadRequestError('Unsupported language.');
+    }
+    const preferredLanguage: string | null = await UserServiceFactory.create(env).updatePreferredLanguage(userEmail, raw);
     return { success: true, preferredLanguage };
   }
 }
 
 interface UpdateCurrentUserRequest extends IRequest {
-  preferredLanguage?: string;
+  preferredLanguage?: string | null;
 }
 
 interface UpdateCurrentUserResponse extends IResponse {

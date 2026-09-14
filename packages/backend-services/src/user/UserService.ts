@@ -1,6 +1,7 @@
 import { AssumableRolesDAO, AwsAccountsDAO, UserFavoriteAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
+import { LocaleUtil } from '@aws-access-bridge/shared/utils';
 
 interface UserServiceEnv {
   AccessBridgeDB: D1Queryable;
@@ -24,19 +25,21 @@ class UserService {
   public async getCurrentUser(userEmail: string): Promise<CurrentUser> {
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
 
-    const [, isSuperAdmin, preferredLanguage]: [void, boolean, string | null] = await Promise.all([
+    const [, isSuperAdmin, storedLanguage]: [void, boolean, string | null] = await Promise.all([
       userMetadataDAO.ensureUserEmailExists(userEmail),
       userMetadataDAO.isSuperAdmin(userEmail),
       userMetadataDAO.getPreferredLanguage(userEmail),
     ]);
 
+    const preferredLanguage = storedLanguage ? LocaleUtil.normalize(storedLanguage) : null;
     return { email: userEmail, isSuperAdmin, preferredLanguage };
   }
 
   public async updatePreferredLanguage(userEmail: string, preferredLanguage: string | null): Promise<string | null> {
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
     await userMetadataDAO.ensureUserEmailExists(userEmail);
-    const normalized: string | null = preferredLanguage?.trim() || null;
+    const trimmed = preferredLanguage?.trim() || null;
+    const normalized: string | null = trimmed ? LocaleUtil.normalize(trimmed) : null;
     await userMetadataDAO.updatePreferredLanguage(userEmail, normalized);
     return normalized;
   }
