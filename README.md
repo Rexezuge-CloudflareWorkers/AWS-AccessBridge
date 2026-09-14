@@ -192,7 +192,7 @@ openssl rand -base64 32 | npx wrangler secrets-store secret create <STORE_ID> \
 npx wrangler d1 migrations apply --remote aws-access-bridge-db
 ```
 
-You should see the 26 migration files apply cleanly. Re-running is safe.
+You should see the squashed migration file apply cleanly. Re-running is safe.
 
 ### Step 6. Build and deploy
 

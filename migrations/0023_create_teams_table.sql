@@ -1,6 +1,0 @@
-CREATE TABLE IF NOT EXISTS teams (
-    team_id VARCHAR(36) PRIMARY KEY,
-    team_name VARCHAR(128) NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL,
-    created_by VARCHAR(120) NOT NULL
-);
