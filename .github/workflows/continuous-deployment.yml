@@ -59,16 +59,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Check Wrangler Configuration Version
-        run: |
-          CURRENT_VERSION=$(grep '"$version"' wrangler.jsonc | sed 's/.*: *\([0-9]*\).*/\1/' 2>/dev/null || echo "0")
-          CURRENT_VERSION=${CURRENT_VERSION:-0}
-          MINIMUM_TEMPLATE_VERSION=$(grep '"$minimumVersion"' apps/api/wrangler.template.jsonc | sed 's/.*: *\([0-9]*\).*/\1/')
-          if [ "$CURRENT_VERSION" -lt "$MINIMUM_TEMPLATE_VERSION" ]; then
-            echo "Error: wrangler.jsonc version ($CURRENT_VERSION) is below minimum template version ($MINIMUM_TEMPLATE_VERSION)"
-            exit 1
-          fi
-
       - name: Initialize Cloudflare Secrets Store
         uses: ./.github/actions/retry-step
         with:

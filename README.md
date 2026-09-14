@@ -260,6 +260,19 @@ You can also trigger the workflow manually via **Actions → Deploy Cloudflare W
 
 The template evolves (new bindings, new vars). If CI fails with a "version below minimum" error, update the `$version` and any new fields in your `WRANGLER_JSONC` GitHub variable to match the latest `wrangler.jsonc.template`.
 
+## Continuous Deployment Variables
+
+GitHub Actions deployments can patch Worker `vars` without replacing the whole Wrangler configuration. Set the repository variable `WRANGLER_VARS_PATCH_JSON` to a JSON object of string values. The deployment merges it into top-level `vars` after loading `WRANGLER_JSONC` or `apps/api/wrangler.template.jsonc`.
+
+```json
+{
+  "POLICY_AUD": "your-cloudflare-zero-trust-application-aud",
+  "TEAM_DOMAIN": "https://your-cloudflare-zero-trust-team-domain.cloudflareaccess.com"
+}
+```
+
+Do not put secrets in `WRANGLER_VARS_PATCH_JSON`; use GitHub secrets, Wrangler secrets, or Cloudflare Secrets Store for sensitive values.
+
 ---
 
 ## AWS IAM Setup (Recommended: Intermediate-Role Pattern)
