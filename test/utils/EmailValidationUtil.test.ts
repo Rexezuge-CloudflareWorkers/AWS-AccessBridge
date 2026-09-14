@@ -38,9 +38,7 @@ describe('AccessAuthService', () => {
         headers: { 'cf-access-jwt-assertion': 'some-jwt-token' },
       });
       await expect(AccessAuthService.verifyAccessJwt(request)).rejects.toThrow(UnauthorizedError);
-      await expect(AccessAuthService.verifyAccessJwt(request)).rejects.toThrow(
-        'Missing required JWT verification configuration.',
-      );
+      await expect(AccessAuthService.verifyAccessJwt(request)).rejects.toThrow('Missing required JWT verification configuration.');
     });
 
     it('throws UnauthorizedError when JWT token present but teamDomain missing', async () => {
@@ -70,8 +68,37 @@ describe('AccessAuthService', () => {
 
     it('uses the dev bypass email when configured', async () => {
       const service = new AccessAuthService({ DEV_AUTH_EMAIL: 'dev@example.com' });
-      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).resolves.toBe(
-        'dev@example.com',
+      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).resolves.toBe('dev@example.com');
+    });
+
+    it('uses the platform-verified identity when JWT vars are unset (Worker-level Access)', async () => {
+      const service = new AccessAuthService({});
+      const accessCtx = { access: { getIdentity: async () => ({ email: 'platform@example.com' }) } };
+      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).resolves.toBe(
+        'platform@example.com',
+      );
+    });
+
+    it('rejects when JWT vars are unset and the platform identity has no email', async () => {
+      const service = new AccessAuthService({});
+      const accessCtx = { access: { getIdentity: async () => null } };
+      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).rejects.toThrow(
+        'No Cloudflare Access JWT token provided in request headers.',
+      );
+    });
+
+    it('rejects when JWT vars are unset and no platform identity is available', async () => {
+      const service = new AccessAuthService({});
+      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).rejects.toThrow(
+        'No Cloudflare Access JWT token provided in request headers.',
+      );
+    });
+
+    it('prefers JWT verification over the platform identity when JWT vars are set', async () => {
+      const service = new AccessAuthService({ TEAM_DOMAIN: 'https://team.example.com', POLICY_AUD: 'aud' });
+      const accessCtx = { access: { getIdentity: async () => ({ email: 'platform@example.com' }) } };
+      await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).rejects.toThrow(
+        'No Cloudflare Access JWT token provided in request headers.',
       );
     });
   });

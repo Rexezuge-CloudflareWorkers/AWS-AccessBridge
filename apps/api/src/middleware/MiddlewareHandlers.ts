@@ -9,6 +9,7 @@ import { Context, Next } from 'hono';
 import { HMACHandler } from './HMACHandler';
 import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { AccessAuthServiceFactory, TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
 import { AuditServiceFactory } from '@aws-access-bridge/backend-services/audit';
 import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
 
@@ -36,7 +37,10 @@ function hasInternalHeadersFor(headers: Headers): boolean {
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   const env: AuthenticatedEnv = c.env as AuthenticatedEnv;
-  return AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(c.req.raw);
+  // Forward the Workers ExecutionContext so AccessAuthService can read the
+  // platform-verified identity (`ctx.access`) when POLICY_AUD/TEAM_DOMAIN
+  // are unset (Worker-level Access, same-account deploys).
+  return AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
 }
 
 function isInternalRequest(c: RequestContext): boolean {

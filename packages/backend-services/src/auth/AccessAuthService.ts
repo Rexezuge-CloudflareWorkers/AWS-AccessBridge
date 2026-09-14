@@ -10,16 +10,39 @@ interface AccessAuthEnv {
   DEMO_MODE?: string;
 }
 
+// Minimal structural view of the Workers runtime ExecutionContext when
+// Worker-level Cloudflare Access is enabled. The platform attaches
+// `ctx.access` only after it has authenticated the request itself, so an
+// identity read here is platform-verified (unlike the spoofable
+// `Cf-Access-Authenticated-User-Email` request header, which must never be
+// trusted). See https://developers.cloudflare.com/workers/configuration/cloudflare-access/
+interface AccessIdentityContext {
+  access?: {
+    getIdentity: () => Promise<{ email?: string | null } | null>;
+  };
+}
+
 class AccessAuthService {
   constructor(private readonly env: AccessAuthEnv) {}
 
-  public async getAuthenticatedUserEmail(request: Request): Promise<string> {
+  public async getAuthenticatedUserEmail(request: Request, accessCtx?: AccessIdentityContext): Promise<string> {
     if (ConfigurationManager.auth.isDemoMode(this.env)) {
       return DEMO_USER_EMAIL;
     }
     // Local-only bypass for integration tests and `wrangler dev`. Never set in production.
     if (this.env.DEV_AUTH_EMAIL) {
       return this.env.DEV_AUTH_EMAIL;
+    }
+    if (this.env.TEAM_DOMAIN && this.env.POLICY_AUD) {
+      return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+    }
+    // No explicit JWT config: fall back to the platform-verified identity
+    // (Worker-level Access). Required for same-account deploys that rely on
+    // one-click Access instead of `POLICY_AUD`/`TEAM_DOMAIN` vars.
+    const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
+    const email = identity?.email;
+    if (email) {
+      return email;
     }
     return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
   }
@@ -72,4 +95,4 @@ class AccessAuthServiceFactory {
 }
 
 export { AccessAuthService, AccessAuthServiceFactory };
-export type { AccessAuthEnv };
+export type { AccessAuthEnv, AccessIdentityContext };
