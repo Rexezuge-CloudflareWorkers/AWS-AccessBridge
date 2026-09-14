@@ -5,23 +5,40 @@ import { useCallback, useEffect, useState } from 'react';
 type View = 'accounts' | 'costs' | 'resources' | 'admin';
 
 const PATH_TO_VIEW: Record<string, View> = {
+  '/user': 'accounts',
+  '/user/app': 'accounts',
+  '/user/app/costs': 'costs',
+  '/user/app/resources': 'resources',
+  // Legacy root page routes (pre-/user/ canonical). The Worker redirects
+  // these to /user/app/* in production; accept them here for dev/transition.
   '/': 'accounts',
   '/costs': 'costs',
   '/resources': 'resources',
 };
 
 const VIEW_TO_PATH: Record<View, string> = {
-  accounts: '/',
-  costs: '/costs',
-  resources: '/resources',
-  admin: '/admin',
+  accounts: '/user/',
+  costs: '/user/app/costs',
+  resources: '/user/app/resources',
+  admin: '/user/app/admin',
 };
 
 function parseRoute(): { view: View; adminTab?: string } {
   const path: string = globalThis.location.pathname.replace(/\/$/, '') || '/';
-  if (path === '/admin' || path.startsWith('/admin/')) {
-    const tab: string | undefined = path.split('/', 3)[2] || undefined;
-    return { view: 'admin', adminTab: tab };
+  if (
+    path === '/admin' ||
+    path === '/user/admin' ||
+    path === '/user/app/admin' ||
+    path.startsWith('/admin/') ||
+    path.startsWith('/user/admin/') ||
+    path.startsWith('/user/app/admin/')
+  ) {
+    const parts: string[] = path.split('/').filter(Boolean);
+    const adminIndex: number = parts.indexOf('admin');
+    if (adminIndex === -1) {
+      return { view: 'admin' };
+    }
+    return { view: 'admin', adminTab: parts[adminIndex + 1] };
   }
   return { view: PATH_TO_VIEW[path] ?? 'accounts' };
 }
@@ -37,7 +54,7 @@ function useRouter() {
   const navigateTo = useCallback((view: View, tab?: string) => {
     setCurrentView(view);
     setAdminTab(view === 'admin' ? tab : undefined);
-    const path: string = view === 'admin' && tab ? `/admin/${tab}` : VIEW_TO_PATH[view];
+    const path: string = view === 'admin' && tab ? `/user/app/admin/${tab}` : VIEW_TO_PATH[view];
     if (globalThis.location.pathname !== path) {
       history.pushState(null, '', path);
     }

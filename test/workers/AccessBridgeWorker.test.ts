@@ -34,26 +34,87 @@ function createEnv(overrides: Partial<TestEnv> = {}): Env {
 }
 
 describe('AccessBridgeWorker', () => {
-  describe('SPA catch-all', () => {
-    it('does not serve the SPA by default', async () => {
+  describe('canonical redirects (Otter parity)', () => {
+    it('redirects root visits to the user console', async () => {
       const worker = new AccessBridgeWorker();
 
       const response: Response = await worker.fetch(new Request('https://worker.example.com/'), createEnv(), createExecutionContext());
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/user/');
     });
 
-    it('serves the SPA when SERVE_SPA_FROM_WORKER is enabled', async () => {
+    it('redirects /user to /user/ preserving query', async () => {
       const worker = new AccessBridgeWorker();
 
       const response: Response = await worker.fetch(
-        new Request('https://worker.example.com/'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        new Request('https://worker.example.com/user?foo=bar'),
+        createEnv(),
         createExecutionContext(),
       );
 
-      expect(response.status).toBe(200);
-      await expect(response.text()).resolves.toContain('AWS AccessBridge');
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/user/?foo=bar');
+    });
+
+    it('redirects legacy page routes to /user/app/* preserving query', async () => {
+      const worker = new AccessBridgeWorker();
+
+      for (const [legacy, canonical] of [
+        ['/costs', '/user/app/costs'],
+        ['/resources', '/user/app/resources'],
+        ['/admin', '/user/app/admin'],
+      ] as const) {
+        const response: Response = await worker.fetch(
+          new Request(`https://worker.example.com${legacy}?x=1`),
+          createEnv(),
+          createExecutionContext(),
+        );
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get('Location')).toBe(`${canonical}?x=1`);
+      }
+    });
+  });
+
+  describe('SPA catch-all', () => {
+    it('does not serve the SPA by default', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/unknown-page-xyz'),
+        createEnv(),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it('serves the SPA for /user/ page routes when SERVE_SPA_FROM_WORKER is enabled (demo bypasses Access)', async () => {
+      const worker = new AccessBridgeWorker();
+
+      for (const path of ['/user/', '/user/app/', '/user/app/costs', '/user/app/resources', '/user/app/admin', '/user/app/admin/teams']) {
+        const response: Response = await worker.fetch(
+          new Request(`https://worker.example.com${path}`),
+          createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+          createExecutionContext(),
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.text()).resolves.toContain('AWS AccessBridge');
+      }
+    });
+
+    it('never serves the SPA for non-/user/ page paths', async () => {
+      const worker = new AccessBridgeWorker();
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/unknown-page-xyz'),
+        createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(404);
     });
 
     it('never serves the SPA for unknown /user/* paths (auth rejects first)', async () => {

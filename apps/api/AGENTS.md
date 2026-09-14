@@ -26,4 +26,4 @@ Protected (`/user/*`, registered in `AccessBridgeWorker.registerUserRoutes`):
 
 Programmatic (`/api/*`): `POST /api/aws/assume-role` · `POST /api/aws/console` · `GET /api/aws/federate` (same classes as the `/user/aws/*` trio)
 
-Catch-all: only non-`/user/` non-`/api/` page paths serve `SPA_HTML`; everything else returns 404 so `/api/*` is never intercepted. `/` redirects to `/user/`.
+Catch-all: only `/user/` page paths serve `SPA_HTML` (pages namespaced under `/user/app/*` so they never collide with `/user/*` JSON API routes like `GET /user/resources`); everything else returns 404 so `/api/*` is never intercepted. `/` redirects to `/user/` (canonical entry — top-level navigation here triggers the Zero Trust login); `/user` normalizes to `/user/`; legacy `/costs`, `/resources`, `/admin/*` redirect to `/user/app/*`.
