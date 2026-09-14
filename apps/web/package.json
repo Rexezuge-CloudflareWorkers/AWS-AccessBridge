@@ -20,7 +20,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.0",
     "terser": "^5.51.2",
-    "vite": "^8.2.2",
+    "vite": "^8.3.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@types/node": "^26.5.1",
