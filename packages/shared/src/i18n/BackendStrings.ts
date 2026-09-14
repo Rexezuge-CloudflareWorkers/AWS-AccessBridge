@@ -1,4 +1,4 @@
-type SupportedLocale = 'en';
+import type { SupportedLocale } from '../utils/LocaleUtil';
 
 interface BackendStrings {
   readonly locale: SupportedLocale;
@@ -10,5 +10,5 @@ function formatBackendString(template: string, params?: Record<string, string | 
   return Object.entries(params).reduce((acc, [key, value]) => acc.split(`{{${key}}}`).join(String(value)), template);
 }
 
-export type { SupportedLocale, BackendStrings };
+export type { BackendStrings };
 export { formatBackendString };
