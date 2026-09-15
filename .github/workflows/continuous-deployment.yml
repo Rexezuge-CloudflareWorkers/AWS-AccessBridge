@@ -133,11 +133,23 @@ jobs:
       - name: Configure Pages Service Bindings
         run: cp apps/web/wrangler.template.jsonc wrangler.jsonc
 
+      - name: Ensure Pages Project Exists
+        run: |
+          PROJECT="${CLOUDFLARE_PAGES_PROJECT_NAME:-aws-access-bridge-web}"
+          if ! pnpm exec wrangler pages project list | grep -qw "$PROJECT"; then
+            pnpm exec wrangler pages project create "$PROJECT" --production-branch "${DEPLOY_BRANCH:-main}"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || 'aws-access-bridge-web' }}
+          DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || github.event.client_payload.branch || github.ref_name }}
+
       - name: Deploy with Wrangler Pages
         uses: ./.github/actions/retry-step
         with:
           command: >
-            pnpm exec wrangler pages deploy
+            pnpm exec wrangler pages deploy apps/web/dist
             --project-name "${CLOUDFLARE_PAGES_PROJECT_NAME:-aws-access-bridge-web}"
             --branch "${DEPLOY_BRANCH}"
             --commit-hash "${DEPLOY_SHA}"
