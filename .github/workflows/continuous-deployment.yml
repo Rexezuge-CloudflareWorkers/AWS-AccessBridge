@@ -136,9 +136,30 @@ jobs:
       - name: Ensure Pages Project Exists
         run: |
           PROJECT="${CLOUDFLARE_PAGES_PROJECT_NAME:-aws-access-bridge-web}"
-          if ! pnpm exec wrangler pages project list | grep -qw "$PROJECT"; then
-            pnpm exec wrangler pages project create "$PROJECT" --production-branch "${DEPLOY_BRANCH:-main}"
+          echo "Ensuring Pages project \"${PROJECT}\" exists..."
+          if CREATE_OUTPUT="$(pnpm exec wrangler pages project create "${PROJECT}" --production-branch "${DEPLOY_BRANCH:-main}" 2>&1)"; then
+            echo "Created Pages project \"${PROJECT}\"."
+          elif echo "${CREATE_OUTPUT}" | grep -qi "already exists"; then
+            echo "Pages project \"${PROJECT}\" already exists."
+          else
+            echo "${CREATE_OUTPUT}"
+            echo "Failed to create Pages project \"${PROJECT}\"." >&2
+            exit 1
           fi
+          echo "Waiting for Pages project \"${PROJECT}\" to become visible..."
+          VISIBLE=0
+          for _ in $(seq 1 18); do
+            if pnpm exec wrangler pages project list 2>/dev/null | grep -qE "(^|[[:space:]])${PROJECT}([[:space:]]|$)"; then
+              VISIBLE=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "${VISIBLE}" -ne 1 ]; then
+            echo "Pages project \"${PROJECT}\" is still not visible after polling." >&2
+            exit 1
+          fi
+          echo "Pages project \"${PROJECT}\" is ready."
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
