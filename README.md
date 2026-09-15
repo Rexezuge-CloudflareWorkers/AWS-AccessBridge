@@ -264,7 +264,7 @@ The repo ships a `Continuous Deployment` workflow at `.github/workflows/continuo
    - Hide any stray OpenNext/Next.js config files (defensive — the repo has none; without that step wrangler would delegate to the OpenNext build)
    - Run `wrangler deploy --dry-run`, then `wrangler deploy` (each step retried up to 3 times)
 
-A second job, `deploy-pages`, runs only when the `CLOUDFLARE_PAGES_PROJECT_NAME` variable is set — it builds the SPA and deploys it to Cloudflare Pages with the `API_WORKER` service binding (from `apps/web/wrangler.template.jsonc`).
+A second job, `deploy-pages`, builds the SPA and deploys it to Cloudflare Pages with the `API_WORKER` service binding (from `apps/web/wrangler.template.jsonc`), defaulting to `aws-access-bridge-web` when the `CLOUDFLARE_PAGES_PROJECT_NAME` variable is unset.
 
 ### Keeping `WRANGLER_JSONC` up to date
 
