@@ -152,8 +152,8 @@ importers:
         specifier: ^19.2.8
         version: 19.3.0(react@19.3.0)
       react-i18next:
-        specifier: ^17.0.13
-        version: 17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        specifier: ^17.0.14
+        version: 17.0.14(i18next@26.4.2(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.3
@@ -2285,8 +2285,8 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
-  baseline-browser-mapping@2.11.23:
-    resolution: {integrity: sha512-le521dGVfxM7yRX0EikCoSz+rOK+hHzdDt/E7mG1jOJB/6WAAUuwVroLwaB7ApaUsz5Q0kFlDXLSA9MheUIfRQ==}
+  baseline-browser-mapping@2.11.25:
+    resolution: {integrity: sha512-gMmEShwwq7FJqMwvfRwvCl00v4kN+KOfJqXn+f4nrufak5gNHJOksd/60Dvjuz7sI8Y5WiSFBa8FEYr+zoyqCw==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -3446,8 +3446,8 @@ packages:
     peerDependencies:
       react: ^19.3.0
 
-  react-i18next@17.0.13:
-    resolution: {integrity: sha512-Cc1PscmblIHA1kljTqDwrcVMI21ydgmUzw0UAeQBe7pAOgfuRLfzXze4EUBQoeDiICzFIXXhHFoZxuetNg5D0Q==}
+  react-i18next@17.0.14:
+    resolution: {integrity: sha512-ZpMBfJL3BiXPuYHj5QMY1GwvKJNhE1vCxOJQ8BoMBdHP5XONTfi/Qss1nuRlnFdIl72PKo2jPmw+fxuLjRFgaQ==}
     peerDependencies:
       i18next: '>= 26.2.0'
       react: '>= 16.8.0'
@@ -5957,7 +5957,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.22: {}
 
-  baseline-browser-mapping@2.11.23: {}
+  baseline-browser-mapping@2.11.25: {}
 
   blake3-wasm@2.1.5: {}
 
@@ -6959,7 +6959,7 @@ snapshots:
     dependencies:
       '@next/env': 16.3.5
       '@swc/helpers': 0.5.23
-      baseline-browser-mapping: 2.11.23
+      baseline-browser-mapping: 2.11.25
       caniuse-lite: 1.0.30001810
       postcss: 8.5.23
       react: 19.3.0
@@ -7121,7 +7121,7 @@ snapshots:
       react: 19.3.0
       scheduler: 0.28.0
 
-  react-i18next@17.0.13(i18next@26.4.2(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3):
+  react-i18next@17.0.14(i18next@26.4.2(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3):
     dependencies:
       '@babel/runtime': 7.29.7
       html-parse-stringify: 4.0.1
