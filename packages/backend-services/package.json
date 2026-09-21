@@ -25,7 +25,7 @@
     "@aws-access-bridge/provider-clients": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
     "aws4fetch": "^1.0.20",
-    "hono": "^4.13.3",
+    "hono": "^4.13.8",
     "jose": "^6.2.11"
   },
   "devDependencies": {
