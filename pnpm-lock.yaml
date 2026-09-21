@@ -96,8 +96,8 @@ importers:
         specifier: ^3.4.0
         version: 3.4.0
       hono:
-        specifier: ^4.13.3
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
       jose:
         specifier: ^6.2.11
         version: 6.2.12
@@ -202,8 +202,8 @@ importers:
   packages/backend-errors:
     dependencies:
       hono:
-        specifier: ^4.13.3
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
     devDependencies:
       '@types/node':
         specifier: 26.6.1
@@ -246,8 +246,8 @@ importers:
         specifier: ^1.0.20
         version: 1.0.20
       hono:
-        specifier: ^4.13.3
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
       jose:
         specifier: ^6.2.11
         version: 6.2.12
@@ -2826,8 +2826,8 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
-  hono@4.13.7:
-    resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
+  hono@4.13.8:
+    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -6621,7 +6621,7 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hono@4.13.7: {}
+  hono@4.13.8: {}
 
   hookified@1.15.1: {}
 
