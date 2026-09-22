@@ -254,6 +254,25 @@ function ensureKVNamespace(config: WranglerConfig, binding: string): string {
   return namespace.id;
 }
 
+export function getRequiredKvBindings(): string[] {
+  return Object.keys(DEFAULT_KV_NAMESPACE_NAMES);
+}
+
+export function ensureRequiredKvBindings(content: string, config: WranglerConfig): string {
+  const existing = new Set((config.kv_namespaces ?? []).map((namespace) => namespace.binding).filter(Boolean));
+  const missing = getRequiredKvBindings().filter((binding) => !existing.has(binding));
+  if (missing.length === 0) {
+    return content;
+  }
+
+  const next = [...(config.kv_namespaces ?? [])];
+  for (const binding of missing) {
+    console.log(`Adding missing KV namespace binding: ${binding}`);
+    next.push({ binding, id: DEFAULT_HEX_ID });
+  }
+  return writeConfigValue(content, ['kv_namespaces'], next);
+}
+
 function parseSecretStoresTable(output: string): SecretStore[] {
   const stores: SecretStore[] = [];
   for (const line of output.split('\n')) {
@@ -311,6 +330,11 @@ function ensureSecretStore(): string {
 function provisionWranglerResources(): void {
   let { content, config } = readConfig();
 
+  // KV namespaces — inject required bindings missing from custom configs
+  // (e.g. WRANGLER_JSONC without kv_namespaces) so CD auto-creates them.
+  content = ensureRequiredKvBindings(content, config);
+  config = parse(content) as WranglerConfig;
+
   for (const [index, database] of config.d1_databases?.entries() ?? []) {
     if (database.database_id !== DEFAULT_UUID) {
       continue;
@@ -353,9 +377,12 @@ function provisionWranglerResources(): void {
   writeFileSync(CONFIG_PATH, content.endsWith('\n') ? content : `${content}\n`);
 }
 
-prepareConfigFile();
-ensureMinimumConfigVersion();
-applyTopLevelPatch();
-applyVarsPatch();
-provisionWranglerResources();
-console.log('Wrangler configuration is ready.');
+const isMain = process.argv[1]?.endsWith('prepare-wrangler-config.ts') ?? false;
+if (isMain) {
+  prepareConfigFile();
+  ensureMinimumConfigVersion();
+  applyTopLevelPatch();
+  applyVarsPatch();
+  provisionWranglerResources();
+  console.log('Wrangler configuration is ready.');
+}
