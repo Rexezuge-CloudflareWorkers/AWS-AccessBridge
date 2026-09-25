@@ -15,8 +15,9 @@ class TeamsDAO extends BaseDAO {
 
   public async getTeamById(teamId: string): Promise<Team | null> {
     const result = await this.database.prepare('SELECT * FROM teams WHERE team_id = ?').bind(teamId).first<TeamInternal>();
-    if (!result) return null;
-    return { teamId: result.team_id, teamName: result.team_name, createdAt: result.created_at, createdBy: result.created_by };
+    return result
+      ? { teamId: result.team_id, teamName: result.team_name, createdAt: result.created_at, createdBy: result.created_by }
+      : null;
   }
 
   public async listTeams(): Promise<Team[]> {

@@ -81,10 +81,11 @@ class CostExplorerClient {
         const serviceName: string = group.Keys?.[0] ?? 'Unknown';
         const amount: number = Number(group.Metrics?.UnblendedCost?.Amount ?? '0');
         currency = group.Metrics?.UnblendedCost?.Unit ?? 'USD';
-        if (amount > 0) {
-          serviceBreakdown[serviceName] = amount;
-          totalCost += amount;
+        if (amount <= 0) {
+          continue;
         }
+        serviceBreakdown[serviceName] = amount;
+        totalCost += amount;
       }
 
       results.push({

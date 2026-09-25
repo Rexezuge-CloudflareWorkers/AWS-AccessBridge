@@ -30,8 +30,5 @@ export async function decryptDataOptional(
   ivBase64: string | undefined,
   keyBase64: string | undefined,
 ): Promise<string | undefined> {
-  if (encryptedBase64 && ivBase64 && keyBase64) {
-    return decryptData(encryptedBase64, ivBase64, keyBase64);
-  }
-  return undefined;
+  return encryptedBase64 && ivBase64 && keyBase64 ? decryptData(encryptedBase64, ivBase64, keyBase64) : undefined;
 }

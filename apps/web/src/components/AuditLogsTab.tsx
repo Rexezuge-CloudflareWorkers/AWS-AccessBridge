@@ -23,9 +23,7 @@ interface AuditLog {
 }
 
 function statusColorStyle(code: number): React.CSSProperties {
-  if (code < 300) return { color: '#4ade80' };
-  if (code < 400) return { color: '#facc15' };
-  return { color: '#f87171' };
+  return code < 300 ? { color: '#4ade80' } : ({ color: code < 400 ? '#facc15' : '#f87171' });
 }
 
 interface AuditLogsTabProps {

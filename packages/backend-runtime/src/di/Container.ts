@@ -54,10 +54,7 @@ class Container {
    */
   public resolve<T>(token: Token<T>): T {
     const factory = this.factories.get(token);
-    if (!factory) {
-      return this.get(token);
-    }
-    return (factory as Factory<T>)(this);
+    return factory ? (factory as Factory<T>)(this) : this.get(token);
   }
 
   public createChild(): Container {

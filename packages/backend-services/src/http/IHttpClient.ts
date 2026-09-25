@@ -71,10 +71,7 @@ class StubHttpClient implements IHttpClient {
     this.calls.push({ url, init });
     if (this.handler) {
       const result = this.handler(url, init);
-      if (result instanceof Response) {
-        return Promise.resolve(result);
-      }
-      return Promise.resolve(result as Response);
+      return result instanceof Response ? Promise.resolve(result) : Promise.resolve(result as Response);
     }
     const next = this.queue.shift();
     if (!next) {
@@ -83,10 +80,7 @@ class StubHttpClient implements IHttpClient {
     if (next.kind === 'error') {
       return Promise.reject(next.error);
     }
-    if (next.value instanceof Response) {
-      return Promise.resolve(next.value);
-    }
-    return Promise.resolve(Response.json(next.value));
+    return next.value instanceof Response ? Promise.resolve(next.value) : Promise.resolve(Response.json(next.value));
   }
 
   public async fetchJson(url: string, init?: RequestInit): Promise<unknown> {

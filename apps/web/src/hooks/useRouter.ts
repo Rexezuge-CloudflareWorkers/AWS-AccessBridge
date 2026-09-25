@@ -35,10 +35,7 @@ function parseRoute(): { view: View; adminTab?: string } {
   ) {
     const parts: string[] = path.split('/').filter(Boolean);
     const adminIndex: number = parts.indexOf('admin');
-    if (adminIndex === -1) {
-      return { view: 'admin' };
-    }
-    return { view: 'admin', adminTab: parts[adminIndex + 1] };
+    return adminIndex === -1 ? { view: 'admin' } : { view: 'admin', adminTab: parts[adminIndex + 1] };
   }
   return { view: PATH_TO_VIEW[path] ?? 'accounts' };
 }

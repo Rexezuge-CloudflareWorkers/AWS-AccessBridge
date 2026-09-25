@@ -92,10 +92,7 @@ export async function apiCall(
   body?: Record<string, unknown>,
 ): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
   const result = await apiFetch<Record<string, unknown>>(url, { method, body });
-  if (result.ok) {
-    return { ok: true, data: result.data ?? {} };
-  }
-  return { ok: false, error: result.error };
+  return result.ok ? { ok: true, data: result.data ?? {} } : { ok: false, error: result.error };
 }
 
 /**
@@ -119,8 +116,5 @@ export async function apiRequest<T>(url: string, options?: { method?: string; bo
     return {} as T;
   }
   const text = await response.text();
-  if (!text) {
-    return {} as T;
-  }
-  return JSON.parse(text) as T;
+  return text ? (JSON.parse(text) as T) : ({} as T);
 }

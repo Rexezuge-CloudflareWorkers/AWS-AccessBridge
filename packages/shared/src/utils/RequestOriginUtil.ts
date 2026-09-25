@@ -64,10 +64,7 @@ class RequestOriginUtil {
   }
 
   public static getForwardedUri(request: Request, env?: unknown): string | undefined {
-    if (!this.isPagesProxyRequest(request, env)) {
-      return undefined;
-    }
-    return request.headers.get(FORWARDED_URI_HEADER) || undefined;
+    return this.isPagesProxyRequest(request, env) ? request.headers.get(FORWARDED_URI_HEADER) || undefined : undefined;
   }
 }
 

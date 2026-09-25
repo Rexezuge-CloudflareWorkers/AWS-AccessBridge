@@ -13,10 +13,7 @@ const BaseUrlUtil = {
       throw new InternalServerError('Internal call missing required base URL header.');
     }
     const trustedForwardedOrigin: string | undefined = RequestOriginUtil.getTrustedForwardedOrigin(request, env);
-    if (trustedForwardedOrigin) {
-      return trustedForwardedOrigin;
-    }
-    return url.origin;
+    return trustedForwardedOrigin ?? url.origin;
   },
 };
 

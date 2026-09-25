@@ -45,10 +45,7 @@ async function authenticateUserIdentity(c: RequestContext): Promise<string> {
 
 function isInternalRequest(c: RequestContext): boolean {
   const url: URL = new URL(c.req.url);
-  if (url.hostname === SELF_WORKER_BASE_HOSTNAME) {
-    return true;
-  }
-  return hasInternalHeadersFor(c.req.raw.headers);
+  return url.hostname === SELF_WORKER_BASE_HOSTNAME || hasInternalHeadersFor(c.req.raw.headers);
 }
 
 async function authenticateApiIdentity(c: RequestContext): Promise<string> {

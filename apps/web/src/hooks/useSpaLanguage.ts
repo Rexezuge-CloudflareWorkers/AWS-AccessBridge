@@ -38,8 +38,7 @@ function useSpaLanguage({ user, setUser, showMessage }: UseSpaLanguageInput) {
   }, [i18n]);
 
   useEffect(() => {
-    if (!user) return;
-    if (languagePendingRef.current) return;
+    if (!user || languagePendingRef.current) return;
     const preferred = normalizeLanguage(
       user.preferredLanguage ??
         (() => {
