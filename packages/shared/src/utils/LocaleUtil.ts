@@ -29,8 +29,7 @@ function canonicalizeLocaleTag(tag: string): string {
     if (index === parts.length - 2 && part.length === 4) {
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
     }
-    if (part.length === 2) return part.toUpperCase();
-    return part.toLowerCase();
+    return part.length === 2 ? part.toUpperCase() : part.toLowerCase();
   });
   return [language, ...rest].join('-');
 }
@@ -65,8 +64,7 @@ class LocaleUtility {
 
   public static negotiate(preferred: string | null | undefined, fallback?: string | null): SupportedLocale {
     const primary = this.normalize(preferred);
-    if (primary !== DEFAULT_LOCALE) return primary;
-    return this.normalize(fallback);
+    return primary === DEFAULT_LOCALE ? this.normalize(fallback) : primary;
   }
 
   public static displayName(locale: string | null | undefined): string {

@@ -50,10 +50,7 @@ class ConsoleService {
   }
 
   public buildIssuerUrl(baseUrl: string, awsAccountId?: string, roleName?: string): string {
-    if (awsAccountId && roleName) {
-      return `${baseUrl}/user/aws/federate?awsAccountId=${awsAccountId}&role=${roleName}`;
-    }
-    return baseUrl;
+    return awsAccountId && roleName ? `${baseUrl}/user/aws/federate?awsAccountId=${awsAccountId}&role=${roleName}` : baseUrl;
   }
 }
 

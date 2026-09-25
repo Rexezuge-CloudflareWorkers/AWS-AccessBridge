@@ -63,8 +63,7 @@ function getConsoleDestination(resource: ResourceItem): ConsoleDestination | nul
 
 async function loadSummary(): Promise<ResourceSummary | null> {
   const res = await fetch('/user/resources/summary');
-  if (!res.ok) return null;
-  return readJson<ResourceSummary>(res);
+  return res.ok ? readJson<ResourceSummary>(res) : null;
 }
 
 async function listResources(options: ListResourcesOptions): Promise<ResourcesResult> {

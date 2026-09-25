@@ -46,10 +46,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       if (statusCode >= 300 && statusCode < 400) {
         return c.body(null);
       }
-      if ('rawBody' in extendedResponse) {
-        return c.body((extendedResponse.rawBody ?? null) as never);
-      }
-      return c.json(extendedResponse.body);
+      return 'rawBody' in extendedResponse ? c.body((extendedResponse.rawBody ?? null) as never) : c.json(extendedResponse.body);
     }
     return c.json(response);
   }

@@ -23,11 +23,7 @@ class AssumableRolesDAO extends BaseDAO {
       .bind(userEmail, awsAccountId)
       .all<GetRolesByUserAndAccountInternal>();
 
-    if (!results || !results.results) {
-      return [];
-    }
-
-    return results.results.map((row) => row.role_name);
+    return results?.results ? results.results.map((row) => row.role_name) : [];
   }
 
   /**
@@ -81,10 +77,7 @@ class AssumableRolesDAO extends BaseDAO {
       .prepare(buildListRolesQuery(showHidden))
       .bind(userEmail, userEmail, limit, offset)
       .all<AssumableRoleRow>();
-    if (results && results.results) {
-      return mapRowsToAssumableMap(results.results);
-    }
-    return {};
+    return results?.results ? mapRowsToAssumableMap(results.results) : {};
   }
 
   /**
@@ -204,10 +197,7 @@ class AssumableRolesDAO extends BaseDAO {
       .prepare(buildSearchRolesQuery(showHidden))
       .bind(userEmail, userEmail, `%${query}%`, `%${query}%`)
       .all<AssumableRoleRow>();
-    if (results && results.results) {
-      return mapRowsToAssumableMap(results.results);
-    }
-    return {};
+    return results?.results ? mapRowsToAssumableMap(results.results) : {};
   }
 }
 

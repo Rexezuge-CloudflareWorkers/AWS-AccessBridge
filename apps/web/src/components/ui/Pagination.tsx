@@ -5,10 +5,7 @@ import { paginationBtnStyle } from './theme';
 function pageNumbers(currentPage: number, totalPages: number, windowSize = 5): number[] {
   const count = Math.min(windowSize, totalPages);
   return Array.from({ length: count }, (_, i) => {
-    if (totalPages <= windowSize) return i + 1;
-    if (currentPage <= 3) return i + 1;
-    if (currentPage >= totalPages - 2) return totalPages - windowSize + 1 + i;
-    return currentPage - 2 + i;
+    return (totalPages <= windowSize) || (currentPage <= 3) ? i + 1 : (currentPage >= totalPages - 2 ? totalPages - windowSize + 1 : currentPage - 2) + i;
   });
 }
 

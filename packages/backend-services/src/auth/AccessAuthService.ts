@@ -41,10 +41,7 @@ class AccessAuthService {
     // one-click Access instead of `POLICY_AUD`/`TEAM_DOMAIN` vars.
     const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
     const email = identity?.email;
-    if (email) {
-      return email;
-    }
-    return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+    return email || AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
   }
 
   public static async verifyAccessJwt(request: Request, teamDomain?: string, policyAud?: string): Promise<string> {

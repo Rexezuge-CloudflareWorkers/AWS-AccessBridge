@@ -10,10 +10,9 @@ import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
  */
 function withUnconstrainedD1Session<TEnv>(env: TEnv): TEnv {
   const db = (env as Record<string, { withSession?: (constraint: unknown) => unknown }>).AccessBridgeDB;
-  if (db && typeof db.withSession === 'function') {
-    return { ...(env as object), AccessBridgeDB: db.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) } as TEnv;
-  }
-  return env;
+  return db && typeof db.withSession === 'function'
+    ? ({ ...(env as object), AccessBridgeDB: db.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) } as TEnv)
+    : env;
 }
 
 function isDemoModeEnv(env: unknown): boolean {

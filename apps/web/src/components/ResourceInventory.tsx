@@ -8,9 +8,11 @@ import type { ConsoleDestination, ResourceItem } from '../services/resourceServi
 import { useResources } from '../hooks/useResources';
 
 function stateColor(state: string): string {
-  if (['running', 'active', 'Active', 'available'].includes(state)) return '#4ade80';
-  if (['stopped', 'inactive'].includes(state)) return '#f87171';
-  return '#facc15';
+  return ['running', 'active', 'Active', 'available'].includes(state)
+    ? '#4ade80'
+    : ['stopped', 'inactive'].includes(state)
+      ? '#f87171'
+      : '#facc15';
 }
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
