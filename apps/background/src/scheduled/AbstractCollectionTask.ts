@@ -1,10 +1,12 @@
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 interface CollectionTaskEnv extends IEnv {
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
@@ -48,7 +50,7 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
       return { itemsProcessed: 0, itemsFailed: 0, summary: 'No accounts due for collection' };
     }
 
-    const credentialService = CredentialServiceFactory.create(env);
+    const credentialService = getRequestScope(env).get(Tokens.CredentialService);
     let succeededItems = 0;
     let failedAccounts = 0;
     for (const principalArn of principalArns) {

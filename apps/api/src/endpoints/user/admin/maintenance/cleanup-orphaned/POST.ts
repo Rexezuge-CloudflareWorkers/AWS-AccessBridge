@@ -1,6 +1,9 @@
-import { MaintenanceServiceFactory, type OrphanCleanupResult } from '@aws-access-bridge/backend-services/maintenance';
+import { type OrphanCleanupResult } from '@aws-access-bridge/backend-services/maintenance';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
   CleanupOrphanedDataRequest,
@@ -136,7 +139,7 @@ class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
     env: CleanupOrphanedDataEnv,
     _cxt: ActivityContext<CleanupOrphanedDataEnv>,
   ): Promise<CleanupOrphanedDataResponse> {
-    const result: OrphanCleanupResult = await MaintenanceServiceFactory.create(env).cleanupOrphanedData();
+    const result: OrphanCleanupResult = await getRequestScope(env).get(Tokens.MaintenanceService).cleanupOrphanedData();
     return { deletedCounts: result.deletedCounts, totalDeleted: result.totalDeleted };
   }
 }

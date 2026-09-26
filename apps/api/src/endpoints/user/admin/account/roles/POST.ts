@@ -1,6 +1,8 @@
-import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesRequest, ListAccountRolesResponse, ListAccountRolesEnv> {
   schema = {
@@ -156,7 +158,7 @@ class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesReque
     env: ListAccountRolesEnv,
     _cxt: ActivityContext<ListAccountRolesEnv>,
   ): Promise<ListAccountRolesResponse> {
-    return AccountServiceFactory.create(env).listAccountRoles(request.principalArn);
+    return getRequestScope(env).get(Tokens.AccountService).listAccountRoles(request.principalArn);
   }
 }
 

@@ -1,6 +1,8 @@
-import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class DeleteRoleConfigRoute extends IAdminActivityAPIRoute<DeleteRoleConfigRequest, DeleteRoleConfigResponse, DeleteRoleConfigEnv> {
   schema = {
@@ -223,7 +225,7 @@ class DeleteRoleConfigRoute extends IAdminActivityAPIRoute<DeleteRoleConfigReque
     env: DeleteRoleConfigEnv,
     _cxt: ActivityContext<DeleteRoleConfigEnv>,
   ): Promise<DeleteRoleConfigResponse> {
-    await AccountServiceFactory.create(env).deleteRoleConfig(request.awsAccountId, request.roleName);
+    await getRequestScope(env).get(Tokens.AccountService).deleteRoleConfig(request.awsAccountId, request.roleName);
 
     return {
       success: true,

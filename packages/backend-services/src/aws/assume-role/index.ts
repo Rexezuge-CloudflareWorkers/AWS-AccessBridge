@@ -1,2 +1,3 @@
-export { AssumeRoleService, AssumeRoleServiceFactory } from './AssumeRoleService';
+export { AssumeRoleService } from './AssumeRoleService';
+
 export type { AssumeRoleServiceEnv } from './AssumeRoleService';

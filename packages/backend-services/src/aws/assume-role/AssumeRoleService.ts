@@ -1,15 +1,16 @@
 import { AssumableRolesDAO, RoleConfigsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { AccessKeysWithExpiration, CredentialCache, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-access-bridge/shared/constants';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
-import { CredentialService, type CredentialServiceEnv } from '../../credential';
+import { CredentialService } from '../../credential';
+import type { ServiceEnv } from '../../composition/ServiceEnv';
 
-interface AssumeRoleServiceEnv extends CredentialServiceEnv {
-  AccessBridgeDB: D1Queryable;
+interface AssumeRoleServiceEnv extends ServiceEnv {
+  // Narrowed from optional: chain walking needs the cache binding.
   AccessBridgeKV: KVNamespace;
 }
 
@@ -113,13 +114,5 @@ class AssumeRoleService {
     }
     return newCredentials;
   }
-}
-
-class AssumeRoleServiceFactory {
-  public static create(env: AssumeRoleServiceEnv): AssumeRoleService {
-    return new AssumeRoleService(env);
-  }
-}
-
-export { AssumeRoleService, AssumeRoleServiceFactory };
+}export { AssumeRoleService };
 export type { AssumeRoleServiceEnv };

@@ -1,7 +1,9 @@
-import { AssumeRoleServiceFactory } from '@aws-access-bridge/backend-services/aws';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleResponse, AssumeRoleEnv> {
   schema = {
@@ -246,7 +248,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
     }
 
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return AssumeRoleServiceFactory.create(env).assumeRoleForUser(userEmail, request.principalArn);
+    return getRequestScope(env).get(Tokens.AssumeRoleService).assumeRoleForUser(userEmail, request.principalArn);
   }
 }
 

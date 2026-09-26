@@ -1,15 +1,14 @@
 import { AwsAccountsDAO, RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { AccessKeys, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { AWS_ACCOUNT_ID_PATTERN } from '../access';
-import { CredentialService, type CredentialServiceEnv } from '../credential';
+import { CredentialService } from '../credential';
 import { IamService, type DiscoveredRole } from '../aws/iam';
 import { StsService } from '../aws/sts';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface AccountServiceEnv extends CredentialServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type AccountServiceEnv = ServiceEnv;
 
 class AccountService {
   private readonly credentials: CredentialService;
@@ -111,13 +110,5 @@ class AccountService {
     const roles = await this.iam.listRoles(credential);
     return { roles };
   }
-}
-
-class AccountServiceFactory {
-  public static create(env: AccountServiceEnv): AccountService {
-    return new AccountService(env);
-  }
-}
-
-export { AccountService, AccountServiceFactory };
+}export { AccountService };
 export type { AccountServiceEnv };

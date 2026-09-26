@@ -53,4 +53,3 @@ const validateRequestInput = async (request: Request, body: unknown): Promise<un
 export { getRequestInputSchema, validateRequestInput };
 export * from './common';
 export * from './input';
-export * from './output';

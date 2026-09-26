@@ -1,10 +1,9 @@
 import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
-import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 
-interface ResourceServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
+import type { ServiceEnv } from '../composition/ServiceEnv';
+
+type ResourceServiceEnv = ServiceEnv;
 
 interface ResourceSearchFilters {
   search?: string;
@@ -73,13 +72,5 @@ class ResourceService {
 
     return { totalResources, byType, byAccount: counts };
   }
-}
-
-class ResourceServiceFactory {
-  public static create(env: ResourceServiceEnv): ResourceService {
-    return new ResourceService(env);
-  }
-}
-
-export { ResourceService, ResourceServiceFactory };
+}export { ResourceService };
 export type { ResourceList, ResourceSearchFilters, ResourceServiceEnv, ResourceSummary };

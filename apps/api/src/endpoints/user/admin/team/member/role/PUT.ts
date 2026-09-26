@@ -1,6 +1,8 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class UpdateTeamMemberRoleRoute extends IAdminActivityAPIRoute<UpdateRoleRequest, UpdateRoleResponse, IAdminEnv> {
   schema = {
@@ -151,7 +153,7 @@ class UpdateTeamMemberRoleRoute extends IAdminActivityAPIRoute<UpdateRoleRequest
   };
 
   protected async handleAdminRequest(request: UpdateRoleRequest, env: IAdminEnv): Promise<UpdateRoleResponse> {
-    await TeamServiceFactory.create(env).updateMemberRole(request.teamId, request.userEmail, request.role);
+    await getRequestScope(env).get(Tokens.TeamService).updateMemberRole(request.teamId, request.userEmail, request.role);
     return { success: true, message: 'Role updated.' };
   }
 }

@@ -1,7 +1,9 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, SearchAccountsResponse, SearchAccountsEnv> {
   schema = {
@@ -185,7 +187,7 @@ class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, Searc
     }
 
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
-    return UserServiceFactory.create(env).searchAccounts(userEmail, query, showHidden);
+    return getRequestScope(env).get(Tokens.UserService).searchAccounts(userEmail, query, showHidden);
   }
 }
 

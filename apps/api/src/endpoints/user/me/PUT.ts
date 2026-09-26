@@ -1,8 +1,10 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { LocaleUtil } from '@aws-access-bridge/shared/utils';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest, UpdateCurrentUserResponse, UpdateCurrentUserEnv> {
   schema = {
@@ -91,7 +93,7 @@ class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest,
     } else if (raw !== null && typeof raw !== 'string') {
       throw new BadRequestError('Unsupported language.');
     }
-    const preferredLanguage: string | null = await UserServiceFactory.create(env).updatePreferredLanguage(userEmail, raw);
+    const preferredLanguage: string | null = await getRequestScope(env).get(Tokens.UserService).updatePreferredLanguage(userEmail, raw);
     return { success: true, preferredLanguage };
   }
 }

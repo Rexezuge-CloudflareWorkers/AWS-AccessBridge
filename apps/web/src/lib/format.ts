@@ -31,6 +31,3 @@ export function formatCurrency(amount: number, currency: string, lng: string): s
   }
 }
 
-export function formatNumber(value: number, lng: string): string {
-  return new Intl.NumberFormat(lng).format(value);
-}

@@ -1,7 +1,9 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteTokenResponse, DeleteTokenEnv> {
   schema = {
@@ -54,7 +56,7 @@ class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteToken
   ): Promise<DeleteTokenResponse> {
     if (request.tokenId) {
       const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-      await TokenServiceFactory.create(env).deleteToken(request.tokenId, userEmail);
+      await getRequestScope(env).get(Tokens.TokenService).deleteToken(request.tokenId, userEmail);
       return { success: true };
     }
     throw new BadRequestError('Token ID is required');

@@ -1,6 +1,8 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCostSummaryResponse, GetCostSummaryEnv> {
   schema = {
@@ -97,7 +99,7 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
     cxt: ActivityContext<GetCostSummaryEnv>,
   ): Promise<GetCostSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return CostServiceFactory.create(env).getSummary(userEmail);
+    return getRequestScope(env).get(Tokens.CostService).getSummary(userEmail);
   }
 }
 

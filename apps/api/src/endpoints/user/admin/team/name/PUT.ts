@@ -1,6 +1,8 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class UpdateTeamNameRoute extends IAdminActivityAPIRoute<UpdateTeamNameRequest, UpdateTeamNameResponse, IAdminEnv> {
   schema = {
@@ -142,7 +144,7 @@ class UpdateTeamNameRoute extends IAdminActivityAPIRoute<UpdateTeamNameRequest, 
   };
 
   protected async handleAdminRequest(request: UpdateTeamNameRequest, env: IAdminEnv): Promise<UpdateTeamNameResponse> {
-    await TeamServiceFactory.create(env).updateTeamName(request.teamId, request.teamName);
+    await getRequestScope(env).get(Tokens.TeamService).updateTeamName(request.teamId, request.teamName);
     return { success: true, message: 'Team name updated.' };
   }
 }

@@ -1,6 +1,6 @@
 export { AbstractCollectionTask } from './AbstractCollectionTask';
 export type { CollectionTaskEnv } from './AbstractCollectionTask';
-export { AbstractPruningTask, DEFAULT_PRUNE_BATCH_SIZE } from './AbstractPruningTask';
+export { AbstractPruningTask } from './AbstractPruningTask';
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
 export { BackgroundTaskRunPruningTask } from './BackgroundTaskRunPruningTask';
 export { CostDataCollectionTask } from './CostDataCollectionTask';

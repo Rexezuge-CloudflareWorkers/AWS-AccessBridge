@@ -1,18 +1,13 @@
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import { DynamoDbCollector } from './DynamoDbCollector';
-import { Ec2Collector } from './Ec2Collector';
-
-import {  createCollectorRegistry, resolveCollector } from './CollectorRegistry';
+import { createCollectorRegistry, resolveCollector } from './CollectorRegistry';
 import type { IAwsResourceCollector } from './IAwsResourceCollector';
-import { LambdaCollector } from './LambdaCollector';
-import { RdsCollector } from './RdsCollector';
-import { S3Collector } from './S3Collector';
 
 /**
  * Injectable registry seam (Otter `InjectableEmailProviderRegistry` precedent).
- * `CollectorRegistry` static API stays for backwards compatibility;
- * new code (and hermetic tests) use `InjectableCollectorRegistry.withDefaults()`
- * / `.withOverrides(...)` without mutating the global map.
+ *
+ * `ResourceInventoryCollectionTask` uses the static `CollectorRegistry`; the
+ * composition root binds an instance of this class under
+ * `Tokens.CollectorRegistry` so tests can substitute collectors without
+ * mutating the global map.
  */
 class InjectableCollectorRegistry {
   private readonly collectors: Map<string, IAwsResourceCollector>;
@@ -38,21 +33,7 @@ class InjectableCollectorRegistry {
   public getAll(): ReadonlyMap<string, IAwsResourceCollector> {
     return this.collectors;
   }
-
-  public resolve(resourceType: string): IAwsResourceCollector {
-    const collector = this.collectors.get(resourceType);
-    if (!collector) {
-      throw new BadRequestError(`Unsupported resource type: ${resourceType}`);
-    }
-    return collector;
-  }
 }
 
-function createDefaultCollectors(): IAwsResourceCollector[] {
-  return [new Ec2Collector(), new S3Collector(), new LambdaCollector(), new RdsCollector(), new DynamoDbCollector()];
-}
-
-export { InjectableCollectorRegistry, createDefaultCollectors,  };
-
-
-export {type CollectorMap, CollectorRegistry} from './CollectorRegistry';
+export { InjectableCollectorRegistry };
+export type { CollectorMap, CollectorRegistry } from './CollectorRegistry';

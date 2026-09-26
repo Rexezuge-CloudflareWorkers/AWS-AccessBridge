@@ -1,11 +1,10 @@
 import { AssumableRolesDAO, CostDataDAO, DataCollectionConfigDAO, SpendAlertDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { CostData, SpendAlert } from '@aws-access-bridge/shared/model';
 import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface CostServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type CostServiceEnv = ServiceEnv;
 
 interface AccountCostSummary {
   totalCost: number;
@@ -156,13 +155,5 @@ class CostService {
     const dao: DataCollectionConfigDAO = new DataCollectionConfigDAO(this.env.AccessBridgeDB);
     await dao.delete(principalArn, collectionType);
   }
-}
-
-class CostServiceFactory {
-  public static create(env: CostServiceEnv): CostService {
-    return new CostService(env);
-  }
-}
-
-export { CostService, CostServiceFactory };
+}export { CostService };
 export type { AccountCost, AccountCostSummary, CostServiceEnv, CostSummary, MonthlyTrend };

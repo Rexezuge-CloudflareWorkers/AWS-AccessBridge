@@ -1,6 +1,8 @@
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class TestCredentialChainRoute extends IAdminActivityAPIRoute<
   TestCredentialChainRequest,
@@ -168,7 +170,7 @@ class TestCredentialChainRoute extends IAdminActivityAPIRoute<
     env: TestCredentialChainEnv,
     _cxt: ActivityContext<TestCredentialChainEnv>,
   ): Promise<TestCredentialChainResponse> {
-    const { success, chain } = await CredentialServiceFactory.create(env).testChain(request.principalArn);
+    const { success, chain } = await getRequestScope(env).get(Tokens.CredentialService).testChain(request.principalArn);
     return { success, chain };
   }
 }

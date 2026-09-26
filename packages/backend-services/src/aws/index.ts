@@ -1,10 +1,11 @@
 export { ArnUtil } from './ArnUtil';
-export { AssumeRoleService, AssumeRoleServiceFactory } from './assume-role';
+export { AssumeRoleService } from './assume-role';
+
 export type { AssumeRoleServiceEnv } from './assume-role';
 export { BaseUrlUtil } from './BaseUrlUtil';
 export { CostExplorerService } from './ce';
 export type { CostExplorerResult } from './ce';
-export { BaseAwsCollector, CollectorRegistry, InjectableCollectorRegistry, createCollectorRegistry, createDefaultCollectors, resolveCollector } from './collectors';
+export { BaseAwsCollector, CollectorRegistry, InjectableCollectorRegistry, createCollectorRegistry, resolveCollector } from './collectors';
 export type { CollectorMap, IAwsResourceCollector, ResourceDiscoveryItem } from './collectors';
 export { DynamoDbCollector } from './collectors';
 export { Ec2Collector } from './collectors';

@@ -5,5 +5,6 @@ export { AuditLogObserver } from './AuditObserver';
 export type { IAuditObserver } from './AuditObserver';
 export { AuditObserverRegistry } from './AuditObserverRegistry';
 export { AuditPayloadBuilder } from './AuditPayloadBuilder';
-export { AuditService, AuditServiceFactory } from './AuditService';
+export { AuditService } from './AuditService';
+
 export type { AuditServiceEnv } from './AuditService';

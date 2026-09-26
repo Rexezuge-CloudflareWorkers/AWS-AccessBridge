@@ -1,6 +1,8 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class DeleteTeamRoute extends IAdminActivityAPIRoute<DeleteTeamRequest, DeleteTeamResponse, IAdminEnv> {
   schema = {
@@ -136,7 +138,7 @@ class DeleteTeamRoute extends IAdminActivityAPIRoute<DeleteTeamRequest, DeleteTe
   };
 
   protected async handleAdminRequest(request: DeleteTeamRequest, env: IAdminEnv): Promise<DeleteTeamResponse> {
-    await TeamServiceFactory.create(env).deleteTeam(request.teamId);
+    await getRequestScope(env).get(Tokens.TeamService).deleteTeam(request.teamId);
     return { success: true, message: 'Team deleted.' };
   }
 }

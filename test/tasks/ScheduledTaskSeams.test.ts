@@ -3,13 +3,14 @@ import { IScheduledTask } from '@aws-access-bridge/background/scheduled/ISchedul
 import { AbstractCollectionTask } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO');
-vi.mock('@aws-access-bridge/backend-services/credential', () => ({
-  CredentialServiceFactory: { create: vi.fn() },
+vi.mock('@aws-access-bridge/backend-services/composition', () => ({
+  getRequestScope: vi.fn(),
+  Tokens: { CredentialService: Symbol('CredentialService') },
 }));
 
 class StubTask extends IScheduledTask<{ AccessBridgeDB: D1Database }> {
@@ -95,8 +96,10 @@ describe('AbstractCollectionTask template', () => {
       'arn:aws:iam::123456789012:role/Dev',
       'arn:aws:iam::123456789012:role/Ops',
     ]);
-    vi.mocked(CredentialServiceFactory.create).mockReturnValue({
-      resolveLeafCredentials: vi.fn().mockResolvedValue({ credentials: { accessKeyId: 'A' } as AccessKeys }),
+    vi.mocked(getRequestScope).mockReturnValue({
+      get: vi.fn().mockReturnValue({
+        resolveLeafCredentials: vi.fn().mockResolvedValue({ credentials: { accessKeyId: 'A' } as AccessKeys }),
+      }),
     } as never);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-3');
@@ -112,6 +115,6 @@ describe('AbstractCollectionTask template', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-4');
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
     await new StubCollectionTask().handle(event(), { AccessBridgeDB: {} } as unknown as Env, {} as ExecutionContext);
-    expect(CredentialServiceFactory.create).not.toHaveBeenCalled();
+    expect(getRequestScope).not.toHaveBeenCalled();
   });
 });

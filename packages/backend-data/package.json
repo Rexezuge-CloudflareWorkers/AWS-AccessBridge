@@ -11,7 +11,9 @@
     "./crypto": "./src/crypto/index.ts",
     "./crypto/*": "./src/crypto/*.ts",
     "./dao": "./src/dao/index.ts",
-    "./dao/*": "./src/dao/*.ts"
+    "./dao/*": "./src/dao/*.ts",
+    "./utils": "./src/utils/index.ts",
+    "./utils/*": "./src/utils/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

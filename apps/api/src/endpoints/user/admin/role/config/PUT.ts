@@ -1,6 +1,8 @@
-import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, SetRoleConfigResponse, SetRoleConfigEnv> {
   schema = {
@@ -258,7 +260,7 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
     env: SetRoleConfigEnv,
     _cxt: ActivityContext<SetRoleConfigEnv>,
   ): Promise<SetRoleConfigResponse> {
-    await AccountServiceFactory.create(env).setRoleConfig(
+    await getRequestScope(env).get(Tokens.AccountService).setRoleConfig(
       request.awsAccountId,
       request.roleName,
       request.destinationPath,

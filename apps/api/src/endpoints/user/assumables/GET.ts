@@ -1,7 +1,9 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
 import type { AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListAssumablesResponse, ListAssumablesEnv> {
   schema = {
@@ -218,7 +220,7 @@ class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListA
     const offsetParam: string | null = url.searchParams.get('offset');
     const limit: number = limitParam ? Math.max(1, Math.min(200, Math.trunc(Number(limitParam)))) : 50;
     const offset: number = offsetParam ? Math.max(0, Math.trunc(Number(offsetParam))) : 0;
-    return UserServiceFactory.create(env).listAssumables(userEmail, { showHidden, limit, offset });
+    return getRequestScope(env).get(Tokens.UserService).listAssumables(userEmail, { showHidden, limit, offset });
   }
 }
 

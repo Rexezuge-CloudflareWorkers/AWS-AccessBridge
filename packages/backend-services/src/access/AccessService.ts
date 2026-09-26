@@ -1,12 +1,11 @@
 import { AssumableRolesDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
 const AWS_ACCOUNT_ID_PATTERN = /^\d{12}$/;
 
-interface AccessServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type AccessServiceEnv = ServiceEnv;
 
 class AccessService {
   constructor(private readonly env: AccessServiceEnv) {}
@@ -37,13 +36,5 @@ class AccessService {
     // up in admin listings until orphan cleanup runs.
     await assumableRolesDAO.revokeUserAccessToRole(userEmail, awsAccountId, roleName);
   }
-}
-
-class AccessServiceFactory {
-  public static create(env: AccessServiceEnv): AccessService {
-    return new AccessService(env);
-  }
-}
-
-export { AccessService, AccessServiceFactory, AWS_ACCOUNT_ID_PATTERN };
+}export { AccessService, AWS_ACCOUNT_ID_PATTERN };
 export type { AccessServiceEnv };

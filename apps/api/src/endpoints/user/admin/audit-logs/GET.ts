@@ -1,8 +1,10 @@
-import { AuditServiceFactory } from '@aws-access-bridge/backend-services/audit';
+
 import type { AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { AuditLog } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, ListAuditLogsResponse, ListAuditLogsEnv> {
   schema = {
@@ -197,7 +199,7 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
     const limit: number = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50'), 1), 200);
     const offset: number = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
 
-    const auditService = AuditServiceFactory.create(env);
+    const auditService = getRequestScope(env).get(Tokens.AuditService);
     const { logs, total } = await auditService.queryLogs(filters, limit, offset);
     return { logs, total };
   }

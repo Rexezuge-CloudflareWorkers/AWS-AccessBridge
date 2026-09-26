@@ -1,15 +1,12 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface TokenServiceEnv {
-  AccessBridgeDB: D1Queryable;
-  MAX_TOKENS_PER_USER?: string;
-  MAX_TOKEN_EXPIRY_DAYS?: string;
-}
+type TokenServiceEnv = ServiceEnv;
 
 interface CreatedToken {
   tokenId: string;
@@ -61,13 +58,5 @@ class TokenService {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
     await dao.delete(tokenId, userEmail);
   }
-}
-
-class TokenServiceFactory {
-  public static create(env: TokenServiceEnv): TokenService {
-    return new TokenService(env);
-  }
-}
-
-export { TokenService, TokenServiceFactory };
+}export { TokenService };
 export type { CreatedToken, TokenServiceEnv };

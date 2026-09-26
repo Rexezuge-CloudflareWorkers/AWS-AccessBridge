@@ -1,2 +1,3 @@
-export { MaintenanceService, MaintenanceServiceFactory } from './MaintenanceService';
+export { MaintenanceService } from './MaintenanceService';
+
 export type { MaintenanceServiceEnv, OrphanCleanupCounts, OrphanCleanupResult } from './MaintenanceService';

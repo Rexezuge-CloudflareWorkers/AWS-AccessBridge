@@ -1,7 +1,9 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensResponse, ListTokensEnv> {
   schema = {
@@ -113,7 +115,7 @@ class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensRes
     cxt: ActivityContext<ListTokensEnv>,
   ): Promise<ListTokensResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const tokens: UserAccessTokenMetadata[] = await TokenServiceFactory.create(env).listTokens(userEmail);
+    const tokens: UserAccessTokenMetadata[] = await getRequestScope(env).get(Tokens.TokenService).listTokens(userEmail);
     return { tokens };
   }
 }

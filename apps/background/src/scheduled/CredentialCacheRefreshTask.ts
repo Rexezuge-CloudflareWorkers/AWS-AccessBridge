@@ -1,7 +1,8 @@
 import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+import { getRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
+import type { CredentialService } from '@aws-access-bridge/backend-services/credential';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
@@ -22,7 +23,7 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
     const refreshBatchSize: number = ConfigurationManager.credential.getRefreshBatchSize(env);
     const cutoffTime: number = TimestampUtil.subtractMinutes(TimestampUtil.getCurrentUnixTimestampInSeconds(), refreshIntervalMinutes);
     const credentialCacheConfigDAO: CredentialCacheConfigDAO = new CredentialCacheConfigDAO(env.AccessBridgeDB);
-    const credentialService = CredentialServiceFactory.create(env);
+    const credentialService = getRequestScope(env).get(Tokens.CredentialService);
     const credentialsCacheDAO = await credentialService.createCacheDAO();
     const sts = new StsService();
     const principalArns: string[] = await credentialCacheConfigDAO.getPrincipalArnsNeedingUpdate(refreshBatchSize, cutoffTime);
@@ -49,7 +50,7 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
 
   private async refreshPrincipal(
     principalArn: string,
-    credentialService: ReturnType<typeof CredentialServiceFactory.create>,
+    credentialService: CredentialService,
     sts: StsService,
     credentialsCacheDAO: { storeCachedCredential(credential: CredentialCache): Promise<void> },
     credentialCacheConfigDAO: CredentialCacheConfigDAO,

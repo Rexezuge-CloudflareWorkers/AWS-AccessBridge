@@ -1,3 +1,5 @@
+import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import type { AuditEvent } from './AuditEventBuilder';
 import type { IAuditObserver } from './AuditObserver';
 import { AuditLogObserver } from './AuditObserver';
 
@@ -14,8 +16,8 @@ class AuditObserverRegistry {
     this.observers = [...observers];
   }
 
-  public static withDefaults(database: { execute(...args: never[]): unknown }): AuditObserverRegistry {
-    return new AuditObserverRegistry([new AuditLogObserver(database as never)]);
+  public static withDefaults(database: D1Queryable): AuditObserverRegistry {
+    return new AuditObserverRegistry([new AuditLogObserver(database)]);
   }
 
   public static withObservers(observers: IAuditObserver[]): AuditObserverRegistry {
@@ -26,7 +28,7 @@ class AuditObserverRegistry {
     return this.observers;
   }
 
-  public async notifyAll(event: Parameters<IAuditObserver['notify']>[0]): Promise<PromiseSettledResult<void>[]> {
+  public async notifyAll(event: AuditEvent): Promise<PromiseSettledResult<void>[]> {
     return Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
   }
 }

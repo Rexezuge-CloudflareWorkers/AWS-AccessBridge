@@ -1,6 +1,8 @@
-import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
   RemoveAccountNicknameRequest,
@@ -160,7 +162,7 @@ class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
     env: RemoveAccountNicknameEnv,
     _cxt: ActivityContext<RemoveAccountNicknameEnv>,
   ): Promise<RemoveAccountNicknameResponse> {
-    const { accountId } = await AccountServiceFactory.create(env).removeNickname(request.awsAccountId);
+    const { accountId } = await getRequestScope(env).get(Tokens.AccountService).removeNickname(request.awsAccountId);
 
     return {
       success: true,

@@ -1,2 +1,3 @@
-export { CostService, CostServiceFactory } from './CostService';
+export { CostService } from './CostService';
+
 export type { AccountCost, AccountCostSummary, CostServiceEnv, CostSummary, MonthlyTrend } from './CostService';

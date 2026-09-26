@@ -1,6 +1,8 @@
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class StoreCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   StoreCredentialRelationshipRequest,
@@ -209,7 +211,7 @@ class StoreCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: StoreCredentialRelationshipEnv,
     _cxt: ActivityContext<StoreCredentialRelationshipEnv>,
   ): Promise<StoreCredentialRelationshipResponse> {
-    await CredentialServiceFactory.create(env).storeCredentialRelationship(request.principalArn, request.assumedBy);
+    await getRequestScope(env).get(Tokens.CredentialService).storeCredentialRelationship(request.principalArn, request.assumedBy);
 
     return {
       success: true,
