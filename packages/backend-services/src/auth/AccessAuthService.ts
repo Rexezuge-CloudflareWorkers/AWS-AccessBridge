@@ -2,13 +2,9 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface AccessAuthEnv {
-  TEAM_DOMAIN?: string;
-  POLICY_AUD?: string;
-  DEV_AUTH_EMAIL?: string;
-  DEMO_MODE?: string;
-}
+type AccessAuthEnv = ServiceEnv;
 
 // Minimal structural view of the Workers runtime ExecutionContext when
 // Worker-level Cloudflare Access is enabled. The platform attaches
@@ -83,13 +79,5 @@ class AccessAuthService {
       throw new UnauthorizedError(`JWT verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
-}
-
-class AccessAuthServiceFactory {
-  public static create(env: AccessAuthEnv): AccessAuthService {
-    return new AccessAuthService(env);
-  }
-}
-
-export { AccessAuthService, AccessAuthServiceFactory };
+}export { AccessAuthService };
 export type { AccessAuthEnv, AccessIdentityContext };

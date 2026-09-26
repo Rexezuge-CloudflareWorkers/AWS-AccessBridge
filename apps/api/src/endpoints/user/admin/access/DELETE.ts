@@ -1,6 +1,8 @@
-import { AccessServiceFactory } from '@aws-access-bridge/backend-services/access';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class RevokeAccessRoute extends IAdminActivityAPIRoute<RevokeAccessRequest, RevokeAccessResponse, RevokeAccessEnv> {
   schema = {
@@ -233,7 +235,7 @@ class RevokeAccessRoute extends IAdminActivityAPIRoute<RevokeAccessRequest, Revo
     cxt: ActivityContext<RevokeAccessEnv>,
   ): Promise<RevokeAccessResponse> {
     const userEmail: string = request.userEmail || this.getAuthenticatedUserEmailAddress(cxt);
-    await AccessServiceFactory.create(env).revokeAccess(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(env).get(Tokens.AccessService).revokeAccess(userEmail, request.awsAccountId, request.roleName);
     return {
       success: true,
       message: 'Access revoked successfully',

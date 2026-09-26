@@ -1,8 +1,10 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { TeamMember } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListTeamMembersRoute extends IAdminActivityAPIRoute<IRequest, ListTeamMembersResponse, IAdminEnv> {
   schema = {
@@ -155,7 +157,7 @@ class ListTeamMembersRoute extends IAdminActivityAPIRoute<IRequest, ListTeamMemb
   ): Promise<ListTeamMembersResponse> {
     const teamId: string | null = new URL(cxt.req.url).searchParams.get('teamId');
     if (!teamId) throw new BadRequestError('Missing required parameter: teamId.');
-    const members: TeamMember[] = await TeamServiceFactory.create(env).listMembers(teamId);
+    const members: TeamMember[] = await getRequestScope(env).get(Tokens.TeamService).listMembers(teamId);
     return { members };
   }
 }

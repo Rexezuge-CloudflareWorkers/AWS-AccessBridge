@@ -1,6 +1,8 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCurrentUserResponse, GetCurrentUserEnv> {
   schema = {
@@ -129,7 +131,7 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
   ): Promise<GetCurrentUserResponse> {
     const demoMode: boolean = this.isDemoMode(cxt);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const currentUser = await UserServiceFactory.create(env).getCurrentUser(userEmail);
+    const currentUser = await getRequestScope(env).get(Tokens.UserService).getCurrentUser(userEmail);
 
     return {
       email: currentUser.email,

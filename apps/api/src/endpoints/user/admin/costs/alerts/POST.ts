@@ -1,7 +1,9 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { SpendAlert } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertRequest, CreateSpendAlertResponse, IAdminEnv> {
   schema = {
@@ -179,7 +181,7 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateSpendAlertResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const alert = await CostServiceFactory.create(env).createAlert(
+    const alert = await getRequestScope(env).get(Tokens.CostService).createAlert(
       request.awsAccountId,
       request.thresholdAmount,
       request.periodType || 'monthly',

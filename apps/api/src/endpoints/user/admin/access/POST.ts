@@ -1,6 +1,8 @@
-import { AccessServiceFactory } from '@aws-access-bridge/backend-services/access';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GrantAccessRoute extends IAdminActivityAPIRoute<GrantAccessRequest, GrantAccessResponse, GrantAccessEnv> {
   schema = {
@@ -224,7 +226,7 @@ class GrantAccessRoute extends IAdminActivityAPIRoute<GrantAccessRequest, GrantA
     cxt: ActivityContext<GrantAccessEnv>,
   ): Promise<GrantAccessResponse> {
     const userEmail: string = request.userEmail || this.getAuthenticatedUserEmailAddress(cxt);
-    await AccessServiceFactory.create(env).grantAccess(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(env).get(Tokens.AccessService).grantAccess(userEmail, request.awsAccountId, request.roleName);
     return {
       success: true,
       message: 'Access granted successfully',

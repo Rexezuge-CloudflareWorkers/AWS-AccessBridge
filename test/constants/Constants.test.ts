@@ -15,15 +15,15 @@ import {
   HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
   HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
   HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
-} from '@aws-access-bridge/backend-errors/constants';
+} from '@aws-access-bridge/shared/constants';
 import {
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT,
-  CREDENTIAL_EXPIRY_BUFFER_MINUTES,
-  NUMBER_OF_CREDENTIALS_TO_REFRESH,
-  CREDENTIAL_REFRESH_INTERVAL_MINUTES,
-  INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
+  DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES,
+  DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH,
+  DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
+  DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
 } from '@aws-access-bridge/backend-runtime/config';
 import {
   INTERNAL_HEADER_PREFIX,
@@ -55,21 +55,25 @@ describe('Constants', () => {
     });
   });
 
-  describe('Configurations', () => {
+  describe('credential and internal-request defaults', () => {
+    // These are string defaults because that is the form the Workers runtime
+    // hands back for a text binding; `ConfigurationManager` parses them.
+    // Previously a parallel set of numeric twins existed here that nothing in
+    // production read.
     it('has credential expiry buffer of 5 minutes', () => {
-      expect(CREDENTIAL_EXPIRY_BUFFER_MINUTES).toBe(5);
+      expect(DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES).toBe('5');
     });
 
     it('has 10 credentials to refresh per batch', () => {
-      expect(NUMBER_OF_CREDENTIALS_TO_REFRESH).toBe(10);
+      expect(DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH).toBe('10');
     });
 
     it('has 45 minute refresh interval', () => {
-      expect(CREDENTIAL_REFRESH_INTERVAL_MINUTES).toBe(45);
+      expect(DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES).toBe('45');
     });
 
     it('has 1 second internal request time window', () => {
-      expect(INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS).toBe(1000);
+      expect(DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS).toBe('1000');
     });
   });
 

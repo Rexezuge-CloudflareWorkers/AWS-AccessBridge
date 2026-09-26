@@ -1,6 +1,8 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleResponse, UnhideRoleEnv> {
   schema = {
@@ -167,7 +169,7 @@ class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleRes
     cxt: ActivityContext<UnhideRoleEnv>,
   ): Promise<UnhideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await UserServiceFactory.create(env).unhideRole(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(env).get(Tokens.UserService).unhideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

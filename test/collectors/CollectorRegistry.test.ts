@@ -32,7 +32,7 @@ describe('InjectableCollectorRegistry', () => {
   it('withDefaults mirrors the static registry', () => {
     const registry = InjectableCollectorRegistry.withDefaults();
     expect([...registry.getAll().keys()].sort()).toEqual(['dynamodb', 'ec2', 'lambda', 'rds', 's3']);
-    expect(registry.resolve('s3').resourceType).toBe('s3');
+    expect(registry.get('s3').resourceType).toBe('s3');
   });
 
   it('withOverrides isolates hermetic tests', () => {
@@ -40,6 +40,6 @@ describe('InjectableCollectorRegistry', () => {
     const registry = InjectableCollectorRegistry.withOverrides({ lambda: stub });
     expect(registry.get('lambda')).toBe(stub);
     expect(InjectableCollectorRegistry.withDefaults().get('lambda')).not.toBe(stub);
-    expect(() => registry.resolve('nope')).toThrow(BadRequestError);
+    expect(() => registry.get('nope')).toThrow(BadRequestError);
   });
 });

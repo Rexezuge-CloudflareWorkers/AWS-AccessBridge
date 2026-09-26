@@ -1,6 +1,8 @@
-import { ResourceServiceFactory } from '@aws-access-bridge/backend-services/resource';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryRequest, GetResourceSummaryResponse, IEnv> {
   schema = {
@@ -100,7 +102,7 @@ class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryReques
     cxt: ActivityContext<IEnv>,
   ): Promise<GetResourceSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return ResourceServiceFactory.create(env).getSummary(userEmail);
+    return getRequestScope(env).get(Tokens.ResourceService).getSummary(userEmail);
   }
 }
 

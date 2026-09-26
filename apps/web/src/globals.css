@@ -5,8 +5,6 @@
   --animate-fade-in-up: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-backdrop-in: backdrop-in 0.2s ease-out both;
   --animate-slide-down: slide-down 0.2s ease-out both;
-  --color-gray-750: #2a3040;
-  --color-gray-850: #171d2b;
 }
 
 @keyframes fade-in {

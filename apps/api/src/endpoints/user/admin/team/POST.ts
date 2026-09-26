@@ -1,7 +1,9 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTeamResponse, IAdminEnv> {
   schema = {
@@ -157,7 +159,7 @@ class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTe
     env: IAdminEnv,
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateTeamResponse> {
-    const team = await TeamServiceFactory.create(env).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
+    const team = await getRequestScope(env).get(Tokens.TeamService).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
     return { success: true, team };
   }
 }

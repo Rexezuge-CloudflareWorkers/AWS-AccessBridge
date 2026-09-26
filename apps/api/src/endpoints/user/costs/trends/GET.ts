@@ -1,6 +1,8 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCostTrendsResponse, GetCostTrendsEnv> {
   schema = {
@@ -111,7 +113,7 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
     const months: number = Math.min(parseInt(url.searchParams.get('months') || '6'), 12);
-    return CostServiceFactory.create(env).getTrends(userEmail, months);
+    return getRequestScope(env).get(Tokens.CostService).getTrends(userEmail, months);
   }
 }
 

@@ -1,6 +1,8 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertRequest, DeleteSpendAlertResponse, IAdminEnv> {
   schema = {
@@ -135,7 +137,7 @@ class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertReque
   };
 
   protected async handleAdminRequest(request: DeleteSpendAlertRequest, env: IAdminEnv): Promise<DeleteSpendAlertResponse> {
-    await CostServiceFactory.create(env).deleteAlert(request.alertId);
+    await getRequestScope(env).get(Tokens.CostService).deleteAlert(request.alertId);
     return { success: true, message: 'Alert deleted.' };
   }
 }

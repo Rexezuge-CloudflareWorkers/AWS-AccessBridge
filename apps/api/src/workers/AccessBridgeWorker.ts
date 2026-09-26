@@ -57,8 +57,10 @@ import { SPA_HTML } from '@/generated/spa-shell';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 import { isDemoModeEnv } from '@/endpoints/route-helpers';
-import { AccessAuthServiceFactory } from '@aws-access-bridge/backend-services/auth';
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
+
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -239,13 +241,13 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     }
     let userEmail: string;
     try {
-      userEmail = await AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(request, {});
+      userEmail = await getRequestScope(env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(request, {});
     } catch (error: unknown) {
       console.warn('Rejected /__scheduled trigger: authentication failed:', error instanceof Error ? error.message : error);
       return denied;
     }
     try {
-      if (!(await UserServiceFactory.create(env).isSuperAdmin(userEmail))) {
+      if (!(await getRequestScope(env).get(Tokens.UserService).isSuperAdmin(userEmail))) {
         console.warn(`Rejected /__scheduled trigger: ${userEmail} is not a super admin.`);
         return denied;
       }

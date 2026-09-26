@@ -1,13 +1,12 @@
 import { TeamAccountsDAO, TeamMembersDAO, TeamsDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { Team, TeamMember } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
 const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
 
-interface TeamServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type TeamServiceEnv = ServiceEnv;
 
 class TeamService {
   constructor(private readonly env: TeamServiceEnv) {}
@@ -67,13 +66,5 @@ class TeamService {
     if (!teamId) throw new BadRequestError('Missing required parameter: teamId.');
     return new TeamAccountsDAO(this.env.AccessBridgeDB).getAccountsByTeam(teamId);
   }
-}
-
-class TeamServiceFactory {
-  public static create(env: TeamServiceEnv): TeamService {
-    return new TeamService(env);
-  }
-}
-
-export { DEFAULT_TEAM_ID, TeamService, TeamServiceFactory };
+}export { DEFAULT_TEAM_ID, TeamService };
 export type { TeamServiceEnv };

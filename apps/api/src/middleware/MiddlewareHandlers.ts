@@ -8,10 +8,12 @@ import {
 import { Context, Next } from 'hono';
 import { HMACHandler } from './HMACHandler';
 import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
-import { AccessAuthServiceFactory, TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+
 import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
-import { AuditServiceFactory } from '@aws-access-bridge/backend-services/audit';
+
 import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 type AuthenticatedEnv = Env & {
@@ -40,7 +42,7 @@ async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   // Forward the Workers ExecutionContext so AccessAuthService can read the
   // platform-verified identity (`ctx.access`) when POLICY_AUD/TEAM_DOMAIN
   // are unset (Worker-level Access, same-account deploys).
-  return AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
+  return getRequestScope(env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
 }
 
 function isInternalRequest(c: RequestContext): boolean {
@@ -63,7 +65,7 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
   const authHeader: string | undefined = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token: string = authHeader.slice(7);
-    return TokenServiceFactory.create(env).authenticateWithPAT(token);
+    return getRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(token);
   }
   throw new UnauthorizedError('No personal access token provided in request headers.');
 }
@@ -80,7 +82,7 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
   } finally {
     try {
       const userEmail: string = c.get('AuthenticatedUserEmailAddress') || 'unknown';
-      const auditService = AuditServiceFactory.create({ AccessBridgeDB: c.env.AccessBridgeDB });
+      const auditService = getRequestScope({ AccessBridgeDB: c.env.AccessBridgeDB }).get(Tokens.AuditService);
       const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env);
       // `waitUntil` returns void, so the promise it is handed is detached: a
       // rejection here would escape as an unhandled rejection in the runtime

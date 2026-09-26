@@ -1,2 +1,3 @@
-export { DEFAULT_TEAM_ID, TeamService, TeamServiceFactory } from './TeamService';
+export { DEFAULT_TEAM_ID, TeamService } from './TeamService';
+
 export type { TeamServiceEnv } from './TeamService';

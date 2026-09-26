@@ -4,7 +4,6 @@ export const theme = {
   cardBg: '#1e2433',
   inputBg: '#252d3d',
   border: '#374151',
-  focusBorder: '#3b82f6',
   blue: '#2563eb',
   blueHover: '#1d4ed8',
   green: '#16a34a',

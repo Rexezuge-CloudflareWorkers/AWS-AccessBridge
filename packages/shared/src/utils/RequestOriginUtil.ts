@@ -1,12 +1,4 @@
-import {
-  CF_CONNECTING_IP_HEADER,
-  CF_RAY_HEADER,
-  API_WORKER_BASE_HOSTNAME,
-  FORWARDED_FOR_HEADER,
-  FORWARDED_HOST_HEADER,
-  FORWARDED_PROTO_HEADER,
-  FORWARDED_URI_HEADER,
-} from '../constants';
+import { CF_CONNECTING_IP_HEADER, CF_RAY_HEADER, API_WORKER_BASE_HOSTNAME, FORWARDED_FOR_HEADER, FORWARDED_HOST_HEADER, FORWARDED_PROTO_HEADER } from '../constants';
 
 class RequestOriginUtil {
   public static isPagesProxyRequest(request: Request, _env?: unknown): boolean {
@@ -61,10 +53,6 @@ class RequestOriginUtil {
     }
 
     return request.headers.get(CF_CONNECTING_IP_HEADER) || undefined;
-  }
-
-  public static getForwardedUri(request: Request, env?: unknown): string | undefined {
-    return this.isPagesProxyRequest(request, env) ? request.headers.get(FORWARDED_URI_HEADER) || undefined : undefined;
   }
 }
 

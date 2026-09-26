@@ -1,6 +1,8 @@
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
   ValidateCredentialsRequest,
@@ -168,7 +170,7 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
     _env: ValidateCredentialsEnv,
     _cxt: ActivityContext<ValidateCredentialsEnv>,
   ): Promise<ValidateCredentialsResponse> {
-    const identity = await CredentialServiceFactory.create(_env).validateCredentials(
+    const identity = await getRequestScope(_env).get(Tokens.CredentialService).validateCredentials(
       request.accessKeyId,
       request.secretAccessKey,
       request.sessionToken,

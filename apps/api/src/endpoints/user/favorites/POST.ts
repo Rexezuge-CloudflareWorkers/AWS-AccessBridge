@@ -1,6 +1,8 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, FavoriteAccountResponse, FavoriteAccountEnv> {
   schema = {
@@ -50,7 +52,7 @@ class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, Fav
     cxt: ActivityContext<FavoriteAccountEnv>,
   ): Promise<FavoriteAccountResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await UserServiceFactory.create(env).favoriteAccount(userEmail, request.awsAccountId);
+    await getRequestScope(env).get(Tokens.UserService).favoriteAccount(userEmail, request.awsAccountId);
     return { success: true };
   }
 }

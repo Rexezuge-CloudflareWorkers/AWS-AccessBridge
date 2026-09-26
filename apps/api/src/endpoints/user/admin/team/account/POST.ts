@@ -1,6 +1,8 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, AddTeamAccountResponse, IAdminEnv> {
   schema = {
@@ -142,7 +144,7 @@ class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, 
   };
 
   protected async handleAdminRequest(request: AddTeamAccountRequest, env: IAdminEnv): Promise<AddTeamAccountResponse> {
-    await TeamServiceFactory.create(env).addAccount(request.teamId, request.awsAccountId);
+    await getRequestScope(env).get(Tokens.TeamService).addAccount(request.teamId, request.awsAccountId);
     return { success: true, message: 'Account added to team.' };
   }
 }

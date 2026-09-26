@@ -7,4 +7,4 @@ export { RdsCollector } from './RdsCollector';
 export { S3Collector } from './S3Collector';
 export { CollectorRegistry, createCollectorRegistry, resolveCollector } from './CollectorRegistry';
 export type { CollectorMap } from './CollectorRegistry';
-export { InjectableCollectorRegistry, createDefaultCollectors } from './InjectableCollectorRegistry';
+export { InjectableCollectorRegistry } from './InjectableCollectorRegistry';

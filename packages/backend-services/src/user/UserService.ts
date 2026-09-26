@@ -1,11 +1,10 @@
 import { AssumableRolesDAO, AwsAccountsDAO, UserFavoriteAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
 import { LocaleUtil } from '@aws-access-bridge/shared/utils';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface UserServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type UserServiceEnv = ServiceEnv;
 
 interface CurrentUser {
   email: string;
@@ -88,13 +87,5 @@ class UserService {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     return assumableRolesDAO.searchAccountsByQuery(userEmail, query.trim(), showHidden);
   }
-}
-
-class UserServiceFactory {
-  public static create(env: UserServiceEnv): UserService {
-    return new UserService(env);
-  }
-}
-
-export { UserService, UserServiceFactory };
+}export { UserService };
 export type { AssumableListOptions, CurrentUser, UserServiceEnv };

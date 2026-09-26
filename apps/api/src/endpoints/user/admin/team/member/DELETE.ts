@@ -1,6 +1,8 @@
-import { TeamServiceFactory } from '@aws-access-bridge/backend-services/team';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class RemoveTeamMemberRoute extends IAdminActivityAPIRoute<RemoveTeamMemberRequest, RemoveTeamMemberResponse, IAdminEnv> {
   schema = {
@@ -142,7 +144,7 @@ class RemoveTeamMemberRoute extends IAdminActivityAPIRoute<RemoveTeamMemberReque
   };
 
   protected async handleAdminRequest(request: RemoveTeamMemberRequest, env: IAdminEnv): Promise<RemoveTeamMemberResponse> {
-    await TeamServiceFactory.create(env).removeMember(request.teamId, request.userEmail);
+    await getRequestScope(env).get(Tokens.TeamService).removeMember(request.teamId, request.userEmail);
     return { success: true, message: 'Member removed.' };
   }
 }

@@ -10,10 +10,9 @@ import {
 } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface MaintenanceServiceEnv {
-  AccessBridgeDB: D1Queryable;
-}
+type MaintenanceServiceEnv = ServiceEnv;
 
 interface OrphanCleanupCounts {
   dataCollectionConfig: number;
@@ -63,13 +62,5 @@ class MaintenanceService {
     const dao: BackgroundTaskRunDAO = new BackgroundTaskRunDAO(this.env.AccessBridgeDB);
     return dao.listRuns({ taskType: options.taskType, status: options.status, limit: options.limit });
   }
-}
-
-class MaintenanceServiceFactory {
-  public static create(env: MaintenanceServiceEnv): MaintenanceService {
-    return new MaintenanceService(env);
-  }
-}
-
-export { MaintenanceService, MaintenanceServiceFactory };
+}export { MaintenanceService };
 export type { MaintenanceServiceEnv, OrphanCleanupCounts, OrphanCleanupResult };

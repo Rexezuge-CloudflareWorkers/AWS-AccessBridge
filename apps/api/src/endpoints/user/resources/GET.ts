@@ -1,7 +1,9 @@
-import { ResourceServiceFactory } from '@aws-access-bridge/backend-services/resource';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListResourcesResponse, IEnv> {
   schema = {
@@ -149,7 +151,7 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
 
-    return ResourceServiceFactory.create(env).searchResources(userEmail, {
+    return getRequestScope(env).get(Tokens.ResourceService).searchResources(userEmail, {
       search: url.searchParams.get('search') || undefined,
       type: url.searchParams.get('type') || undefined,
       limit: parseInt(url.searchParams.get('limit') || '50'),

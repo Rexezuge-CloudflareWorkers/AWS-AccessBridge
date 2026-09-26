@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { createRequestScope, getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
+import { InternalServerError } from '@aws-access-bridge/backend-errors';
 
 function scopeEnv() {
   return {
@@ -45,5 +46,30 @@ describe('createRequestScope', () => {
     await key();
     expect(get).toHaveBeenCalledTimes(1);
     expect(scope.get(Tokens.CollectorRegistry).getAll().size).toBe(5);
+  });
+
+  it('fails loudly when the encryption key binding is missing', async () => {
+    const scope = createRequestScope({ AccessBridgeDB: {} } as never);
+    await expect(scope.get(Tokens.MasterKey)()).rejects.toThrow(InternalServerError);
+  });
+
+  it('fails loudly when the credential cache KV binding is missing', () => {
+    // AssumeRoleService needs AccessBridgeKV; narrowing it silently to undefined
+    // would fail much later inside STS assume-role with a confusing error.
+    const scope = createRequestScope({ AccessBridgeDB: {} } as never);
+    expect(() => scope.get(Tokens.AssumeRoleService)).toThrow(InternalServerError);
+  });
+});
+
+describe('getRequestScope', () => {
+  it('returns the same scope for the same env, so a request shares services', () => {
+    const env = scopeEnv();
+    const first = getRequestScope(env);
+    expect(getRequestScope(env)).toBe(first);
+    expect(first.get(Tokens.TeamService)).toBe(first.get(Tokens.TeamService));
+  });
+
+  it('does not share services across different env objects', () => {
+    expect(getRequestScope(scopeEnv())).not.toBe(getRequestScope(scopeEnv()));
   });
 });

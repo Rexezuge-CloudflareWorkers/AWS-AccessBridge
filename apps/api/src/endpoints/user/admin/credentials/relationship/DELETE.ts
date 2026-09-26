@@ -1,6 +1,8 @@
-import { CredentialServiceFactory } from '@aws-access-bridge/backend-services/credential';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   RemoveCredentialRelationshipRequest,
@@ -192,7 +194,7 @@ class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: RemoveCredentialRelationshipEnv,
     _cxt: ActivityContext<RemoveCredentialRelationshipEnv>,
   ): Promise<RemoveCredentialRelationshipResponse> {
-    await CredentialServiceFactory.create(env).removeCredential(request.principalArn);
+    await getRequestScope(env).get(Tokens.CredentialService).removeCredential(request.principalArn);
 
     return {
       success: true,

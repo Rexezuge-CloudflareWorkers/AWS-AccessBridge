@@ -1,16 +1,13 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService, type CallerIdentity } from '../aws/sts';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
 const PRINCIPAL_ARN_PATTERN = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
 
-interface CredentialStoreServiceEnv {
-  AccessBridgeDB: D1Queryable;
-  AES_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
-}
+type CredentialStoreServiceEnv = ServiceEnv;
 
 /**
  * Store/relationship CRUD + STS validation slice of the previous

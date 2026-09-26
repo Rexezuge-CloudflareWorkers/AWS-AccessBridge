@@ -1,6 +1,8 @@
-import { AccountServiceFactory } from '@aws-access-bridge/backend-services/account';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class SetAccountNicknameRoute extends IAdminActivityAPIRoute<SetAccountNicknameRequest, SetAccountNicknameResponse, SetAccountNicknameEnv> {
   schema = {
@@ -176,7 +178,7 @@ class SetAccountNicknameRoute extends IAdminActivityAPIRoute<SetAccountNicknameR
     env: SetAccountNicknameEnv,
     _cxt: ActivityContext<SetAccountNicknameEnv>,
   ): Promise<SetAccountNicknameResponse> {
-    const { accountId, nickname } = await AccountServiceFactory.create(env).setNickname(request.awsAccountId, request.nickname);
+    const { accountId, nickname } = await getRequestScope(env).get(Tokens.AccountService).setNickname(request.awsAccountId, request.nickname);
 
     return {
       success: true,

@@ -6,9 +6,6 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./constants": "./src/constants/index.ts",
-    "./constants/*": "./src/constants/*.ts",
-    "./model": "./src/model/index.ts",
     "./model/*": "./src/model/*.ts"
   },
   "scripts": {

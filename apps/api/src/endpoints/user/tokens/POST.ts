@@ -1,6 +1,8 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { TokenServiceFactory } from '@aws-access-bridge/backend-services/auth';
+
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateTokenResponse, CreateTokenEnv> {
   schema = {
@@ -61,7 +63,7 @@ class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateToken
     cxt: ActivityContext<CreateTokenEnv>,
   ): Promise<CreateTokenResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return TokenServiceFactory.create(env).createToken(userEmail, request.name, request.expiresInDays);
+    return getRequestScope(env).get(Tokens.TokenService).createToken(userEmail, request.name, request.expiresInDays);
   }
 }
 

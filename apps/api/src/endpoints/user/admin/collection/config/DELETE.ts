@@ -1,6 +1,8 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class DisableDataCollectionRoute extends IAdminActivityAPIRoute<DisableDataCollectionRequest, DisableDataCollectionResponse, IAdminEnv> {
   schema = {
@@ -145,7 +147,7 @@ class DisableDataCollectionRoute extends IAdminActivityAPIRoute<DisableDataColle
   };
 
   protected async handleAdminRequest(request: DisableDataCollectionRequest, env: IAdminEnv): Promise<DisableDataCollectionResponse> {
-    await CostServiceFactory.create(env).disableCollection(request.principalArn, request.collectionType);
+    await getRequestScope(env).get(Tokens.CostService).disableCollection(request.principalArn, request.collectionType);
     return { success: true, message: 'Data collection disabled.' };
   }
 }

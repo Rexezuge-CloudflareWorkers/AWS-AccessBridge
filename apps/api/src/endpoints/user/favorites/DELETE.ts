@@ -1,6 +1,8 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class UnfavoriteAccountRoute extends IActivityAPIRoute<UnfavoriteAccountRequest, UnfavoriteAccountResponse, UnfavoriteAccountEnv> {
   schema = {
@@ -50,7 +52,7 @@ class UnfavoriteAccountRoute extends IActivityAPIRoute<UnfavoriteAccountRequest,
     cxt: ActivityContext<UnfavoriteAccountEnv>,
   ): Promise<UnfavoriteAccountResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await UserServiceFactory.create(env).unfavoriteAccount(userEmail, request.awsAccountId);
+    await getRequestScope(env).get(Tokens.UserService).unfavoriteAccount(userEmail, request.awsAccountId);
     return { success: true };
   }
 }

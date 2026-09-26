@@ -1,17 +1,13 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { AccessKeys, Credential, CredentialCache, CredentialChain } from '@aws-access-bridge/shared/model';
 import { ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService } from '../aws/sts';
 import { ChainTestWalker, LeafCredentialsWalker } from './CredentialChainWalker';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface CredentialChainServiceEnv {
-  AccessBridgeDB: D1Queryable;
-  AES_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
-  AccessBridgeKV?: KVNamespace;
-}
+type CredentialChainServiceEnv = ServiceEnv;
 
 /**
  * Chain-resolution slice of the previous 219-line `CredentialService` god-class.

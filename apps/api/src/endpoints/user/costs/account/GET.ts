@@ -1,8 +1,10 @@
-import { CostServiceFactory } from '@aws-access-bridge/backend-services/cost';
+
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import type { CostData } from '@aws-access-bridge/shared/model';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAccountCostResponse, GetAccountCostEnv> {
   schema = {
@@ -190,7 +192,7 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
     const endDate: string | undefined = url.searchParams.get('endDate') || undefined;
     const startDate: string | undefined = url.searchParams.get('startDate') || undefined;
 
-    return CostServiceFactory.create(env).getAccountCost(userEmail, awsAccountId, startDate, endDate);
+    return getRequestScope(env).get(Tokens.CostService).getAccountCost(userEmail, awsAccountId, startDate, endDate);
   }
 }
 

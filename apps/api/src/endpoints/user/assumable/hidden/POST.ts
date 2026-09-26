@@ -1,6 +1,8 @@
-import { UserServiceFactory } from '@aws-access-bridge/backend-services/user';
+
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class HideRoleRoute extends IActivityAPIRoute<HideRoleRequest, HideRoleResponse, HideRoleEnv> {
   schema = {
@@ -163,7 +165,7 @@ class HideRoleRoute extends IActivityAPIRoute<HideRoleRequest, HideRoleResponse,
 
   protected async handleRequest(request: HideRoleRequest, env: HideRoleEnv, cxt: ActivityContext<HideRoleEnv>): Promise<HideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await UserServiceFactory.create(env).hideRole(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(env).get(Tokens.UserService).hideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

@@ -1,16 +1,12 @@
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+
 import type { CredentialChain } from '@aws-access-bridge/shared/model';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { StsService, type CallerIdentity } from '../aws/sts';
 import { CredentialChainService } from './CredentialChainService';
 import { CredentialStoreService } from './CredentialStoreService';
+import type { ServiceEnv } from '../composition/ServiceEnv';
 
-interface CredentialServiceEnv {
-  AccessBridgeDB: D1Queryable;
-  AES_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
-  PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
-  AccessBridgeKV?: KVNamespace;
-}
+type CredentialServiceEnv = ServiceEnv;
 
 /**
  * Facade over `CredentialChainService` (chain resolution) +
@@ -93,13 +89,5 @@ class CredentialService {
     }
     return this.chain.testChain(principalArn, sessionName);
   }
-}
-
-class CredentialServiceFactory {
-  public static create(env: CredentialServiceEnv): CredentialService {
-    return new CredentialService(env);
-  }
-}
-
-export { CredentialService, CredentialServiceFactory };
+}export { CredentialService };
 export type { CredentialServiceEnv };
