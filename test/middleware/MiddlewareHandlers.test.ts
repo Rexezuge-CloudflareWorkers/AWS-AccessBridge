@@ -232,6 +232,60 @@ describe('MiddlewareHandlers', () => {
       );
       expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('hands waitUntil a promise that never rejects, and logs the failure', async () => {
+      // Regression guard: `waitUntil` returns void, so the audit promise was
+      // detached and a rejection escaped as an unhandled rejection in the
+      // runtime. The surrounding try/catch could never see it, so the named
+      // warning could never fire. The promise handed to waitUntil must now
+      // already carry its own rejection handler.
+      auditLogCreateSpy.mockRejectedValue(new Error('D1 unavailable'));
+
+      const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+      app.use('*', MiddlewareHandlers.activityAudit());
+      app.get('/api/test', async (c) => {
+        c.set('AuthenticatedUserEmailAddress', 'user@example.com');
+        return c.json({ ok: true });
+      });
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+      expect(response.status).toBe(200);
+
+      const handedToWaitUntil = waitUntilSpy.mock.calls[0][0] as Promise<unknown>;
+      expect(handedToWaitUntil).toBeInstanceOf(Promise);
+      await expect(handedToWaitUntil).resolves.toBeUndefined();
+    });
+
+    it('still serves the response when the audit event cannot be built', async () => {
+      auditLogConstructorSpy.mockImplementation(() => {
+        throw new Error('no database binding');
+      });
+
+      const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+      app.use('*', MiddlewareHandlers.activityAudit());
+      app.get('/api/test', async (c) => {
+        c.set('AuthenticatedUserEmailAddress', 'user@example.com');
+        return c.json({ ok: true });
+      });
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+      // Auditing is best-effort and must never break the request it describes.
+      expect(response.status).toBe(200);
+    });
+
+    it('audits a failed request with a 5xx status and does not swallow the error', async () => {
+      const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+      app.use('*', MiddlewareHandlers.activityAudit());
+      app.get('/api/test', () => Promise.reject(new Error('boom')));
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+      expect(response.status).toBe(500);
+      // The failure must still be recorded; auditing a failed request matters
+      // more than auditing a successful one.
+      const recordedStatus = auditLogCreateSpy.mock.calls[0][4];
+      expect(recordedStatus).toBeGreaterThanOrEqual(500);
+      expect(auditLogCreateSpy).toHaveBeenCalledWith('unknown', 'GET:/api/test', 'GET', '/api/test', recordedStatus, undefined, undefined, undefined, undefined);
+    });
   });
 
   describe('userAuthentication', () => {

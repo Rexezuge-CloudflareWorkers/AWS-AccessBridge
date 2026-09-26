@@ -1,105 +1,94 @@
 import { describe, it, expect, vi } from 'vitest';
+import { IKeyValueDAO } from '@aws-access-bridge/backend-data/dao/IKeyValueDAO';
 import { KV_NAMESPACE_DELIMITER } from '@aws-access-bridge/backend-data/constants/kv';
 
-// We test the protected methods via a concrete subclass
-class TestKeyValueDAO {
-  private readonly kv: KVNamespace;
-  private readonly namespace: string;
-
-  constructor(kv: KVNamespace, namespace: string) {
-    this.kv = kv;
-    this.namespace = namespace;
+/**
+ * Exercises the real base class. An earlier version of this file re-declared a
+ * lookalike class with its own copies of get/put/delete, which is why the
+ * namespacing bug in `delete` survived: the test asserted the copy's behaviour,
+ * not the production code's.
+ */
+class ExposedKeyValueDAO extends IKeyValueDAO {
+  public async read<T = unknown>(key: string): Promise<T | null> {
+    return this.get<T>(key);
   }
 
-  public toNamespacedKey(rawKey: string): string {
-    return `${this.namespace}${KV_NAMESPACE_DELIMITER}${rawKey}`;
+  public async write(key: string, value: unknown, options?: KVNamespacePutOptions): Promise<void> {
+    return this.put(key, value, options);
   }
 
-  public async get<T = unknown>(key: string): Promise<T | null> {
-    return this.kv.get<T>(this.toNamespacedKey(key), 'json');
+  public async remove(key: string): Promise<void> {
+    return this.delete(key);
   }
 
-  public async put(key: string, value: unknown, options?: KVNamespacePutOptions): Promise<void> {
-    return this.kv.put(this.toNamespacedKey(key), JSON.stringify(value), options);
-  }
-
-  public async delete(key: string): Promise<void> {
-    return this.kv.delete(key);
+  public namespacedKey(rawKey: string): string {
+    return this.toNamespacedKey(rawKey);
   }
 }
 
-describe('IKeyValueDAO', () => {
-  function createMockKV(): KVNamespace {
-    return {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
-      list: vi.fn(),
-      getWithMetadata: vi.fn(),
-    } as unknown as KVNamespace;
-  }
+function createMockKV(): KVNamespace {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    put: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+    list: vi.fn(),
+    getWithMetadata: vi.fn(),
+  } as unknown as KVNamespace;
+}
 
+describe('IKeyValueDAO', () => {
   describe('toNamespacedKey', () => {
-    it('prefixes key with namespace and delimiter', () => {
-      const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'TEST');
-      expect(dao.toNamespacedKey('myKey')).toBe('TEST::myKey');
+    it('prefixes the key with the namespace and delimiter', () => {
+      const dao = new ExposedKeyValueDAO(createMockKV(), 'TEST');
+      expect(dao.namespacedKey('myKey')).toBe(`TEST${KV_NAMESPACE_DELIMITER}myKey`);
     });
 
-    it('handles empty key', () => {
-      const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'NS');
-      expect(dao.toNamespacedKey('')).toBe('NS::');
+    it('handles an empty key', () => {
+      const dao = new ExposedKeyValueDAO(createMockKV(), 'NS');
+      expect(dao.namespacedKey('')).toBe(`NS${KV_NAMESPACE_DELIMITER}`);
     });
   });
 
   describe('get', () => {
-    it('calls kv.get with namespaced key and json type', async () => {
+    it('requests the namespaced key with the json type', async () => {
       const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      await dao.get('test-key');
-      expect(kv.get).toHaveBeenCalledWith('CC::test-key', 'json');
+      await new ExposedKeyValueDAO(kv, 'CC').read('test-key');
+      expect(kv.get).toHaveBeenCalledWith(`CC${KV_NAMESPACE_DELIMITER}test-key`, 'json');
     });
 
-    it('returns value from KV', async () => {
+    it('returns the stored value, and null when absent', async () => {
       const kv = createMockKV();
       vi.mocked(kv.get).mockResolvedValue({ data: 'value' });
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      const result = await dao.get('key');
-      expect(result).toEqual({ data: 'value' });
-    });
+      const dao = new ExposedKeyValueDAO(kv, 'CC');
+      await expect(dao.read('key')).resolves.toEqual({ data: 'value' });
 
-    it('returns null when key not found', async () => {
-      const kv = createMockKV();
       vi.mocked(kv.get).mockResolvedValue(null);
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      const result = await dao.get('missing');
-      expect(result).toBeNull();
+      await expect(dao.read('missing')).resolves.toBeNull();
     });
   });
 
   describe('put', () => {
-    it('calls kv.put with namespaced key and JSON-stringified value', async () => {
+    it('writes a JSON-stringified value under the namespaced key', async () => {
       const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      await dao.put('key', { foo: 'bar' });
-      expect(kv.put).toHaveBeenCalledWith('CC::key', '{"foo":"bar"}', undefined);
+      await new ExposedKeyValueDAO(kv, 'CC').write('key', { foo: 'bar' });
+      expect(kv.put).toHaveBeenCalledWith(`CC${KV_NAMESPACE_DELIMITER}key`, '{"foo":"bar"}', undefined);
     });
 
     it('passes TTL options through', async () => {
       const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      await dao.put('key', 'value', { expirationTtl: 300 });
-      expect(kv.put).toHaveBeenCalledWith('CC::key', '"value"', { expirationTtl: 300 });
+      await new ExposedKeyValueDAO(kv, 'CC').write('key', 'value', { expirationTtl: 300 });
+      expect(kv.put).toHaveBeenCalledWith(`CC${KV_NAMESPACE_DELIMITER}key`, '"value"', { expirationTtl: 300 });
     });
   });
 
   describe('delete', () => {
-    it('calls kv.delete with key directly (not namespaced)', async () => {
+    it('deletes the namespaced key, matching get and put', async () => {
+      // Regression guard: `delete` used to pass the raw key to kv.delete while
+      // get/put namespaced it, so every delete silently no-oped and entries
+      // were never actually evicted.
       const kv = createMockKV();
-      const dao = new TestKeyValueDAO(kv, 'CC');
-      await dao.delete('raw-key');
-      expect(kv.delete).toHaveBeenCalledWith('raw-key');
+      await new ExposedKeyValueDAO(kv, 'CC').remove('raw-key');
+      expect(kv.delete).toHaveBeenCalledWith(`CC${KV_NAMESPACE_DELIMITER}raw-key`);
     });
   });
 });

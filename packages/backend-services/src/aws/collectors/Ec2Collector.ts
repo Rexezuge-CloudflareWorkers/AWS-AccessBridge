@@ -1,4 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { matchAll } from '@aws-access-bridge/shared/utils';
 import type { AwsClientFactory } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import { BaseAwsCollector } from './BaseAwsCollector';
@@ -16,44 +17,27 @@ class Ec2Collector extends BaseAwsCollector {
   }
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
-    const client = this.clientFactory({ service: 'ec2', region, keys: accessKeys });
-
     const params: URLSearchParams = new URLSearchParams({ Action: 'DescribeInstances', Version: '2016-11-15' });
-    const response: Response = await client.fetch(`https://ec2.${region}.amazonaws.com/?${params.toString()}`);
-    const xmlText: string = await response.text();
-
-    if (!response.ok) {
-      console.error(`EC2 DescribeInstances failed: ${response.status}`);
+    // fetchText owns the non-OK case (logs and returns undefined), so a
+    // throttled or denied DescribeInstances yields [] rather than throwing into
+    // the caller's per-account loop.
+    const xmlText: string | undefined = await this.fetchText(`https://ec2.${region}.amazonaws.com/?${params.toString()}`, 'ec2', region, accessKeys);
+    if (xmlText === undefined) {
       return [];
     }
 
-    const items: ResourceDiscoveryItem[] = [];
-    const instanceRegex = /<instanceId>([^<]+)<\/instanceId>/g;
-    const stateRegex = /<name>([^<]+)<\/name>/g;
-    const nameTagRegex = /<key>Name<\/key>\s*<value>([^<]*)<\/value>/g;
+    const instanceIds: string[] = matchAll(xmlText, /<instanceId>([^<]+)<\/instanceId>/g);
+    const states: string[] = matchAll(xmlText, /<name>([^<]+)<\/name>/g);
+    const names: string[] = matchAll(xmlText, /<key>Name<\/key>\s*<value>([^<]*)<\/value>/g);
 
-    let match: RegExpExecArray | null;
-    const instanceIds: string[] = [];
-    while ((match = instanceRegex.exec(xmlText)) !== null) instanceIds.push(match[1]);
-
-    const states: string[] = [];
-    while ((match = stateRegex.exec(xmlText)) !== null) states.push(match[1]);
-
-    const names: string[] = [];
-    while ((match = nameTagRegex.exec(xmlText)) !== null) names.push(match[1]);
-
-    for (const [i, instanceId] of instanceIds.entries()) {
-      items.push({
-        resourceType: 'ec2',
-        resourceId: instanceId,
-        resourceName: names[i] || instanceId,
-        state: states[i] || 'unknown',
-        region,
-        metadata: {},
-      });
-    }
-
-    return items;
+    return instanceIds.map((instanceId, index) => ({
+      resourceType: 'ec2',
+      resourceId: instanceId,
+      resourceName: names[index] || instanceId,
+      state: states[index] || 'unknown',
+      region,
+      metadata: {},
+    }));
   }
 }
 
