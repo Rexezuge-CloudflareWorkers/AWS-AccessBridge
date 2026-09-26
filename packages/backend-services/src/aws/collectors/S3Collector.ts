@@ -1,4 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { matchAll } from '@aws-access-bridge/shared/utils';
 import type { AwsClientFactory } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import { BaseAwsCollector } from './BaseAwsCollector';
@@ -15,32 +16,21 @@ class S3Collector extends BaseAwsCollector {
     return this.collect(accessKeys);
   }
 
-  protected override async collectWithRegion(accessKeys: AccessKeys): Promise<ResourceDiscoveryItem[]> {
-    const client = this.clientFactory({ service: 's3', region: 'us-east-1', keys: accessKeys });
-
-    const response: Response = await client.fetch('https://s3.amazonaws.com/');
-    const xmlText: string = await response.text();
-
-    if (!response.ok) {
-      console.error(`S3 ListBuckets failed: ${response.status}`);
+  protected override async collectWithRegion(accessKeys: AccessKeys, _region: string): Promise<ResourceDiscoveryItem[]> {
+    // S3 is a global service: the request goes to the global endpoint and
+    // discovered buckets are reported with region 'global'.
+    const xmlText: string | undefined = await this.fetchText('https://s3.amazonaws.com/', 's3', 'us-east-1', accessKeys);
+    if (xmlText === undefined) {
       return [];
     }
-
-    const items: ResourceDiscoveryItem[] = [];
-    const nameRegex = /<Name>([^<]+)<\/Name>/g;
-    let match: RegExpExecArray | null;
-    while ((match = nameRegex.exec(xmlText)) !== null) {
-      items.push({
-        resourceType: 's3',
-        resourceId: match[1],
-        resourceName: match[1],
-        state: 'active',
-        region: 'global',
-        metadata: {},
-      });
-    }
-
-    return items;
+    return matchAll(xmlText, /<Name>([^<]+)<\/Name>/g).map((bucketName) => ({
+      resourceType: 's3',
+      resourceId: bucketName,
+      resourceName: bucketName,
+      state: 'active',
+      region: 'global',
+      metadata: {},
+    }));
   }
 }
 

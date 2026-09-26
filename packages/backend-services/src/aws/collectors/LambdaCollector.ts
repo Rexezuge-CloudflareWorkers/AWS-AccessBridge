@@ -26,33 +26,27 @@ class LambdaCollector extends BaseAwsCollector {
   }
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
-    const client = this.clientFactory({ service: 'lambda', region, keys: accessKeys });
-
-    const response: Response = await client.fetch(`https://lambda.${region}.amazonaws.com/2015-03-31/functions`);
-
-    if (!response.ok) {
-      console.error(`Lambda ListFunctions failed: ${response.status}`);
+    const data: LambdaListResponse | undefined = await this.fetchJson<LambdaListResponse>(
+      `https://lambda.${region}.amazonaws.com/2015-03-31/functions`,
+      'lambda',
+      region,
+      accessKeys,
+    );
+    if (data === undefined) {
       return [];
     }
 
-    const data: LambdaListResponse = (await response.json());
-    const items: ResourceDiscoveryItem[] = [];
-    const functions = data.Functions ?? [];
-
-    for (const fn of functions) {
+    return (data.Functions ?? []).map((fn) => {
       const resourceId: string = fn.FunctionArn ?? fn.FunctionName ?? 'unknown';
-      const resourceName: string = fn.FunctionName ?? resourceId;
-      items.push({
+      return {
         resourceType: 'lambda',
         resourceId,
-        resourceName,
+        resourceName: fn.FunctionName ?? resourceId,
         state: fn.State ?? 'Active',
         region,
         metadata: { runtime: fn.Runtime ?? '', memorySize: String(fn.MemorySize ?? '') },
-      });
-    }
-
-    return items;
+      };
+    });
   }
 }
 

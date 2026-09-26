@@ -31,12 +31,27 @@ export default defineConfig({
         'apps/web/src/lib/**/*.ts',
         'packages/**/src/**/*.ts',
       ],
-      exclude: ['**/*.test.ts', '**/*.d.ts', '**/index.ts', '**/types.d.ts', '**/model/**'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.d.ts',
+        // Barrels are already excluded; also exclude the `apps/api/src/schema/*`
+        // shim layer, which is pure `export *` over shared and has no executable
+        // statements of its own.
+        '**/index.ts',
+        '**/types.d.ts',
+        '**/model/**',
+        'apps/api/src/schema/**',
+        // Type-only modules compile to no runnable code, so v8 reports 0% and
+        // they would otherwise drag the aggregate down without any behaviour
+        // left to cover.
+        'packages/backend-services/src/composition/ServiceEnv.ts',
+        'packages/backend-services/src/composition/tokens.ts',
+      ],
       thresholds: {
-        statements: 85,
-        branches: 75,
-        functions: 75,
-        lines: 85,
+        statements: 90,
+        branches: 77,
+        functions: 89,
+        lines: 90,
       },
     },
   },
