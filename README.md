@@ -200,7 +200,9 @@ When the vars are set they always take precedence; when unset, requests authenti
 pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
 ```
 
-You should see the squashed migration file apply cleanly. Re-running is safe.
+You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql`. Re-running is safe.
+
+`0031` adds `salt_secret_access_key` and `salt_session_token` to `credentials`. Every encrypted field now gets its own AES-GCM IV instead of sharing one (nonce reuse leaks the XOR of the plaintexts and enables authentication-tag forgery). **No backfill is required**: existing rows keep their shared `salt` and are read with it, then rewritten with distinct IVs the next time a credential is stored. The same applies to the KV credential cache, whose entries simply expire.
 
 ### Step 6. Build and deploy
 
@@ -391,6 +393,7 @@ curl -I https://<your-worker-url>/
 pnpm exec wrangler tail
 
 # Is the scheduled handler delegating to the cron Durable Object?
+# Requires a signed-in super-admin session (Cloudflare Access); it returns 404 otherwise.
 curl "https://<your-worker-url>/__scheduled?cron=*/10+*+*+*+*"
 
 # Is the OpenAPI doc rendering?
@@ -403,7 +406,7 @@ open https://<your-worker-url>/docs
 - **Admin tab is missing** — you haven't been promoted to superadmin yet. See Step 7 of the manual guide.
 - **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync (note: the check only fires when the template declares `$minimumVersion`).
 - **`wrangler deploy` OOMs in CI** — the workflow hides stray `open-next.config.ts` / `next.config.ts` files before deploying so wrangler doesn't delegate to the OpenNext Next.js build (the repo currently ships neither file, so this is defensive).
-- **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45). You can force a cycle via `GET /__scheduled?cron=*/10+*+*+*+*`.
+- **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45). You can force a cycle via `GET /__scheduled?cron=*/10+*+*+*+*` (super-admin only).
 
 ---
 
