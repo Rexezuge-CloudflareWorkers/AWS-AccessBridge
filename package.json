@@ -12,7 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config test/integration/vitest.config.mts",
     "test:coverage:integration": "vitest run --coverage --config test/integration/vitest.config.mts",
-    "lint": "eslint --fix --quiet .",
+    "lint": "NODE_OPTIONS=--max-old-space-size=6144 eslint --fix --quiet .",
     "typegen": "wrangler types --config ./apps/api/wrangler.template.jsonc --env-interface CloudflareEnv"
   },
   "devDependencies": {

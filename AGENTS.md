@@ -34,7 +34,7 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 
 ## Commands
 
-Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. Type-aware ESLint and Vitest need heap headroom on small machines: prefix with `NODE_OPTIONS="--max-old-space-size=6144"`.
+Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any *manual* `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
 
 ```bash
 pnpm install
