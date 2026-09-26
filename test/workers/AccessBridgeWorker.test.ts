@@ -34,6 +34,50 @@ function createEnv(overrides: Partial<TestEnv> = {}): Env {
 }
 
 describe('AccessBridgeWorker', () => {
+  describe('manual scheduled trigger authorization', () => {
+    // /__scheduled runs the privileged cron pipeline (real AWS calls with
+    // stored credentials, D1 writes, retention pruning) before any route
+    // middleware, so it must never be reachable unauthenticated.
+    it('denies an unauthenticated trigger with 404 and never runs the pipeline', async () => {
+      const worker = new AccessBridgeWorker();
+      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
+
+      const response: Response = await worker.fetch(new Request('https://worker.example.com/__scheduled', { method: 'POST' }), createEnv(), createExecutionContext());
+
+      expect(response.status).toBe(404);
+      expect(scheduled).not.toHaveBeenCalled();
+    });
+
+    it('denies the trigger in demo mode', async () => {
+      const worker = new AccessBridgeWorker();
+      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/__scheduled', { method: 'POST' }),
+        createEnv({ DEMO_MODE: 'true' }),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(404);
+      expect(scheduled).not.toHaveBeenCalled();
+    });
+
+    it('denies a non-super-admin identity without revealing that it authenticated', async () => {
+      const worker = new AccessBridgeWorker();
+      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/__scheduled', { method: 'POST' }),
+        createEnv({ DEV_AUTH_EMAIL: 'regular@example.com' }),
+        createExecutionContext(),
+      );
+
+      // Same status/body as the unauthenticated case: no identity oracle.
+      expect(response.status).toBe(404);
+      expect(scheduled).not.toHaveBeenCalled();
+    });
+  });
+
   describe('canonical redirects (Otter parity)', () => {
     it('redirects root visits to the user console', async () => {
       const worker = new AccessBridgeWorker();

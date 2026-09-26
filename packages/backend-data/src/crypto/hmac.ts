@@ -21,6 +21,27 @@ export async function generateHMACSignature(
   return btoa(String.fromCodePoint(...new Uint8Array(signature)));
 }
 
+/**
+ * Compare two base64 signatures without leaking their contents through timing.
+ *
+ * `===` short-circuits on the first differing byte, which is a byte-at-a-time
+ * forgery oracle for an attacker able to measure response latency. Comparing
+ * fixed-length byte arrays with an accumulator that never branches on the
+ * result keeps the work independent of where (or whether) they differ.
+ */
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  // Length is not secret — both are base64-encoded SHA-256 digests — but a
+  // mismatch must not fall through to the byte loop.
+  if (a.length !== b.length) {
+    return false;
+  }
+  let diff = 0;
+  for (const [i, element] of a.entries()) {
+    diff |= element ^ b[i];
+  }
+  return diff === 0;
+}
+
 export async function verifyHMACSignature(
   secret: string,
   signature: string,
@@ -31,7 +52,13 @@ export async function verifyHMACSignature(
   method: string,
 ): Promise<boolean> {
   const expectedSignature: string = await generateHMACSignature(secret, headers, timestamp, bodyHash, path, method);
-  return signature === expectedSignature;
+  // Decoding is inside the guard so a malformed (non-base64) attacker-supplied
+  // signature is rejected rather than throwing.
+  try {
+    return timingSafeEqual(Uint8Array.from(atob(signature), (c) => c.codePointAt(0) ?? 0), Uint8Array.from(atob(expectedSignature), (c) => c.codePointAt(0) ?? 0));
+  } catch {
+    return false;
+  }
 }
 
 export async function hashBody(body: string): Promise<string> {

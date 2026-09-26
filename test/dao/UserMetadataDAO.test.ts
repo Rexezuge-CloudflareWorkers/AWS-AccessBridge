@@ -77,19 +77,35 @@ describe('UserMetadataDAO', () => {
       expect(result).toBe('EXISTING123');
     });
 
-    it('generates and stores a new federation username when none exists', async () => {
-      vi.mocked(mockStmt.first).mockResolvedValue({ federation_username: null });
+    it('generates and persists a federation username when the row has none', async () => {
+      // First read: no username yet. Then the INSERT, then the re-read that the
+      // method actually returns from.
+      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'STORED' });
       vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
       const dao = new UserMetadataDAO(mockDb);
-      const result = await dao.getOrCreateFederationUsername('user@example.com');
-      // Should be uppercase hex without dashes (32 chars)
-      expect(result).toMatch(/^[0-9A-F]{32}$/);
-      expect(mockStmt.bind).toHaveBeenCalledWith(result, 'user@example.com');
+      await expect(dao.getOrCreateFederationUsername('user@example.com')).resolves.toBe('STORED');
+      // INSERT, not UPDATE: callers reaching this before any other metadata
+      // write have no row, and an UPDATE would match nothing — the generated
+      // name would be returned but never stored, so the STS RoleSessionName
+      // would change on every assume-role.
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO user_metadata'));
+      // Both SELECTs bind only the ARN; the INSERT binds (user_email, username).
+      const insertBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call as unknown[]).length === 2) as unknown as [string, string];
+      expect(insertBind[0]).toBe('user@example.com');
+      // The generated candidate is uppercase hex without dashes (32 chars).
+      expect(insertBind[1]).toMatch(/^[0-9A-F]{32}$/);
     });
 
-    it('throws DatabaseError when update fails', async () => {
+    it('returns the stored username on a concurrent insert instead of the losing candidate', async () => {
+      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'WINNER' });
+      vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
+      const dao = new UserMetadataDAO(mockDb);
+      await expect(dao.getOrCreateFederationUsername('user@example.com')).resolves.toBe('WINNER');
+    });
+
+    it('throws DatabaseError when the insert fails', async () => {
       vi.mocked(mockStmt.first).mockResolvedValue({ federation_username: null });
-      vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'update failed' } as unknown as D1Result);
+      vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'insert failed' } as unknown as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await expect(dao.getOrCreateFederationUsername('user@example.com')).rejects.toThrow(DatabaseError);
     });

@@ -35,8 +35,10 @@ class TokenService {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
     const maxExpiryInDays: number = ConfigurationManager.token.getMaxExpiryDays(this.env);
-    const existingTokens: UserAccessTokenMetadata[] = await dao.getByUserEmail(userEmail);
-    if (existingTokens.length >= maxTokens) {
+    // Quota applies to usable tokens only: expired rows are never cleaned up in
+    // the background, so counting them would lock a user out permanently.
+    const activeTokenCount: number = await dao.countActiveByUserEmail(userEmail);
+    if (activeTokenCount >= maxTokens) {
       throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
     }
     const effectiveExpiryInDays: number = expiresInDays || maxExpiryInDays;

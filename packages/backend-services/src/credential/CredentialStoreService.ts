@@ -1,5 +1,5 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService, type CallerIdentity } from '../aws/sts';
@@ -44,6 +44,10 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.storeCredential(principalArn, accessKeyId, secretAccessKey, sessionToken);
+    // Track the principal so the scheduled refresh task has work to do. Without
+    // this the `credential_cache_config` table stays empty and phase 1 of the
+    // cron silently iterates nothing while reporting success.
+    await new CredentialCacheConfigDAO(this.env.AccessBridgeDB).create(principalArn);
   }
 
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
@@ -69,6 +73,11 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.removeCredential(principalArn);
+    // Drop the refresh registration too. The table declares
+    // `ON DELETE CASCADE`, but D1 does not enforce foreign keys by default, so
+    // without this a deleted credential leaves a row the refresh task keeps
+    // retrying and failing on.
+    await new CredentialCacheConfigDAO(this.env.AccessBridgeDB).delete(principalArn);
   }
 
   public async validateCredentials(accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<CallerIdentity> {

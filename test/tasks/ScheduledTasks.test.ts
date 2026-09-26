@@ -48,7 +48,7 @@ describe('IScheduledTask run tracking', () => {
     });
   });
 
-  it('records failure when the task throws', async () => {
+  it('records failure when the task throws, then rethrows', async () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-9');
     vi.mocked(BackgroundTaskRunDAO.prototype.failRun).mockResolvedValue(undefined);
     class FailingTask extends IScheduledTask<IEnv> {
@@ -60,11 +60,13 @@ describe('IScheduledTask run tracking', () => {
         throw new Error('kaput');
       }
     }
-    await new FailingTask().handle(
-      createEvent(),
-      { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env,
-      {} as unknown as ExecutionContext,
-    );
+    await expect(
+      new FailingTask().handle(
+        createEvent(),
+        { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env,
+        {} as unknown as ExecutionContext,
+      ),
+    ).rejects.toThrow('kaput');
     expect(BackgroundTaskRunDAO.prototype.failRun).toHaveBeenCalledWith('run-9', 'Error: kaput');
   });
 

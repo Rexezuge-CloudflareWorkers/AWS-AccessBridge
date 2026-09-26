@@ -52,6 +52,10 @@ abstract class IScheduledTask<TEnv extends IEnv> {
           console.warn(`[${this.constructor.name}] Failed to mark task run failed:`, recordError);
         });
       }
+      // Re-throw after recording. The run record is durable, but swallowing here
+      // left the caller (CronTasksWorker) reporting "completed" for a task that
+      // failed outright, so cron failures were invisible in its logs and status.
+      throw error;
     }
   }
 

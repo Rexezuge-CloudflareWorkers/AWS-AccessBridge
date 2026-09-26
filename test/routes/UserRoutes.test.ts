@@ -150,6 +150,7 @@ describe('token routes', () => {
         lastUsedAt: undefined,
       })),
     );
+    vi.mocked(UserAccessTokenDAO.prototype.countActiveByUserEmail).mockResolvedValue(5);
     const c = createRouteContext({ method: 'POST', body: { name: 'extra' } });
     await new CreateTokenRoute({} as never).handle(c as never);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);

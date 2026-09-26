@@ -39,11 +39,16 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
     const resourceDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
     const collectedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
 
-    // Collect from every registered collector; one provider failing must not fail the account.
+    // Collect from every registered collector; one provider failing must not fail
+    // the account — but it must also not lose the account's previously collected
+    // resources of that type, so track which collectors actually reported.
     const allItems: ResourceDiscoveryItem[] = [];
+    const succeededTypes = new Set<string>();
     for (const collector of collectors.values()) {
       try {
-        allItems.push(...(await collector.collect(credentials)));
+        const items: ResourceDiscoveryItem[] = await collector.collect(credentials);
+        allItems.push(...items);
+        succeededTypes.add(collector.resourceType);
       } catch (e) {
         console.warn(`${collector.resourceType} collection failed:`, e);
       }
@@ -63,8 +68,10 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
       await resourceDAO.upsertResource(resource);
     }
 
-    // Clean stale resources
-    for (const resourceType of collectors.keys()) {
+    // Clean stale resources, but only for types we actually collected this run.
+    // Pruning a type whose collector failed would delete every previously
+    // recorded row of that type, turning a transient AWS error into data loss.
+    for (const resourceType of succeededTypes) {
       await resourceDAO.deleteStaleResources(accountId, resourceType, collectedAt);
     }
 

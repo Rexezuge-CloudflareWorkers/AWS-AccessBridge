@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TeamsDAO } from '@aws-access-bridge/backend-data/dao/TeamsDAO';
 import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao/TeamMembersDAO';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 
 function createMockDb() {
   const mockStmt = {
@@ -13,7 +14,8 @@ function createMockDb() {
   const mockDb = {
     prepare: vi.fn().mockReturnValue(mockStmt),
     exec: vi.fn(),
-    batch: vi.fn(),
+    // D1 batch resolves to one result per statement, all successful by default.
+    batch: vi.fn().mockResolvedValue([{ success: true }, { success: true }, { success: true }]),
     dump: vi.fn(),
   };
   return { mockDb, mockStmt };
@@ -54,7 +56,7 @@ describe('TeamsDAO', () => {
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY team_name'));
   });
 
-  it('deletes team accounts, members, then the team', async () => {
+  it('deletes team accounts, members, then the team in one atomic batch', async () => {
     const dao = new TeamsDAO(mockDb);
     await dao.deleteTeam('t1');
     expect(vi.mocked(mockDb.prepare).mock.calls.map((c: unknown[]) => c[0])).toEqual([
@@ -62,6 +64,16 @@ describe('TeamsDAO', () => {
       expect.stringContaining('DELETE FROM team_members'),
       expect.stringContaining('DELETE FROM teams'),
     ]);
+    // Batched, not three independent autocommitted runs: a mid-cascade failure
+    // would otherwise leave a team with partially destroyed members/accounts.
+    expect(mockDb.batch).toHaveBeenCalledOnce();
+    expect(mockStmt.run).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a failed statement in the delete batch', async () => {
+    vi.mocked(mockDb.batch).mockResolvedValue([{ success: true }, { success: false, error: 'constraint' }, { success: true }] as unknown as D1Result[]);
+    const dao = new TeamsDAO(mockDb);
+    await expect(dao.deleteTeam('t1')).rejects.toThrow(DatabaseError);
   });
 
   it('updates the team name', async () => {

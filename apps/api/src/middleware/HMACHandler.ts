@@ -21,7 +21,12 @@ class HMACHandler {
         const clonedRequest = c.req.raw.clone();
         const body: string = await clonedRequest.text();
         const bodyHash: string = await hashBody(body);
-        const path: string = new URL(c.req.url).pathname;
+        // Sign the query string too. Without it a captured, validly signed
+        // request stays valid after query parameters are appended, making the
+        // signature malleable — harmless for the current body-only internal
+        // calls, but an auth-bypass primitive as soon as one signs a GET.
+        const requestUrl: URL = new URL(c.req.url);
+        const path: string = requestUrl.pathname + requestUrl.search;
         const method: string = c.req.method;
         const headers: Record<string, string> = {};
         for (const [key, value] of c.req.raw.headers.entries()) {

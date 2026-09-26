@@ -32,8 +32,9 @@ class AccessService {
       throw new BadRequestError('AWS Account ID must be exactly 12 digits.');
     }
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
-    await accountsDAO.ensureAccountExists(awsAccountId);
+    // No `ensureAccountExists` here: revoking access for an account that was
+    // never granted would create a phantom `aws_accounts` row, which then shows
+    // up in admin listings until orphan cleanup runs.
     await assumableRolesDAO.revokeUserAccessToRole(userEmail, awsAccountId, roleName);
   }
 }

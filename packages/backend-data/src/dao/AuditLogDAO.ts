@@ -52,11 +52,14 @@ class AuditLogDAO extends BaseDAO {
       conditions.push('action = ?');
       bindings.push(filters.action);
     }
-    if (filters.startTime) {
+    // `!== undefined` rather than truthiness: the query schema accepts 0, and
+    // `endTime=0` ("nothing before the epoch") would otherwise be dropped,
+    // silently widening the query to the entire audit log.
+    if (filters.startTime !== undefined) {
       conditions.push('timestamp >= ?');
       bindings.push(filters.startTime);
     }
-    if (filters.endTime) {
+    if (filters.endTime !== undefined) {
       conditions.push('timestamp <= ?');
       bindings.push(filters.endTime);
     }

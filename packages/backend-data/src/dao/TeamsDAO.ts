@@ -1,5 +1,6 @@
 import type { Team, TeamInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { assertD1Success } from '@aws-access-bridge/backend-data/utils';
 import { BaseDAO } from './BaseDAO';
 
 class TeamsDAO extends BaseDAO {
@@ -31,9 +32,18 @@ class TeamsDAO extends BaseDAO {
   }
 
   public async deleteTeam(teamId: string): Promise<void> {
-    await this.database.prepare('DELETE FROM team_accounts WHERE team_id = ?').bind(teamId).run();
-    await this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId).run();
-    await this.database.prepare('DELETE FROM teams WHERE team_id = ?').bind(teamId).run();
+    // Batched so the cascade is atomic: three separate autocommitted statements
+    // could fail partway and leave a team with a partially destroyed member or
+    // account set, while still reporting success (none checked `result.success`).
+    // D1 rolls the whole batch back if any statement fails.
+    const results: D1Result[] = await this.database.batch([
+      this.database.prepare('DELETE FROM team_accounts WHERE team_id = ?').bind(teamId),
+      this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId),
+      this.database.prepare('DELETE FROM teams WHERE team_id = ?').bind(teamId),
+    ]);
+    for (const result of results) {
+      assertD1Success(result, `delete team ${teamId}`);
+    }
   }
 
   public async updateTeamName(teamId: string, newName: string): Promise<void> {

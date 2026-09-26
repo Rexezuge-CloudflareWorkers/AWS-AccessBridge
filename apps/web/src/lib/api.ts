@@ -56,7 +56,8 @@ function isUnauthorized(error: unknown): boolean {
 
 export { ApiError, readErrorMessage, throwForResponse, isUnauthorized };
 
-export async function apiFetch<T>(url: string, options?: { method?: string; body?: unknown }): Promise<ApiResult<T>> {  const method: string = options?.method ?? 'GET';
+export async function apiFetch<T>(url: string, options?: { method?: string; body?: unknown }): Promise<ApiResult<T>> {
+  const method: string = options?.method ?? 'GET';
   try {
     const init: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
     if (options?.body !== undefined) {
@@ -116,5 +117,16 @@ export async function apiRequest<T>(url: string, options?: { method?: string; bo
     return {} as T;
   }
   const text = await response.text();
-  return text ? (JSON.parse(text) as T) : ({} as T);
+  if (!text) {
+    return {} as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // A 2xx body that is not JSON (an HTML error page from a proxy, say) must
+    // surface as an ApiError, not a SyntaxError: `isUnauthorized` and the
+    // Unauthorized screen only recognise ApiError, so a raw SyntaxError would
+    // defeat the 401 handling this path exists to drive.
+    throw new ApiError(response.status, `Malformed response body: ${method} ${url}`);
+  }
 }

@@ -64,8 +64,22 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
 
   protected async runScheduledTasks(event: ScheduledController): Promise<void> {
     const ctx: ExecutionContext = this.createExecutionContext();
-    await Promise.all(tasksForPhase(1).map((task) => task.handle(event, this.env, ctx)));
-    await Promise.all(tasksForPhase(2).map((task) => task.handle(event, this.env, ctx)));
+    // `allSettled` so one failing task neither aborts its phase-mates nor hides
+    // behind a bare `Promise.all` rejection; the aggregate is re-thrown below so
+    // the run is still reported as failed.
+    const phases = [tasksForPhase(1), tasksForPhase(2)];
+    const failures: string[] = [];
+    for (const tasks of phases) {
+      const settled = await Promise.allSettled(tasks.map((task) => task.handle(event, this.env, ctx)));
+      for (const result of settled) {
+        if (result.status === 'rejected') {
+          failures.push(result.reason instanceof Error ? `${result.reason.name}: ${result.reason.message}` : String(result.reason));
+        }
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(`${failures.length} scheduled task(s) failed: ${failures.join('; ')}`);
+    }
   }
 }
 

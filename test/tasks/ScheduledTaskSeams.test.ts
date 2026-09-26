@@ -65,7 +65,9 @@ describe('IScheduledTask factory seam', () => {
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith('run-1', expect.objectContaining({ itemsProcessed: 1 }));
   });
 
-  it('marks runs failed on uncaught errors', async () => {
+  it('marks runs failed on uncaught errors and rethrows', async () => {
+    // Re-throwing after recording is what lets CronTasksWorker report the run as
+    // failed; swallowing here made a total cron failure look like "completed".
     class FailingTask extends StubTask {
       protected override async handleScheduledTask(): Promise<never> {
         throw new Error('boom');
@@ -73,8 +75,13 @@ describe('IScheduledTask factory seam', () => {
     }
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-2');
     vi.mocked(BackgroundTaskRunDAO.prototype.failRun).mockResolvedValue(undefined);
-    await new FailingTask().handle(event(), { AccessBridgeDB: {} } as unknown as Env, {} as ExecutionContext);
+    await expect(new FailingTask().handle(event(), { AccessBridgeDB: {} } as unknown as Env, {} as ExecutionContext)).rejects.toThrow('boom');
     expect(BackgroundTaskRunDAO.prototype.failRun).toHaveBeenCalledWith('run-2', expect.stringContaining('boom'));
+  });
+
+  it('does not rethrow when only the run record bookkeeping fails', async () => {
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockRejectedValue(new Error('D1 down'));
+    await expect(new StubTask().handle(event(), { AccessBridgeDB: {} } as unknown as Env, {} as ExecutionContext)).resolves.toBeUndefined();
   });
 });
 

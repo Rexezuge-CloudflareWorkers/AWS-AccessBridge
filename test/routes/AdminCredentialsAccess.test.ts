@@ -7,6 +7,7 @@ import { TestCredentialChainRoute } from '@/endpoints/user/admin/credentials/tes
 import { GrantAccessRoute } from '@/endpoints/user/admin/access/POST';
 import { RevokeAccessRoute } from '@/endpoints/user/admin/access/DELETE';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
+import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO';
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
 import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
@@ -14,6 +15,7 @@ import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
+vi.mock('@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');

@@ -3,9 +3,16 @@ import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 
 class CredentialCacheConfigDAO extends BaseDAO {
+  /**
+   * Idempotently register a principal for scheduled cache refresh.
+   *
+   * `INSERT OR IGNORE` because this runs on every credential store, including
+   * re-stores of a principal that is already tracked; a plain INSERT would throw
+   * on the primary key.
+   */
   public async create(principalArn: string): Promise<void> {
     const result: D1Result = await this.database
-      .prepare('INSERT INTO credential_cache_config (principal_arn) VALUES (?)')
+      .prepare('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)')
       .bind(principalArn)
       .run();
     if (!result.success) {

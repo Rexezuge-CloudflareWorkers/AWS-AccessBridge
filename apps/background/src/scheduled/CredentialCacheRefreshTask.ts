@@ -27,38 +27,60 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
     const sts = new StsService();
     const principalArns: string[] = await credentialCacheConfigDAO.getPrincipalArnsNeedingUpdate(refreshBatchSize, cutoffTime);
     let refreshedCount: number = 0;
+    let failedCount: number = 0;
     for (const principalArn of principalArns) {
-      const credentialChain: CredentialChain = await credentialService.getCredentialChain(principalArn);
-      let credential: AccessKeys = {
-        accessKeyId: credentialChain.accessKeyId,
-        secretAccessKey: credentialChain.secretAccessKey,
-        sessionToken: credentialChain.sessionToken,
-      };
-      for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
-        const roleArn: string = credentialChain.principalArns[i];
-        const assumedCredentials: AccessKeysWithExpiration = await sts.assumeRole(
-          roleArn,
-          credential,
-          CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME,
-        );
-        if (assumedCredentials.sessionToken && assumedCredentials.expiration) {
-          const credentialCache: CredentialCache = {
-            principalArn,
-            accessKeyId: assumedCredentials.accessKeyId,
-            secretAccessKey: assumedCredentials.secretAccessKey,
-            sessionToken: assumedCredentials.sessionToken,
-            expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(assumedCredentials.expiration),
-          };
-          await Promise.all([
-            credentialsCacheDAO.storeCachedCredential(credentialCache),
-            credentialCacheConfigDAO.updateLastCachedTime(principalArn),
-          ]);
-          refreshedCount += 1;
-        }
-        credential = assumedCredentials;
+      // Isolate per principal: one unresolvable chain (e.g. a credentials row
+      // deleted out from under a stale cache_config entry) must not abort the
+      // remaining principals in the batch.
+      try {
+        const refreshedForPrincipal: number = await this.refreshPrincipal(principalArn, credentialService, sts, credentialsCacheDAO, credentialCacheConfigDAO);
+        refreshedCount += refreshedForPrincipal;
+      } catch (error: unknown) {
+        failedCount += 1;
+        console.error(`[CredentialCacheRefreshTask] Failed to refresh ${principalArn}:`, error);
       }
     }
-    return { itemsProcessed: refreshedCount, itemsFailed: 0, summary: `Refreshed ${refreshedCount} cached credentials` };
+    return {
+      itemsProcessed: refreshedCount,
+      itemsFailed: failedCount,
+      summary: `Refreshed ${refreshedCount} cached credentials, ${failedCount} principal(s) failed`,
+    };
+  }
+
+  private async refreshPrincipal(
+    principalArn: string,
+    credentialService: ReturnType<typeof CredentialServiceFactory.create>,
+    sts: StsService,
+    credentialsCacheDAO: { storeCachedCredential(credential: CredentialCache): Promise<void> },
+    credentialCacheConfigDAO: CredentialCacheConfigDAO,
+  ): Promise<number> {
+    const credentialChain: CredentialChain = await credentialService.getCredentialChain(principalArn);
+    let credential: AccessKeys = {
+      accessKeyId: credentialChain.accessKeyId,
+      secretAccessKey: credentialChain.secretAccessKey,
+      sessionToken: credentialChain.sessionToken,
+    };
+    let refreshed: number = 0;
+    for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
+      const roleArn: string = credentialChain.principalArns[i];
+      const assumedCredentials: AccessKeysWithExpiration = await sts.assumeRole(roleArn, credential, CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME);
+      if (assumedCredentials.sessionToken && assumedCredentials.expiration) {
+        const credentialCache: CredentialCache = {
+          principalArn,
+          accessKeyId: assumedCredentials.accessKeyId,
+          secretAccessKey: assumedCredentials.secretAccessKey,
+          sessionToken: assumedCredentials.sessionToken,
+          expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(assumedCredentials.expiration),
+        };
+        await Promise.all([
+          credentialsCacheDAO.storeCachedCredential(credentialCache),
+          credentialCacheConfigDAO.updateLastCachedTime(principalArn),
+        ]);
+        refreshed += 1;
+      }
+      credential = assumedCredentials;
+    }
+    return refreshed;
   }
 }
 

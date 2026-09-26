@@ -83,10 +83,20 @@ describe('IActivityAPIRoute', () => {
     expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('x').getErrorType(), Message: 'bad input' } }, 400);
   });
 
-  it('maps database errors distinctly from generic server errors', async () => {
+  it('does not leak raw database error text to the client', async () => {
+    // DatabaseError messages embed the underlying D1/SQLite text (table and
+    // column names, constraint names, statement offsets), so a 5xx must fall
+    // through to the same generic body as any other server-side fault.
     const c = createContext();
-    await new FailRoute(new DatabaseError('db down')).handle(c);
-    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: 'DatabaseError', Message: 'db down' } }, 500);
+    await new FailRoute(new DatabaseError('D1_ERROR: SELECT * FROM credentials: SQLITE_ERROR: no such column: secret at offset 42')).handle(c);
+    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: expect.any(String), Message: expect.not.stringContaining('SQLITE_ERROR') } }, 500);
+    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: expect.any(String), Message: expect.not.stringContaining('credentials') } }, 500);
+  });
+
+  it('still surfaces client errors with their own message', async () => {
+    const c = createContext();
+    await new FailRoute(new BadRequestError('q is required')).handle(c);
+    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('q is required').getErrorType(), Message: 'q is required' } }, 400);
   });
 });
 

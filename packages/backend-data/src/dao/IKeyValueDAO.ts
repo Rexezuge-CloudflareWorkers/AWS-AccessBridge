@@ -18,7 +18,9 @@ abstract class IKeyValueDAO {
   }
 
   protected async delete(key: string): Promise<void> {
-    return this.kv.delete(key);
+    // Must mirror get/put: deleting the raw key silently no-ops, because every
+    // read and write is namespaced.
+    return this.kv.delete(this.toNamespacedKey(key));
   }
 
   protected toNamespacedKey(rawKey: string): string {

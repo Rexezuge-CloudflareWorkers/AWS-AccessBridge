@@ -49,14 +49,26 @@ class UserMetadataDAO extends BaseDAO {
       return result.federation_username;
     }
     const federationUsername: string = crypto.randomUUID().replaceAll('-', '').toUpperCase();
-    const updateResult: D1Result = await this.database
-      .prepare('UPDATE user_metadata SET federation_username = ? WHERE user_email = ?')
-      .bind(federationUsername, userEmail)
+    // INSERT rather than UPDATE: callers that reach here before any other
+    // metadata write (e.g. token creation) have no row yet, and an UPDATE would
+    // match nothing — the generated name would be returned but never persisted,
+    // handing the user a different STS RoleSessionName on every assume-role and
+    // defeating CloudTrail correlation. ON CONFLICT keeps concurrent callers on
+    // the single stored value rather than racing to overwrite it.
+    const insertResult: D1Result = await this.database
+      .prepare('INSERT INTO user_metadata (user_email, federation_username) VALUES (?, ?) ON CONFLICT(user_email) DO UPDATE SET federation_username = COALESCE(user_metadata.federation_username, excluded.federation_username)')
+      .bind(userEmail, federationUsername)
       .run();
-    if (!updateResult.success) {
-      throw new DatabaseError(`Failed to update federation username: ${updateResult.error}`);
+    if (!insertResult.success) {
+      throw new DatabaseError(`Failed to store federation username: ${insertResult.error}`);
     }
-    return federationUsername;
+    // Re-read rather than returning the candidate: under a concurrent insert
+    // another caller may have won, and their value is now the stored one.
+    const stored: UserMetadataInternal | null = await this.database
+      .prepare('SELECT federation_username FROM user_metadata WHERE user_email = ?')
+      .bind(userEmail)
+      .first<UserMetadataInternal>();
+    return stored?.federation_username ?? federationUsername;
   }
 }
 
