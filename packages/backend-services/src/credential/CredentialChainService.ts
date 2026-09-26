@@ -80,7 +80,10 @@ class CredentialChainService {
       if (credential.assumedBy) {
         assumedBy = credential.assumedBy;
       }
-    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth <= limit);
+    // `++depth < limit`, not `<=`: this is a do/while, so the increment runs in
+    // the condition and `<=` would admit `limit + 1` hops. Mirrors the walk in
+    // `CredentialsDAO.getCredentialChainByPrincipalArn`.
+    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth < limit);
     if (credential.accessKeyId && credential.secretAccessKey) {
       if (trustChain.length > 1) {
         return {

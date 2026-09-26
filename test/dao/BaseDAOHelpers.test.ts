@@ -33,7 +33,9 @@ describe('BaseDAO helpers', () => {
     const { db } = mockDb();
     const row = await BaseDAO.findById<{ id: string }>(db as never, 'teams', 'id', 't1', 'id, name');
     expect(row).toBeNull();
-    expect(() => BaseDAO.findById(db as never, 'teams; DROP TABLE teams', 'id', 't1')).rejects.toThrow('Invalid SQL identifier');
+    await expect(BaseDAO.findById(db as never, 'teams; DROP TABLE teams', 'id', 't1')).rejects.toThrow('Invalid SQL identifier');
+    await expect(BaseDAO.findById(db as never, 'teams', 'id; DROP TABLE teams', 't1')).rejects.toThrow('Invalid SQL identifier');
+    await expect(BaseDAO.findById(db as never, 'teams', 'id', 't1', 'id, secret; DROP TABLE teams')).rejects.toThrow('Invalid SQL identifier');
   });
 
   it('findRowById instance helper delegates to the static', async () => {

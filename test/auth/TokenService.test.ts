@@ -27,16 +27,27 @@ describe('TokenService lifecycle', () => {
   });
 
   it('enforces MAX_TOKENS_PER_USER and MAX_TOKEN_EXPIRY_DAYS', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByUserEmail).mockResolvedValue([{}, {}] as never);
+    vi.mocked(UserAccessTokenDAO.prototype.countActiveByUserEmail).mockResolvedValue(2);
     await expect(new TokenService(env()).createToken('u@e.com', 'n')).rejects.toBeInstanceOf(BadRequestError);
 
-    vi.mocked(UserAccessTokenDAO.prototype.getByUserEmail).mockResolvedValue([]);
+    vi.mocked(UserAccessTokenDAO.prototype.countActiveByUserEmail).mockResolvedValue(0);
     await expect(new TokenService(env()).createToken('u@e.com', 'n', 90)).rejects.toBeInstanceOf(BadRequestError);
 
     vi.mocked(UserAccessTokenDAO.prototype.create).mockResolvedValue(undefined);
     const created = await new TokenService(env()).createToken('u@e.com', 'n', 7);
     expect(created.token).toHaveLength(64);
     expect(UserAccessTokenDAO.prototype.create).toHaveBeenCalledOnce();
+  });
+
+  it('counts only unexpired tokens against the quota', async () => {
+    // Expired rows are never pruned in the background, so counting them would
+    // lock a user out of ever minting another token.
+    vi.mocked(UserAccessTokenDAO.prototype.getByUserEmail).mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => ({ tokenId: `t${i}`, userEmail: 'u', name: 'n', createdAt: 1, expiresAt: 1, lastUsedAt: undefined })),
+    );
+    vi.mocked(UserAccessTokenDAO.prototype.countActiveByUserEmail).mockResolvedValue(0);
+    vi.mocked(UserAccessTokenDAO.prototype.create).mockResolvedValue(undefined);
+    await expect(new TokenService(env()).createToken('u@e.com', 'n', 7)).resolves.toMatchObject({ name: 'n' });
   });
 
   it('lists and revokes tokens', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateAESGCMKey, encryptData, decryptData, decryptDataOptional } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
+import { generateAESGCMKey, encryptData, decryptData, decryptDataOptional, decryptDataTolerant } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 describe('AES-GCM Crypto', () => {
   describe('generateAESGCMKey', () => {
@@ -38,13 +38,27 @@ describe('AES-GCM Crypto', () => {
       expect(result1.encrypted).not.toBe(result2.encrypted);
     });
 
-    it('produces same ciphertext when same IV is reused', async () => {
+    it('never reuses an IV across calls, so identical plaintexts stay unlinked', async () => {
       const key = await generateAESGCMKey();
       const plaintext = 'test data';
-      const result1 = await encryptData(plaintext, key);
-      const result2 = await encryptData(plaintext, key, result1.iv);
-      expect(result2.iv).toBe(result1.iv);
-      expect(result2.encrypted).toBe(result1.encrypted);
+      const seen = new Set<string>();
+      for (let i = 0; i < 25; i++) {
+        const { iv } = await encryptData(plaintext, key);
+        expect(seen.has(iv)).toBe(false);
+        seen.add(iv);
+      }
+    });
+
+    it('encrypts each field of a multi-field secret under an independent IV', async () => {
+      // Regression guard for the GCM nonce-reuse flaw: encrypting accessKeyId,
+      // secretAccessKey and sessionToken under one shared IV made the CTR
+      // keystream identical, so XORing two ciphertexts revealed the XOR of two
+      // plaintexts and the GHASH auth subkey became recoverable.
+      const key = await generateAESGCMKey();
+      const fields = await Promise.all([encryptData('AKIAIOSFODNN7EXAMPLE', key), encryptData('wJalrXUtnFEMI', key), encryptData('token', key)]);
+      const ivs = fields.map((f) => f.iv);
+      expect(new Set(ivs).size).toBe(3);
+      await Promise.all(fields.map(async (f) => expect(await decryptData(f.encrypted, f.iv, key)).toBeTypeOf('string')));
     });
 
     it('encrypts and decrypts empty string', async () => {
@@ -104,6 +118,39 @@ describe('AES-GCM Crypto', () => {
     it('returns undefined when all parameters are undefined', async () => {
       const result = await decryptDataOptional(undefined, undefined, undefined);
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('decryptDataTolerant', () => {
+    it('returns the plaintext when the payload authenticates', async () => {
+      const key = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', key);
+      await expect(decryptDataTolerant(encrypted, iv, key)).resolves.toBe('secret');
+    });
+
+    it('returns undefined instead of throwing when the tag does not verify', async () => {
+      const key = await generateAESGCMKey();
+      const other = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', key);
+      // Wrong key: GCM authentication fails. Callers on a recoverable read path
+      // (e.g. the credential cache) treat this as a miss rather than a crash.
+      await expect(decryptDataTolerant(encrypted, iv, other)).resolves.toBeUndefined();
+    });
+
+    it('returns undefined when the ciphertext is tampered with', async () => {
+      const key = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', key);
+      const bytes = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
+      bytes[0] = bytes[0] ^ 0xff;
+      await expect(decryptDataTolerant(btoa(String.fromCodePoint(...bytes)), iv, key)).resolves.toBeUndefined();
+    });
+
+    it('returns undefined when any parameter is missing', async () => {
+      const key = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', key);
+      await expect(decryptDataTolerant(undefined, iv, key)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(encrypted, undefined, key)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(encrypted, iv, undefined)).resolves.toBeUndefined();
     });
   });
 });

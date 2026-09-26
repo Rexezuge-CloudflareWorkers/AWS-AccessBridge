@@ -55,6 +55,11 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  // Monotonic request ids: switching teams quickly fires overlapping requests,
+  // and without a guard the slower earlier one can resolve last and render the
+  // previously-selected team's members/accounts under the new selection.
+  const membersRequestId = useRef(0);
+  const accountsRequestId = useRef(0);
 
   const refreshTeams = useCallback(async () => {
     setIsLoading(true);
@@ -69,13 +74,21 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
 
   const refreshMembers = useCallback(
     async (teamId: string) => {
+      const requestId = ++membersRequestId.current;
       setMembersLoading(true);
       try {
-        setMembers(await listTeamMembers(teamId));
+        const result = await listTeamMembers(teamId);
+        if (requestId === membersRequestId.current) {
+          setMembers(result);
+        }
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to load members');
+        if (requestId === membersRequestId.current) {
+          onError(err instanceof Error ? err.message : 'Failed to load members');
+        }
       } finally {
-        setMembersLoading(false);
+        if (requestId === membersRequestId.current) {
+          setMembersLoading(false);
+        }
       }
     },
     [onError],
@@ -83,13 +96,21 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
 
   const refreshAccounts = useCallback(
     async (teamId: string) => {
+      const requestId = ++accountsRequestId.current;
       setAccountsLoading(true);
       try {
-        setAccounts(await listTeamAccounts(teamId));
+        const result = await listTeamAccounts(teamId);
+        if (requestId === accountsRequestId.current) {
+          setAccounts(result);
+        }
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to load accounts');
+        if (requestId === accountsRequestId.current) {
+          onError(err instanceof Error ? err.message : 'Failed to load accounts');
+        }
       } finally {
-        setAccountsLoading(false);
+        if (requestId === accountsRequestId.current) {
+          setAccountsLoading(false);
+        }
       }
     },
     [onError],
@@ -120,8 +141,14 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
         void refreshMembers(teamId).catch(() => undefined);
         void refreshAccounts(teamId).catch(() => undefined);
       } else {
+        // Invalidate any in-flight request for the previously selected team so
+        // it cannot repopulate members/accounts after the selection is cleared.
+        membersRequestId.current += 1;
+        accountsRequestId.current += 1;
         setMembers([]);
         setAccounts([]);
+        setMembersLoading(false);
+        setAccountsLoading(false);
       }
     },
     [refreshAccounts, refreshMembers],

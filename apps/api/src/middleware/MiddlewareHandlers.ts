@@ -82,9 +82,16 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
       const userEmail: string = c.get('AuthenticatedUserEmailAddress') || 'unknown';
       const auditService = AuditServiceFactory.create({ AccessBridgeDB: c.env.AccessBridgeDB });
       const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env);
-      c.executionCtx.waitUntil(auditService.record(event));
-    } catch {
-      console.warn('Failed to write audit log');
+      // `waitUntil` returns void, so the promise it is handed is detached: a
+      // rejection here would escape as an unhandled rejection in the runtime
+      // rather than reach the catch below. Attach the handler to the promise.
+      c.executionCtx.waitUntil(
+        auditService.record(event).catch((auditError: unknown): void => {
+          console.error('Failed to write audit log:', auditError);
+        }),
+      );
+    } catch (error: unknown) {
+      console.error('Failed to build audit log event:', error);
     }
   }
 }

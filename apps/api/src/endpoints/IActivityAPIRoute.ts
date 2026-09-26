@@ -73,8 +73,11 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
     }
     if (error instanceof DatabaseError) {
+      // DatabaseError messages embed the underlying D1/SQLite text (table and
+      // column names, constraint names, statement offsets), so they are logged
+      // rather than returned. Callers get the same generic 500 as any other
+      // server-side fault.
       console.error('Caught database error during execution:', error);
-      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
     }
     if (!(error instanceof IServiceError) || error instanceof InternalServerError) {
       console.error('Caught service error during execution:', error);

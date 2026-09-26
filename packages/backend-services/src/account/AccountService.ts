@@ -54,7 +54,9 @@ class AccountService {
       throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
     }
     const accountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
-    await accountsDAO.ensureAccountExists(awsAccountId);
+    // No `ensureAccountExists` here: removing a nickname from an unknown account
+    // would create the very row the caller is trying to clear, leaving a
+    // phantom account visible in admin listings.
     await accountsDAO.removeAccountNickname(awsAccountId);
     return { accountId: awsAccountId };
   }

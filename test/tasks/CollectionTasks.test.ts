@@ -155,6 +155,49 @@ describe('ResourceInventoryCollectionTask', () => {
       expect.objectContaining({ itemsProcessed: 1, itemsFailed: 0 }),
     );
   });
+
+  it('does not prune a resource type whose collector failed', async () => {
+    // Regression guard: a transient AWS failure (throttling, a lost IAM
+    // permission) must not delete the account's previously collected rows of
+    // that type. Only types that actually reported this run may be pruned.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(stubCollectors.get('ec2')!.collect).mockResolvedValue([
+      { resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} },
+    ]);
+    vi.mocked(stubCollectors.get('s3')!.collect).mockRejectedValue(new Error('AccessDenied: s3:ListAllMyBuckets'));
+    vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
+    vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-4');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+
+    await new ResourceInventoryCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    const prunedTypes = vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mock.calls.map((call) => call[1]);
+    expect(prunedTypes).not.toContain('s3');
+    expect(prunedTypes).toEqual(expect.arrayContaining(['ec2', 'lambda', 'rds', 'dynamodb']));
+    expect(prunedTypes).toHaveLength(4);
+  });
+
+  it('prunes nothing when every collector fails', async () => {
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    for (const collector of stubCollectors.values()) {
+      vi.mocked(collector.collect).mockRejectedValue(new Error('AWS unavailable'));
+    }
+    vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
+    vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-4');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+
+    await new ResourceInventoryCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(ResourceInventoryDAO.prototype.deleteStaleResources).not.toHaveBeenCalled();
+  });
 });
 
 describe('CredentialCacheRefreshTask', () => {

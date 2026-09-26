@@ -24,10 +24,13 @@ describe('CredentialCacheConfigDAO', () => {
   });
 
   describe('create', () => {
-    it('inserts a principal ARN into cache config', async () => {
+    it('inserts a principal ARN into cache config idempotently', async () => {
       const dao = new CredentialCacheConfigDAO(mockDb);
       await dao.create('arn:aws:iam::123456789012:role/MyRole');
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO credential_cache_config'));
+      // INSERT OR IGNORE: this runs on every credential store, including
+      // re-stores of an already-tracked principal, so a plain INSERT would
+      // throw on the primary key.
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE INTO credential_cache_config'));
       expect(mockStmt.bind).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/MyRole');
     });
 

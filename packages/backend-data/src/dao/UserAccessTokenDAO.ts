@@ -80,6 +80,20 @@ class UserAccessTokenDAO extends BaseDAO {
     }));
   }
 
+  /**
+   * Count only tokens that still authenticate. Used for the per-user quota:
+   * counting expired rows let a user who let every token lapse be permanently
+   * refused new ones, since nothing prunes `user_access_tokens` in the
+   * background.
+   */
+  public async countActiveByUserEmail(userEmail: string): Promise<number> {
+    const result = await this.database
+      .prepare('SELECT COUNT(*) as total FROM user_access_tokens WHERE user_email = ? AND expires_at > ?')
+      .bind(userEmail, TimestampUtil.getCurrentUnixTimestampInSeconds())
+      .first<{ total: number }>();
+    return result?.total ?? 0;
+  }
+
   public async updateLastUsedById(tokenId: string): Promise<void> {
     const lastUsedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database

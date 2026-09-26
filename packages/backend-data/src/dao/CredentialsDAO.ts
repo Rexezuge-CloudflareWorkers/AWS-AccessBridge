@@ -4,6 +4,18 @@ import { decryptDataOptional, encryptData } from '@aws-access-bridge/backend-dat
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { EncryptedDAO } from './BaseDAO';
 
+/**
+ * Pick the IV to decrypt a credential field with.
+ *
+ * Rows written before migration `0031_distinct_credential_ivs.sql` encrypted
+ * every field under the single IV in `salt`, so an absent per-field column means
+ * "legacy row" and `salt` is the correct IV. Such rows keep decrypting and are
+ * rewritten with distinct IVs on their next store.
+ */
+function resolveIv(fieldIv: string | undefined, legacySalt: string | undefined): string | undefined {
+  return fieldIv ?? legacySalt;
+}
+
 class CredentialsDAO extends EncryptedDAO {
   protected readonly principalTrustChainLimit: number;
 
@@ -15,7 +27,8 @@ class CredentialsDAO extends EncryptedDAO {
   public async getCredentialByPrincipalArn(principalArn: string): Promise<Credential> {
     const result: CredentialInternal | null = await this.database
       .prepare(
-        `SELECT principal_arn, assumed_by, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token, salt
+        `SELECT principal_arn, assumed_by, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token,
+                salt, salt_secret_access_key, salt_session_token
          FROM credentials
          WHERE principal_arn = ?
          LIMIT 1`,
@@ -31,8 +44,16 @@ class CredentialsDAO extends EncryptedDAO {
       principalArn: result.principal_arn,
       assumedBy: result.assumed_by,
       accessKeyId: await decryptDataOptional(result.encrypted_access_key_id, result.salt, this.masterKey),
-      secretAccessKey: await decryptDataOptional(result.encrypted_secret_access_key, result.salt, this.masterKey),
-      sessionToken: await decryptDataOptional(result.encrypted_session_token, result.salt, this.masterKey),
+      secretAccessKey: await decryptDataOptional(
+        result.encrypted_secret_access_key,
+        resolveIv(result.salt_secret_access_key, result.salt),
+        this.masterKey,
+      ),
+      sessionToken: await decryptDataOptional(
+        result.encrypted_session_token,
+        resolveIv(result.salt_session_token, result.salt),
+        this.masterKey,
+      ),
     };
   }
 
@@ -48,7 +69,9 @@ class CredentialsDAO extends EncryptedDAO {
         assumedBy = credential.assumedBy;
       }
       trustChain.push(credential);
-    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth <= this.principalTrustChainLimit);
+      // `++depth < limit`, not `<=`: this is a do/while, so the increment runs in
+      // the condition and `<=` would admit `limit + 1` hops.
+    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth < this.principalTrustChainLimit);
 
     if (!credential.accessKeyId || !credential.secretAccessKey) {
       if (depth >= this.principalTrustChainLimit) {
@@ -71,19 +94,20 @@ class CredentialsDAO extends EncryptedDAO {
   }
 
   public async storeCredential(principalArn: string, accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<void> {
-    const encryptedAccessKeyId: { encrypted: string; iv: string } = await encryptData(accessKeyId, this.masterKey);
-    const encryptedSecretAccessKey: { encrypted: string; iv: string } = await encryptData(
-      secretAccessKey,
-      this.masterKey,
-      encryptedAccessKeyId.iv,
-    );
-    const encryptedSessionToken: { encrypted: string; iv: string } | null = sessionToken
-      ? await encryptData(sessionToken, this.masterKey, encryptedAccessKeyId.iv)
-      : null;
+    // Distinct IV per field: a shared nonce would make the three ciphertexts
+    // cancel to the XOR of their plaintexts and would expose the GCM auth
+    // subkey. `encryptData` generates each IV, and each travels with its own
+    // ciphertext into its own column.
+    const encryptedAccessKeyId = await encryptData(accessKeyId, this.masterKey);
+    const encryptedSecretAccessKey = await encryptData(secretAccessKey, this.masterKey);
+    const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, this.masterKey) : null;
     const result: D1Result = await this.database
       .prepare(
-        `INSERT OR REPLACE INTO credentials (principal_arn, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token, salt)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO credentials (
+           principal_arn, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token,
+           salt, salt_secret_access_key, salt_session_token
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         principalArn,
@@ -91,6 +115,8 @@ class CredentialsDAO extends EncryptedDAO {
         encryptedSecretAccessKey.encrypted,
         encryptedSessionToken?.encrypted || null,
         encryptedAccessKeyId.iv,
+        encryptedSecretAccessKey.iv,
+        encryptedSessionToken?.iv || null,
       )
       .run();
     if (!result.success) {
