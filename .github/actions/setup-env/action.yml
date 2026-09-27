@@ -1,0 +1,20 @@
+name: Setup Environment
+description: Install pnpm, set up Node.js with pnpm store cache, and install workspace dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: pnpm
+
+    - name: Install Dependencies
+      uses: ./.github/actions/retry-step
+      with:
+        command: pnpm install
+        max_attempts: '3'
