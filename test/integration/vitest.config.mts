@@ -17,11 +17,16 @@ const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.m
 const migrationFiles = readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
   .sort();
-const migrationSql = migrationFiles.map((f) => readFileSync(resolve(migrationsDir, f), 'utf-8')).join('\n\n');
+const migrationEntries = migrationFiles.map((f) => ({ name: f, sql: readFileSync(resolve(migrationsDir, f), 'utf-8') }));
+// Both forms are injected: the per-file list so a test can apply a named range
+// (the 0032 upgrade test seeds between migrations), and the flattened string
+// kept for harnesses/tests that only want the whole bundle.
+const migrationSql = migrationEntries.map((f) => f.sql).join('\n\n');
 
 export default defineConfig({
   define: {
     __INTEGRATION_MIGRATION_SQL__: JSON.stringify(migrationSql),
+    __INTEGRATION_MIGRATION_FILES__: JSON.stringify(migrationEntries),
   },
   plugins: [
     cloudflareTest({

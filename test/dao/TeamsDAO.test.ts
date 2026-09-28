@@ -93,24 +93,34 @@ describe('TeamMembersDAO', () => {
 
   it('adds members with the default role', async () => {
     const dao = new TeamMembersDAO(mockDb);
-    await dao.addMember('t1', 'user@example.com');
-    expect(mockStmt.bind).toHaveBeenCalledWith('t1', 'user@example.com', 'member', expect.any(Number));
+    // Migration 0032: the anchor goes in the address column, the id alongside.
+    await dao.addMember('t1', { userId: 'usr_abc', anchorEmail: 'user@example.com' });
+    expect(mockStmt.bind).toHaveBeenCalledWith('t1', 'user@example.com', 'usr_abc', 'member', expect.any(Number));
   });
 
   it('removes members', async () => {
     const dao = new TeamMembersDAO(mockDb);
-    await dao.removeMember('t1', 'user@example.com');
-    expect(mockStmt.bind).toHaveBeenCalledWith('t1', 'user@example.com');
+    await dao.removeMember('t1', { userId: 'usr_abc', anchorEmail: 'user@example.com' });
+    expect(mockStmt.bind).toHaveBeenCalledWith('t1', 'usr_abc', 'user@example.com');
   });
 
   it('detects team admins by role', async () => {
     vi.mocked(mockStmt.first).mockResolvedValue({ role: 'admin' });
     const dao = new TeamMembersDAO(mockDb);
-    await expect(dao.isTeamAdmin('t1', 'user@example.com')).resolves.toBe(true);
+    const owner = { userId: 'usr_abc', anchorEmail: 'user@example.com' };
+    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(true);
     vi.mocked(mockStmt.first).mockResolvedValue({ role: 'member' });
-    await expect(dao.isTeamAdmin('t1', 'user@example.com')).resolves.toBe(false);
+    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(false);
     vi.mocked(mockStmt.first).mockResolvedValue(null);
-    await expect(dao.isTeamAdmin('t1', 'user@example.com')).resolves.toBe(false);
+    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(false);
+  });
+
+  it('lists teams for an account id', async () => {
+    vi.mocked(mockStmt.all).mockResolvedValue({ results: [{ team_id: 't1', team_name: 'Ops', role: 'admin' }] });
+    const dao = new TeamMembersDAO(mockDb);
+    await expect(dao.getTeamsByUserId({ userId: 'usr_abc', anchorEmail: 'u@e.c' })).resolves.toEqual([
+      { teamId: 't1', teamName: 'Ops', role: 'admin' },
+    ]);
   });
 
   it('lists teams for a user', async () => {
@@ -120,14 +130,40 @@ describe('TeamMembersDAO', () => {
   });
 
   it('lists and maps team members', async () => {
-    vi.mocked(mockStmt.all).mockResolvedValue({ results: [{ team_id: 't1', user_email: 'u@e.c', role: 'member', joined_at: 5 }] });
+    vi.mocked(mockStmt.all).mockResolvedValue({
+      results: [{ team_id: 't1', user_email: 'u@e.c', role: 'member', joined_at: 5, display_email: 'u@e.c' }],
+    });
     const dao = new TeamMembersDAO(mockDb);
     await expect(dao.getMembersByTeam('t1')).resolves.toEqual([{ teamId: 't1', userEmail: 'u@e.c', role: 'member', joinedAt: 5 }]);
   });
 
+  // Admins read this list by address, so a renamed account must show its
+  // current address rather than the frozen anchor it still stores.
+  it('lists a member under its current address, not the frozen anchor', async () => {
+    vi.mocked(mockStmt.all).mockResolvedValue({
+      results: [
+        { team_id: 't1', user_email: 'old@e.c', role: 'member', joined_at: 5, display_email: 'new@e.c' },
+      ],
+    });
+    const dao = new TeamMembersDAO(mockDb);
+    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([
+      { teamId: 't1', userEmail: 'new@e.c', role: 'member', joinedAt: 5 },
+    ]);
+  });
+
+  it('falls back to the stored address when no current address is known', async () => {
+    vi.mocked(mockStmt.all).mockResolvedValue({
+      results: [{ team_id: 't1', user_email: 'u@e.c', role: 'member', joined_at: 5, display_email: null }],
+    });
+    const dao = new TeamMembersDAO(mockDb);
+    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([
+      { teamId: 't1', userEmail: 'u@e.c', role: 'member', joinedAt: 5 },
+    ]);
+  });
+
   it('updates member roles', async () => {
     const dao = new TeamMembersDAO(mockDb);
-    await dao.updateMemberRole('t1', 'u@e.c', 'admin');
-    expect(mockStmt.bind).toHaveBeenCalledWith('admin', 't1', 'u@e.c');
+    await dao.updateMemberRole('t1', { userId: 'usr_abc', anchorEmail: 'u@e.c' }, 'admin');
+    expect(mockStmt.bind).toHaveBeenCalledWith('admin', 't1', 'usr_abc', 'u@e.c');
   });
 });

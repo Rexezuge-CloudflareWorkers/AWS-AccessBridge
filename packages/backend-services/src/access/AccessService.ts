@@ -2,13 +2,21 @@ import { AssumableRolesDAO, AwsAccountsDAO } from '@aws-access-bridge/backend-da
 
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
 const AWS_ACCOUNT_ID_PATTERN = /^\d{12}$/;
 
 type AccessServiceEnv = ServiceEnv;
 
 class AccessService {
-  constructor(private readonly env: AccessServiceEnv) {}
+  private readonly identity: UserIdentityService;
+
+  constructor(
+    private readonly env: AccessServiceEnv,
+    identity?: UserIdentityService,
+  ) {
+    this.identity = identity ?? new UserIdentityService(env);
+  }
 
   public async grantAccess(userEmail: string, awsAccountId: string, roleName: string): Promise<void> {
     if (!awsAccountId || !roleName) {
@@ -19,8 +27,13 @@ class AccessService {
     }
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
+    const account = await this.identity.resolveAccount(userEmail);
     await accountsDAO.ensureAccountExists(awsAccountId);
-    await assumableRolesDAO.grantUserAccessToRole(userEmail, awsAccountId, roleName);
+    await assumableRolesDAO.grantUserAccessToRole(
+      { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail },
+      awsAccountId,
+      roleName,
+    );
   }
 
   public async revokeAccess(userEmail: string, awsAccountId: string, roleName: string): Promise<void> {
@@ -34,7 +47,12 @@ class AccessService {
     // No `ensureAccountExists` here: revoking access for an account that was
     // never granted would create a phantom `aws_accounts` row, which then shows
     // up in admin listings until orphan cleanup runs.
-    await assumableRolesDAO.revokeUserAccessToRole(userEmail, awsAccountId, roleName);
+    const account = await this.identity.resolveAccount(userEmail);
+    await assumableRolesDAO.revokeUserAccessToRole(
+      { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail },
+      awsAccountId,
+      roleName,
+    );
   }
 }export { AccessService, AWS_ACCOUNT_ID_PATTERN };
 export type { AccessServiceEnv };

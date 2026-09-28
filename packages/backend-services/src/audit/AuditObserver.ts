@@ -21,6 +21,7 @@ class AuditLogObserver implements IAuditObserver {
       event.detail,
       event.ipAddress,
       event.userAgent,
+      event.userId ?? null,
     );
   }
 }

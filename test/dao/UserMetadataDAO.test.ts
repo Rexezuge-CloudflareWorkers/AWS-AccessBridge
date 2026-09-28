@@ -24,12 +24,34 @@ describe('UserMetadataDAO', () => {
   });
 
   describe('ensureUserEmailExists', () => {
-    it('executes INSERT OR IGNORE with user email', async () => {
+    it('executes INSERT OR IGNORE with the anchor, an id, and the normalized login address', async () => {
+      const dao = new UserMetadataDAO(mockDb);
+      await dao.ensureUserEmailExists('User@Example.com');
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE'));
+      // The identity columns are stamped at provisioning time, not left to a
+      // backfill: a row created after 0032 is never backfilled again, so an
+      // account provisioned without an id would be permanently unresolvable and
+      // its grants/tokens would carry a NULL user_id that fails the new FKs.
+      expect(mockStmt.bind).toHaveBeenCalledWith('User@Example.com', expect.stringMatching(/^usr_[0-9a-f]{32}$/), 'user@example.com');
+      expect(mockStmt.run).toHaveBeenCalled();
+    });
+
+    // A database that has not applied 0032 has no identity columns, and the
+    // address alone is still a complete identity there.
+    it('falls back to the pre-0032 insert shape when the identity columns are absent', async () => {
+      vi.mocked(mockStmt.run)
+        .mockRejectedValueOnce(new Error('D1_ERROR: SQLITE_ERROR: no such column: id'))
+        .mockResolvedValueOnce({ success: true } as unknown as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await dao.ensureUserEmailExists('user@example.com');
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE'));
-      expect(mockStmt.bind).toHaveBeenCalledWith('user@example.com');
-      expect(mockStmt.run).toHaveBeenCalled();
+      expect(mockStmt.bind).toHaveBeenNthCalledWith(1, 'user@example.com', expect.any(String), 'user@example.com');
+      expect(mockStmt.bind).toHaveBeenNthCalledWith(2, 'user@example.com');
+    });
+
+    it('rethrows a non-schema database error rather than degrading', async () => {
+      vi.mocked(mockStmt.run).mockRejectedValue(new Error('D1_ERROR: UNIQUE constraint failed: user_metadata.user_email'));
+      const dao = new UserMetadataDAO(mockDb);
+      await expect(dao.ensureUserEmailExists('user@example.com')).rejects.toThrow(/UNIQUE constraint failed/);
     });
 
     it('throws DatabaseError when query fails', async () => {

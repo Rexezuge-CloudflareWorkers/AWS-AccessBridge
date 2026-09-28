@@ -5,13 +5,20 @@ import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 
 class UserAccessTokenDAO extends BaseDAO {
-  public async create(tokenId: string, userEmail: string, token: string, name: string, expiresAt: number): Promise<void> {
+  public async create(
+    tokenId: string,
+    userEmail: string,
+    token: string,
+    name: string,
+    expiresAt: number,
+    userId: string | null = null,
+  ): Promise<void> {
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database
       .prepare(
-        'INSERT INTO user_access_tokens (token_id, user_email, access_token, name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO user_access_tokens (token_id, user_email, access_token, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(tokenId, userEmail, token, name, createdAt, expiresAt)
+      .bind(tokenId, userEmail, token, name, createdAt, expiresAt, userId)
       .run();
     if (!result.success) {
       throw new DatabaseError(`Failed to create access token: ${result.error}`);
@@ -24,7 +31,7 @@ class UserAccessTokenDAO extends BaseDAO {
     const bindings: unknown[] = activeOnly ? [tokenId, currentTime] : [tokenId];
     const result: UserAccessTokenInternal | null = await this.database
       .prepare(
-        `SELECT token_id, user_email, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE token_id = ? ${activeFilter} LIMIT 1`,
+        `SELECT token_id, user_email, user_id, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE token_id = ? ${activeFilter} LIMIT 1`,
       )
       .bind(...bindings)
       .first<UserAccessTokenInternal>();
@@ -32,6 +39,7 @@ class UserAccessTokenDAO extends BaseDAO {
       return {
         tokenId: result.token_id,
         userEmail: result.user_email,
+        userId: result.user_id ?? null,
         name: result.name,
         createdAt: result.created_at,
         expiresAt: result.expires_at,
@@ -41,13 +49,19 @@ class UserAccessTokenDAO extends BaseDAO {
     return undefined;
   }
 
+  /**
+   * The PAT authentication read. Carries `user_id` so the caller can resolve the
+   * owner's CURRENT address rather than reporting the token's stored anchor —
+   * without it, a token minted before an address change would keep
+   * authenticating as the old address forever.
+   */
   public async getByToken(token: string, activeOnly: boolean): Promise<UserAccessTokenMetadata | undefined> {
     const currentTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const activeFilter: string = activeOnly ? 'AND expires_at > ?' : '';
     const bindings: unknown[] = activeOnly ? [token, currentTime] : [token];
     const result: UserAccessTokenInternal | null = await this.database
       .prepare(
-        `SELECT token_id, user_email, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE access_token = ? ${activeFilter} LIMIT 1`,
+        `SELECT token_id, user_email, user_id, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE access_token = ? ${activeFilter} LIMIT 1`,
       )
       .bind(...bindings)
       .first<UserAccessTokenInternal>();
@@ -55,6 +69,7 @@ class UserAccessTokenDAO extends BaseDAO {
       return {
         tokenId: result.token_id,
         userEmail: result.user_email,
+        userId: result.user_id ?? null,
         name: result.name,
         createdAt: result.created_at,
         expiresAt: result.expires_at,
@@ -64,15 +79,47 @@ class UserAccessTokenDAO extends BaseDAO {
     return undefined;
   }
 
+  /**
+   * Tokens owned by an account id.
+   *
+   * The id-keyed read; `getByUserEmail` below is the pre-0032 fallback for a
+   * caller that could not resolve an id. The `user_id = ? OR user_email = ?`
+   * shape matters: a row written before 0032 has `user_id IS NULL`, and
+   * dropping the address clause would make such a token invisible to its owner.
+   */
+  public async getByUserId(userId: string, anchorEmail: string): Promise<UserAccessTokenMetadata[]> {
+    const results: UserAccessTokenInternal[] = await this.database
+      .prepare(
+        `SELECT token_id, user_email, user_id, name, created_at, expires_at, last_used_at
+         FROM user_access_tokens
+         WHERE user_id = ? OR (user_id IS NULL AND user_email = ?)`,
+      )
+      .bind(userId, anchorEmail)
+      .all<UserAccessTokenInternal>()
+      .then((result) => result.results);
+    return results.map((row) => ({
+      tokenId: row.token_id,
+      userEmail: row.user_email,
+      userId: row.user_id ?? null,
+      name: row.name,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      lastUsedAt: row.last_used_at,
+    }));
+  }
+
   public async getByUserEmail(userEmail: string): Promise<UserAccessTokenMetadata[]> {
     const results: UserAccessTokenInternal[] = await this.database
-      .prepare('SELECT token_id, user_email, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE user_email = ?')
+      .prepare(
+        'SELECT token_id, user_email, user_id, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE user_email = ?',
+      )
       .bind(userEmail)
       .all<UserAccessTokenInternal>()
       .then((result) => result.results);
     return results.map((row) => ({
       tokenId: row.token_id,
       userEmail: row.user_email,
+      userId: row.user_id ?? null,
       name: row.name,
       createdAt: row.created_at,
       expiresAt: row.expires_at,
@@ -90,6 +137,23 @@ class UserAccessTokenDAO extends BaseDAO {
     const result = await this.database
       .prepare('SELECT COUNT(*) as total FROM user_access_tokens WHERE user_email = ? AND expires_at > ?')
       .bind(userEmail, TimestampUtil.getCurrentUnixTimestampInSeconds())
+      .first<{ total: number }>();
+    return result?.total ?? 0;
+  }
+
+  /**
+   * Quota count for an account id. The `user_id IS NULL` clause is what stops a
+   * token the 0032 backfill could not attribute from escaping the quota — the
+   * alternative is a user who can mint past the cap by holding unattributed
+   * rows.
+   */
+  public async countActiveByUserId(userId: string, anchorEmail: string): Promise<number> {
+    const result = await this.database
+      .prepare(
+        `SELECT COUNT(*) as total FROM user_access_tokens
+         WHERE (user_id = ? OR (user_id IS NULL AND user_email = ?)) AND expires_at > ?`,
+      )
+      .bind(userId, anchorEmail, TimestampUtil.getCurrentUnixTimestampInSeconds())
       .first<{ total: number }>();
     return result?.total ?? 0;
   }
@@ -116,10 +180,25 @@ class UserAccessTokenDAO extends BaseDAO {
     }
   }
 
-  public async delete(tokenId: string, userEmail: string): Promise<void> {
+  /**
+   * Delete a token, asserting ownership.
+   *
+   * The ownership check is a security control, not a convenience filter, so it
+   * matches on the id when the caller resolved one and falls back to the anchor
+   * for a token written before 0032. The `user_id IS NULL` guard on the address
+   * arm is load-bearing: without it, an address that one account has moved off
+   * but which still sits in another account's legacy column would let the wrong
+   * caller delete the token.
+   */
+  public async delete(tokenId: string, anchorEmail: string, userId: string | null = null): Promise<void> {
+    const ownerClause: string =
+      userId === null
+        ? 'token_id = ? AND user_id IS NULL AND user_email = ?'
+        : 'token_id = ? AND (user_id = ? OR (user_id IS NULL AND user_email = ?))';
+    const bindings: unknown[] = userId === null ? [tokenId, anchorEmail] : [tokenId, userId, anchorEmail];
     const result: D1Result = await this.database
-      .prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND user_email = ?')
-      .bind(tokenId, userEmail)
+      .prepare(`DELETE FROM user_access_tokens WHERE ${ownerClause}`)
+      .bind(...bindings)
       .run();
     if (!result.success) {
       throw new DatabaseError(`Failed to delete access token: ${result.error}`);

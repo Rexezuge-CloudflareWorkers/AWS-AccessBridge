@@ -15,7 +15,14 @@ import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+type RequestContext = Context<{
+  Bindings: Env;
+  // `AuthenticatedUserEmailAddress` is the address the request authenticated as.
+  // `AuthenticatedUserId` is the stable account key that address resolves to
+  // (migration 0032), published alongside it so identity-keyed reads survive an
+  // address change. Optional, and absent on a database without 0032.
+  Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
+}>;
 type AuthenticatedEnv = Env & {
   DEMO_MODE?: string;
   DEV_AUTH_EMAIL?: string;
@@ -82,8 +89,12 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
   } finally {
     try {
       const userEmail: string = c.get('AuthenticatedUserEmailAddress') || 'unknown';
+      // The stable account id, so the entry stays findable after the account
+      // changes address. Optional: a database without 0032 leaves it unset and
+      // the entry is written address-keyed, exactly as before.
+      const userId: string | null = c.get('AuthenticatedUserId') ?? null;
       const auditService = getRequestScope({ AccessBridgeDB: c.env.AccessBridgeDB }).get(Tokens.AuditService);
-      const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env);
+      const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env, userId);
       // `waitUntil` returns void, so the promise it is handed is detached: a
       // rejection here would escape as an unhandled rejection in the runtime
       // rather than reach the catch below. Attach the handler to the promise.
@@ -98,10 +109,33 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
   }
 }
 
+/**
+ * Publish the authenticated account's stable id next to its address.
+ *
+ * Best-effort by design: the id is an optimisation that lets identity-keyed
+ * reads survive an address change, and the address alone remains a complete
+ * identity on a database that has not run 0032. So a failure here (a missing
+ * table, an unknown account) leaves the request authenticated rather than
+ * rejecting it — logging and continuing is the correct trade for a key that is
+ * only a faster path to the same answer.
+ */
+async function publishAccountId(c: RequestContext, userEmail: string): Promise<void> {
+  try {
+    const identity = getRequestScope(c.env as AuthenticatedEnv).get(Tokens.UserIdentityService);
+    const userId: string | null = await identity.resolveUserId(userEmail);
+    if (userId) {
+      c.set('AuthenticatedUserId', userId);
+    }
+  } catch (error: unknown) {
+    console.warn('Could not resolve authenticated user id:', error instanceof Error ? error.message : error);
+  }
+}
+
 async function userAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
   try {
     const userEmail: string = await authenticateUserIdentity(c);
     c.set('AuthenticatedUserEmailAddress', userEmail);
+    await publishAccountId(c, userEmail);
     await next();
   } catch (error: unknown) {
     if (error instanceof IServiceError) {
@@ -115,6 +149,7 @@ async function apiAuthenticationHandler(c: RequestContext, next: Next): Promise<
   try {
     const userEmail: string = await authenticateApiIdentity(c);
     c.set('AuthenticatedUserEmailAddress', userEmail);
+    await publishAccountId(c, userEmail);
     await next();
   } catch (error: unknown) {
     if (error instanceof IServiceError) {

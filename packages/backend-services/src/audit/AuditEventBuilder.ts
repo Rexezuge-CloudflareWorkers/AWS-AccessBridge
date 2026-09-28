@@ -1,7 +1,17 @@
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
 
 interface AuditEventInput {
+  /**
+   * The address as presented, so the log reads the same for an operator
+   * reconstructing history even after the account moves to a new one.
+   */
   userEmail: string;
+  /**
+   * The stable account key, which is what makes the entry still findable after
+   * an address change. Optional: an unauthenticated or unattributable actor is
+   * a legitimate state, and the entry is still written, just not id-keyed.
+   */
+  userId?: string | null;
   action: string;
   method: string;
   path: string;
@@ -26,6 +36,11 @@ class AuditEventBuilder {
 
   public userEmail(userEmail: string): this {
     this.input.userEmail = userEmail;
+    return this;
+  }
+
+  public userId(userId: string | null): this {
+    this.input.userId = userId;
     return this;
   }
 
@@ -67,6 +82,7 @@ class AuditEventBuilder {
     }
     return {
       userEmail: this.input.userEmail,
+      userId: this.input.userId ?? null,
       action: this.input.action,
       method: this.input.method,
       path: this.input.path,

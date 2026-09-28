@@ -9,6 +9,16 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 - Worker bindings: D1 `AccessBridgeDB`, KV `AccessBridgeKV`, Secrets Store `AES_ENCRYPTION_KEY_SECRET` / `INTERNAL_HMAC_SECRET`, DO `CRON_TASKS`, service binding `SELF`, cron `*/10 * * * *`. Binding source of truth: `packages/backend-runtime/src/env.d.ts` (checked in) + generated root `worker-configuration.d.ts` (`pnpm run typegen`).
 - `functions/[[path]].ts` — Pages catch-all proxy → `API_WORKER.fetch()` with `X-Forwarded-*` headers.
 
+## Migrations
+
+Apply with `pnpm exec wrangler d1 migrations apply aws-access-bridge-db [--local|--remote]` (requires a materialized `wrangler.jsonc`, or pass `--config`). `migrations/0030_squash.sql` is the squashed baseline for fresh databases; `0031`–`0032` are incremental and idempotent-ish (`ADD COLUMN` is guarded, but the harness must not re-apply a file).
+
+`0032_user_identity.sql` must be applied **before or with** the first deploy of the identity-decoupled code. It is purely additive — `user_metadata.user_email` stays the frozen anchor and primary key, because D1 honours neither `PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on`, and `defer_foreign_keys` does not suppress the `ON DELETE CASCADE` from `user_access_tokens`. The DAOs tolerate a database without it (they fall back to address lookups, via `isMissingSchemaError`), so a partially-migrated database still authenticates — but identity-keyed reads only key on `user_id` after the backfill, and provisioning stamps `id`/`current_email` only where those columns exist.
+
+Accounts whose address collides case-insensitively with another account (e.g. `Alice@x.com` alongside `alice@x.com`) are deliberately left with `user_metadata.current_email IS NULL`; find them with `SELECT user_email FROM user_metadata WHERE current_email IS NULL` and merge them out of band.
+
+Changing a sign-in address: `scripts/change-email.ts` (see `packages/backend-data/AGENTS.md` for the anchor rationale). It refuses an address already live for another account, case-insensitively.
+
 ## Auth vars (JWT config optional with Worker-level Access)
 
 `POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). Set both for self-hosted Access applications and cross-account (Cloudflare for SaaS) setups — explicit vars always win. When both are unset, requests authenticate via the platform-verified Worker-level Access identity (`ctx.access.getIdentity()`, threaded through `MiddlewareHandlers.authenticateUserIdentity`); enable one-click Access on the worker for same-account deploys that omit the vars.

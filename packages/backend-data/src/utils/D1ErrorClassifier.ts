@@ -45,4 +45,20 @@ function isD1ErrorRetryable(errorMessage: string): boolean {
   return false;
 }
 
-export { isD1ErrorRetryable };
+const MISSING_SCHEMA_PATTERNS: RegExp[] = [/no such table/i, /no such column/i, /has no column named/i, /does not exist/i];
+
+/**
+ * Whether an error is a *missing schema* failure rather than a genuine fault.
+ *
+ * The distinction matters wherever a read has a pre- and post-migration shape: a
+ * database that has not applied a migration raises "no such table", and the
+ * caller must degrade to its legacy path rather than treat it as an outage and
+ * fail the request. Anything else — a constraint violation, a timeout — keeps
+ * propagating, so an outage can never be mistaken for legacy data.
+ */
+function isMissingSchemaError(error: unknown): boolean {
+  const message: string = error instanceof Error ? error.message : String(error);
+  return message ? MISSING_SCHEMA_PATTERNS.some((pattern) => pattern.test(message)) : false;
+}
+
+export { isD1ErrorRetryable, isMissingSchemaError };

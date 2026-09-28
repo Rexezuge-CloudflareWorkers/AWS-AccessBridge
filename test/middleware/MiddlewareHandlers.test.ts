@@ -125,6 +125,7 @@ describe('MiddlewareHandlers', () => {
         undefined,
         '203.0.113.10',
         'Vitest',
+        null,
       );
       expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });
@@ -162,6 +163,7 @@ describe('MiddlewareHandlers', () => {
         undefined,
         '203.0.113.10',
         undefined,
+        null,
       );
     });
 
@@ -198,6 +200,7 @@ describe('MiddlewareHandlers', () => {
         undefined,
         '192.0.2.10',
         undefined,
+        null,
       );
     });
 
@@ -229,6 +232,7 @@ describe('MiddlewareHandlers', () => {
         undefined,
         undefined,
         undefined,
+        null,
       );
       expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });
@@ -284,7 +288,18 @@ describe('MiddlewareHandlers', () => {
       // more than auditing a successful one.
       const recordedStatus = auditLogCreateSpy.mock.calls[0][4];
       expect(recordedStatus).toBeGreaterThanOrEqual(500);
-      expect(auditLogCreateSpy).toHaveBeenCalledWith('unknown', 'GET:/api/test', 'GET', '/api/test', recordedStatus, undefined, undefined, undefined, undefined);
+      expect(auditLogCreateSpy).toHaveBeenCalledWith(
+        'unknown',
+        'GET:/api/test',
+        'GET',
+        '/api/test',
+        recordedStatus,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        null,
+      );
     });
   });
 
@@ -396,6 +411,8 @@ describe('MiddlewareHandlers', () => {
         undefined,
         undefined,
         undefined,
+        // No authenticated account, so no id: the entry is still written.
+        null,
       );
       expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });

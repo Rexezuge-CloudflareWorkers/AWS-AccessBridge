@@ -59,6 +59,15 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
     return c.get('AuthenticatedUserEmailAddress');
   }
 
+  /**
+   * The stable account id for the authenticated caller, or null when the
+   * database predates migration 0032 or the account could not be resolved.
+   * Services prefer it where available but must not require it.
+   */
+  protected getAuthenticatedUserId(c: ActivityContext<TEnv>): string | null {
+    return c.get('AuthenticatedUserId') ?? null;
+  }
+
   protected getBaseUrl(c: ActivityContext<TEnv>): string {
     return getRequestBaseUrl(c.req.raw, c.env);
   }
@@ -113,6 +122,10 @@ interface IEnv {
   DEMO_MODE?: string;
   Variables: {
     AuthenticatedUserEmailAddress: string;
+    /**
+    Stable account key (migration 0032); absent on a database without it.
+    */
+    AuthenticatedUserId?: string;
   };
   AccessBridgeDB: D1DatabaseSession;
 }

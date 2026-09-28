@@ -13,11 +13,18 @@ class AuditPayloadBuilder {
     return AUDIT_ACTIONS[`${method}:${path}`] || `${method}:${path}`;
   }
 
-  public static fromRequest(request: Request, userEmail: string, statusCode: number, envForOrigin?: unknown): AuditEvent {
+  public static fromRequest(
+    request: Request,
+    userEmail: string,
+    statusCode: number,
+    envForOrigin?: unknown,
+    userId: string | null = null,
+  ): AuditEvent {
     const method: string = request.method;
     const path: string = new URL(request.url).pathname;
     return AuditEventBuilder.create()
       .userEmail(userEmail)
+      .userId(userId)
       .action(this.resolveAction(method, path))
       .request(method, path)
       .status(statusCode)

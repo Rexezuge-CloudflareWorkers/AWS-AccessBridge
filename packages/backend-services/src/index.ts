@@ -8,6 +8,7 @@ export * from './cost';
 export * from './credential';
 export * from './error';
 export * from './http';
+export * from './identity';
 export * from './maintenance';
 export * from './resource';
 export * from './team';

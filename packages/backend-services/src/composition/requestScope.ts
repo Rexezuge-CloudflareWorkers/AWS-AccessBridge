@@ -15,6 +15,7 @@ import { CostService } from '../cost/CostService';
 import { CredentialChainService } from '../credential/CredentialChainService';
 import { CredentialService } from '../credential/CredentialService';
 import { CredentialStoreService } from '../credential/CredentialStoreService';
+import { UserIdentityService } from '../identity/UserIdentityService';
 import { MaintenanceService } from '../maintenance/MaintenanceService';
 import { ResourceService } from '../resource/ResourceService';
 import { TeamService } from '../team/TeamService';
@@ -83,6 +84,9 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
   scope.bind(Tokens.AuditService, () => new AuditService(env));
   scope.bind(Tokens.TokenService, () => new TokenService(env));
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env));
+  // One instance per request scope, which is what makes the address -> account
+  // memo in `UserIdentityService` a per-request cache rather than a leak.
+  scope.bind(Tokens.UserIdentityService, () => new UserIdentityService(env));
 
   return scope;
 }

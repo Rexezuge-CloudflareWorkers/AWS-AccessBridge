@@ -64,7 +64,7 @@ import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
-  Variables: { AuthenticatedUserEmailAddress: string };
+  Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
 }>;
 
 class AccessBridgeWorker extends AbstractEntrypointWorker {
@@ -75,10 +75,10 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
 
     const app: Hono<{
       Bindings: Env;
-      Variables: { AuthenticatedUserEmailAddress: string };
+      Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
     }> = new Hono<{
       Bindings: Env;
-      Variables: { AuthenticatedUserEmailAddress: string };
+      Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
     }>();
 
     // Canonical app entry is /user/ (protected by Cloudflare Access).

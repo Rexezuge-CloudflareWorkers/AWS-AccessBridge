@@ -1,7 +1,9 @@
 import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
+import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
 type ResourceServiceEnv = ServiceEnv;
 
@@ -26,11 +28,29 @@ interface ResourceSummary {
 }
 
 class ResourceService {
-  constructor(private readonly env: ResourceServiceEnv) {}
+  private readonly identity: UserIdentityService;
+
+  constructor(
+    private readonly env: ResourceServiceEnv,
+    identity?: UserIdentityService,
+  ) {
+    this.identity = identity ?? new UserIdentityService(env);
+  }
+
+  /**
+   * The id-keyed read target for `assumable_roles`. An unresolvable address
+   * still yields an owner with a null id, so an unknown actor reads as "no
+   * accounts" rather than erroring.
+   */
+  private async ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
+    const account = await this.identity.resolveAccount(userEmail);
+    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
+  }
 
   public async searchResources(userEmail: string, filters: ResourceSearchFilters = {}): Promise<ResourceList> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    let accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
+    const owner: AssumableRoleOwner = await this.ownerFor(userEmail);
+    let accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(owner);
 
     if (filters.accountId && accountIds.includes(filters.accountId)) {
       accountIds = [filters.accountId];
@@ -47,7 +67,7 @@ class ResourceService {
     const rolesByAccountEntries: Array<[string, string[]]> = await Promise.all(
       accountIds.map(async (accountId): Promise<[string, string[]]> => [
         accountId,
-        await assumableRolesDAO.getRolesByUserAndAccount(userEmail, accountId),
+        await assumableRolesDAO.getRolesByUserAndAccount(owner, accountId),
       ]),
     );
 
@@ -56,7 +76,7 @@ class ResourceService {
 
   public async getSummary(userEmail: string): Promise<ResourceSummary> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
+    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
 
     const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(this.env.AccessBridgeDB);
     const counts: Record<string, Record<string, number>> = await resourceDAO.getResourceCounts(accountIds);

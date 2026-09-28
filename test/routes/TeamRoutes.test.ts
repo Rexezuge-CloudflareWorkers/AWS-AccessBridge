@@ -20,6 +20,12 @@ vi.mock('@aws-access-bridge/backend-data/dao/TeamsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamMembersDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
+// Migration 0032: account resolution consults the address registry before the
+// anchor, so this suite stubs `UserEmailDAO` alongside `UserMetadataDAO`. The
+// automock resolves undefined, which `UserIdentityService` reads as "no
+// registry row" and falls through to the anchor - the pre-0032 path these
+// route tests already assume.
+vi.mock('@aws-access-bridge/backend-data/dao/UserEmailDAO');
 
 function adminEnv() {
   vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(true);
@@ -86,7 +92,11 @@ describe('team member routes', () => {
       env: adminEnv(),
     });
     await new AddTeamMemberRoute({} as never).handle(c as never);
-    expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('t1', 'dev@example.com', 'member');
+    expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+      't1',
+      { userId: null, anchorEmail: 'dev@example.com' },
+      'member',
+    );
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
@@ -123,7 +133,11 @@ describe('team member routes', () => {
       env: adminEnv(),
     });
     await new UpdateTeamMemberRoleRoute({} as never).handle(c as never);
-    expect(TeamMembersDAO.prototype.updateMemberRole).toHaveBeenCalledWith('t1', 'dev@example.com', 'admin');
+    expect(TeamMembersDAO.prototype.updateMemberRole).toHaveBeenCalledWith(
+      't1',
+      { userId: null, anchorEmail: 'dev@example.com' },
+      'admin',
+    );
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });
