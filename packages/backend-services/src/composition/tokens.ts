@@ -13,6 +13,7 @@ import type { AuditService } from '../audit/AuditService';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
 import type { CostService } from '../cost/CostService';
+import type { UserIdentityService } from '../identity/UserIdentityService';
 import type { CredentialService } from '../credential/CredentialService';
 import type { CredentialChainService } from '../credential/CredentialChainService';
 import type { CredentialStoreService } from '../credential/CredentialStoreService';
@@ -52,6 +53,7 @@ const Tokens = {
   AuditService: Symbol('AuditService') as Token<AuditService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
+  UserIdentityService: Symbol('UserIdentityService') as Token<UserIdentityService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

@@ -8,6 +8,7 @@ import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
 import { CredentialService } from '../../credential';
 import type { ServiceEnv } from '../../composition/ServiceEnv';
+import { UserIdentityService, idOf } from '../../identity/UserIdentityService';
 
 interface AssumeRoleServiceEnv extends ServiceEnv {
   // Narrowed from optional: chain walking needs the cache binding.
@@ -18,13 +19,17 @@ class AssumeRoleService {
   private readonly credentials: CredentialService;
   private readonly sts: StsService;
 
+  private readonly identity: UserIdentityService;
+
   constructor(
     private readonly env: AssumeRoleServiceEnv,
     sts?: StsService,
     credentials?: CredentialService,
+    identity?: UserIdentityService,
   ) {
     this.sts = sts ?? new StsService();
     this.credentials = credentials ?? new CredentialService(env, this.sts);
+    this.identity = identity ?? new UserIdentityService(env);
   }
 
   public async assumeRoleForUser(userEmail: string, principalArn: string): Promise<AccessKeysWithExpiration> {
@@ -35,19 +40,27 @@ class AssumeRoleService {
     const roleName: string = ArnUtil.getRoleNameFromArn(principalArn);
 
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    await assumableRolesDAO.verifyUserHasAccessToRole(userEmail, accountId, roleName);
+    const account = await this.identity.resolveAccount(userEmail);
+    await assumableRolesDAO.verifyUserHasAccessToRole(
+      { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail },
+      accountId,
+      roleName,
+    );
     const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(this.env.AccessBridgeDB);
     const roleConfig: RoleConfig | undefined = await roleConfigsDAO.getRoleConfig(accountId, roleName);
 
     const credentialChain: CredentialChain = await this.credentials.getCredentialChainToFirstCachedPrincipal(principalArn);
 
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
-    const userId: string = await userMetadataDAO.getOrCreateFederationUsername(userEmail);
+    // The anchor, not the presented address: the account row is keyed on the
+    // anchor, and reading the current address here would return a session name
+    // for a row that does not exist and change the STS RoleSessionName.
+    const sessionName: string = await userMetadataDAO.getOrCreateFederationUsername(account?.anchorEmail ?? userEmail);
 
     const cacheDAO = await this.credentials.createCacheDAO();
     const { startIndex, credentials } = await this.findClosestCachedCredential(cacheDAO, credentialChain);
 
-    return this.assumeRoleChain(cacheDAO, credentialChain, startIndex, credentials, userId, roleConfig?.roleSessionDurationSeconds);
+    return this.assumeRoleChain(cacheDAO, credentialChain, startIndex, credentials, sessionName, roleConfig?.roleSessionDurationSeconds);
   }
 
   /**

@@ -1,6 +1,7 @@
 interface UserAccessTokenMetadata {
   tokenId: string;
   userEmail: string;
+  userId?: string | null;
   name: string;
   createdAt: number;
   expiresAt: number;
@@ -14,6 +15,7 @@ interface UserAccessToken extends UserAccessTokenMetadata {
 interface UserAccessTokenInternal {
   token_id: string;
   user_email: string;
+  user_id?: string | null;
   access_token: string;
   name: string;
   created_at: number;

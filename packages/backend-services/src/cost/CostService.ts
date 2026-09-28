@@ -1,8 +1,10 @@
 import { AssumableRolesDAO, CostDataDAO, DataCollectionConfigDAO, SpendAlertDAO } from '@aws-access-bridge/backend-data/dao';
+import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { CostData, SpendAlert } from '@aws-access-bridge/shared/model';
 import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
 type CostServiceEnv = ServiceEnv;
 
@@ -30,11 +32,28 @@ interface MonthlyTrend {
 }
 
 class CostService {
-  constructor(private readonly env: CostServiceEnv) {}
+  private readonly identity: UserIdentityService;
+
+  constructor(
+    private readonly env: CostServiceEnv,
+    identity?: UserIdentityService,
+  ) {
+    this.identity = identity ?? new UserIdentityService(env);
+  }
+
+  /**
+   * The id-keyed read target for `assumable_roles`. An unresolvable address
+   * still yields an owner with a null id, so an unknown actor reads as "no
+   * accounts" instead of erroring.
+   */
+  private async ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
+    const account = await this.identity.resolveAccount(userEmail);
+    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
+  }
 
   public async getSummary(userEmail: string, lookbackDays: number = 30): Promise<CostSummary> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
+    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
 
     if (accountIds.length === 0) return { accounts: {}, grandTotal: 0 };
 
@@ -65,7 +84,7 @@ class CostService {
 
   public async getAccountCost(userEmail: string, awsAccountId: string, startDate?: string, endDate?: string): Promise<AccountCost> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const roles: string[] = await assumableRolesDAO.getRolesByUserAndAccount(userEmail, awsAccountId);
+    const roles: string[] = await assumableRolesDAO.getRolesByUserAndAccount(await this.ownerFor(userEmail), awsAccountId);
     if (roles.length === 0) throw new ForbiddenError('You do not have access to this account.');
 
     const effectiveEndDate: string = endDate || new Date().toISOString().split('T', 1)[0];
@@ -94,7 +113,7 @@ class CostService {
   public async getTrends(userEmail: string, months: number = 6): Promise<{ months: MonthlyTrend[] }> {
     const boundedMonths: number = Math.min(months, 12);
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(userEmail);
+    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
 
     if (accountIds.length === 0) return { months: [] };
 

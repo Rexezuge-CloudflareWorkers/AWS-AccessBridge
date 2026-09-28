@@ -22,6 +22,12 @@ vi.mock('@aws-access-bridge/backend-data/dao/UserFavoriteAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
+// Migration 0032: account resolution consults the address registry before the
+// anchor, so this suite stubs `UserEmailDAO` alongside `UserMetadataDAO`. The
+// automock resolves undefined, which `UserIdentityService` reads as "no
+// registry row" and falls through to the anchor - the pre-0032 path these
+// route tests already assume.
+vi.mock('@aws-access-bridge/backend-data/dao/UserEmailDAO');
 
 describe('user profile routes', () => {
   beforeEach(() => {
@@ -53,7 +59,7 @@ describe('assumables routes', () => {
 
   it('GET /user/assumables lists roles with totals', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getTotalAccountsCount).mockResolvedValue(2);
-    vi.mocked(AssumableRolesDAO.prototype.getAllRolesByUserEmail).mockResolvedValue({
+    vi.mocked(AssumableRolesDAO.prototype.getAllRolesByOwner).mockResolvedValue({
       '123456789012': { roles: ['Dev'], nickname: 'dev', favorite: false },
     });
     const c = createRouteContext({ url: 'https://example.com/user/assumables?limit=10&offset=0' });
@@ -81,7 +87,11 @@ describe('assumables routes', () => {
     vi.mocked(AssumableRolesDAO.prototype.hideRole).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012', roleName: 'Dev' } });
     await new HideRoleRoute({} as never).handle(c as never);
-    expect(AssumableRolesDAO.prototype.hideRole).toHaveBeenCalledWith('user@example.com', '123456789012', 'Dev');
+    expect(AssumableRolesDAO.prototype.hideRole).toHaveBeenCalledWith(
+      { userId: null, anchorEmail: 'user@example.com' },
+      '123456789012',
+      'Dev',
+    );
     expect(c.json).toHaveBeenCalledWith({ success: true });
   });
 

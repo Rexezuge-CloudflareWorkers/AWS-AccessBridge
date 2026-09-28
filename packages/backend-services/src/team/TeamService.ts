@@ -1,15 +1,24 @@
 import { TeamAccountsDAO, TeamMembersDAO, TeamsDAO } from '@aws-access-bridge/backend-data/dao';
+import type { TeamMemberOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { Team, TeamMember } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
 const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
 
 type TeamServiceEnv = ServiceEnv;
 
 class TeamService {
-  constructor(private readonly env: TeamServiceEnv) {}
+  private readonly identity: UserIdentityService;
+
+  constructor(
+    private readonly env: TeamServiceEnv,
+    identity?: UserIdentityService,
+  ) {
+    this.identity = identity ?? new UserIdentityService(env);
+  }
 
   public async createTeam(teamName: string, createdBy: string): Promise<Team> {
     if (!teamName?.trim()) throw new BadRequestError('Missing required field: teamName.');
@@ -34,12 +43,14 @@ class TeamService {
 
   public async addMember(teamId: string, userEmail: string, role: string = 'member'): Promise<void> {
     if (!teamId || !userEmail) throw new BadRequestError('Missing required fields.');
-    await new TeamMembersDAO(this.env.AccessBridgeDB).addMember(teamId, userEmail, role);
+    const owner = await this.ownerFor(userEmail);
+    await new TeamMembersDAO(this.env.AccessBridgeDB).addMember(teamId, owner, role);
   }
 
   public async removeMember(teamId: string, userEmail: string): Promise<void> {
     if (!teamId || !userEmail) throw new BadRequestError('Missing required fields.');
-    await new TeamMembersDAO(this.env.AccessBridgeDB).removeMember(teamId, userEmail);
+    const owner = await this.ownerFor(userEmail);
+    await new TeamMembersDAO(this.env.AccessBridgeDB).removeMember(teamId, owner);
   }
 
   public async listMembers(teamId: string): Promise<TeamMember[]> {
@@ -49,7 +60,21 @@ class TeamService {
 
   public async updateMemberRole(teamId: string, userEmail: string, role: string): Promise<void> {
     if (!teamId || !userEmail || !role) throw new BadRequestError('Missing required fields.');
-    await new TeamMembersDAO(this.env.AccessBridgeDB).updateMemberRole(teamId, userEmail, role);
+    const owner = await this.ownerFor(userEmail);
+    await new TeamMembersDAO(this.env.AccessBridgeDB).updateMemberRole(teamId, owner, role);
+  }
+
+  /**
+   * The id-keyed read/write target for `team_members`.
+   *
+   * An unresolvable address still yields an owner with a null id, so a membership
+   * operation against an unknown actor matches only the legacy rows that
+   * pre-0032 could not attribute — it cannot silently retarget someone else's
+   * membership.
+   */
+  private async ownerFor(userEmail: string): Promise<TeamMemberOwner> {
+    const account = await this.identity.resolveAccount(userEmail);
+    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
   }
 
   public async addAccount(teamId: string, awsAccountId: string): Promise<void> {

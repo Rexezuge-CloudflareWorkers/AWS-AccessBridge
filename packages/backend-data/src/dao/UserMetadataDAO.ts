@@ -1,15 +1,123 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { UserMetadataInternal } from '@aws-access-bridge/shared/model';
+import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
 import { BaseDAO } from './BaseDAO';
 
+/**
+ * A row of `user_metadata`, including the identity columns added by migration
+ * 0032. `user_email` is the frozen anchor and `current_email` the mutable
+ * sign-in address; both are absent on a database that predates 0032, which is
+ * why the read paths below fall back rather than assume.
+ */
+interface UserMetadataIdentityInternal extends UserMetadataInternal {
+  id?: string | null;
+  current_email?: string | null;
+}
+
 class UserMetadataDAO extends BaseDAO {
+  /**
+   * Mint a new opaque account id. `randomblob` is the same source migration
+   * 0032 uses for the backfill, so ids minted here and ids minted by the
+   * migration are indistinguishable in shape.
+   */
+  public static newId(): string {
+    return `usr_${crypto.randomUUID().replaceAll('-', '')}`;
+  }
+
+  /**
+   * Provision an account if it does not exist, stamping the 0032 identity
+   * columns in the same statement.
+   *
+   * The identity columns cannot be left to a later backfill: a row created after
+   * the migration is never backfilled again, so an account provisioned here
+   * without an id would be permanently unresolvable — and its tokens, grants
+   * and memberships would carry a NULL `user_id` that fails the foreign keys
+   * added alongside them.
+   */
   public async ensureUserEmailExists(userEmail: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('INSERT OR IGNORE INTO user_metadata (user_email) VALUES (?)')
-      .bind(userEmail)
-      .run();
+    const id: string = UserMetadataDAO.newId();
+    let result: D1Result;
+    try {
+      result = await this.database
+        .prepare('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email) VALUES (?, ?, ?)')
+        .bind(userEmail, id, userEmail.toLowerCase())
+        .run();
+    } catch (error) {
+      // Pre-0032 database: the identity columns do not exist yet, and the
+      // address alone is still a complete identity there.
+      if (!isMissingSchemaError(error)) throw error;
+      result = await this.database
+        .prepare('INSERT OR IGNORE INTO user_metadata (user_email) VALUES (?)')
+        .bind(userEmail)
+        .run();
+    }
     if (!result.success) {
       throw new DatabaseError(`Failed to ensure user email exists: ${result.error}`);
+    }
+  }
+
+  /**
+   * Provision a new account, stamping the 0032 identity columns in the same
+   * statement.
+   *
+   * The anchor is the address itself whenever it is free, which keeps a fresh
+   * row shaped like every pre-0032 one. `INSERT OR IGNORE` makes a second call
+   * with an anchor that is already taken a no-op rather than an error, so
+   * `UserIdentityService` can retry with a different anchor when a released
+   * address is still held.
+   */
+  public async createUser(input: { id: string; anchor: string; loginEmail: string }): Promise<void> {
+    const result: D1Result = await this.database
+      .prepare('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email) VALUES (?, ?, ?)')
+      .bind(input.anchor, input.id, input.loginEmail.toLowerCase())
+      .run();
+    if (!result.success) {
+      throw new DatabaseError(`Failed to create user: ${result.error}`);
+    }
+  }
+
+  /**
+   * Account behind a stable id. The inverse of the address lookups, for
+   * callers that already hold a key (a token, a team membership) and need the
+   * address the account signs in with today.
+   */
+  public async getById(userId: string): Promise<UserMetadataIdentityInternal | null> {
+    return this.database
+      .prepare('SELECT user_email, id, current_email FROM user_metadata WHERE id = ? LIMIT 1')
+      .bind(userId)
+      .first<UserMetadataIdentityInternal>();
+  }
+
+  /**
+   * Account by its mutable sign-in address. 0032-only: `current_email` is the
+   * column that moves, so this is what survives a change of address.
+   */
+  public async getByCurrentEmail(currentEmail: string): Promise<UserMetadataIdentityInternal | null> {
+    return this.database
+      .prepare('SELECT user_email, id, current_email FROM user_metadata WHERE current_email = ? LIMIT 1')
+      .bind(currentEmail.toLowerCase())
+      .first<UserMetadataIdentityInternal>();
+  }
+
+  /**
+   * Account by its frozen anchor — the pre-0032 identity, and the only lookup
+   * that works on a database which has not applied 0032 at all. Exact match, to
+   * mirror the case-sensitive foreign keys the anchor still backs.
+   */
+  public async getByAnchor(anchorEmail: string): Promise<UserMetadataIdentityInternal | null> {
+    return this.database
+      .prepare('SELECT user_email, id, current_email FROM user_metadata WHERE user_email = ? LIMIT 1')
+      .bind(anchorEmail)
+      .first<UserMetadataIdentityInternal>();
+  }
+
+  public async setCurrentEmail(userId: string, currentEmail: string): Promise<void> {
+    const result: D1Result = await this.database
+      .prepare('UPDATE user_metadata SET current_email = ? WHERE id = ?')
+      .bind(currentEmail.toLowerCase(), userId)
+      .run();
+    if (!result.success) {
+      throw new DatabaseError(`Failed to set current email: ${result.error}`);
     }
   }
 
@@ -73,3 +181,4 @@ class UserMetadataDAO extends BaseDAO {
 }
 
 export { UserMetadataDAO };
+export type { UserMetadataIdentityInternal };

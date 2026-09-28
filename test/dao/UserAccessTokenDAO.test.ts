@@ -29,9 +29,18 @@ describe('UserAccessTokenDAO', () => {
   describe('create', () => {
     it('inserts a new access token', async () => {
       const dao = new UserAccessTokenDAO(mockDb);
-      await dao.create('token-id', 'user@test.com', 'token-value', 'My Token', 1800000000);
+      await dao.create('token-id', 'user@test.com', 'token-value', 'My Token', 1800000000, 'usr_abc');
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO user_access_tokens'));
-      expect(mockStmt.bind).toHaveBeenCalledWith('token-id', 'user@test.com', 'token-value', 'My Token', expect.any(Number), 1800000000);
+      // The anchor goes in the FK'd column; the id is what survives a change.
+      expect(mockStmt.bind).toHaveBeenCalledWith(
+        'token-id',
+        'user@test.com',
+        'token-value',
+        'My Token',
+        expect.any(Number),
+        1800000000,
+        'usr_abc',
+      );
     });
 
     it('throws DatabaseError on failure', async () => {
@@ -50,6 +59,7 @@ describe('UserAccessTokenDAO', () => {
         name: 'My Token',
         created_at: 1700000000,
         expires_at: 1800000000,
+        user_id: 'usr_abc',
         last_used_at: 1750000000,
       });
       const dao = new UserAccessTokenDAO(mockDb);
@@ -57,6 +67,7 @@ describe('UserAccessTokenDAO', () => {
       expect(result).toEqual({
         tokenId: 'tid',
         userEmail: 'user@test.com',
+        userId: 'usr_abc',
         name: 'My Token',
         createdAt: 1700000000,
         expiresAt: 1800000000,
@@ -80,13 +91,17 @@ describe('UserAccessTokenDAO', () => {
         name: 'My Token',
         created_at: 1700000000,
         expires_at: 1800000000,
+        user_id: null,
         last_used_at: undefined,
       });
       const dao = new UserAccessTokenDAO(mockDb);
       const result = await dao.getByToken('tok', false);
+      // A token with no id (pre-0032) reports null, which is what makes
+      // TokenService fall back to the stored address.
       expect(result).toEqual({
         tokenId: 'tid',
         userEmail: 'user@test.com',
+        userId: null,
         name: 'My Token',
         createdAt: 1700000000,
         expiresAt: 1800000000,

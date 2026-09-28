@@ -19,6 +19,12 @@ vi.mock('@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
+// Migration 0032: account resolution consults the address registry before the
+// anchor, so this suite stubs `UserEmailDAO` alongside `UserMetadataDAO`. The
+// automock resolves undefined, which `UserIdentityService` reads as "no
+// registry row" and falls through to the anchor - the pre-0032 path these
+// route tests already assume.
+vi.mock('@aws-access-bridge/backend-data/dao/UserEmailDAO');
 vi.mock('@aws-access-bridge/backend-services/aws/sts');
 
 function adminEnv() {
@@ -115,7 +121,11 @@ describe('admin access routes', () => {
       env: adminEnv(),
     });
     await new GrantAccessRoute({} as never).handle(c as never);
-    expect(AssumableRolesDAO.prototype.grantUserAccessToRole).toHaveBeenCalledWith('dev@example.com', '123456789012', 'Dev');
+    expect(AssumableRolesDAO.prototype.grantUserAccessToRole).toHaveBeenCalledWith(
+      { userId: null, anchorEmail: 'dev@example.com' },
+      '123456789012',
+      'Dev',
+    );
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 

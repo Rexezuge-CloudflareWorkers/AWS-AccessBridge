@@ -26,8 +26,14 @@ class AuditService {
     return AuditPayloadBuilder.resolveAction(method, path);
   }
 
-  public buildRequestEvent(request: Request, userEmail: string, statusCode: number, envForOrigin?: unknown): AuditEvent {
-    return AuditPayloadBuilder.fromRequest(request, userEmail, statusCode, envForOrigin);
+  public buildRequestEvent(
+    request: Request,
+    userEmail: string,
+    statusCode: number,
+    envForOrigin?: unknown,
+    userId: string | null = null,
+  ): AuditEvent {
+    return AuditPayloadBuilder.fromRequest(request, userEmail, statusCode, envForOrigin, userId);
   }
 
   public async record(event: AuditEvent): Promise<void> {
