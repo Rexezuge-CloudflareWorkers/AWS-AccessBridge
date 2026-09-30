@@ -6,7 +6,7 @@ permissions:
 on:
   repository_dispatch:
     types:
-      - Upstream Sync
+      - Upstream Sync Integration
   pull_request:
   push:
     branches:
