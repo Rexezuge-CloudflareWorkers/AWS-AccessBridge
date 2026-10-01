@@ -1,6 +1,6 @@
 import { OpenAPIRoute } from 'chanfana';
 import { Context } from 'hono';
-import type { StatusCode } from 'hono/utils/http-status';
+import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
 import { DefaultInternalServerError, DatabaseError, InternalServerError, IServiceError } from '@aws-access-bridge/backend-errors';
 import { validateRequestInput } from '@/schema';
 import { getQueryParam, getRequestBaseUrl, isDemoModeEnv, withUnconstrainedD1Session } from './route-helpers';
@@ -79,7 +79,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
   protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {
     if (error instanceof IServiceError && error.getErrorCode() < 500) {
       console.warn(`Responding with ${error.getErrorType()}:`, error.stack);
-      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
+      return this.exceptionResponse(c, error, error.getErrorCode());
     }
     if (error instanceof DatabaseError) {
       // DatabaseError messages embed the underlying D1/SQLite text (table and
@@ -92,12 +92,19 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       console.error('Caught service error during execution:', error);
     }
     console.warn('Responding with DefaultInternalServerError:', DefaultInternalServerError);
-    return c.json(
-      {
-        Exception: { Type: DefaultInternalServerError.getErrorType(), Message: DefaultInternalServerError.getErrorMessage() },
-      },
-      DefaultInternalServerError.getErrorCode(),
-    );
+    return this.exceptionResponse(c, DefaultInternalServerError, DefaultInternalServerError.getErrorCode());
+  }
+
+  /**
+   * The `{Exception: {Type, Message}}` envelope every error response shares.
+   *
+   * `status` is a plain number rather than Hono's `StatusCode` because the two
+   * call sites pass `getErrorCode()`, which is `ContentfulStatusCode` — the
+   * declared type of which is narrower than the generic this route's context
+   * infers.
+   */
+  private exceptionResponse(c: ActivityContext<TEnv>, error: IServiceError, status: ContentfulStatusCode) {
+    return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, status as never);
   }
 }
 

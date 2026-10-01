@@ -13,3 +13,10 @@ export const DEFAULT_COST_COLLECTION_INTERVAL_HOURS: string = '6';
 export const DEFAULT_COST_LOOKBACK_DAYS: string = '30';
 export const DEFAULT_RESOURCE_COLLECTION_INTERVAL_HOURS: string = '2';
 export const DEFAULT_PRUNE_BATCH_SIZE: string = '500';
+/**
+ * Anything other than the literal `production` — unset included. The value only
+ * matters because `production` makes the `DEV_AUTH_EMAIL` auth bypass refuse
+ * rather than authenticate, so defaulting to non-production is the permissive
+ * direction a fresh clone wants and the loud one a deployed Worker gets.
+ */
+export const DEFAULT_ENVIRONMENT: string = 'development';

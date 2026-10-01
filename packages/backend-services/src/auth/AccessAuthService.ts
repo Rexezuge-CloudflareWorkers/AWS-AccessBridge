@@ -1,6 +1,6 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
@@ -27,6 +27,16 @@ class AccessAuthService {
     }
     // Local-only bypass for integration tests and `wrangler dev`. Never set in production.
     if (this.env.DEV_AUTH_EMAIL) {
+      // Fail closed rather than authenticate. Read before JWT verification and
+      // with no environment guard, a `DEV_AUTH_EMAIL` promoted from a `.dev.vars`
+      // would authenticate *every* caller as that address — including as
+      // super-admin, and for `/api/aws/assume-role`. The integration suite sets
+      // it in vars, which is exactly the mistake being guarded against, so it is
+      // honoured only when the environment says it is not a real deployment.
+      if (ConfigurationManager.environment.isProduction(this.env)) {
+        throw new InternalServerError('DEV_AUTH_EMAIL is set in a production environment. Remove it and redeploy.');
+      }
+      console.warn('Bypassing Cloudflare Access: DEV_AUTH_EMAIL is set. This is only safe outside production.');
       return this.env.DEV_AUTH_EMAIL;
     }
     if (this.env.TEAM_DOMAIN && this.env.POLICY_AUD) {

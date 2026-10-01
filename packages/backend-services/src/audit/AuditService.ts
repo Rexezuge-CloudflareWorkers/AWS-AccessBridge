@@ -36,7 +36,14 @@ class AuditService {
     return AuditPayloadBuilder.fromRequest(request, userEmail, statusCode, envForOrigin, userId);
   }
 
-  public async record(event: AuditEvent): Promise<void> {
+  /**
+   * Record an event to every observer.
+   *
+   * Never rejects: a failing audit sink must not fail the request that triggered
+   * it, and `activityAudit` runs this detached via `waitUntil`. Failures are
+   * logged inside `AuditObserverRegistry.notifyAll`.
+   */
+public async record(event: AuditEvent): Promise<void> {
     await this.registry.notifyAll(event);
   }
 

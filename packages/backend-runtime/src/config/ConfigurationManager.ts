@@ -6,6 +6,7 @@ import {
   DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES,
   DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
   DEFAULT_DEMO_MODE,
+  DEFAULT_ENVIRONMENT,
   DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
@@ -60,7 +61,6 @@ class ConfigurationManager {
   public static readonly auth = {
     getTeamDomain: (env: unknown): string | undefined => (env as Record<string, string | undefined>)['TEAM_DOMAIN'],
     getPolicyAud: (env: unknown): string | undefined => (env as Record<string, string | undefined>)['POLICY_AUD'],
-    getDevAuthEmail: (env: unknown): string | undefined => (env as Record<string, string | undefined>)['DEV_AUTH_EMAIL'],
     isDemoMode: (env: unknown): boolean => EnvParser.boolean(env, 'DEMO_MODE', DEFAULT_DEMO_MODE),
   };
 
@@ -71,6 +71,16 @@ class ConfigurationManager {
         'INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS',
         DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
       ),
+  };
+
+  /**
+   * The deployment environment name. `production` is the only value that changes
+   * behaviour — it makes the `DEV_AUTH_EMAIL` bypass refuse rather than
+   * authenticate — so it is an explicit opt-in rather than an inference from
+   * `wrangler dev`.
+   */
+  public static readonly environment = {
+    isProduction: (env: unknown): boolean => EnvParser.string(env, 'ENVIRONMENT', DEFAULT_ENVIRONMENT) === 'production',
   };
 
   public static readonly spa = {

@@ -84,6 +84,9 @@
     "PRINCIPAL_TRUST_CHAIN_LIMIT": "3",
     "AUDIT_LOG_RETENTION_DAYS": "90",
     "DEMO_MODE": "false",
+    // Only the literal "production" arms the DEV_AUTH_EMAIL guard. Set this on
+    // every real deployment.
+    "ENVIRONMENT": "production",
   },
   "triggers": {
     "crons": ["*/10 * * * *"],

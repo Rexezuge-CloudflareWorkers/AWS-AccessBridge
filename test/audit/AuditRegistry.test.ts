@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuditPayloadBuilder } from '@aws-access-bridge/backend-services/audit/AuditPayloadBuilder';
 import { AuditObserverRegistry } from '@aws-access-bridge/backend-services/audit/AuditObserverRegistry';
 import { AuditService } from '@aws-access-bridge/backend-services/audit/AuditService';
@@ -21,13 +21,32 @@ describe('AuditPayloadBuilder', () => {
 });
 
 describe('AuditObserverRegistry', () => {
-  it('fans out via allSettled and isolates failures', async () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('notifies every observer even when one fails', async () => {
     const ok = { notify: vi.fn().mockResolvedValue(undefined) };
     const failing = { notify: vi.fn().mockRejectedValue(new Error('sink down')) };
     const registry = AuditObserverRegistry.withObservers([ok, failing]);
-    const results = await registry.notifyAll({ action: 'X' } as never);
-    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected']);
+    await registry.notifyAll({ action: 'X' } as never);
+    // `allSettled`, so a failing sink cannot stop the others recording.
     expect(ok.notify).toHaveBeenCalledOnce();
+    expect(failing.notify).toHaveBeenCalledOnce();
+  });
+
+  it('does not reject, so an audit failure cannot fail the request', async () => {
+    const failing = { notify: vi.fn().mockRejectedValue(new Error('D1 is busy')) };
+    await expect(AuditObserverRegistry.withObservers([failing]).notifyAll({ action: 'X' } as never)).resolves.toBeUndefined();
+  });
+
+  it('logs a failure that would otherwise vanish', async () => {
+    // Regression: `notifyAll` used to *return* the `allSettled` results and
+    // `AuditService.record` discarded them, so every rejected `AuditLogDAO.create`
+    // disappeared with no log at all — a governance control failing silently.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await AuditObserverRegistry.withObservers([{ notify: vi.fn().mockRejectedValue(new Error('D1 is busy')) }]).notifyAll({ action: 'X' } as never);
+    expect(logged.mock.calls.flat().join(' ')).toContain('D1 is busy');
   });
 });
 

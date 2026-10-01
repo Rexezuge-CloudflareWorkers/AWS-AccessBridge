@@ -153,7 +153,14 @@ class UserIdentityService {
     // pre-0032 database where the anchor *is* the identity. All three still
     // resolve, the last two through the anchor. A revoked address always has a
     // registry row and returned above.
-    const byAnchor = await Promise.resolve(userMetadataDAO.getByCurrentEmail(email)).catch(() => null);
+    // Only a missing registry schema is tolerated. Swallowing a real D1 failure
+    // here would return "no such account" for an account that exists, so every
+    // service would read as empty — no assumables, no resources, not an
+    // administrator — with no error anywhere.
+    const byAnchor = await Promise.resolve(userMetadataDAO.getByCurrentEmail(email)).catch((error: unknown) => {
+      if (isMissingSchemaError(error)) return null;
+      throw error;
+    });
     if (byAnchor?.id && byAnchor.current_email !== null) {
       return {
         id: byAnchor.id,
@@ -171,7 +178,12 @@ class UserIdentityService {
    * whose anchor was left ambiguous still lands here.
    */
   private async findByAnchor(dao: UserMetadataDAO, email: string): Promise<AccountIdentity | null> {
-    const row = await Promise.resolve(dao.getByAnchor(email)).catch(() => null);
+    // Same rule as `load`: only a pre-0032 database degrades to the anchor path,
+    // an actual D1 failure propagates.
+    const row = await Promise.resolve(dao.getByAnchor(email)).catch((error: unknown) => {
+      if (isMissingSchemaError(error)) return null;
+      throw error;
+    });
     if (!row) return null;
     // A row with no id is either a pre-0032 database or one of the ambiguous
     // mixed-case accounts 0032 left unresolved. Report the empty id rather than
@@ -279,10 +291,20 @@ class UserIdentityService {
     email: string,
     userId: string,
   ): Promise<boolean> {
-    const registered = await Promise.resolve(userEmailDAO.get(email)).catch(() => null);
+    // Propagates on anything but a missing 0032 schema, deliberately. This is the
+    // guard that stops `setPrimaryEmail` claiming an address that is already a
+    // live login for a different account; treating a failed lookup as "not
+    // claimed" turns a D1 blip into an identity takeover.
+    const registered = await Promise.resolve(userEmailDAO.get(email)).catch((error: unknown) => {
+      if (isMissingSchemaError(error)) return null;
+      throw error;
+    });
     if (registered && registered.is_verified === 1 && registered.user_id !== userId) return true;
 
-    const owner = await Promise.resolve(userMetadataDAO.getByCurrentEmail(email)).catch(() => null);
+    const owner = await Promise.resolve(userMetadataDAO.getByCurrentEmail(email)).catch((error: unknown) => {
+      if (isMissingSchemaError(error)) return null;
+      throw error;
+    });
     return Boolean(owner?.id && owner.id !== userId);
   }
 

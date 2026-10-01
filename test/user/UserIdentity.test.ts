@@ -162,6 +162,67 @@ describe('UserIdentityService', () => {
       });
       await expect(service.resolveAccount('user@example.com')).rejects.toThrow(/UNIQUE constraint failed/);
     });
+
+    // The registry lookup discriminates correctly, but three sibling lookups used
+    // a bare `.catch(() => null)`. On a D1 outage `resolveAccount` therefore
+    // answered "no such account" for an account that exists, and every service
+    // reading through it silently returned empty — no assumables, no resources,
+    // not a super-admin — with no error anywhere.
+    it('propagates a D1 failure from the current_email lookup', async () => {
+      const { service, metadataDAO } = harness();
+      vi.mocked(metadataDAO.getByCurrentEmail).mockRejectedValue(new Error('D1_ERROR: database is locked'));
+      await expect(service.resolveAccount('user@example.com')).rejects.toThrow(/database is locked/);
+    });
+
+    it('propagates a D1 failure from the anchor lookup', async () => {
+      const { service, metadataDAO } = harness();
+      vi.mocked(metadataDAO.getByAnchor).mockRejectedValue(new Error('D1_ERROR: database is locked'));
+      await expect(service.resolveAccount('user@example.com')).rejects.toThrow(/database is locked/);
+    });
+
+    it('still degrades to the anchor for a pre-0032 database', async () => {
+      const { service, metadataDAO } = harness({ byAnchor: { user_email: 'user@example.com', id: null, current_email: null } });
+      vi.mocked(metadataDAO.getByCurrentEmail).mockRejectedValue(new Error('D1_ERROR: no such column: current_email'));
+      await expect(service.resolveAccount('user@example.com')).resolves.toMatchObject({ anchorEmail: 'user@example.com' });
+    });
+  });
+
+  describe('setPrimaryEmail claim guard', () => {
+    /**
+     * `isClaimedByOther` returning `false` on a failed lookup is an identity
+     * takeover: the check is the only thing stopping one account from claiming an
+     * address that is already a live login for another, and Cloudflare Access is
+     * the sole authenticator so there is no proof-of-control step behind it.
+     */
+    it('refuses to proceed when the claim check fails, instead of claiming the address', async () => {
+      const { service, metadataDAO, emailDAO } = harness();
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
+      vi.mocked(emailDAO.get).mockRejectedValue(new Error('D1_ERROR: database is locked'));
+
+      await expect(service.setPrimaryEmail('usr_abc', 'victim@example.com')).rejects.toThrow(/database is locked/);
+      // The decisive assertion: nothing was written.
+      expect(emailDAO.register).not.toHaveBeenCalled();
+      expect(metadataDAO.setCurrentEmail).not.toHaveBeenCalled();
+    });
+
+    it('refuses when only the current_email probe fails', async () => {
+      const { service, metadataDAO, emailDAO } = harness();
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
+      vi.mocked(emailDAO.get).mockResolvedValue(null);
+      vi.mocked(metadataDAO.getByCurrentEmail).mockRejectedValue(new Error('D1_ERROR: database is locked'));
+
+      await expect(service.setPrimaryEmail('usr_abc', 'victim@example.com')).rejects.toThrow(/database is locked/);
+      expect(emailDAO.register).not.toHaveBeenCalled();
+    });
+
+    it('rejects an address that is already verified for another account', async () => {
+      const { service, metadataDAO, emailDAO } = harness();
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
+      vi.mocked(emailDAO.get).mockResolvedValue({ email: 'victim@example.com', user_id: 'usr_other', is_verified: 1 });
+
+      await expect(service.setPrimaryEmail('usr_abc', 'victim@example.com')).rejects.toThrow(/already in use/);
+      expect(emailDAO.register).not.toHaveBeenCalled();
+    });
   });
 
   describe('resolveUserId', () => {
