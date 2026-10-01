@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PLACEHOLDER_DATABASE_ID, resolveD1Target } from '../../scripts/backup/resolve-d1-target';
+import { DEFAULT_UUID } from '../../scripts/lib/wrangler-config/types';
+import { resolveD1Target } from '../../scripts/backup/d1-target';
 
 const REAL_ID = '11111111-2222-3333-4444-555555555555';
 
@@ -24,7 +25,7 @@ describe('resolveD1Target', () => {
   it('refuses to back up a database prepare-wrangler-config just created', () => {
     expect(() =>
       resolveD1Target({
-        d1_databases: [{ binding: 'AccessBridgeDB', database_name: 'aws-access-bridge-db', database_id: PLACEHOLDER_DATABASE_ID }],
+        d1_databases: [{ binding: 'AccessBridgeDB', database_name: 'aws-access-bridge-db', database_id: DEFAULT_UUID }],
       }),
     ).toThrow(/still the template placeholder/);
   });

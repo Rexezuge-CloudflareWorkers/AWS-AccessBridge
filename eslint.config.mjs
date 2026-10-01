@@ -11,7 +11,6 @@ export default tseslint.config(
   {
     ignores: [
       'eslint.config.mjs',
-      'scripts/**',
       'worker-configuration.d.ts',
       'app/dist/**',
       'apps/web/dist/**',

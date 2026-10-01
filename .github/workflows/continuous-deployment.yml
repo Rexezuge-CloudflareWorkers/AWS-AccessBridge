@@ -50,7 +50,7 @@ jobs:
       - name: Prepare Wrangler Configuration
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm exec tsx scripts/prepare-wrangler-config.ts
+          command: pnpm exec tsx scripts/deploy/prepare-wrangler-config.ts
           max_attempts: '3'
         env:
           WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
@@ -62,7 +62,7 @@ jobs:
       - name: Initialize Cloudflare Secrets Store
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm exec tsx scripts/init-secrets.ts
+          command: pnpm exec tsx scripts/deploy/init-secrets.ts
           max_attempts: '3'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

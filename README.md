@@ -147,7 +147,7 @@ Open `wrangler.jsonc` and replace every placeholder (the `0000…` strings) with
 Then generate and upload the two secrets in one go (requires `wrangler.jsonc` to exist first — the script reads the store IDs from it):
 
 ```bash
-pnpm exec tsx scripts/init-secrets.ts
+pnpm exec tsx scripts/deploy/init-secrets.ts
 ```
 
 This script reads `wrangler.jsonc`, detects the two expected secrets (`aws-access-bridge-aes-encryption-key`, `aws-access-bridge-internal-hmac-secret`), generates cryptographically strong values for each, and uploads them to the store. Re-running it is a no-op — it skips any secret that already exists.
@@ -259,8 +259,8 @@ The repo ships a `Continuous Deployment` workflow at `.github/workflows/continuo
    The workflow writes this out to `wrangler.jsonc` at the start of each run (since `wrangler.jsonc` itself is gitignored).
 
 6. **Push to `main`**. Once CI passes, the `Continuous Deployment` workflow kicks off automatically and will:
-   - Prepare the Wrangler config via `scripts/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, applies `WRANGLER_PATCH_JSON` / `WRANGLER_VARS_PATCH_JSON`, provisions missing D1/KV/Secrets Store resources)
-   - Initialize any missing secrets via `scripts/init-secrets.ts`
+   - Prepare the Wrangler config via `scripts/deploy/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, applies `WRANGLER_PATCH_JSON` / `WRANGLER_VARS_PATCH_JSON`, provisions missing D1/KV/Secrets Store resources)
+   - Initialize any missing secrets via `scripts/deploy/init-secrets.ts`
    - Apply pending D1 migrations to your remote database (`AccessBridgeDB` binding)
    - Build the Vite SPA (`pnpm --filter @aws-access-bridge/web build`)
    - Hide any stray OpenNext/Next.js config files (defensive — the repo has none; without that step wrangler would delegate to the OpenNext build)

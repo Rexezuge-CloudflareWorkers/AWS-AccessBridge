@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { backupFileName, backupStamp } from '../../scripts/backup/encrypt-backup';
-import { remoteTargetDir } from '../../scripts/backup/upload-webdav';
+import { backupFileName, backupStamp } from '../../scripts/backup/naming';
+import { remoteTargetDir } from '../../scripts/backup/webdav-target';
 
 describe('backupStamp', () => {
   it('formats the UTC timestamp for a filename', () => {
@@ -12,7 +12,7 @@ describe('backupStamp', () => {
     const later = backupFileName(new Date('2026-10-01T04:15:00Z'));
 
     expect(earlier < later).toBe(true);
-    expect(later).toMatch(/^access-bridge_prod_2026-10-01_04-15-00\.sql\.gz\.enc$/);
+    expect(later).toMatch(/^access-bridge_prod_2026-10-01_04-15-00\.sql\.xz\.enc$/);
   });
 });
 
