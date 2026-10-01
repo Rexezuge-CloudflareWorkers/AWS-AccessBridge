@@ -61,7 +61,7 @@ AWS AccessBridge is a pnpm monorepo deploying a Cloudflare Worker API, a cron Du
 ### Security
 
 - **Cloudflare Zero Trust** enforces identity at the edge — AccessBridge never handles passwords or OIDC directly. `POLICY_AUD`/`TEAM_DOMAIN` JWT verification is used when set; otherwise the platform-verified Worker-level Access identity (`ctx.access`) is used.
-- **AES-GCM encryption** for all stored AWS credentials, with the key held in Cloudflare Secrets Store.
+- **AES-GCM encryption** for all stored AWS credentials, with a separate key per encrypted surface (long-term IAM keys and the temporary-credential cache), each held in Cloudflare Secrets Store.
 - **HMAC-signed internal requests** between worker components, with a 1-second timestamp window to block replay.
 - **Every `/user/*` and `/api/*` call is audit-logged** automatically and retained for the period you configure (`/docs`, `/openapi.json`, and health-check routes bypass auditing).
 - **Demo mode** flag disables all admin write operations — safe for public demo deployments.
@@ -102,7 +102,7 @@ pnpm exec wrangler whoami
 
 ### Step 2. Create the Cloudflare resources
 
-AccessBridge needs one D1 database, one KV namespace, and one Secrets Store with two secrets inside it. The Durable Object namespace (`CRON_TASKS`), the `SELF` service binding for federate fan-out, and the `*/10 * * * *` cron trigger are created from `wrangler.jsonc` on deploy.
+AccessBridge needs one D1 database, one KV namespace, and one Secrets Store with the secrets listed below. The Durable Object namespace (`CRON_TASKS`), the `SELF` service binding for federate fan-out, and the `*/10 * * * *` cron trigger are created from `wrangler.jsonc` on deploy.
 
 **D1 database:**
 
@@ -150,18 +150,24 @@ Then generate and upload the two secrets in one go (requires `wrangler.jsonc` to
 pnpm exec tsx scripts/deploy/init-secrets.ts
 ```
 
-This script reads `wrangler.jsonc`, detects the two expected secrets (`aws-access-bridge-aes-encryption-key`, `aws-access-bridge-internal-hmac-secret`), generates cryptographically strong values for each, and uploads them to the store. Re-running it is a no-op — it skips any secret that already exists.
+This script reads `wrangler.jsonc` and creates any declared secret that does not yet exist, generating a cryptographically strong value for each. Re-running it is a no-op — it skips any secret that already exists.
+
+On the **first** run after an upgrade it does one extra thing: `aws-access-bridge-credential-encryption-key` and `aws-access-bridge-credential-cache-encryption-key` are *seeded with the value `aws-access-bridge-aes-encryption-key` already had*, rather than generated independently. That is what makes the per-feature key split non-breaking — no key material changes hands, and rows written under the old single key stay readable. Both per-feature bindings then serve as the read fallback for legacy rows, and new writes always use the surface's own key. A genuinely fresh install has no legacy key to copy, so each surface simply gets its own.
 
 If you'd rather generate the secrets yourself:
 
 ```bash
-# AES-GCM 256-bit key (base64)
+# AES-GCM 256-bit key for the credentials table (base64)
 openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
-  --name aws-access-bridge-aes-encryption-key --scopes workers --remote
+  --name aws-access-bridge-credential-encryption-key --scopes workers --remote
 
-# HMAC secret (base64)
+# AES-GCM 256-bit key for the credential cache
 openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
-  --name aws-access-bridge-internal-hmac-secret --scopes workers --remote
+  --name aws-access-bridge-credential-cache-encryption-key --scopes workers --remote
+
+# HMAC secret for internal self-calls
+openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
+  --name aws-access-bridge-internal-request-hmac-secret --scopes workers --remote
 ```
 
 ### Step 4. Wire up Cloudflare Zero Trust

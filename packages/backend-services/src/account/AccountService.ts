@@ -3,7 +3,7 @@ import { AwsAccountsDAO, RoleConfigsDAO } from '@aws-access-bridge/backend-data/
 import type { AccessKeys, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { AWS_ACCOUNT_ID_PATTERN } from '../access';
-import { CredentialService } from '../credential';
+import { CredentialChainService } from '../credential';
 import { IamService, type DiscoveredRole } from '../aws/iam';
 import { StsService } from '../aws/sts';
 import type { ServiceEnv } from '../composition/ServiceEnv';
@@ -11,7 +11,7 @@ import type { ServiceEnv } from '../composition/ServiceEnv';
 type AccountServiceEnv = ServiceEnv;
 
 class AccountService {
-  private readonly credentials: CredentialService;
+  private readonly credentials: CredentialChainService;
   private readonly sts: StsService;
   private readonly iam: IamService;
 
@@ -19,11 +19,11 @@ class AccountService {
     private readonly env: AccountServiceEnv,
     sts?: StsService,
     iam?: IamService,
-    credentials?: CredentialService,
+    credentials?: CredentialChainService,
   ) {
     this.sts = sts ?? new StsService();
     this.iam = iam ?? new IamService();
-    this.credentials = credentials ?? new CredentialService(env, this.sts);
+    this.credentials = credentials ?? new CredentialChainService(env, this.sts);
   }
 
   public async setNickname(awsAccountId: string, nickname: string): Promise<{ accountId: string; nickname: string }> {

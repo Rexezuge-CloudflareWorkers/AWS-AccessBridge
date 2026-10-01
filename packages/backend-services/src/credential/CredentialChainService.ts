@@ -2,9 +2,11 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { AccessKeys, Credential, CredentialCache, CredentialChain } from '@aws-access-bridge/shared/model';
-import { ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService } from '../aws/sts';
 import { ChainTestWalker, LeafCredentialsWalker } from './CredentialChainWalker';
+import { getRequestScope } from '../composition';
+import { Tokens } from '../composition/tokens';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
 type CredentialChainServiceEnv = ServiceEnv;
@@ -28,22 +30,27 @@ class CredentialChainService {
     return ConfigurationManager.credential.getTrustChainLimit(this.env);
   }
 
-  public async getMasterKey(): Promise<string> {
-    if (!this.env.AES_ENCRYPTION_KEY_SECRET) {
-      throw new InternalServerError('Credential encryption key is not configured for this environment.');
-    }
-    return this.env.AES_ENCRYPTION_KEY_SECRET.get();
+  /**
+   * The ordered keys for each encrypted surface: its own key first, then the
+   * legacy master key for rows written before the per-feature split.
+   */
+  private async encryptionKeys(): Promise<{ credentials: readonly string[]; cache: readonly string[] }> {
+    const scope = getRequestScope(this.env);
+    const [credentials, cache] = await Promise.all([scope.get(Tokens.CredentialKey)(), scope.get(Tokens.CredentialCacheKey)()]);
+    return { credentials, cache };
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {
-    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getMasterKey(), this.getTrustChainLimit());
+    const { credentials } = await this.encryptionKeys();
+    return new CredentialsDAO(this.env.AccessBridgeDB, credentials, this.getTrustChainLimit());
   }
 
   public async createCacheDAO(): Promise<CredentialsCacheDAO> {
     if (!this.env.AccessBridgeKV) {
       throw new InternalServerError('Credential cache is not configured for this environment.');
     }
-    return new CredentialsCacheDAO(this.env.AccessBridgeKV, await this.getMasterKey());
+    const { cache } = await this.encryptionKeys();
+    return new CredentialsCacheDAO(this.env.AccessBridgeKV, cache);
   }
 
   public async getCredentialChain(principalArn: string): Promise<CredentialChain> {
@@ -114,6 +121,9 @@ class CredentialChainService {
     principalArn: string,
     sessionName = 'AccessBridge-ChainTest',
   ): Promise<{ success: boolean; chain: Array<{ arn: string; status: string }> }> {
+    if (!principalArn) {
+      throw new BadRequestError('Missing required field: principalArn.');
+    }
     const credentialChain: CredentialChain = await this.getCredentialChain(principalArn);
     return new ChainTestWalker(this.sts).walk(credentialChain, sessionName);
   }

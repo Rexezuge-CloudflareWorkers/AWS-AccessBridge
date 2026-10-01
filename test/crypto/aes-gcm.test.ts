@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateAESGCMKey, encryptData, decryptData, decryptDataOptional, decryptDataTolerant } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
+import {
+  generateAESGCMKey,
+  encryptData,
+  decryptData,
+  decryptDataWithKeys,
+  decryptDataTolerant,
+} from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 describe('AES-GCM Crypto', () => {
   describe('generateAESGCMKey', () => {
@@ -92,32 +98,36 @@ describe('AES-GCM Crypto', () => {
     });
   });
 
-  describe('decryptDataOptional', () => {
-    it('returns decrypted data when all parameters provided', async () => {
+  describe('decryptDataWithKeys', () => {
+    it('returns decrypted data when the first key authenticates', async () => {
       const key = await generateAESGCMKey();
       const { encrypted, iv } = await encryptData('secret', key);
-      const result = await decryptDataOptional(encrypted, iv, key);
-      expect(result).toBe('secret');
+      await expect(decryptDataWithKeys(encrypted, iv, [key])).resolves.toBe('secret');
     });
 
-    it('returns undefined when encrypted is undefined', async () => {
-      const result = await decryptDataOptional(undefined, 'iv', 'key');
-      expect(result).toBeUndefined();
+    /**
+     * The migration path: a row written before the per-feature key split is still
+     * encrypted under the legacy master key, which sits later in the chain.
+     */
+    it('falls back to a later key when the first does not authenticate', async () => {
+      const legacy = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', legacy);
+      const current = await generateAESGCMKey();
+      await expect(decryptDataWithKeys(encrypted, iv, [current, legacy])).resolves.toBe('secret');
     });
 
-    it('returns undefined when iv is undefined', async () => {
-      const result = await decryptDataOptional('encrypted', undefined, 'key');
-      expect(result).toBeUndefined();
+    it('throws when no key in the chain authenticates', async () => {
+      const key = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', key);
+      const other = await generateAESGCMKey();
+      await expect(decryptDataWithKeys(encrypted, iv, [other])).rejects.toThrow(/No key in the chain/);
     });
 
-    it('returns undefined when key is undefined', async () => {
-      const result = await decryptDataOptional('encrypted', 'iv', undefined);
-      expect(result).toBeUndefined();
-    });
-
-    it('returns undefined when all parameters are undefined', async () => {
-      const result = await decryptDataOptional(undefined, undefined, undefined);
-      expect(result).toBeUndefined();
+    it('throws when the ciphertext or IV is absent, rather than returning undefined', async () => {
+      // Durable data: a missing envelope is a loud failure, not a soft miss.
+      const key = await generateAESGCMKey();
+      await expect(decryptDataWithKeys(undefined, 'iv', [key])).rejects.toThrow();
+      await expect(decryptDataWithKeys('ciphertext', undefined, [key])).rejects.toThrow();
     });
   });
 
@@ -125,16 +135,27 @@ describe('AES-GCM Crypto', () => {
     it('returns the plaintext when the payload authenticates', async () => {
       const key = await generateAESGCMKey();
       const { encrypted, iv } = await encryptData('secret', key);
-      await expect(decryptDataTolerant(encrypted, iv, key)).resolves.toBe('secret');
+      await expect(decryptDataTolerant(encrypted, iv, [key])).resolves.toBe('secret');
     });
 
-    it('returns undefined instead of throwing when the tag does not verify', async () => {
+    it('returns undefined instead of throwing when no key in the chain verifies', async () => {
       const key = await generateAESGCMKey();
       const other = await generateAESGCMKey();
       const { encrypted, iv } = await encryptData('secret', key);
       // Wrong key: GCM authentication fails. Callers on a recoverable read path
       // (e.g. the credential cache) treat this as a miss rather than a crash.
-      await expect(decryptDataTolerant(encrypted, iv, other)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(encrypted, iv, [other])).resolves.toBeUndefined();
+    });
+
+    /**
+     * A cache entry written before the per-feature key split still decrypts: the
+     * legacy master key sits later in the chain.
+     */
+    it('falls back to a later key in the chain', async () => {
+      const legacy = await generateAESGCMKey();
+      const { encrypted, iv } = await encryptData('secret', legacy);
+      const current = await generateAESGCMKey();
+      await expect(decryptDataTolerant(encrypted, iv, [current, legacy])).resolves.toBe('secret');
     });
 
     it('returns undefined when the ciphertext is tampered with', async () => {
@@ -142,15 +163,16 @@ describe('AES-GCM Crypto', () => {
       const { encrypted, iv } = await encryptData('secret', key);
       const bytes = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
       bytes[0] = bytes[0] ^ 0xff;
-      await expect(decryptDataTolerant(btoa(String.fromCodePoint(...bytes)), iv, key)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(btoa(String.fromCodePoint(...bytes)), iv, [key])).resolves.toBeUndefined();
     });
 
     it('returns undefined when any parameter is missing', async () => {
       const key = await generateAESGCMKey();
       const { encrypted, iv } = await encryptData('secret', key);
-      await expect(decryptDataTolerant(undefined, iv, key)).resolves.toBeUndefined();
-      await expect(decryptDataTolerant(encrypted, undefined, key)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(undefined, iv, [key])).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(encrypted, undefined, [key])).resolves.toBeUndefined();
       await expect(decryptDataTolerant(encrypted, iv, undefined)).resolves.toBeUndefined();
+      await expect(decryptDataTolerant(encrypted, iv, [])).resolves.toBeUndefined();
     });
   });
 });

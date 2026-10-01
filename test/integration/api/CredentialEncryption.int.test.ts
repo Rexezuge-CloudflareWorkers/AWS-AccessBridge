@@ -14,7 +14,7 @@ describe('Credential encryption against real D1', () => {
   });
 
   it('stores three independent IVs and reads each field back with only its own', async () => {
-    const dao = new CredentialsDAO(env.AccessBridgeDB as never, MASTER_KEY, 3);
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredential(ROLE_ARN, 'AKIAIOSFODNN7EXAMPLE', 'wJalrXUtnFEMI/K7MDENG', 'session-token-value');
 
     // Inspect the raw row: the per-field IV columns must all be populated and
@@ -54,7 +54,7 @@ describe('Credential encryption against real D1', () => {
       .bind(legacyArn, await encryptLegacy('AKIALEGACYACCESSKEY00'), await encryptLegacy('legacySecretValue'), sharedIv)
       .run();
 
-    const dao = new CredentialsDAO(env.AccessBridgeDB as never, MASTER_KEY, 3);
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await expect(dao.getCredentialByPrincipalArn(legacyArn)).resolves.toMatchObject({
       accessKeyId: 'AKIALEGACYACCESSKEY00',
       secretAccessKey: 'legacySecretValue',
@@ -63,7 +63,7 @@ describe('Credential encryption against real D1', () => {
 
   it('re-encrypts a legacy row with distinct IVs on the next write', async () => {
     const arn = 'arn:aws:iam::123456789012:role/Upgraded';
-    const dao = new CredentialsDAO(env.AccessBridgeDB as never, MASTER_KEY, 3);
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredential(arn, 'AKIAUPGRADEDKEY00000', 'upgradedSecretValue', 'tok');
 
     const row = await env.AccessBridgeDB.prepare('SELECT salt, salt_secret_access_key, salt_session_token FROM credentials WHERE principal_arn = ?')
@@ -75,7 +75,7 @@ describe('Credential encryption against real D1', () => {
 
   it('rejects a tampered ciphertext rather than returning garbage', async () => {
     const arn = 'arn:aws:iam::123456789012:role/Tampered';
-    const dao = new CredentialsDAO(env.AccessBridgeDB as never, MASTER_KEY, 3);
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredential(arn, 'AKIATAMPEREDKEY00000', 'tamperSecretValue');
     await env.AccessBridgeDB.prepare('UPDATE credentials SET encrypted_secret_access_key = ? WHERE principal_arn = ?')
       .bind((await encryptData('attackerValue', MASTER_KEY)).encrypted, arn)
@@ -87,13 +87,91 @@ describe('Credential encryption against real D1', () => {
   });
 
   it('walks a two-hop trust chain', async () => {
-    const dao = new CredentialsDAO(env.AccessBridgeDB as never, MASTER_KEY, 3);
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredentialRelationship(ROLE_ARN, BASE_ARN);
     await dao.storeCredential(BASE_ARN, 'AKIABASEROLEKEY000000', 'baseSecretValue');
 
     const chain = await dao.getCredentialChainByPrincipalArn(ROLE_ARN);
     expect(chain.principalArns).toEqual([ROLE_ARN, BASE_ARN]);
     expect(chain).toMatchObject({ accessKeyId: 'AKIABASEROLEKEY000000', secretAccessKey: 'baseSecretValue' });
+  });
+});
+
+/**
+ * The per-feature key split, against real D1.
+ *
+ * A row written under the legacy master key must stay readable once the DAO is
+ * given the feature key first, and it must be rewritten onto the feature key the
+ * next time it is stored — the same self-healing shape migration 0031 uses for IVs.
+ */
+describe('Per-feature credential keys', () => {
+  beforeAll(async () => {
+    await applyMigrations(env.AccessBridgeDB);
+  });
+
+  const featureKey = 'ZmVhdHVyZS1rZXktZm9yLWNyZWRlbnRpYWxzLTAwMDA=';
+  const legacyArn = 'arn:aws:iam::123456789012:role/NeedsRekey';
+
+  /** Write a row under the legacy master key, as a pre-split deployment would. */
+  async function seedLegacyRow(): Promise<void> {
+    const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, [
+      'encrypt',
+    ]);
+    const iv = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(12))));
+    const seal = async (data: string): Promise<string> => {
+      const out = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: Uint8Array.from(atob(iv), (c) => c.codePointAt(0) ?? 0) },
+        key,
+        new TextEncoder().encode(data),
+      );
+      return btoa(String.fromCodePoint(...new Uint8Array(out)));
+    };
+    await env.AccessBridgeDB.prepare(
+      'INSERT OR REPLACE INTO credentials (principal_arn, encrypted_access_key_id, encrypted_secret_access_key, salt, salt_secret_access_key) VALUES (?, ?, ?, ?, ?)',
+    )
+      .bind(legacyArn, await seal('AKIALEGACYACCESSKEY00'), await seal('legacySecretValue'), iv, iv)
+      .run();
+  }
+
+  it('reads a legacy-key row through the chain, feature key first', async () => {
+    await seedLegacyRow();
+    // The feature key is first and cannot decrypt this row; the chain falls back.
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
+    await expect(dao.getCredentialByPrincipalArn(legacyArn)).resolves.toMatchObject({
+      accessKeyId: 'AKIALEGACYACCESSKEY00',
+      secretAccessKey: 'legacySecretValue',
+    });
+  });
+
+  it('fails loudly when the chain contains no key that can read it', async () => {
+    await seedLegacyRow();
+    const wrongKey = 'bm90LXRoZS1rZXktYXQtYWxsLTMyLWJ5dGVzLWJhc2U2NA==';
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [wrongKey], 3);
+    await expect(dao.getCredentialByPrincipalArn(legacyArn)).rejects.toThrow(/No key in the chain/);
+  });
+
+  it('rewrites a legacy row onto the feature key on its next store', async () => {
+    await seedLegacyRow();
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
+    await dao.storeCredential(legacyArn, 'AKIAREKEYEDACCESSKEY', 'rekeyedSecretValue');
+
+    // Readable with the feature key alone — the legacy fallback is no longer needed.
+    const featureOnly = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey], 3);
+    await expect(featureOnly.getCredentialByPrincipalArn(legacyArn)).resolves.toMatchObject({
+      accessKeyId: 'AKIAREKEYEDACCESSKEY',
+      secretAccessKey: 'rekeyedSecretValue',
+    });
+  });
+
+  it('treats an absent ciphertext column as absent, not as corruption', async () => {
+    // A relationship-only row carries no ciphertext in any column.
+    const relationshipArn = 'arn:aws:iam::123456789012:role/ChildOnly';
+    await env.AccessBridgeDB.prepare('INSERT OR REPLACE INTO credentials (principal_arn, assumed_by) VALUES (?, ?)').bind(relationshipArn, legacyArn).run();
+    const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
+    const credential = await dao.getCredentialByPrincipalArn(relationshipArn);
+    expect(credential.assumedBy).toBe(legacyArn);
+    expect(credential.accessKeyId).toBeUndefined();
+    expect(credential.secretAccessKey).toBeUndefined();
   });
 });
 

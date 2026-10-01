@@ -125,7 +125,7 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 | `user_metadata`, `user_emails`                    | Sign-in addresses, superadmin flags, stable account ids.                                                                                      |
 | `audit_logs`                                      | Who did what, from which IP, with which user agent.                                                                                           |
 | `teams`, `team_members`, `team_accounts`          | Tenant structure and membership.                                                                                                              |
-| `credentials`                                     | AES-GCM ciphertext. The key lives in the Secrets Store (`AES_ENCRYPTION_KEY_SECRET`), **not** in D1, so a dump alone cannot decrypt IAM keys. |
+| `credentials`                                     | AES-GCM ciphertext. The key lives in the Secrets Store (`CREDENTIAL_ENCRYPTION_KEY_SECRET`), **not** in D1, so a dump alone cannot decrypt IAM keys. |
 | `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                    |
 | `background_task_runs`                            | Cron phase history.                                                                                                                           |
 

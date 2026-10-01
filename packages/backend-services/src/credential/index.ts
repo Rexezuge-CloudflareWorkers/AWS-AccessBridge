@@ -4,6 +4,4 @@ export { CredentialChainWalker, ChainTestWalker, LeafCredentialsWalker } from '.
 export type { ChainTestStep } from './CredentialChainWalker';
 export { CredentialStoreService, PRINCIPAL_ARN_PATTERN } from './CredentialStoreService';
 export type { CredentialStoreServiceEnv } from './CredentialStoreService';
-export { CredentialService } from './CredentialService';
 
-export type { CredentialServiceEnv } from './CredentialService';

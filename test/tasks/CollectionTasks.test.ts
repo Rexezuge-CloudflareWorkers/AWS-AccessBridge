@@ -50,7 +50,8 @@ function taskEnv() {
   return {
     AccessBridgeDB: {},
     AccessBridgeKV: {},
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
   } as unknown as Env;
 }
 

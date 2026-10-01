@@ -3,7 +3,7 @@ declare global {
     AccessBridgeKV: KVNamespace;
     AccessBridgeDB: D1Database;
     AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
-    INTERNAL_HMAC_SECRET: SecretsStoreSecret;
+    INTERNAL_REQUEST_HMAC_SECRET: SecretsStoreSecret;
     CRON_TASKS: DurableObjectNamespace;
     SELF: Fetcher;
     POLICY_AUD?: string;

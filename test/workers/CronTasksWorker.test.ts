@@ -50,7 +50,8 @@ function createEnv(): Env {
   return {
     AccessBridgeDB: { mock: true } as D1Database,
     AccessBridgeKV: { mock: true } as KVNamespace,
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn() } as unknown as SecretsStoreSecret,
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn() } as unknown as SecretsStoreSecret,
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn() } as unknown as SecretsStoreSecret,
   } as Env;
 }
 

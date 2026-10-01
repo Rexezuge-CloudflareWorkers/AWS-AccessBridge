@@ -6,7 +6,7 @@ import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-a
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
-import { CredentialService } from '../../credential';
+import { CredentialChainService } from '../../credential';
 import type { ServiceEnv } from '../../composition/ServiceEnv';
 import { UserIdentityService } from '../../identity/UserIdentityService';
 import { resolveOwner } from '../../identity/resolveOwner';
@@ -17,7 +17,7 @@ interface AssumeRoleServiceEnv extends ServiceEnv {
 }
 
 class AssumeRoleService {
-  private readonly credentials: CredentialService;
+  private readonly credentials: CredentialChainService;
   private readonly sts: StsService;
 
   private readonly identity: UserIdentityService;
@@ -25,11 +25,11 @@ class AssumeRoleService {
   constructor(
     private readonly env: AssumeRoleServiceEnv,
     sts?: StsService,
-    credentials?: CredentialService,
+    credentials?: CredentialChainService,
     identity?: UserIdentityService,
   ) {
     this.sts = sts ?? new StsService();
-    this.credentials = credentials ?? new CredentialService(env, this.sts);
+    this.credentials = credentials ?? new CredentialChainService(env, this.sts);
     this.identity = identity ?? new UserIdentityService(env);
   }
 

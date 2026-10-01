@@ -64,7 +64,7 @@ describe('HMACHandler constants and validation logic', () => {
           url: raw.url,
           method: 'POST',
         },
-        env: { INTERNAL_HMAC_SECRET: { get: async () => SECRET } },
+        env: { INTERNAL_REQUEST_HMAC_SECRET: { get: async () => SECRET } },
       };
     }
 

@@ -1,9 +1,11 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { StsService, type CallerIdentity } from '../aws/sts';
+import { getRequestScope } from '../composition';
+import { Tokens } from '../composition/tokens';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
 /**
@@ -30,16 +32,17 @@ class CredentialStoreService {
     this.sts = sts ?? new StsService();
   }
 
-  public async getMasterKey(): Promise<string> {
-    if (!this.env.AES_ENCRYPTION_KEY_SECRET) {
-      throw new InternalServerError('Credential encryption key is not configured for this environment.');
-    }
-    return this.env.AES_ENCRYPTION_KEY_SECRET.get();
+  /**
+   * The ordered keys for the `credentials` table: the surface's own key first,
+   * then the legacy master key for rows written before the split.
+   */
+  public async getEncryptionKeys(): Promise<readonly string[]> {
+    return getRequestScope(this.env).get(Tokens.CredentialKey)();
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {
     const limit = ConfigurationManager.credential.getTrustChainLimit(this.env);
-    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getMasterKey(), limit);
+    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getEncryptionKeys(), limit);
   }
 
   public async storeCredential(principalArn: string, accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<void> {

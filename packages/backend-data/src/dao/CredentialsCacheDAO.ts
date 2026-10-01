@@ -1,15 +1,22 @@
-import { CredentialCache } from '@aws-access-bridge/shared/model/CredentialCache';
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import type { CredentialCache } from '@aws-access-bridge/shared/model/CredentialCache';
 import { decryptDataTolerant, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
 import { KV_MINIMUM_TIVE_TO_LIVE_SECONDS, KV_NAMESPACE_CREDENTIAL_CACHE } from '@aws-access-bridge/backend-data/constants/kv';
 import { IKeyValueDAO } from './IKeyValueDAO';
 
 class CredentialsCacheDAO extends IKeyValueDAO {
-  protected readonly masterKey: string;
-
-  constructor(kv: KVNamespace, masterKey: string) {
+  /**
+   * @param encryptionKeys Keys to try, in preference order; see
+   *   `backend-services/composition/encryptionKeys`. The cache is disposable — an
+   *   entry that cannot be decrypted is evicted and re-resolved — which is why
+   *   this reads tolerantly where `CredentialsDAO` does not.
+   */
+  constructor(
+    kv: KVNamespace,
+    private readonly encryptionKeys: readonly string[],
+  ) {
     super(kv, KV_NAMESPACE_CREDENTIAL_CACHE);
-    this.masterKey = masterKey;
   }
 
   public async getCachedCredential(principalArn: string): Promise<CredentialCache | undefined> {
@@ -26,9 +33,9 @@ class CredentialsCacheDAO extends IKeyValueDAO {
     // AES-GCM nonce-reuse flaw. Entries written before that fix have only
     // `salt`, so fall back to it.
     const [accessKeyId, secretAccessKey, sessionToken] = await Promise.all([
-      decryptDataTolerant(cached.encryptedAccessKeyId, cached.salt, this.masterKey),
-      decryptDataTolerant(cached.encryptedSecretAccessKey, cached.saltSecretAccessKey ?? cached.salt, this.masterKey),
-      decryptDataTolerant(cached.encryptedSessionToken, cached.saltSessionToken ?? cached.salt, this.masterKey),
+      decryptDataTolerant(cached.encryptedAccessKeyId, cached.salt, this.encryptionKeys),
+      decryptDataTolerant(cached.encryptedSecretAccessKey, cached.saltSecretAccessKey ?? cached.salt, this.encryptionKeys),
+      decryptDataTolerant(cached.encryptedSessionToken, cached.saltSessionToken ?? cached.salt, this.encryptionKeys),
     ]);
 
     // A key pair is mandatory; a session token is not (longer-lived or
@@ -51,9 +58,13 @@ class CredentialsCacheDAO extends IKeyValueDAO {
     if (!credential.sessionToken) {
       return;
     }
-    const encryptedAccessKeyId = await encryptData(credential.accessKeyId, this.masterKey);
-    const encryptedSecretAccessKey = await encryptData(credential.secretAccessKey, this.masterKey);
-    const encryptedSessionToken = await encryptData(credential.sessionToken, this.masterKey);
+    if (this.encryptionKeys.length === 0) {
+      throw new DatabaseError('No encryption key is configured for the credential cache.');
+    }
+    const key = this.encryptionKeys[0];
+    const encryptedAccessKeyId = await encryptData(credential.accessKeyId, key);
+    const encryptedSecretAccessKey = await encryptData(credential.secretAccessKey, key);
+    const encryptedSessionToken = await encryptData(credential.sessionToken, key);
 
     const data: CachedCredentialData = {
       encryptedAccessKeyId: encryptedAccessKeyId.encrypted,
@@ -82,15 +93,15 @@ interface CachedCredentialData {
   encryptedSessionToken?: string;
   /**
   IV for `encryptedAccessKeyId`; also the legacy shared IV for pre-split entries.
-  */
+   */
   salt?: string;
   /**
-  Absent on entries written before IVs were split per field.
-  */
+   * Absent on entries written before IVs were split per field.
+   */
   saltSecretAccessKey?: string;
   /**
-  Absent on entries written before IVs were split per field.
-  */
+   * Absent on entries written before IVs were split per field.
+   */
   saltSessionToken?: string;
   expiresAt: number;
 }

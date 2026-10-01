@@ -50,12 +50,12 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
       return { itemsProcessed: 0, itemsFailed: 0, summary: 'No accounts due for collection' };
     }
 
-    const credentialService = getRequestScope(env).get(Tokens.CredentialService);
+    const credentialChain = getRequestScope(env).get(Tokens.CredentialChainService);
     let succeededItems = 0;
     let failedAccounts = 0;
     for (const principalArn of principalArns) {
       try {
-        const { credentials }: { credentials: AccessKeys } = await credentialService.resolveLeafCredentials(
+        const { credentials }: { credentials: AccessKeys } = await credentialChain.resolveLeafCredentials(
           principalArn,
           this.sessionName(),
         );

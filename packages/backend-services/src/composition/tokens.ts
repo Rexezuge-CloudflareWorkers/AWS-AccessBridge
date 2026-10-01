@@ -1,5 +1,6 @@
 import type { Token } from '@aws-access-bridge/backend-runtime/di';
 import type { ServiceEnv } from './ServiceEnv';
+import type { KeyChain } from './encryptionKeys';
 import type { AccessService } from '../access/AccessService';
 import type { AccountService } from '../account/AccountService';
 import type { AssumeRoleService } from '../aws/assume-role/AssumeRoleService';
@@ -13,7 +14,6 @@ import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
 import type { CostService } from '../cost/CostService';
 import type { UserIdentityService } from '../identity/UserIdentityService';
-import type { CredentialService } from '../credential/CredentialService';
 import type { CredentialChainService } from '../credential/CredentialChainService';
 import type { CredentialStoreService } from '../credential/CredentialStoreService';
 import type { MaintenanceService } from '../maintenance/MaintenanceService';
@@ -23,16 +23,22 @@ import type { UserService } from '../user/UserService';
 
 // Central token registry for the per-request composition root
 // (`requestScope.ts`). Call sites resolve services via
-// `getRequestScope(env).get(Tokens.CredentialService)`.
+// `getRequestScope(env).get(Tokens.CredentialChainService)`.
 //
 // Tokens carry their value type (`Token<T>`) so `scope.get(...)` infers the
 // service type without an explicit generic at call sites.
 type RequestScopeEnvShape = ServiceEnv;
 
 const Tokens = {
-  MasterKey: Symbol('MasterKey') as Token<() => Promise<string>>,
+  /**
+  Resolves to the ordered key chain for the `credentials` D1 table.
+  */
+  CredentialKey: Symbol('CredentialKey') as Token<() => Promise<KeyChain>>,
+  /**
+  Resolves to the ordered key chain for the `credentials_cache` KV namespace.
+  */
+  CredentialCacheKey: Symbol('CredentialCacheKey') as Token<() => Promise<KeyChain>>,
   CollectorRegistry: Symbol('CollectorRegistry') as Token<InjectableCollectorRegistry>,
-  CredentialService: Symbol('CredentialService') as Token<CredentialService>,
   CredentialChainService: Symbol('CredentialChainService') as Token<CredentialChainService>,
   CredentialStoreService: Symbol('CredentialStoreService') as Token<CredentialStoreService>,
   AssumeRoleService: Symbol('AssumeRoleService') as Token<AssumeRoleService>,

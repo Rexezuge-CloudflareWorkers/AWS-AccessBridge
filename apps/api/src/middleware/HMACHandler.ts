@@ -34,7 +34,7 @@ class HMACHandler {
             headers[key] = value;
           }
         }
-        const secret: string = await c.env.INTERNAL_HMAC_SECRET.get();
+        const secret: string = await c.env.INTERNAL_REQUEST_HMAC_SECRET.get();
         const isValid: boolean = await verifyHMACSignature(secret, signature, headers, timestamp, bodyHash, path, method);
         if (isValid) {
           await next();

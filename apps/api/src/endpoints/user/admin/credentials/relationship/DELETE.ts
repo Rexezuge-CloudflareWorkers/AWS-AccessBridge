@@ -194,7 +194,7 @@ class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: RemoveCredentialRelationshipEnv,
     _cxt: ActivityContext<RemoveCredentialRelationshipEnv>,
   ): Promise<RemoveCredentialRelationshipResponse> {
-    await getRequestScope(env).get(Tokens.CredentialService).removeCredential(request.principalArn);
+    await getRequestScope(env).get(Tokens.CredentialStoreService).removeCredential(request.principalArn);
 
     return {
       success: true,

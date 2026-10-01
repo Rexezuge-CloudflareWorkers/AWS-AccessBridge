@@ -10,7 +10,7 @@ vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO');
 vi.mock('@aws-access-bridge/backend-services/composition', () => ({
   getRequestScope: vi.fn(),
-  Tokens: { CredentialService: Symbol('CredentialService') },
+  Tokens: { CredentialChainService: Symbol('CredentialChainService') },
 }));
 
 class StubTask extends IScheduledTask<{ AccessBridgeDB: D1Database }> {

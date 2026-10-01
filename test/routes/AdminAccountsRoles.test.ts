@@ -28,7 +28,8 @@ vi.mock('@aws-access-bridge/backend-services/aws/iam');
 function adminEnv() {
   vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(true);
   return {
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
   };
 }
 

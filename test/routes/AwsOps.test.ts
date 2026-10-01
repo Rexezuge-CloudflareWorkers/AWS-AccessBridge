@@ -36,8 +36,9 @@ const PRINCIPAL = 'arn:aws:iam::123456789012:role/Dev';
 function secretsEnv() {
   return {
     AccessBridgeKV: {},
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
-    INTERNAL_HMAC_SECRET: { get: vi.fn().mockResolvedValue('hmac-secret') },
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    INTERNAL_REQUEST_HMAC_SECRET: { get: vi.fn().mockResolvedValue('hmac-secret') },
     SELF: {},
   };
 }

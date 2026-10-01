@@ -19,14 +19,19 @@
   ],
   "secrets_store_secrets": [
     {
-      "binding": "AES_ENCRYPTION_KEY_SECRET",
+      "binding": "CREDENTIAL_ENCRYPTION_KEY_SECRET",
       "store_id": "00000000-0000-0000-0000-000000000000",
-      "secret_name": "test-aes-encryption-key",
+      "secret_name": "test-credential-encryption-key",
     },
     {
-      "binding": "INTERNAL_HMAC_SECRET",
+      "binding": "CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET",
       "store_id": "00000000-0000-0000-0000-000000000000",
-      "secret_name": "test-internal-hmac-secret",
+      "secret_name": "test-credential-cache-encryption-key",
+    },
+    {
+      "binding": "INTERNAL_REQUEST_HMAC_SECRET",
+      "store_id": "00000000-0000-0000-0000-000000000000",
+      "secret_name": "test-internal-request-hmac-secret",
     },
   ],
   "vars": {

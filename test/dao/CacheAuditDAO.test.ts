@@ -39,7 +39,7 @@ function createMockKv(stored: Record<string, string> = {}) {
 describe('CredentialsCacheDAO', () => {
   it('round-trips cached credentials through encryption', async () => {
     const kv = createMockKv();
-    const dao = new CredentialsCacheDAO(kv, '0123456789abcdef0123456789abcdef');
+    const dao = new CredentialsCacheDAO(kv, ['0123456789abcdef0123456789abcdef']);
     await dao.storeCachedCredential({
       principalArn: 'arn:aws:iam::123456789012:role/Dev',
       accessKeyId: 'ASIA',
@@ -60,7 +60,7 @@ describe('CredentialsCacheDAO', () => {
 
   it('evicts expired entries', async () => {
     const kv = createMockKv();
-    const dao = new CredentialsCacheDAO(kv, '0123456789abcdef0123456789abcdef');
+    const dao = new CredentialsCacheDAO(kv, ['0123456789abcdef0123456789abcdef']);
     await dao.storeCachedCredential({
       principalArn: 'arn:expired',
       accessKeyId: 'A',

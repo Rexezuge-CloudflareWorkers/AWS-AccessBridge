@@ -1,5 +1,6 @@
 import { Container } from '@aws-access-bridge/backend-runtime/di';
 import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { createEncryptionKeys, keyChain } from './encryptionKeys';
 import { AccessService } from '../access/AccessService';
 import { AccountService } from '../account/AccountService';
 import { AssumeRoleService } from '../aws/assume-role/AssumeRoleService';
@@ -13,7 +14,6 @@ import { AccessAuthService } from '../auth/AccessAuthService';
 import { TokenService } from '../auth/TokenService';
 import { CostService } from '../cost/CostService';
 import { CredentialChainService } from '../credential/CredentialChainService';
-import { CredentialService } from '../credential/CredentialService';
 import { CredentialStoreService } from '../credential/CredentialStoreService';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { MaintenanceService } from '../maintenance/MaintenanceService';
@@ -27,10 +27,10 @@ import type { RequestScopeEnvShape } from './tokens';
  * Cache a promise for the lifetime of the scope, so a secret fetch happens once
  * per request rather than once per service.
  *
- * Declared `async` so a throw inside `fn` becomes a rejection: `Tokens.MasterKey`
- * is typed `() => Promise<string>`, and a synchronous throw would slip past a
- * caller's `.catch()` and surface as an unhandled error instead. The rejected
- * promise is cached too, so a failing binding is not retried per lookup.
+ * Declared `async` so a throw inside `fn` becomes a rejection: the encryption-key
+ * tokens are typed `() => Promise<string[]>`, and a synchronous throw would slip
+ * past a caller's `.catch()` and surface as an unhandled error instead. The
+ * rejected promise is cached too, so a failing binding is not retried per lookup.
  */
 function memoize<T>(fn: () => Promise<T>): () => Promise<T> {
   let pending: Promise<T> | undefined;
@@ -54,16 +54,13 @@ function requireCredentialCacheKv(env: RequestScopeEnvShape): KVNamespace {
 // `getRequestScope(env)` so a request shares one set of instances.
 function createRequestScope(env: RequestScopeEnvShape): Container {
   const scope = new Container();
-  // `Tokens.Env`/`Tokens.Db` were removed: they were bound on every request and
-  // never `get()`, so each one cost a WeakMap entry to hold a value nobody read.
-
-  const masterKey = memoize(() => {
-    if (!env.AES_ENCRYPTION_KEY_SECRET) {
-      throw new InternalServerError('Credential encryption key is not configured for this environment.');
-    }
-    return env.AES_ENCRYPTION_KEY_SECRET.get();
-  });
-  scope.bindValue(Tokens.MasterKey, masterKey);
+  // Per-feature encryption keys. Each resolves to the ordered chain for its
+  // surface (own key first, legacy master key as a read fallback) and is
+  // memoized, so resolving one key never fetches another and a failing binding
+  // is not retried per lookup.
+  const keys = createEncryptionKeys(env);
+  scope.bindValue(Tokens.CredentialKey, memoize(() => keyChain(keys.credentialKey, keys.legacyMasterKey)));
+  scope.bindValue(Tokens.CredentialCacheKey, memoize(() => keyChain(keys.credentialCacheKey, keys.legacyMasterKey)));
   scope.bindValue(Tokens.CollectorRegistry, InjectableCollectorRegistry.withDefaults());
 
   scope.bind(Tokens.StsService, () => new StsService());
@@ -72,7 +69,6 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
   scope.bind(Tokens.ConsoleService, () => new ConsoleService());
   scope.bind(Tokens.CredentialChainService, () => new CredentialChainService(env));
   scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env));
-  scope.bind(Tokens.CredentialService, () => new CredentialService(env));
   scope.bind(Tokens.AssumeRoleService, () => new AssumeRoleService({ ...env, AccessBridgeKV: requireCredentialCacheKv(env) }));
   scope.bind(Tokens.CostService, () => new CostService(env));
   scope.bind(Tokens.ResourceService, () => new ResourceService(env));
