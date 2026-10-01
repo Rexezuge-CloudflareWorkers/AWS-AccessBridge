@@ -76,7 +76,6 @@
     },
   ],
   "vars": {
-    "SERVE_SPA_FROM_WORKER": "false",
     "POLICY_AUD": "you-cloudflare-zero-trust-application-aud",
     "TEAM_DOMAIN": "https://your-cloudflare-zero-trust-team-domain.cloudflareaccess.com",
     "MAX_TOKENS_PER_USER": "5",

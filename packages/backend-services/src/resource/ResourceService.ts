@@ -2,6 +2,7 @@ import { AssumableRolesDAO, ResourceInventoryDAO } from '@aws-access-bridge/back
 import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
@@ -50,20 +51,22 @@ class ResourceService {
   public async searchResources(userEmail: string, filters: ResourceSearchFilters = {}): Promise<ResourceList> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const owner: AssumableRoleOwner = await this.ownerFor(userEmail);
-    let accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(owner);
+    const accessibleAccountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(owner);
 
-    if (filters.accountId && accountIds.includes(filters.accountId)) {
+    let accountIds: string[] = accessibleAccountIds;
+    if (filters.accountId) {
+      // A filter naming an account the caller cannot reach reads as "no such
+      // account" — the same answer as a filter that matches nothing. Narrowing
+      // only on a hit used to leave `accountIds` untouched, so asking for an
+      // inaccessible account returned *every* account the caller does have.
+      if (!accessibleAccountIds.includes(filters.accountId)) {
+        return { items: [], total: 0, rolesByAccount: {} };
+      }
       accountIds = [filters.accountId];
     }
 
     const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(this.env.AccessBridgeDB);
-    const { items, total } = await resourceDAO.searchResources(
-      accountIds,
-      filters.search,
-      filters.type,
-      Math.min(filters.limit ?? 50, 200),
-      Math.max(filters.offset ?? 0, 0),
-    );
+    const { items, total } = await resourceDAO.searchResources(accountIds, filters.search, filters.type, Pagination.limit(filters.limit), Pagination.offset(filters.offset));
     const rolesByAccountEntries: Array<[string, string[]]> = await Promise.all(
       accountIds.map(async (accountId): Promise<[string, string[]]> => [
         accountId,

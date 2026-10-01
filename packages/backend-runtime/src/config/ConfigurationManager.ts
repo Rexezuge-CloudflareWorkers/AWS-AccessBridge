@@ -14,7 +14,6 @@ import {
   DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT,
   DEFAULT_PRUNE_BATCH_SIZE,
   DEFAULT_RESOURCE_COLLECTION_INTERVAL_HOURS,
-  DEFAULT_SERVE_SPA_FROM_WORKER,
 } from './ConfigurationDefaults';
 import { EnvParser } from './EnvParser';
 
@@ -83,9 +82,6 @@ class ConfigurationManager {
     isProduction: (env: unknown): boolean => EnvParser.string(env, 'ENVIRONMENT', DEFAULT_ENVIRONMENT) === 'production',
   };
 
-  public static readonly spa = {
-    isServeFromWorker: (env: unknown): boolean => EnvParser.boolean(env, 'SERVE_SPA_FROM_WORKER', DEFAULT_SERVE_SPA_FROM_WORKER),
-  };
-}
+  }
 
 export { ConfigurationManager };

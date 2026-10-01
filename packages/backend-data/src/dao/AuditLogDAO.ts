@@ -42,7 +42,7 @@ class AuditLogDAO extends BaseDAO {
     }
   }
 
-  public async query(filters: AuditLogQueryFilters, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[]; total: number }> {
+  public async query(filters: AuditLogQueryFilters, limit: number, offset: number): Promise<{ logs: AuditLog[]; total: number }> {
     const conditions: string[] = [];
     const bindings: unknown[] = [];
 

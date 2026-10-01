@@ -5,6 +5,7 @@ import { type AuditEvent } from './AuditEventBuilder';
 import { type IAuditObserver } from './AuditObserver';
 import { AuditObserverRegistry } from './AuditObserverRegistry';
 import { AuditPayloadBuilder } from './AuditPayloadBuilder';
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
 type AuditServiceEnv = ServiceEnv;
@@ -49,11 +50,11 @@ public async record(event: AuditEvent): Promise<void> {
 
   public async queryLogs(
     filters: AuditLogQueryFilters,
-    limit: number = 50,
-    offset: number = 0,
+    limit?: number,
+    offset?: number,
   ): Promise<{ logs: AuditLog[]; total: number }> {
     const dao: AuditLogDAO = new AuditLogDAO(this.env.AccessBridgeDB);
-    return dao.query(filters, limit, offset);
+    return dao.query(filters, Pagination.limit(limit), Pagination.offset(offset));
   }
 }export { AuditService };
 export type { AuditServiceEnv };

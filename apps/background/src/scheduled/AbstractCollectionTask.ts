@@ -60,8 +60,18 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
           this.sessionName(),
         );
         const accountId: string = ArnUtil.getAccountIdFromArn(principalArn);
-        succeededItems += await this.collectForAccount(principalArn, credentials, accountId, env);
-        await configDAO.updateLastCollectedTime(principalArn, this.collectionType());
+        const collected: number = await this.collectForAccount(principalArn, credentials, accountId, env);
+        succeededItems += collected;
+        // Only stamp the interval when something was actually collected. The
+        // collectors report 0 for a genuinely empty account just as they do for
+        // one that failed to answer, and advancing the cutoff either way means an
+        // account that AWS is refusing is not retried until the next full
+        // interval — 6 hours for cost, 2 for resources — instead of the next tick.
+        if (collected > 0) {
+          await configDAO.updateLastCollectedTime(principalArn, this.collectionType());
+        } else {
+          console.warn(`[${this.collectionType()}] ${principalArn} reported no data; leaving its collection interval unadvanced.`);
+        }
       } catch (error: unknown) {
         failedAccounts += 1;
         console.error(`Failed to collect ${this.collectionType()} data for ${principalArn}:`, error);

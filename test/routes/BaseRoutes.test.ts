@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
-import { BadRequestError, DatabaseError, MethodNotAllowedError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, DatabaseError, ForbiddenError, MethodNotAllowedError } from '@aws-access-bridge/backend-errors';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
@@ -122,9 +122,11 @@ describe('IAdminActivityAPIRoute', () => {
     vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(false);
     const c = createContext();
     await new AdminOkRoute({} as never).handle(c);
+    // 403, not 401: the caller is authenticated by Cloudflare Access and simply
+    // lacks the role, so a 401 would tell them to sign in again, which cannot help.
     expect(c.json).toHaveBeenCalledWith(
-      expect.objectContaining({ Exception: expect.objectContaining({ Type: new UnauthorizedError('x').getErrorType() }) }),
-      401,
+      expect.objectContaining({ Exception: expect.objectContaining({ Type: new ForbiddenError('x').getErrorType() }) }),
+      403,
     );
   });
 

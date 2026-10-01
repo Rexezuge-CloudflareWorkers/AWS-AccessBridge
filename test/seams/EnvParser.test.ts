@@ -44,7 +44,6 @@ describe('ConfigurationManager namespaces', () => {
       DEV_AUTH_EMAIL: 'dev@example.com',
       DEMO_MODE: 'true',
       INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS: '18',
-      SERVE_SPA_FROM_WORKER: 'true',
     };
     expect(ConfigurationManager.credential.getTrustChainLimit(env)).toBe(4);
     expect(ConfigurationManager.token.getMaxPerUser(env)).toBe(9);
@@ -59,7 +58,6 @@ describe('ConfigurationManager namespaces', () => {
     expect(ConfigurationManager.auth.getPolicyAud(env)).toBe('aud');
     expect(ConfigurationManager.auth.isDemoMode(env)).toBe(true);
     expect(ConfigurationManager.internal.getRequestTimeWindowMs(env)).toBe(18);
-    expect(ConfigurationManager.spa.isServeFromWorker(env)).toBe(true);
   });
 
   it('recognises only the literal "production" as a production environment', () => {
@@ -77,6 +75,5 @@ describe('ConfigurationManager namespaces', () => {
     expect(ConfigurationManager.credential.getTrustChainLimit({})).toBeGreaterThan(0);
     expect(ConfigurationManager.auth.isDemoMode({})).toBe(false);
     expect(ConfigurationManager.auth.getTeamDomain({})).toBeUndefined();
-    expect(ConfigurationManager.spa.isServeFromWorker({})).toBe(false);
   });
 });

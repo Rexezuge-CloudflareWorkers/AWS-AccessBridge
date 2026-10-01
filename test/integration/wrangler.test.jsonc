@@ -31,7 +31,6 @@
   ],
   "vars": {
     "DEV_AUTH_EMAIL": "test@example.com",
-    "SERVE_SPA_FROM_WORKER": "false",
     "POLICY_AUD": "test-aud",
     "TEAM_DOMAIN": "https://test.cloudflareaccess.com",
     "MAX_TOKENS_PER_USER": "5",
@@ -39,5 +38,8 @@
     "PRINCIPAL_TRUST_CHAIN_LIMIT": "3",
     "AUDIT_LOG_RETENTION_DAYS": "90",
     "DEMO_MODE": "false",
+    // Not "production": the harness sets DEV_AUTH_EMAIL in vars, which is the
+    // exact mistake the guard exists to catch.
+    "ENVIRONMENT": "development",
   },
 }

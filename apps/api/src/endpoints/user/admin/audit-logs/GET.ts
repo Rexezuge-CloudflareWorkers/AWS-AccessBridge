@@ -4,6 +4,7 @@ import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { AuditLog } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, ListAuditLogsResponse, ListAuditLogsEnv> {
@@ -196,8 +197,8 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
       startTime: url.searchParams.get('startTime') ? parseInt(url.searchParams.get('startTime')!) : undefined,
       endTime: url.searchParams.get('endTime') ? parseInt(url.searchParams.get('endTime')!) : undefined,
     };
-    const limit: number = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50'), 1), 200);
-    const offset: number = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
+    const limit: number = Pagination.limit(url.searchParams.get('limit'));
+    const offset: number = Pagination.offset(url.searchParams.get('offset'));
 
     const auditService = getRequestScope(env).get(Tokens.AuditService);
     const { logs, total } = await auditService.queryLogs(filters, limit, offset);

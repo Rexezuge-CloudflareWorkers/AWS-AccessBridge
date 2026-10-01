@@ -390,9 +390,9 @@ All of these live in `wrangler.jsonc` under `vars`. Defaults come from `packages
 | `COST_LOOKBACK_DAYS`                              | Days of cost history fetched per collection.                                                                                                                                                       | `30`      |
 | `RESOURCE_COLLECTION_INTERVAL_HOURS`              | Background resource inventory collection interval.                                                                                                                                                 | `2`       |
 | `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` | HMAC timestamp replay window for internal self-calls.                                                                                                                                              | `1000`    |
-| `SERVE_SPA_FROM_WORKER`                           | When `"true"`, the Worker serves the SPA from `/user/` page routes.                                                                                                                                | `"false"` |
 | `DEMO_MODE`                                       | When `"true"`, all admin write operations are blocked. Safe for public demos.                                                                                                                      | `"false"` |
-| `DEV_AUTH_EMAIL`                                  | Local-only auth bypass (never set in production).                                                                                                                                                  | —         |
+| `ENVIRONMENT`                                     | Only the literal `"production"` arms the `DEV_AUTH_EMAIL` guard. Set it on every real deployment.                                                                                                 | `"development"` |
+| `DEV_AUTH_EMAIL`                                  | Local-only auth bypass. **Refused** when `ENVIRONMENT` is `"production"`.                                                                                                                        | —         |
 
 ---
 

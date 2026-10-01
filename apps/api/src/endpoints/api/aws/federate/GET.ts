@@ -7,6 +7,7 @@ import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws';
 import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error';
 
 import type { RoleConfig } from '@aws-access-bridge/shared/model';
+import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
@@ -201,7 +202,9 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
     }
     const destinationPath: string | null = url.searchParams.get('destinationPath');
     const destinationRegion: string | null = url.searchParams.get('destinationRegion');
-    const principalArn: string = `arn:aws:iam::${awsAccountId}:role/${roleName}`;
+    // `buildPrincipalArn`, not a template literal: the role name may carry an IAM
+    // path, and this is the same helper the web client uses to build this URL.
+    const principalArn: string = buildPrincipalArn(awsAccountId, roleName);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const baseUrl: string = this.getBaseUrl(cxt);
     const roleConfig: RoleConfig | undefined = await getRequestScope(env).get(Tokens.AccountService).getRoleConfig(awsAccountId, roleName);

@@ -16,7 +16,7 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 - **Onboarding**: 6-step admin Setup Wizard (Account → Credentials → Chain → Roles → Users → Summary) with credential validation, chain testing, and IAM role discovery. See `apps/web/AGENTS.md`.
 - **Background**: cron Durable Object `CronTasksWorker` on `*/10 * * * *` — phase 1 credential-cache refresh, phase 2 audit prune + task prune + cost/resource collection. See `apps/background/AGENTS.md` and `docs/agents/runtime/AGENTS.md`.
 - **i18n**: 12 web locales + backend `preferredLanguage` (`GET|PUT /user/me`) > `localStorage` > `navigator` > `en`; Title Case, no ALL-CAPS. See `apps/web/AGENTS.md`.
-- **Web entry**: canonical `/user/` (Zero Trust login trigger), pages under `/user/app/*` (never collide with `/user/*` JSON), legacy `/costs|/resources|/admin/*` redirects, `SERVE_SPA_FROM_WORKER` gating. See `apps/web/AGENTS.md` and `apps/api/AGENTS.md`.
+- **Web entry**: canonical `/user/` (Zero Trust login trigger), pages under `/user/app/*` (never collide with `/user/*` JSON), legacy `/costs|/resources|/admin/*` redirects; the Worker always serves the SPA (unconditional catch-all). See `apps/web/AGENTS.md` and `apps/api/AGENTS.md`.
 - **DI**: per-request composition root (`composition/Tokens` + `createRequestScope`, resolved via `getRequestScope(env).get(Tokens.X)`). This is the only way services are constructed; the legacy `*Factory.create(env)` classes have been removed. `ServiceEnv` (`composition/ServiceEnv.ts`) is the single source of truth for what a service may read, which is what makes the root type-safe without casts. See `packages/backend-services/AGENTS.md`.
 
 ## Cloudflare Documentation

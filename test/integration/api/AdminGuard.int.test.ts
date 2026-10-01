@@ -3,10 +3,13 @@ import { env, SELF } from 'cloudflare:test';
 import { applyMigrations } from '../helpers/migrations';
 
 // Offline-safe guard matrix: test@example.com is not a super-admin
-// (see UserMe.int.test.ts), so every /user/admin/* route must 401
-// (`IAdminActivityAPIRoute` throws `UnauthorizedError`) before touching
-// D1/KV/AWS. Bodies are valid so validation passes and the guard is
-// what rejects. /api/* without credentials must 401.
+// (see UserMe.int.test.ts), so every /user/admin/* route must 403
+// (`IAdminActivityAPIRoute` throws `ForbiddenError`) before touching
+// D1/KV/AWS. The caller is authenticated — Cloudflare Access established who they
+// are — they merely lack the role, which is what every `/user/admin/*` OpenAPI
+// document already declares. Bodies are valid so validation passes and the guard
+// is what rejects. /api/* without any credentials must 401: there the caller is
+// genuinely unauthenticated.
 describe('Admin guard + programmatic auth matrix', () => {
   beforeAll(async () => {
     await applyMigrations(env.AccessBridgeDB);
@@ -33,13 +36,15 @@ describe('Admin guard + programmatic auth matrix', () => {
   ];
 
   for (const call of adminCalls) {
-    it(`401s non-super-admin ${call.method} ${call.path}`, async () => {
+    it(`403s non-super-admin ${call.method} ${call.path}`, async () => {
       const response: Response = await SELF.fetch(`http://localhost${call.path}`, {
         method: call.method,
         headers: { 'Content-Type': 'application/json' },
         body: call.body ? JSON.stringify(call.body) : undefined,
       });
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
+      // `ForbiddenError.getErrorType()` is the wire name: 'Forbidden'.
+      await expect(response.json()).resolves.toMatchObject({ Exception: { Type: 'Forbidden' } });
     });
   }
 
