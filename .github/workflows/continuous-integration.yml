@@ -79,6 +79,27 @@ jobs:
           command: pnpm run validate:migrations
           max_attempts: '2'
 
+  god-files:
+    name: God-Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      # Its own job, like `migrations` and `locales`: a file growing past the
+      # limit is invisible to typecheck, lint, and the tests — they all pass
+      # perfectly well on a 500-line component. A separate job so the failure says
+      # "god-file" rather than arriving inside a lint log.
+      - name: Check God-Files
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run check:god-files
+          max_attempts: '2'
+
   locales:
     name: Locales
     runs-on: ubuntu-latest
@@ -166,6 +187,7 @@ jobs:
       - typecheck
       - lint
       - migrations
+      - god-files
       - locales
       - unit-tests
       - integration-tests
@@ -195,6 +217,7 @@ jobs:
       - typecheck
       - lint
       - migrations
+      - god-files
       - locales
       - unit-tests
       - integration-tests

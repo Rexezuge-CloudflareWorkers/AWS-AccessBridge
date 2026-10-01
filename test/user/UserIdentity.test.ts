@@ -340,14 +340,25 @@ describe('UserIdentityService', () => {
     // case-sensitive, so without an explicit case-insensitive check two
     // accounts could differ only by case and both sign in.
     it('rejects an address that differs only by case', async () => {
-      const { service } = changeHarness();
-      service['deps'].userEmailDAO = () =>
-        Promise.resolve({
-          get: vi.fn().mockResolvedValue(row({ email: 'taken@example.com', user_id: 'usr_other' })),
-          register: vi.fn(),
-          revokeAllVerified: vi.fn(),
-          listByUserId: vi.fn(),
-        } as never);
+      // Constructed with the override rather than mutating `deps` afterwards:
+      // `AddressRegistryService` captures its DAO factories at construction, so
+      // a post-construction swap would not reach the code under test.
+      const service = new UserIdentityService(env(), {
+        userEmailDAO: () =>
+          Promise.resolve({
+            get: vi.fn().mockResolvedValue(row({ email: 'taken@example.com', user_id: 'usr_other' })),
+            register: vi.fn(),
+            revokeAllVerified: vi.fn(),
+            listByUserId: vi.fn(),
+          } as never),
+        userMetadataDAO: () =>
+          Promise.resolve({
+            getById: vi.fn().mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' }),
+            getByCurrentEmail: vi.fn().mockResolvedValue(null),
+            getByAnchor: vi.fn().mockResolvedValue(null),
+            setCurrentEmail: vi.fn(),
+          } as never),
+      });
       await expect(service.setPrimaryEmail('usr_abc', 'TAKEN@example.com')).rejects.toBeInstanceOf(ConflictError);
     });
 

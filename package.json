@@ -5,11 +5,12 @@
   "scripts": {
     "postinstall": "node scripts/build/ensure-spa-shell-stub.ts && pnpm run typegen",
     "build": "pnpm -r build",
-    "checks": "pnpm run typecheck && pnpm run lint && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration",
+    "checks": "pnpm run typecheck && pnpm run lint && pnpm run check:god-files && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration",
     "prettier": "prettier --write .",
     "typecheck": "pnpm -r typecheck && pnpm run typecheck:scripts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "validate:locales": "tsx scripts/i18n/validate_locales.ts",
+    "check:god-files": "node scripts/check-god-files.mjs",
     "validate:migrations": "tsx scripts/migrations/verify-migrations.ts",
     "migrations:lock": "tsx scripts/migrations/verify-migrations.ts --write",
     "test": "vitest run",

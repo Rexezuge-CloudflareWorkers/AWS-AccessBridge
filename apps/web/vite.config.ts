@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
@@ -6,11 +6,52 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
 const apiGeneratedDir = path.resolve(__dirname, '../../apps/api/src/generated');
 const apiSpaShellPath = path.resolve(apiGeneratedDir, 'spa-shell.ts');
+const publicDir = path.resolve(__dirname, 'public');
+
+/**
+ * Inline `public/favicon.svg` into the document as a `data:` URI.
+ *
+ * The Worker serves the SPA itself, so `href="/favicon.svg"` costs a request that
+ * the Worker must answer — either from the static-asset binding or, worse, by
+ * falling through the SPA catch-all and being served 845 bytes of HTML as an icon.
+ * A data URI makes the browser zero requests for it.
+ *
+ * Generated from `public/favicon.svg` on every build rather than pasted into
+ * `index.html`, so the icon cannot drift from the file it is supposed to be. The
+ * `<link rel="icon">` placeholder in `index.html` is replaced; a hand-written data
+ * URI there would be silently overwritten.
+ */
+function inlineFavicon(): Plugin {
+  const source: string = path.join(publicDir, 'favicon.svg');
+  return {
+    name: 'favicon-inline',
+    transformIndexHtml(html) {
+      if (!existsSync(source)) {
+        throw new Error(`favicon-inline: ${source} is missing; the SPA would ship without an icon.`);
+      }
+      const svg: string = readFileSync(source, 'utf8').trim();
+      // `encodeURIComponent` already escapes everything that would break out of a
+      // double-quoted attribute; the explicit passes below are belt-and-braces for
+      // the three characters that matter most. `#` and `%` are load-bearing and
+      // must NOT be escaped further: they are the data URI's own escape mechanism.
+      const dataUri: string = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      const link: string = `<link rel="icon" type="image/svg+xml" href="${dataUri}" />`;
+      // A replacer function, so `$&` and friends inside the data URI are literal
+      // rather than interpreted as replacement patterns.
+      const replaced: string = html.replace(/<link[^>]*rel=["']icon["'][^>]*>/, () => link);
+      if (replaced === html) {
+        throw new Error('favicon-inline: no <link rel="icon"> found in index.html to inline.');
+      }
+      return replaced;
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    inlineFavicon(),
     {
       name: 'spa-shell-embed',
       closeBundle() {

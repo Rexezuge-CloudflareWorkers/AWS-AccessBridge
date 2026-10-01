@@ -1,8 +1,8 @@
 import { UserEmailDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { isMissingSchemaError } from '@aws-access-bridge/backend-data/utils';
-import { BadRequestError, ConflictError, DatabaseError } from '@aws-access-bridge/backend-errors';
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/;
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { AddressRegistryService } from './AddressRegistryService';
 
 interface UserIdentityEnv {
   AccessBridgeDB: D1Queryable;
@@ -60,6 +60,7 @@ function idOf(account: AccountIdentity | null): string | null {
  */
 class UserIdentityService {
   private readonly deps: Required<UserIdentityDeps>;
+  private readonly registry: AddressRegistryService;
   private readonly byEmail = new Map<string, AccountIdentity | null>();
 
   constructor(
@@ -71,6 +72,7 @@ class UserIdentityService {
       userEmailDAO: () => Promise.resolve(new UserEmailDAO(env.AccessBridgeDB)),
       ...deps,
     };
+    this.registry = new AddressRegistryService(this.deps.userEmailDAO, this.deps.userMetadataDAO);
   }
 
   /**
@@ -213,120 +215,38 @@ class UserIdentityService {
   }
 
   /**
-   * Every address known for an account, verified ones first.
+   * Address management, delegated to `AddressRegistryService`.
+   *
+   * Exposed here so callers keep resolving one identity object; the registry is a
+   * separate class only because its safety argument is a different one from
+   * resolution's.
    */
+
+  /**
+  Every address known for an account, verified ones first.
+  */
   public async listAddresses(userId: string): Promise<Array<{ email: string; isVerified: boolean }>> {
-    const dao: UserEmailDAO = await this.deps.userEmailDAO();
-    const rows = await dao.listByUserId(userId);
-    return rows.map((row) => ({ email: row.email, isVerified: row.is_verified === 1 }));
+    return this.registry.listAddresses(userId);
   }
 
   /**
-   * Point an account at a new sign-in address.
-   *
-   * The account id, the frozen anchor, and every id-keyed grant are untouched:
-   * only which address authenticates the account moves. The previous address is
-   * revoked rather than deleted, so rows written before the change still resolve
-   * to this account, and it is released for a later legitimate holder.
-   *
-   * The order is the safety property. Claiming first means the account is never
-   * locked out — there is only a brief window where both addresses authenticate.
-   * Revoking first would open a window where neither does.
-   *
-   * Rejects an address that is already verified for another account. That check
-   * is the whole reason this is not simply an `UPDATE`: Cloudflare Access is the
-   * only authenticator, so an unverified self-service change would let anyone
-   * claim an address and inherit its account. The check is case-INsensitive,
-   * which is stricter than the registry's exact-match key and than the unique
-   * index on `current_email` — those are both case-sensitive, so without this
-   * two accounts could differ only by case and both sign in.
-   *
-   * No route exposes this yet. Proof of control for the new address (a confirm
-   * step performed while authenticated as that address) has to land first;
-   * `scripts/ops/change-email.ts` applies the same sequence out of band.
-   */
+  Point an account at a new sign-in address. See `AddressRegistryService`.
+  */
   public async setPrimaryEmail(userId: string, newEmail: string): Promise<AccountIdentity> {
-    const email: string = newEmail.trim();
-    if (!EMAIL_PATTERN.test(email)) {
-      throw new BadRequestError('Invalid email address.');
-    }
-    const userMetadataDAO: UserMetadataDAO = await this.deps.userMetadataDAO();
-    const userEmailDAO: UserEmailDAO = await this.deps.userEmailDAO();
-    const row = await userMetadataDAO.getById(userId);
-    if (!row?.id) throw new BadRequestError('User not found.');
-
-    const current: string = (row.current_email ?? row.user_email ?? '').trim();
-    if (current.toLowerCase() === email.toLowerCase()) {
-      return { id: row.id, email: current, anchorEmail: row.user_email ?? current };
-    }
-
-    if (await this.isClaimedByOther(userEmailDAO, userMetadataDAO, email, userId)) {
-      throw new ConflictError('Email is already in use by another account.');
-    }
-
-    const now: number = Math.floor(Date.now() / 1000);
-    const outcome = await userEmailDAO.register({ email, userId: row.id, isVerified: true, now });
-    if (outcome === 'already-claimed') {
-      throw new ConflictError('Email is already in use by another account.');
-    }
-    // Revoke every other verified address, so only the new one authenticates.
-    await userEmailDAO.revokeAllVerified(row.id, email);
-    await userMetadataDAO.setCurrentEmail(row.id, email);
-
-    this.byEmail.delete(current);
-    this.byEmail.set(email, { id: row.id, email, anchorEmail: row.user_email ?? current });
-    return { id: row.id, email, anchorEmail: row.user_email ?? current };
+    const account: AccountIdentity = await this.registry.setPrimaryEmail(userId, newEmail);
+    // The memoised resolution for the old address is now stale: it points at an
+    // address that no longer authenticates. Drop it rather than let a second
+    // resolution in this scope return the pre-change identity.
+    this.byEmail.delete(account.anchorEmail);
+    this.byEmail.set(account.email, account);
+    return account;
   }
 
   /**
-   * Whether `email` is already a live login for some account other than `userId`.
-   *
-   * Two checks, because the two stores differ in case-sensitivity: the registry
-   * row (exact key) and, for accounts whose address predates 0032, the
-   * `current_email` column. Both are probed case-insensitively.
-   */
-  private async isClaimedByOther(
-    userEmailDAO: UserEmailDAO,
-    userMetadataDAO: UserMetadataDAO,
-    email: string,
-    userId: string,
-  ): Promise<boolean> {
-    // Propagates on anything but a missing 0032 schema, deliberately. This is the
-    // guard that stops `setPrimaryEmail` claiming an address that is already a
-    // live login for a different account; treating a failed lookup as "not
-    // claimed" turns a D1 blip into an identity takeover.
-    const registered = await Promise.resolve(userEmailDAO.get(email)).catch((error: unknown) => {
-      if (isMissingSchemaError(error)) return null;
-      throw error;
-    });
-    if (registered && registered.is_verified === 1 && registered.user_id !== userId) return true;
-
-    const owner = await Promise.resolve(userMetadataDAO.getByCurrentEmail(email)).catch((error: unknown) => {
-      if (isMissingSchemaError(error)) return null;
-      throw error;
-    });
-    return Boolean(owner?.id && owner.id !== userId);
-  }
-
-  /**
-   * Ops/migration path: attach an address that has already been proven, without
-   * making it the sign-in address.
-   */
+  Attach an already-proven address without making it the sign-in address.
+  */
   public async linkVerifiedEmail(userId: string, email: string): Promise<void> {
-    const address: string = email.trim();
-    if (!EMAIL_PATTERN.test(address)) {
-      throw new BadRequestError('Invalid email address.');
-    }
-    const userEmailDAO: UserEmailDAO = await this.deps.userEmailDAO();
-    const outcome = await userEmailDAO.register({
-      email: address,
-      userId,
-      isVerified: true,
-      now: Math.floor(Date.now() / 1000),
-    });
-    if (outcome === 'already-claimed') {
-      throw new ConflictError('Email is already in use by another account.');
-    }
+    return this.registry.linkVerifiedEmail(userId, email);
   }
 }
 

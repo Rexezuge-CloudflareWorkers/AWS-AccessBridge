@@ -81,6 +81,10 @@ Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 block
 | Team workspaces                                 | `docs/agents/features/teams/AGENTS.md`              |
 | User identity (account key vs email)            | `docs/agents/features/identity/AGENTS.md`           |
 
+## File Size Guard
+
+`scripts/check-god-files.mjs` fails above 400 LOC and warns above 300, run by `pnpm run check:god-files` (wired into `checks`, plus its own CI job). Excludes tooling, tests, generated output, and migrations. A file past a few hundred lines stops being readable as a unit — this repo's own history has a 219-line god-class and a 495-line React component, both split by hand.
+
 ## Keeping AGENTS.md Current
 
 Update the scoped sub-guide (not this index) as part of any change that adds, removes, or renames:
