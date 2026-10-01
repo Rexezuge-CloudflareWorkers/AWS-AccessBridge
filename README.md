@@ -288,6 +288,19 @@ GitHub Actions deployments can patch the Wrangler configuration without replacin
 
 Do not put secrets in either patch variable; use GitHub secrets, Wrangler secrets, or Cloudflare Secrets Store for sensitive values.
 
+### Database backups (optional)
+
+A `Backup D1 Database (S3/WebDAV)` workflow (`.github/workflows/backup-d1.yml`) exports `AccessBridgeDB` daily at 04:15 UTC and uploads it to S3-compatible storage and/or WebDAV. It is off until you configure a destination, so adding it changes nothing by default.
+
+To enable it, add these repository secrets (`Settings → Secrets and variables → Actions → Secrets`):
+
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` — already present for deployment; nothing new.
+- `BACKUP_ENCRYPTION_KEY` — **required**. The D1 database stores API bearer tokens (`user_access_tokens.access_token`) and user addresses in plaintext, so the workflow refuses to run or upload anything unencrypted.
+- Destination credentials: `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` / `S3_REGION` (plus optional `S3_ENDPOINT` for R2, MinIO, B2) and/or `WEBDAV_URL` / `WEBDAV_USER` / `WEBDAV_PASSWORD`.
+- Optional: `BACKUP_RETENTION_DAYS` (default 30) and `WEBDAV_BASE_PATH` (default `aws-access-bridge`).
+
+Run it once from the Actions tab to enable the schedule. Store backups outside your Cloudflare account — the Worker, D1, and the Secrets Store holding your IAM encryption key all live in one account. Full setup, restore, and Time Travel instructions: **[Database Backup, Restore, and Time Travel](./docs/db-backup-recovery.md)**.
+
 ---
 
 ## AWS IAM Setup (Recommended: Intermediate-Role Pattern)
@@ -443,6 +456,7 @@ Useful scripts (see root `package.json` and `apps/web/package.json`):
 ## Documentation
 
 - **[`AGENTS.md`](./AGENTS.md)** — architecture, endpoint inventory, database layout, scheduled tasks, and everything else an LLM agent or new contributor needs to navigate the codebase.
+- **[Database Backup, Restore, and Time Travel](./docs/db-backup-recovery.md)** — the daily D1 backup workflow, its secrets, and how to get your data back.
 - **OpenAPI docs** — the running worker serves interactive API docs at **`/docs`**.
 
 ---

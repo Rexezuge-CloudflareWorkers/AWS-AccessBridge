@@ -1,0 +1,328 @@
+name: Backup D1 Database (S3/WebDAV)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # Daily at 04:15 UTC. Off the top of the hour on purpose: GitHub drops scheduled
+    # workflows that share a minute with high-traffic crons.
+    - cron: '15 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: backup-d1
+  cancel-in-progress: false
+
+env:
+  BACKUP_RETENTION_DAYS: ${{ secrets.BACKUP_RETENTION_DAYS || 30 }}
+
+jobs:
+  check-secrets:
+    name: Check Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      cloudflare: ${{ steps.check.outputs.cloudflare }}
+      encryption: ${{ steps.check.outputs.encryption }}
+      s3: ${{ steps.check.outputs.s3 }}
+      webdav: ${{ steps.check.outputs.webdav }}
+    steps:
+      - name: Detect Configured Destinations
+        id: check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          WEBDAV_URL: ${{ secrets.WEBDAV_URL }}
+          WEBDAV_USER: ${{ secrets.WEBDAV_USER }}
+          WEBDAV_PASSWORD: ${{ secrets.WEBDAV_PASSWORD }}
+        run: |
+          set -uo pipefail
+
+          if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            CLOUDFLARE_ENABLED=true
+            echo "✅ Cloudflare credentials: enabled"
+          else
+            CLOUDFLARE_ENABLED=false
+            echo "⚠️ Cloudflare credentials: disabled (missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID)"
+          fi
+
+          if [[ -n "$BACKUP_ENCRYPTION_KEY" ]]; then
+            ENCRYPTION_ENABLED=true
+            echo "✅ Encryption key: enabled"
+          else
+            ENCRYPTION_ENABLED=false
+            echo "⚠️ Encryption key: disabled (BACKUP_ENCRYPTION_KEY is not set)"
+          fi
+
+          if [[ -n "$S3_ACCESS_KEY_ID" && -n "$S3_SECRET_ACCESS_KEY" && -n "$S3_BUCKET" && -n "$S3_REGION" ]]; then
+            S3_ENABLED=true
+            echo "✅ S3 destination: enabled"
+          else
+            S3_ENABLED=false
+            echo "⚠️ S3 destination: disabled (missing credentials)"
+          fi
+
+          if [[ -n "$WEBDAV_URL" && -n "$WEBDAV_USER" && -n "$WEBDAV_PASSWORD" ]]; then
+            WEBDAV_ENABLED=true
+            echo "✅ WebDAV destination: enabled"
+          else
+            WEBDAV_ENABLED=false
+            echo "⚠️ WebDAV destination: disabled (missing credentials)"
+          fi
+
+          echo "cloudflare=$CLOUDFLARE_ENABLED" >> "$GITHUB_OUTPUT"
+          echo "encryption=$ENCRYPTION_ENABLED" >> "$GITHUB_OUTPUT"
+          echo "s3=$S3_ENABLED" >> "$GITHUB_OUTPUT"
+          echo "webdav=$WEBDAV_ENABLED" >> "$GITHUB_OUTPUT"
+
+          # Fail closed. AccessBridgeDB stores API bearer tokens and user addresses in
+          # plaintext, so an unencrypted dump is a credential leak. If anyone opted into a
+          # destination we hold them to the encryption key; if nobody did, the backup jobs
+          # simply skip and the repository stays green.
+          if [[ "$S3_ENABLED" == "true" || "$WEBDAV_ENABLED" == "true" ]]; then
+            if [[ "$CLOUDFLARE_ENABLED" != "true" ]]; then
+              echo "::error::A backup destination is configured but CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are missing."
+            fi
+            if [[ "$ENCRYPTION_ENABLED" != "true" ]]; then
+              echo "::error::BACKUP_ENCRYPTION_KEY is required. AccessBridgeDB stores user_access_tokens.access_token and user addresses in plaintext."
+            fi
+            if [[ "$CLOUDFLARE_ENABLED" != "true" || "$ENCRYPTION_ENABLED" != "true" ]]; then
+              echo "See docs/db-backup-recovery.md for the full secret list."
+              exit 1
+            fi
+          fi
+
+  export-d1:
+    name: Export D1 Database
+    needs: check-secrets
+    if: needs.check-secrets.outputs.cloudflare == 'true' && needs.check-secrets.outputs.encryption == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      backup-file: ${{ steps.encrypt.outputs.file }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      - name: Prepare Wrangler Configuration
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm exec tsx scripts/prepare-wrangler-config.ts
+          max_attempts: '3'
+        env:
+          WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
+          WRANGLER_PATCH_JSON: ${{ vars.WRANGLER_PATCH_JSON }}
+          WRANGLER_VARS_PATCH_JSON: ${{ vars.WRANGLER_VARS_PATCH_JSON }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Resolve D1 Database
+        id: db
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          # wrangler.jsonc is jsonc (the template keeps // comments and trailing commas),
+          # so read the single d1_databases entry with a targeted scan instead of JSON.parse.
+          # One value per line keeps empty fields intact — no eval, no IFS surprises.
+          node -e '
+            const { readFileSync } = require("fs");
+            const raw = readFileSync("wrangler.jsonc", "utf8");
+            const start = raw.indexOf("\"d1_databases\"");
+            const block = start === -1 ? "" : raw.slice(start, raw.indexOf("]", start) + 1);
+            const pick = (key) => (block.match(new RegExp("\"" + key + "\"\\s*:\\s*\"([^\"]*)\"")) || [])[1] ?? "";
+            console.log([pick("binding"), pick("database_name"), pick("database_id")].join("\n"));
+          ' > .d1-target.txt
+          mapfile -t D1_FIELDS < .d1-target.txt
+          rm -f .d1-target.txt
+
+          BINDING="${D1_FIELDS[0]:-}"
+          DATABASE_NAME="${D1_FIELDS[1]:-}"
+          DATABASE_ID="${D1_FIELDS[2]:-}"
+          echo "D1 binding: $BINDING"
+
+          if [[ -z "$BINDING" ]]; then
+            echo "::error::No d1_databases entry found in wrangler.jsonc."
+            exit 1
+          fi
+
+          # prepare-wrangler-config.ts provisions a missing D1 database. A database it had
+          # to create holds no user data, and uploading it would be a false sense of safety.
+          if [[ "$DATABASE_ID" == "00000000-0000-0000-0000-000000000000" ]]; then
+            echo "::error::D1 database_id for $BINDING is still the template placeholder. The database does not exist yet, so there is nothing to back up."
+            exit 1
+          fi
+
+          # `d1 export` takes a database name; fall back to the binding for hand-written configs.
+          TARGET="$DATABASE_NAME"
+          [[ -n "$TARGET" ]] || TARGET="$BINDING"
+          echo "Exporting D1 database: $TARGET ($DATABASE_ID)"
+
+          pnpm exec wrangler d1 info "$TARGET" --remote --config ./wrangler.jsonc --json > /dev/null
+
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+
+      - name: Export D1 Database
+        uses: ./.github/actions/retry-step
+        with:
+          command: >
+            pnpm exec wrangler d1 export "${{ steps.db.outputs.target }}"
+            --remote
+            --config ./wrangler.jsonc
+            --skip-confirmation
+            --output=backup.sql
+          max_attempts: '3'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Compress And Encrypt Backup
+        id: encrypt
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$BACKUP_ENCRYPTION_KEY" ]]; then
+            echo "::error::BACKUP_ENCRYPTION_KEY is not set. Refusing to export an unencrypted database."
+            exit 1
+          fi
+
+          STAMP="$(date -u +'%Y-%m-%d_%H-%M-%S')"
+          BACKUP_FILE="access-bridge_prod_${STAMP}.sql.gz.enc"
+
+          gzip backup.sql
+          # `env:` keeps a passphrase containing spaces or quotes from breaking the command.
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+            -in backup.sql.gz \
+            -out "$BACKUP_FILE" \
+            -pass env:BACKUP_ENCRYPTION_KEY
+
+          # gzip already unlinked the plaintext SQL; make the intent explicit so no
+          # unencrypted copy ever reaches the artifact store.
+          rm -f backup.sql backup.sql.gz
+
+          echo "✅ Backup encrypted: $BACKUP_FILE"
+          ls -lh "$BACKUP_FILE"
+          echo "file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup
+          path: access-bridge_prod_*.sql.gz.enc
+          if-no-files-found: error
+          retention-days: 1
+
+  backup-s3:
+    name: Upload To S3
+    needs: [check-secrets, export-d1]
+    if: needs.check-secrets.outputs.s3 == 'true'
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+    steps:
+      - name: Download Backup Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: d1-backup
+
+      - name: Upload To S3
+        run: |
+          set -euo pipefail
+
+          BACKUP_FILE="${{ needs.export-d1.outputs.backup-file }}"
+          PREFIX="aws-access-bridge/production"
+
+          ENDPOINT_FLAG=""
+          if [[ -n "$S3_ENDPOINT" ]]; then
+            ENDPOINT_FLAG="--endpoint-url $S3_ENDPOINT"
+          fi
+
+          aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/$PREFIX/" $ENDPOINT_FLAG
+          echo "✅ Backup uploaded to S3: s3://$S3_BUCKET/$PREFIX/$BACKUP_FILE"
+
+          CUTOFF_DATE=$(date -u -d "-$BACKUP_RETENTION_DAYS days" +%Y-%m-%d)
+          echo "Cleaning up backups older than $CUTOFF_DATE..."
+
+          aws s3 ls "s3://$S3_BUCKET/$PREFIX/" $ENDPOINT_FLAG | while read -r line; do
+            FILE_DATE=$(echo "$line" | awk '{print $1}')
+            FILE_NAME=$(echo "$line" | awk '{print $4}')
+            # Never delete anything that is not a backup artifact in our own prefix.
+            case "$FILE_NAME" in
+              *.sql.gz | *.sql.gz.enc) ;;
+              *) continue ;;
+            esac
+            if [[ -n "$FILE_NAME" && "$FILE_DATE" < "$CUTOFF_DATE" ]]; then
+              echo "Deleting old backup: $FILE_NAME"
+              aws s3 rm "s3://$S3_BUCKET/$PREFIX/$FILE_NAME" $ENDPOINT_FLAG
+            fi
+          done
+
+          echo "✅ Cleanup completed"
+
+  backup-webdav:
+    name: Upload To WebDAV
+    needs: [check-secrets, export-d1]
+    if: needs.check-secrets.outputs.webdav == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Backup Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: d1-backup
+
+      - name: Setup rclone
+        uses: AnimMouse/setup-rclone@26ef2133e09fd383329a1d4c1fbe6a71db1976c9 # v1
+
+      - name: Configure rclone (WebDAV)
+        env:
+          WEBDAV_URL: ${{ secrets.WEBDAV_URL }}
+          WEBDAV_VENDOR: ${{ secrets.WEBDAV_VENDOR || 'other' }}
+          WEBDAV_USER: ${{ secrets.WEBDAV_USER }}
+          WEBDAV_PASSWORD: ${{ secrets.WEBDAV_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.config/rclone
+          RCLONE_WEBDAV_PASS="$(rclone obscure "$WEBDAV_PASSWORD")"
+
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [webdav]
+          type = webdav
+          url = $WEBDAV_URL
+          vendor = $WEBDAV_VENDOR
+          user = $WEBDAV_USER
+          pass = $RCLONE_WEBDAV_PASS
+          EOF
+
+      - name: Upload To WebDAV
+        env:
+          WEBDAV_BASE_PATH: ${{ secrets.WEBDAV_BASE_PATH || 'aws-access-bridge' }}
+        run: |
+          set -euo pipefail
+
+          BACKUP_FILE="${{ needs.export-d1.outputs.backup-file }}"
+          TARGET_DIR="webdav:${WEBDAV_BASE_PATH}/production"
+
+          rclone mkdir "webdav:${WEBDAV_BASE_PATH}" || true
+          rclone mkdir "$TARGET_DIR" || true
+
+          rclone copyto "$BACKUP_FILE" "$TARGET_DIR/$BACKUP_FILE"
+          echo "✅ Backup uploaded to WebDAV: $TARGET_DIR/$BACKUP_FILE"
+
+          rclone delete "$TARGET_DIR/" -v --min-age ${BACKUP_RETENTION_DAYS}d
+          echo "✅ Cleanup completed"

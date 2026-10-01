@@ -19,6 +19,10 @@ Accounts whose address collides case-insensitively with another account (e.g. `A
 
 Changing a sign-in address: `scripts/change-email.ts` (see `packages/backend-data/AGENTS.md` for the anchor rationale). It refuses an address already live for another account, case-insensitively.
 
+## Backups
+
+`.github/workflows/backup-d1.yml` exports `AccessBridgeDB` daily at 04:15 UTC (`workflow_dispatch` for manual runs). Job graph: `check-secrets` (preflight, emits `cloudflare`/`encryption`/`s3`/`webdav` booleans) → `export-d1` (materializes `wrangler.jsonc` through the same `scripts/prepare-wrangler-config.ts` the deploy uses, then `wrangler d1 export --remote`, gzip, AES-256-CBC) → `backup-s3` / `backup-webdav` consume the encrypted `d1-backup` artifact (1-day retention). With no destination secret set every backup job skips; with a destination set but no `BACKUP_ENCRYPTION_KEY`, `check-secrets` fails — encryption is mandatory because `user_access_tokens.access_token` is plaintext and is looked up directly for `/api/*` auth. `export-d1` aborts when `database_id` is still the `000…` placeholder, since that means `prepare-wrangler-config.ts` just auto-created the database. Object prefix `aws-access-bridge/production/`, file `access-bridge_prod_<UTC timestamp>.sql.gz.enc`, pruned past `BACKUP_RETENTION_DAYS`. Playbook (secrets, restore, Time Travel 30d Paid / 7d Free): `docs/db-backup-recovery.md`.
+
 ## Auth vars (JWT config optional with Worker-level Access)
 
 `POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). Set both for self-hosted Access applications and cross-account (Cloudflare for SaaS) setups — explicit vars always win. When both are unset, requests authenticate via the platform-verified Worker-level Access identity (`ctx.access.getIdentity()`, threaded through `MiddlewareHandlers.authenticateUserIdentity`); enable one-click Access on the worker for same-account deploys that omit the vars.
