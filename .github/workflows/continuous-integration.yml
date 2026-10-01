@@ -57,6 +57,27 @@ jobs:
           command: pnpm run validate:migrations
           max_attempts: '2'
 
+  locales:
+    name: Locales
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      # A locale defect is invisible to the unit tests: the catalogs are data, and
+      # a key that is missing from eleven bundles still typechecks and still
+      # builds. Its own job so a failure says "locales" rather than arriving
+      # inside a typecheck log.
+      - name: Validate Locale Bundles
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run validate:locales
+          max_attempts: '2'
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -122,6 +143,7 @@ jobs:
     needs:
       - checks
       - migrations
+      - locales
       - unit-tests
       - integration-tests
       - build
@@ -149,6 +171,7 @@ jobs:
     needs:
       - checks
       - migrations
+      - locales
       - unit-tests
       - integration-tests
       - build

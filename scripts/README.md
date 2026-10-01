@@ -10,7 +10,7 @@ by `pnpm run lint` and `pnpm run typecheck:scripts`.
 | `deploy/`      | `deploy-worker` job   | Materialize `wrangler.jsonc` and provision its resources and secrets. |
 | `backup/`      | `backup-d1.yml`       | One entrypoint per workflow step.                                     |
 | `ops/`         | a human at a terminal | Destructive or data-touching operations.                              |
-| `i18n/`        | a human, or CI        | Web locale validation.                                                |
+| `i18n/`        | a human, or CI        | Web locale validation (also in `checks` and the `locales` CI job).      |
 | `migrations/`  | a human, or CI        | The migration checksum lock. See `../docs/agents/runtime/AGENTS.md`.   |
 
 ## Entrypoint vs module convention
@@ -58,6 +58,11 @@ pnpm run validate:migrations
 After adding a migration, `pnpm run migrations:lock` records it. It is add-only for
 incremental migrations and refreshes the squashed baseline, so it will not adopt
 the new digest of one that has already been applied.
+
+`validate:migrations` and `validate:locales` both run from `pnpm run checks` and
+from their own CI jobs, so the local gate and CI agree. Both are `tsx`, not
+`node`: each entrypoint imports a sibling module with an extensionless relative
+path, which Node's ESM resolver will not resolve.
 
 There is no committed `wrangler.jsonc`. `scripts/deploy/prepare-wrangler-config.ts`
 creates it, and both `deploy/` and `backup/` expect it to exist.
