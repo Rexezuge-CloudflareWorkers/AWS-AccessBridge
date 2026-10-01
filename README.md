@@ -290,7 +290,7 @@ Do not put secrets in either patch variable; use GitHub secrets, Wrangler secret
 
 ### Database backups (optional)
 
-A `Backup D1 Database (S3/WebDAV)` workflow (`.github/workflows/backup-d1.yml`) exports `AccessBridgeDB` daily at 04:15 UTC and uploads it to S3-compatible storage and/or WebDAV. It is off until you configure a destination, so adding it changes nothing by default.
+A `Backup D1 Database` workflow (`.github/workflows/backup-d1.yml`) exports `AccessBridgeDB` daily at 04:15 UTC and uploads it to S3-compatible storage and/or WebDAV. It is off until you configure a destination, so adding it changes nothing by default.
 
 To enable it, add these repository secrets (`Settings → Secrets and variables → Actions → Secrets`):
 
