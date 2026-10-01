@@ -1,147 +1,159 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
- * Validate all web locale bundles: JSON-valid, key parity with `en` (no missing
- * and no extra keys), `{{placeholder}}` parity, and no empty values.
+ * Validate the web locale bundles: JSON-valid, key parity with `en` in both
+ * directions, `{{placeholder}}` parity, no empty or non-string values, and the
+ * three lists of supported tags agreeing with each other.
+ *
+ * `en` is checked for empty values like every other bundle. It is the fallback
+ * for every missing key and the file new keys are added to first, so an empty
+ * value there is the one defect that reaches the most users — and the reason
+ * every call site passes an English default to `t()`, which makes `''`
+ * indistinguishable from a missing key.
  *
  * Key order is deliberately not checked. Locale files are maintained by
- * mirroring new keys into 12 files, and failing on order would turn an
+ * mirroring new keys into 11 files, and failing on order would turn an
  * otherwise-correct translation update into a CI failure about formatting.
  *
- * Run with `pnpm run validate:locales`. TypeScript rather than `.mjs` so the
- * script is covered by the repo's lint and typecheck rules.
+ * Run with `pnpm run validate:locales`. The rules live in `locale-checks.ts` so
+ * they are unit tested; this entrypoint only does I/O and reporting. Run through
+ * `tsx` rather than `node` because of the extensionless relative import, as every
+ * other script that imports a sibling module does.
  */
-
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  BASE_LOCALE,
+  checkBaseLocale,
+  checkBundle,
+  checkTagListsAgree,
+  checkTags,
+  flatten,
+  readDeclaredTags,
+  type Finding,
+} from './locale-checks';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCALES_DIR = path.join(ROOT, 'apps', 'web', 'src', 'locales');
-
-/**
- * Matches one `{{name}}` token.
- *
- * `[^{}]` rather than `.*?` so the pattern cannot backtrack across a long
- * translation string looking for a closing brace that is not there.
- */
-const PLACEHOLDER = /\{\{[^{}]+\}\}/g;
+const WEB_I18N = path.join(ROOT, 'apps', 'web', 'src', 'i18n.ts');
+const SHARED_LOCALE_UTIL = path.join(ROOT, 'packages', 'shared', 'src', 'utils', 'LocaleUtil.ts');
 
 /**
  * Collects failures rather than exiting on the first, so one run reports them all.
  */
-const failures: string[] = [];
+const failures: Finding[] = [];
 
 /**
- * Flattens a nested translation object into dotted keys.
+ * The per-tag tallies printed in the summary line.
  */
-function flatten(node: unknown, prefix = '', out: Map<string, unknown> = new Map()): Map<string, unknown> {
-  if (typeof node !== 'object' || node === null || Array.isArray(node)) {
-    throw new Error(`expected an object, found ${Array.isArray(node) ? 'an array' : typeof node} at ${prefix || '<root>'}`);
-  }
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-    const keyPath = prefix ? `${prefix}.${key}` : key;
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      flatten(value, keyPath, out);
-    } else {
-      out.set(keyPath, value);
-    }
-  }
-  return out;
+interface Counts {
+  missing: number;
+  extra: number;
+  empty: number;
+  placeholder: number;
 }
 
 /**
- * The distinct `{{placeholder}}` tokens in a value, sorted for comparison.
+ * The locale tags that have a directory, in apply order.
  */
-function placeholdersOf(value: unknown): string[] {
-  if (typeof value !== 'string') {
-    return [];
-  }
-  const matches = value.match(PLACEHOLDER) ?? [];
-  return Array.from(new Set(matches)).toSorted((a, b) => a.localeCompare(b));
-}
-
-/**
- * Reads and flattens one locale bundle, throwing with the tag on failure.
- */
-function readBundle(tag: string): Map<string, unknown> {
-  const file = path.join(LOCALES_DIR, tag, 'translation.json');
-  return flatten(JSON.parse(readFileSync(file, 'utf8')), '', new Map());
-}
-
-const tags = readdirSync(LOCALES_DIR, { withFileTypes: true })
+const onDisk = readdirSync(LOCALES_DIR, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
-  .toSorted((a, b) => a.localeCompare(b));
+  .toSorted((left, right) => left.localeCompare(right));
 
-if (!tags.includes('en')) {
-  console.error('FAIL: missing base locale en/translation.json');
+/**
+ * Reads and flattens one bundle. A throw here is a finding, not a crash: one
+ * unreadable file should not hide the state of the other eleven.
+ */
+function readBundle(tag: string): ReturnType<typeof flatten> {
+  return flatten(JSON.parse(readFileSync(path.join(LOCALES_DIR, tag, 'translation.json'), 'utf8')));
+}
+
+if (!onDisk.includes(BASE_LOCALE)) {
+  console.error(`FAIL: missing base locale ${BASE_LOCALE}/translation.json`);
   process.exit(1);
 }
 
-const en = readBundle('en');
-if (en.size === 0) {
-  failures.push('en/translation.json is empty');
+const base = readBundle(BASE_LOCALE);
+const baseFindings = checkBaseLocale(BASE_LOCALE, base);
+failures.push(...baseFindings);
+
+// An empty base locale would make all 306 keys of every other bundle look like
+// extras, burying the one finding that matters under 3000 lines of noise. `en` is
+// the source every bundle is compared against, so there is nothing to compare to.
+if (baseFindings.some((finding) => finding.kind === 'no-base-locale')) {
+  for (const finding of baseFindings) {
+    console.error(`FAIL: ${finding.subject} ${finding.detail}`);
+  }
+  console.log('FAILURES PRESENT');
+  process.exit(1);
 }
 
-for (const tag of tags) {
-  if (tag === 'en') {
+for (const tag of onDisk) {
+  if (tag === BASE_LOCALE) {
+    // Already checked above, and comparing it to itself would report every key as
+    // a mismatch.
+    console.log(`${tag}: keys=${base.size} [base]`);
     continue;
   }
 
-  let bundle: Map<string, unknown>;
+  let bundle: ReturnType<typeof flatten>;
   try {
     bundle = readBundle(tag);
   } catch (error) {
-    failures.push(`${tag}: ${error instanceof Error ? error.message : String(error)}`);
+    failures.push({ kind: 'malformed', subject: tag, detail: error instanceof Error ? error.message : String(error) });
+    console.log(`${tag}: [UNREADABLE]`);
     continue;
   }
 
-  const missing = en
-    .keys()
-    .filter((key) => !bundle.has(key))
-    .toArray();
-  const extra = bundle
-    .keys()
-    .filter((key) => !en.has(key))
-    .toArray();
-  const empty = [...bundle].filter(([, value]) => typeof value !== 'string' || value === '').map(([key]) => key);
-  const placeholderMismatches = en
-    .keys()
-    .filter((key) => {
-      if (!bundle.has(key)) {
-        return false;
-      }
-      const expected = placeholdersOf(en.get(key));
-      const actual = placeholdersOf(bundle.get(key));
-      return expected.length !== actual.length || expected.some((token, index) => token !== actual[index]);
-    })
-    .toArray();
+  const findings = checkBundle(tag, base, bundle);
+  failures.push(...findings);
 
-  for (const key of missing) {
-    failures.push(`${tag}: missing key ${key}`);
+  // Tallyed through a lookup rather than a `switch`, so a new finding kind
+  // cannot be added to the module and silently omitted from this summary.
+  const COUNTED: Readonly<Record<string, keyof Counts | undefined>> = {
+    missing: 'missing',
+    extra: 'extra',
+    empty: 'empty',
+    placeholder: 'placeholder',
+  };
+  const counts: Counts = { missing: 0, extra: 0, empty: 0, placeholder: 0 };
+  for (const finding of findings) {
+    const field = COUNTED[finding.kind];
+    if (field !== undefined) {
+      counts[field] += 1;
+    }
   }
-  for (const key of extra) {
-    failures.push(`${tag}: extra key ${key} (no en source)`);
-  }
-  for (const key of empty) {
-    failures.push(`${tag}: empty value at ${key}`);
-  }
-  for (const key of placeholderMismatches) {
-    const expected = placeholdersOf(en.get(key)).join(',');
-    const actual = placeholdersOf(bundle.get(key)).join(',');
-    failures.push(`${tag}: placeholder mismatch at ${key} (en=${expected} vs ${tag}=${actual})`);
-  }
-
-  const problems = missing.length + extra.length + empty.length + placeholderMismatches.length;
-  const status = problems === 0 ? 'OK' : 'FAIL';
   console.log(
-    `${tag}: keys=${bundle.size} missing=${missing.length} extra=${extra.length} empty=${empty.length} ph_mismatch=${placeholderMismatches.length} [${status}]`,
+    `${tag}: keys=${bundle.size} missing=${counts.missing} extra=${counts.extra} empty=${counts.empty} ph_mismatch=${counts.placeholder} [${findings.length === 0 ? 'OK' : 'FAIL'}]`,
   );
 }
 
-for (const message of failures) {
-  console.error(`FAIL: ${message}`);
+// The declared tag lists are read from source text, not imported:
+// `apps/web/src/i18n.ts` calls `import.meta.glob`, which only exists after Vite's
+// transform, so the module cannot be loaded outside a bundler.
+const declared: Record<string, string[]> = {};
+for (const [label, file] of [
+  ['SUPPORTED_LANGUAGES', WEB_I18N],
+  ['SUPPORTED_LOCALES', SHARED_LOCALE_UTIL],
+] as const) {
+  try {
+    const tags = readDeclaredTags(readFileSync(file, 'utf8'), path.relative(ROOT, file));
+    declared[label] = tags;
+    if (label === 'SUPPORTED_LANGUAGES') {
+      failures.push(...checkTags(tags, onDisk));
+    }
+  } catch (error) {
+    declared[label] = [];
+    failures.push({ kind: 'malformed', subject: label, detail: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+failures.push(...checkTagListsAgree(declared.SUPPORTED_LANGUAGES ?? [], declared.SUPPORTED_LOCALES ?? []));
+
+for (const finding of failures) {
+  console.error(`FAIL: ${finding.subject} ${finding.detail}`);
 }
 console.log(failures.length === 0 ? 'ALL OK' : 'FAILURES PRESENT');
 process.exit(failures.length === 0 ? 0 : 1);
