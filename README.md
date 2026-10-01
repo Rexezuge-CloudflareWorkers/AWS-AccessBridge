@@ -202,6 +202,8 @@ pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
 
 You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql`. Re-running is safe.
 
+Once a migration has been applied, **do not edit it** — D1 records the filename, not the file's contents, so it would never re-apply your change and production would keep the old schema. `migrations/migrations.lock.json` records a checksum per migration and CI fails on drift. After adding a migration, run `pnpm run migrations:lock` to record it. The squashed baseline (`0030_squash.sql`) is exempt, since rewriting it is what a squash is.
+
 `0031` adds `salt_secret_access_key` and `salt_session_token` to `credentials`. Every encrypted field now gets its own AES-GCM IV instead of sharing one (nonce reuse leaks the XOR of the plaintexts and enables authentication-tag forgery). **No backfill is required**: existing rows keep their shared `salt` and are read with it, then rewritten with distinct IVs the next time a credential is stored. The same applies to the KV credential cache, whose entries simply expire.
 
 ### Step 6. Build and deploy

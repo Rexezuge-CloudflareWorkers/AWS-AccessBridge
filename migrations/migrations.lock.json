@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "baseline": "0030_squash.sql",
+  "migrations": {
+    "0030_squash.sql": "sha256:5f8413f537af9edc43f2a58ef28449c4633fd269bc758db13dfee56f2154baf0",
+    "0031_distinct_credential_ivs.sql": "sha256:470fcdc91d13dd0c027e7cb891b6de23b17073a87f0acda3d8f3879bcdc30e07",
+    "0032_user_identity.sql": "sha256:2b7388149ad158bbd8378f66c6f2d72e4fd55a2480ecbfbdf53f0ffa4e3942ba"
+  }
+}
