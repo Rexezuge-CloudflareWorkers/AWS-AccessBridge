@@ -10,6 +10,8 @@
     "typecheck": "pnpm -r typecheck && pnpm run typecheck:scripts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "validate:locales": "node scripts/i18n/validate_locales.ts",
+    "validate:migrations": "tsx scripts/migrations/verify-migrations.ts",
+    "migrations:lock": "tsx scripts/migrations/verify-migrations.ts --write",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config test/integration/vitest.config.mts",

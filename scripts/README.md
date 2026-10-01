@@ -3,14 +3,15 @@
 Repo tooling, grouped by who runs it. Every script is TypeScript and is covered
 by `pnpm run lint` and `pnpm run typecheck:scripts`.
 
-| Directory | Runs from             | Purpose                                                               |
-| --------- | --------------------- | --------------------------------------------------------------------- |
-| `lib/`    | imported              | Reusable helpers. No side effects on import.                          |
-| `build/`  | `pnpm install`        | Keeps a fresh clone typecheckable before the first build.             |
-| `deploy/` | `deploy-worker` job   | Materialize `wrangler.jsonc` and provision its resources and secrets. |
-| `backup/` | `backup-d1.yml`       | One entrypoint per workflow step.                                     |
-| `ops/`    | a human at a terminal | Destructive or data-touching operations.                              |
-| `i18n/`   | a human, or CI        | Web locale validation.                                                |
+| Directory      | Runs from             | Purpose                                                               |
+| -------------- | --------------------- | --------------------------------------------------------------------- |
+| `lib/`         | imported              | Reusable helpers. No side effects on import.                          |
+| `build/`       | `pnpm install`        | Keeps a fresh clone typecheckable before the first build.             |
+| `deploy/`      | `deploy-worker` job   | Materialize `wrangler.jsonc` and provision its resources and secrets. |
+| `backup/`      | `backup-d1.yml`       | One entrypoint per workflow step.                                     |
+| `ops/`         | a human at a terminal | Destructive or data-touching operations.                              |
+| `i18n/`        | a human, or CI        | Web locale validation.                                                |
+| `migrations/`  | a human, or CI        | The migration checksum lock. See `../docs/agents/runtime/AGENTS.md`.   |
 
 ## Entrypoint vs module convention
 
@@ -37,7 +38,7 @@ ordered calls into `lib/wrangler-config/`.
 | `wrangler-config/resources.ts` | Create missing D1 / KV / Secrets Store resources and patch their ids in.                              |
 | `wrangler-table.ts`            | Parses the `cli-table3` output `wrangler secrets-store` prints.                                       |
 | `github-actions.ts`            | `setOutput`, `logError`, `fail`. No `@actions/*` dependency, so scripts stay runnable locally.        |
-| `cli-args.ts`                  | Flag parsing for `ops/` scripts.                                                                      |
+| `cli-args.ts`                  | Flag parsing for `ops/` and `migrations/` scripts.                                                   |
 
 `DEFAULT_UUID` is the single definition of the placeholder D1 id. `deploy/`
 writes a real id over it and `backup/` refuses to export while it is still
@@ -51,7 +52,12 @@ CI entrypoints are runnable from a local shell with the same flags Actions uses:
 pnpm exec tsx scripts/backup/evaluate-destination-config.ts
 pnpm exec tsx scripts/deploy/prepare-wrangler-config.ts
 pnpm run validate:locales
+pnpm run validate:migrations
 ```
+
+After adding a migration, `pnpm run migrations:lock` records it. It is add-only for
+incremental migrations and refreshes the squashed baseline, so it will not adopt
+the new digest of one that has already been applied.
 
 There is no committed `wrangler.jsonc`. `scripts/deploy/prepare-wrangler-config.ts`
 creates it, and both `deploy/` and `backup/` expect it to exist.

@@ -35,6 +35,28 @@ jobs:
           command: pnpm run typecheck && pnpm run lint
           max_attempts: '2'
 
+  migrations:
+    name: Migration Lock
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      # Its own job rather than a step in `checks`, so a failure names migrations
+      # instead of arriving inside a typecheck or lint log. Editing an
+      # already-applied migration is invisible to every other check: the deploy
+      # succeeds, fresh databases pick up the edited statements, and production
+      # keeps the schema it had.
+      - name: Verify Migration Lock
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run validate:migrations
+          max_attempts: '2'
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -99,6 +121,7 @@ jobs:
     name: Auto-Merge Dependabot PR
     needs:
       - checks
+      - migrations
       - unit-tests
       - integration-tests
       - build
@@ -125,6 +148,7 @@ jobs:
     name: Dispatch Upstream Sync Deployment
     needs:
       - checks
+      - migrations
       - unit-tests
       - integration-tests
       - build
