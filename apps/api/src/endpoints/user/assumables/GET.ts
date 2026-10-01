@@ -4,6 +4,7 @@ import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRo
 import type { AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 
 class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListAssumablesResponse, ListAssumablesEnv> {
   schema = {
@@ -216,10 +217,8 @@ class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListA
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(request.raw.url);
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
-    const limitParam: string | null = url.searchParams.get('limit');
-    const offsetParam: string | null = url.searchParams.get('offset');
-    const limit: number = limitParam ? Math.max(1, Math.min(200, Math.trunc(Number(limitParam)))) : 50;
-    const offset: number = offsetParam ? Math.max(0, Math.trunc(Number(offsetParam))) : 0;
+    const limit: number = Pagination.limit(url.searchParams.get('limit'));
+    const offset: number = Pagination.offset(url.searchParams.get('offset'));
     return getRequestScope(env).get(Tokens.UserService).listAssumables(userEmail, { showHidden, limit, offset });
   }
 }

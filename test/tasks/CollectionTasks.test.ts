@@ -85,6 +85,41 @@ describe('CostDataCollectionTask', () => {
     vi.clearAllMocks();
   });
 
+  it('does not advance the collection interval when a principal reported no data', async () => {
+    // The collectors answer 0 for a genuinely empty account and for one AWS is
+    // refusing, so stamping either way meant an inaccessible account was not
+    // retried until the next full interval — 6 hours for cost, 2 for resources.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockResolvedValue([]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([]);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-x');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+
+    await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(DataCollectionConfigDAO.prototype.updateLastCollectedTime).not.toHaveBeenCalled();
+  });
+
+  it('advances the collection interval when a principal produced data', async () => {
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockResolvedValue([
+      { accountId: '', periodStart: '2025-01-01', periodEnd: '2025-01-02', totalCost: 1.5, currency: 'USD', serviceBreakdown: { EC2: 1.5 } },
+    ]);
+    vi.mocked(CostDataDAO.prototype.upsertCostData).mockResolvedValue(undefined);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-y');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+
+    await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(DataCollectionConfigDAO.prototype.updateLastCollectedTime).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/Dev', 'cost');
+  });
+
   it('collects cost data for due accounts and summarizes', async () => {
     vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
       'arn:aws:iam::123456789012:role/Dev',

@@ -17,8 +17,82 @@ class HttpFetchError extends Error {
   }
 }
 
+/**
+429 and 5xx are worth another attempt; a 4xx will fail identically.
+*/
 function isRetryableHttpStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status <= 599);
+}
+
+/**
+ * An AWS client that retries a throttled or transiently-faulted call.
+ *
+ * Without it a single `Throttling` on one hop of a credential chain failed the
+ * whole operation for the caller, even though the same request usually succeeds
+ * immediately. Attempts are bounded and the delay is exponential with jitter:
+ * without the jitter, every concurrent request retries in lockstep and
+ * reproduces the burst that caused the throttle.
+ *
+ * `Retry-After` is honoured when AWS sends one, since it is the authoritative
+ * backoff request.
+ */
+/**
+ * Jitter source, injectable so the backoff is deterministically testable.
+ * Backed by `crypto.getRandomValues` rather than `Math.random`: it only spreads
+ * timing, and never decides access, retries, or any value that reaches a
+ * response.
+ */
+type Jitter = (max: number) => number;
+
+const cryptoJitter: Jitter = (max: number): number => {
+  if (max <= 0) return 0;
+  const buffer = new Uint32Array(new ArrayBuffer(4));
+  crypto.getRandomValues(buffer);
+  return buffer[0] % max;
+};
+
+class RetryingAwsClient implements AwsSignedClient {
+  constructor(
+    private readonly inner: AwsSignedClient,
+    private readonly maxAttempts: number = 3,
+    private readonly baseDelayMs: number = 100,
+    private readonly jitter: Jitter = cryptoJitter,
+  ) {}
+
+  public async fetch(url: string, init?: RequestInit): Promise<Response> {
+    for (let attempt = 0; attempt < this.maxAttempts; attempt++) {
+      try {
+        const response: Response = await this.inner.fetch(url, init);
+        if (!isRetryableHttpStatus(response.status) || attempt === this.maxAttempts - 1) {
+          return response;
+        }
+        await RetryingAwsClient.delay(this.backoffMs(attempt, response));
+      } catch (error: unknown) {
+        if (attempt === this.maxAttempts - 1) {
+          throw error;
+        }
+        await RetryingAwsClient.delay(this.backoffMs(attempt));
+      }
+    }
+    // Unreachable: the loop returns or throws on its final iteration. Present so
+    // the signature has a total return type.
+    throw new HttpFetchError(0, 'Retries exhausted', `Gave up after ${this.maxAttempts} attempts: ${url}`);
+  }
+
+  private backoffMs(attempt: number, response?: Response): number {
+    const retryAfter: string | null = response?.headers.get('Retry-After') ?? null;
+    const seconds: number = retryAfter ? Number(retryAfter) : NaN;
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+    // Full jitter across the exponential window, so concurrent callers do not
+    // retry in lockstep and reproduce the burst that caused the throttle.
+    return this.jitter(this.baseDelayMs * 2 ** attempt);
+  }
+
+  private static async delay(ms: number): Promise<void> {
+    await new Promise((resolve: (value: void) => void): unknown => setTimeout(resolve, ms));
+  }
 }
 
 class FetchHttpClient implements IHttpClient {
@@ -32,7 +106,22 @@ class FetchHttpClient implements IHttpClient {
     if (!response.ok) {
       throw new HttpFetchError(response.status, response.statusText, text);
     }
-    return text ? (JSON.parse(text) as unknown) : {};
+    return parseJsonBody(text, url);
+  }
+}
+
+/**
+ * Parse a JSON body, reporting a malformed one as an `HttpFetchError`.
+ *
+ * A bare `JSON.parse` here threw a raw `SyntaxError`, which bypassed the
+ * `IServiceError` taxonomy every caller maps status codes through.
+ */
+function parseJsonBody(text: string, url: string): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error: unknown) {
+    throw new HttpFetchError(200, 'Malformed JSON', `${url} returned a body that is not valid JSON: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 }
 
@@ -92,7 +181,7 @@ class StubHttpClient implements IHttpClient {
         if (!result.ok) {
           throw new HttpFetchError(result.status, result.statusText, text);
         }
-        return text ? (JSON.parse(text) as unknown) : {};
+        return parseJsonBody(text, url);
       }
       return result;
     }
@@ -107,6 +196,10 @@ class StubHttpClient implements IHttpClient {
   }
 }
 
-export { FetchHttpClient, HttpFetchError, StubHttpClient, isRetryableHttpStatus };
+import type {   AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
+
+export { FetchHttpClient, HttpFetchError, RetryingAwsClient, StubHttpClient, isRetryableHttpStatus };
 export type { IHttpClient, StubHttpHandler };
-export type { AwsClientFactory, AwsClientOptions, AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
+
+
+export {type AwsClientFactory, type AwsClientOptions, type AwsSignedClient} from '@aws-access-bridge/provider-clients/aws';

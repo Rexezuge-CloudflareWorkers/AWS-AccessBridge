@@ -125,7 +125,6 @@ interface ExtendedResponse<TResponse extends IResponse> {
 interface IEnv {
   TEAM_DOMAIN?: string;
   POLICY_AUD?: string;
-  SERVE_SPA_FROM_WORKER?: string;
   DEMO_MODE?: string;
   Variables: {
     AuthenticatedUserEmailAddress: string;

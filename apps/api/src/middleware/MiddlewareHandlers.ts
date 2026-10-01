@@ -170,6 +170,26 @@ async function authenticateAndContinue(c: RequestContext, next: Next, authentica
   }
 }
 
+/**
+ * Mark every response uncacheable.
+ *
+ * Registered FIRST on both surfaces, wrapping the rest of the chain. It awaits
+ * `next()` and then sets the header, so it must sit outside any handler that can
+ * return without calling `next()` — an authentication failure returns its JSON
+ * directly, and a middleware registered after it would never run on that path.
+ *
+ * `/user/*` and `/api/*` answers carry AWS `SecretAccessKey`/`SessionToken`, a
+ * 15-minute pre-authenticated console URL, and account and audit data — none of
+ * which should survive in a shared cache or the browser's back/forward cache.
+ */
+async function noStoreHandler(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
+  await next();
+  c.header('Cache-Control', 'no-store, max-age=0');
+  // Belt and braces for the redirect: a 302 whose `Location` carries a console
+  // token is itself the sensitive artefact.
+  c.header('Pragma', 'no-cache');
+}
+
 async function userAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
   return authenticateAndContinue(c, next, authenticateUserIdentity);
 }
@@ -194,6 +214,10 @@ class MiddlewareHandlers {
 
   public static activityAudit(): (c: RequestContext, next: Next) => Promise<void> {
     return activityAuditHandler;
+  }
+
+  public static noStore(): (c: Context<{ Bindings: Env }>, next: Next) => Promise<void> {
+    return noStoreHandler;
   }
 
   public static userAuthentication(): (c: RequestContext, next: Next) => Promise<Response | void> {

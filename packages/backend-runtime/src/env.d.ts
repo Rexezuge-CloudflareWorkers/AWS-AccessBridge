@@ -6,7 +6,6 @@ declare global {
     INTERNAL_HMAC_SECRET: SecretsStoreSecret;
     CRON_TASKS: DurableObjectNamespace;
     SELF: Fetcher;
-    SERVE_SPA_FROM_WORKER?: string;
     POLICY_AUD?: string;
     TEAM_DOMAIN?: string;
     DEV_AUTH_EMAIL?: string;

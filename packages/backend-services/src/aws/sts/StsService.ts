@@ -1,18 +1,23 @@
 import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
 import { StsClient, defaultAwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
-import type { AwsClientFactory,  } from '@aws-access-bridge/provider-clients/aws';
+import type { AwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
 import type { CallerIdentity } from '@aws-access-bridge/provider-clients/aws';
+import { RetryingAwsClient } from '../../http/IHttpClient';
 
 /**
  * Domain STS service (Layer 3). Thin orchestration over the raw
  * `provider-clients` `StsClient` (Layer 2, Otter precedent).
  * Public API preserved; new code may import `StsClient` directly.
+ *
+ * The client is wrapped in `RetryingAwsClient`, so a throttled hop no longer
+ * fails the whole operation: assume-role walks a multi-hop chain and a single
+ * `Throttling` on any one hop otherwise surfaces to the caller.
  */
 class StsService {
   private readonly client: StsClient;
 
   constructor(clientFactory: AwsClientFactory = defaultAwsClientFactory) {
-    this.client = new StsClient(clientFactory);
+    this.client = new StsClient((options) => new RetryingAwsClient(clientFactory(options)));
   }
 
   public async assumeRole(

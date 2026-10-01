@@ -3,7 +3,6 @@ export const DEFAULT_MAX_TOKEN_EXPIRY_DAYS: string = '90';
 export const DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT: string = '3';
 export const DEFAULT_AUDIT_LOG_RETENTION_DAYS: string = '90';
 export const DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS: string = '30';
-export const DEFAULT_SERVE_SPA_FROM_WORKER: string = 'false';
 export const DEFAULT_DEMO_MODE: string = 'false';
 export const DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES: string = '5';
 export const DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH: string = '10';

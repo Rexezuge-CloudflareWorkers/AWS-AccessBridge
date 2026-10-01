@@ -1,4 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import { InternalServerError } from '@aws-access-bridge/backend-errors';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { defaultAwsClientFactory } from './AwsSignedFetcher';
@@ -65,9 +66,14 @@ class CostExplorerClient {
       throw new InternalServerError(`Cost Explorer API failed: ${response.status}`);
     }
 
-    const data: { ResultsByTime?: CostExplorerTimeResult[] } = JSON.parse(responseText) as {
-      ResultsByTime?: CostExplorerTimeResult[];
-    };
+    let data: { ResultsByTime?: CostExplorerTimeResult[] };
+    try {
+      data = JSON.parse(responseText) as { ResultsByTime?: CostExplorerTimeResult[] };
+    } catch (error: unknown) {
+      // A malformed body would otherwise throw a raw `SyntaxError`, bypassing the
+      // `IServiceError` taxonomy and the typed 4xx/5xx mapping the callers rely on.
+      throw new InternalServerError(`Cost Explorer returned a malformed response body: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
     const results: CostExplorerResult[] = [];
     const resultsByTime: CostExplorerTimeResult[] = data.ResultsByTime ?? [];
 
@@ -92,7 +98,7 @@ class CostExplorerClient {
         accountId: '',
         periodStart: result.TimePeriod?.Start ?? startDate,
         periodEnd: result.TimePeriod?.End ?? endDate,
-        totalCost: Math.round(totalCost * 100) / 100,
+        totalCost: MoneyUtil.round(totalCost),
         currency,
         serviceBreakdown,
       });

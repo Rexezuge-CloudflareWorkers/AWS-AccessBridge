@@ -3,10 +3,21 @@ import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { CostData, SpendAlert } from '@aws-access-bridge/shared/model';
 import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService, idOf } from '../identity/UserIdentityService';
 
 type CostServiceEnv = ServiceEnv;
+
+/**
+The window used when a caller does not supply one, matching the cron default.
+*/
+const DEFAULT_COST_LOOKBACK_DAYS: number = 30;
+
+/**
+Cost Explorer's granularity cannot express a calendar month, so trends use 30-day months.
+*/
+const DAYS_PER_MONTH: number = 30;
 
 interface AccountCostSummary {
   totalCost: number;
@@ -57,8 +68,7 @@ class CostService {
 
     if (accountIds.length === 0) return { accounts: {}, grandTotal: 0 };
 
-    const endDate: string = new Date().toISOString().split('T', 1)[0];
-    const startDate: string = new Date(Date.now() - lookbackDays * 86_400_000).toISOString().split('T', 1)[0];
+    const { startDate, endDate } = MoneyUtil.lookbackWindow(lookbackDays);
 
     const costDataDAO: CostDataDAO = new CostDataDAO(this.env.AccessBridgeDB);
     const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
@@ -74,12 +84,11 @@ class CostService {
       grandTotal += data.totalCost;
     }
 
-    // Round totals
     for (const accountId in accounts) {
-      accounts[accountId].totalCost = Math.round(accounts[accountId].totalCost * 100) / 100;
+      accounts[accountId].totalCost = MoneyUtil.round(accounts[accountId].totalCost);
     }
 
-    return { accounts, grandTotal: Math.round(grandTotal * 100) / 100 };
+    return { accounts, grandTotal: MoneyUtil.round(grandTotal) };
   }
 
   public async getAccountCost(userEmail: string, awsAccountId: string, startDate?: string, endDate?: string): Promise<AccountCost> {
@@ -87,8 +96,9 @@ class CostService {
     const roles: string[] = await assumableRolesDAO.getRolesByUserAndAccount(await this.ownerFor(userEmail), awsAccountId);
     if (roles.length === 0) throw new ForbiddenError('You do not have access to this account.');
 
-    const effectiveEndDate: string = endDate || new Date().toISOString().split('T', 1)[0];
-    const effectiveStartDate: string = startDate || new Date(Date.now() - 30 * 86_400_000).toISOString().split('T', 1)[0];
+    const { startDate: defaultStart, endDate: defaultEnd } = MoneyUtil.lookbackWindow(DEFAULT_COST_LOOKBACK_DAYS);
+    const effectiveEndDate: string = endDate || defaultEnd;
+    const effectiveStartDate: string = startDate || defaultStart;
 
     const costDataDAO: CostDataDAO = new CostDataDAO(this.env.AccessBridgeDB);
     const costData: CostData[] = await costDataDAO.getCostDataByAccount(awsAccountId, effectiveStartDate, effectiveEndDate);
@@ -106,7 +116,7 @@ class CostService {
       awsAccountId,
       dailyCosts: costData,
       serviceBreakdown,
-      total: Math.round(total * 100) / 100,
+      total: MoneyUtil.round(total),
     };
   }
 
@@ -117,8 +127,9 @@ class CostService {
 
     if (accountIds.length === 0) return { months: [] };
 
-    const endDate: string = new Date().toISOString().split('T', 1)[0];
-    const startDate: string = new Date(Date.now() - boundedMonths * 30 * 86_400_000).toISOString().split('T', 1)[0];
+    // A month is 30 days here because Cost Explorer's granularity cannot express a
+    // calendar month; the previous code hardcoded the same `* 30`.
+const { startDate, endDate } = MoneyUtil.lookbackWindow(boundedMonths * DAYS_PER_MONTH);
 
     const costDataDAO: CostDataDAO = new CostDataDAO(this.env.AccessBridgeDB);
     const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
@@ -136,7 +147,7 @@ class CostService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([period, data]) => ({
         period,
-        total: Math.round(data.total * 100) / 100,
+        total: MoneyUtil.round(data.total),
         byAccount: data.byAccount,
       }));
 

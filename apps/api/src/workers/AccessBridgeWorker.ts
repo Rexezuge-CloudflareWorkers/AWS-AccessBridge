@@ -54,7 +54,6 @@ import {
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 import { isDemoModeEnv } from '@/endpoints/route-helpers';
 
@@ -101,6 +100,17 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     // The programmatic surface (/api/*) authenticates via Bearer PAT
     // (or HMAC-signed internal SELF calls) and must stay outside Access.
     app.use('*', MiddlewareHandlers.hmacValidation());
+    // Every response on both surfaces carries AWS credentials, a session token, a
+    // 15-minute pre-authenticated console URL, or account and audit data. Without
+    // this an intermediary or the browser back/forward cache could replay them
+    // after the request that produced them.
+    //
+    // Registered FIRST so it wraps the rest of the chain: it awaits `next()` and
+    // then sets the header, so a handler that returns without calling `next()` —
+    // an authentication failure, which returns its JSON directly — would
+    // otherwise never reach it.
+    app.use('/user/*', MiddlewareHandlers.noStore());
+    app.use('/api/*', MiddlewareHandlers.noStore());
     app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/api/*', MiddlewareHandlers.activityAudit());
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
@@ -115,13 +125,12 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
 
     // SPA catch-all: serve embedded index.html for the protected /user/ page
     // routes only (mirrors Otter). API surfaces (/user/* JSON, /api/* JSON)
-    // match registered routes or 401 in auth middleware first and never fall
-    // through to HTML; everything else returns 404.
+    // match registered routes or 401/403 in auth middleware first and never fall
+    // through to HTML; everything else returns 404. Unconditional — `assets` is
+    // declared with `run_worker_first` unset, so `/assets/*` is served by the
+    // asset router before this handler ever runs, and the catch-all is not
+    // intercepting it.
     app.get('*', (c) => {
-      const serveSpaFromWorker: boolean = ConfigurationManager.spa.isServeFromWorker(c.env);
-      if (!serveSpaFromWorker) {
-        return c.notFound();
-      }
       const path: string = new URL(c.req.url).pathname;
       return path.startsWith('/user/') ? c.html(SPA_HTML) : c.notFound();
     });

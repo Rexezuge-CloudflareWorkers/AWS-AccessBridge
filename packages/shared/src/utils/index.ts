@@ -1,4 +1,5 @@
 export * from './aws';
+export * from './MoneyUtil';
 export * from './EmailUtil';
 export * from './LocaleUtil';
 export * from './RegexUtil';

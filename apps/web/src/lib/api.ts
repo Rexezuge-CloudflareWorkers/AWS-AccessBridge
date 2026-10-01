@@ -50,6 +50,12 @@ async function throwForResponse(response: Response, fallback: string): Promise<n
   throw new ApiError(response.status, await readErrorMessage(response, fallback));
 }
 
+/**
+ * Whether an error means "sign in again", which is what shows the `Unauthorized`
+ * screen. Only 401 — a 403 is a real answer (authenticated, but not permitted),
+ * so treating it as "session expired" would send an administrator to the Zero
+ * Trust login page for something re-authenticating cannot fix.
+ */
 function isUnauthorized(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }

@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AccessBridgeWorker } from '@/workers/AccessBridgeWorker';
 
-type TestEnv = Env & {
-  SERVE_SPA_FROM_WORKER?: string;
-};
+type TestEnv = Env;
 
 function createExecutionContext(): ExecutionContext {
   return {
@@ -134,13 +132,13 @@ describe('AccessBridgeWorker', () => {
       expect(response.status).toBe(404);
     });
 
-    it('serves the SPA for /user/ page routes when SERVE_SPA_FROM_WORKER is enabled (demo bypasses Access)', async () => {
+    it('serves the SPA for /user/ page routes (demo bypasses Access)', async () => {
       const worker = new AccessBridgeWorker();
 
       for (const path of ['/user/', '/user/app/', '/user/app/costs', '/user/app/resources', '/user/app/admin', '/user/app/admin/teams']) {
         const response: Response = await worker.fetch(
           new Request(`https://worker.example.com${path}`),
-          createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+          createEnv({ DEMO_MODE: 'true' }),
           createExecutionContext(),
         );
 
@@ -154,7 +152,7 @@ describe('AccessBridgeWorker', () => {
 
       const response: Response = await worker.fetch(
         new Request('https://worker.example.com/unknown-page-xyz'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+        createEnv({ DEMO_MODE: 'true' }),
         createExecutionContext(),
       );
 
@@ -166,7 +164,7 @@ describe('AccessBridgeWorker', () => {
 
       const response: Response = await worker.fetch(
         new Request('https://worker.example.com/user/unknown-route-xyz'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createEnv(),
         createExecutionContext(),
       );
 
@@ -179,7 +177,7 @@ describe('AccessBridgeWorker', () => {
 
       const response: Response = await worker.fetch(
         new Request('https://worker.example.com/api/unknown-route-xyz'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createEnv(),
         createExecutionContext(),
       );
 
@@ -194,7 +192,7 @@ describe('AccessBridgeWorker', () => {
 
       const response: Response = await worker.fetch(
         new Request('https://worker.example.com/user/me'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true' }),
+        createEnv(),
         createExecutionContext(),
       );
 
@@ -213,7 +211,7 @@ describe('AccessBridgeWorker', () => {
 
       const response: Response = await worker.fetch(
         new Request('https://worker.example.com/user/me'),
-        createEnv({ SERVE_SPA_FROM_WORKER: 'true', DEMO_MODE: 'true' }),
+        createEnv({ DEMO_MODE: 'true' }),
         createExecutionContext(),
       );
 

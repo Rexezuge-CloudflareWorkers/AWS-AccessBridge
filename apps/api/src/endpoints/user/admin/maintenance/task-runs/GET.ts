@@ -3,6 +3,7 @@ import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 class ListTaskRunsRoute extends IAdminActivityAPIRoute<ListTaskRunsRequest, ListTaskRunsResponse, ListTaskRunsEnv> {
@@ -157,7 +158,7 @@ class ListTaskRunsRoute extends IAdminActivityAPIRoute<ListTaskRunsRequest, List
     const url: URL = new URL(cxt.req.url);
     const taskType: string | undefined = url.searchParams.get('taskType') || undefined;
     const status: string | undefined = url.searchParams.get('status') || undefined;
-    const limit: number = Math.min(Math.max(Number(url.searchParams.get('limit') || '50'), 1), 200);
+    const limit: number = Pagination.limit(url.searchParams.get('limit'));
 
     const runs: BackgroundTaskRun[] = await getRequestScope(env).get(Tokens.MaintenanceService).listTaskRuns({ taskType, status, limit });
     return { runs };
