@@ -3,8 +3,8 @@
 Scope: `apps/background/**`. Parent index: `../../AGENTS.md`.
 
 - `CronTasksWorker.ts` — DO serializing cron in two phases via `scheduled/TaskRegistry.ts` (`tasksForPhase(1|2)`; add tasks there, not in the worker):
-  - Phase 1 (parallel): `CredentialCacheRefreshTask` (user-facing freshness first)
-  - Phase 2 (parallel): `AuditLogCleanupTask`, `BackgroundTaskRunPruningTask`, `CostDataCollectionTask`, `ResourceInventoryCollectionTask`
+  - Phase 1 (parallel): `CredentialCacheRefreshTask` (user-facing freshness first; pre-warms the *intermediate* hops of each due chain — `principalArns[0]` is the target role and the last entry is the base IAM user, so neither is cacheable — and bumps `last_cached_at` once per principal after the walk, so a one-hop chain with nothing to cache still leaves the batch)
+  - Phase 2 (parallel): `AuditLogCleanupTask`, `BackgroundTaskRunPruningTask`, `CostDataCollectionTask`, `ResourceInventoryCollectionTask` (prunes stale rows only for collector types that did not throw — see `BaseAwsCollector`)
 - Shared scheduled bases: `IScheduledTask` (Template Method + automatic `background_task_runs` tracking for tasks overriding `getTaskType()` and returning a `TaskRunSummary`; `createTaskRunDAO` Factory-Method seam for tests), `AbstractPruningTask` (Template Method for retention pruning: `getRetentionDays` + `pruneBatch` abstract, cutoff + batched loop in base; both cleanup tasks extend it), `AbstractCollectionTask` (Template Method for per-account collection: `collectionType`/`maxAccountsPerCollection`/`collectionIntervalHours`/`sessionName` + `collectForAccount` abstract; `CostDataCollectionTask` + `ResourceInventoryCollectionTask` extend it).
 - `scheduled/TaskRegistry.ts` — composite phase registry (`CRON_TASK_DEFINITIONS`); append a definition to add a task.
 - Tasks compose `backend-services`: `CredentialService` (chain resolution, `resolveLeafCredentials` chain walk), `StsService`, `CostExplorerService`, `CollectorRegistry` (resource fan-out over all registered collectors), `ConfigurationManager` (`credential`/`costs`/`resource`/`audit`/`processing` namespaces — no `parseInt(env.X || DEFAULT)` inline).

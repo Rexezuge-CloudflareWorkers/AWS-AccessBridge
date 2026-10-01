@@ -54,11 +54,23 @@ function taskEnv() {
   } as unknown as Env;
 }
 
+// `principalArns[0]` is the target role and the last entry is the base IAM user,
+// so this two-element chain has no cacheable intermediate hop.
 const CHAIN = {
   principalArns: ['arn:aws:iam::123456789012:role/Dev', 'arn:aws:iam::123456789012:user/base'],
   accessKeyId: 'AKIA',
   secretAccessKey: 'secret',
   sessionToken: 'token',
+};
+
+// A two-hop chain: target -> Mid -> base. Only `Mid` is pre-warmed.
+const CHAIN_WITH_INTERMEDIATE = {
+  ...CHAIN,
+  principalArns: [
+    'arn:aws:iam::123456789012:role/Dev',
+    'arn:aws:iam::123456789012:role/Mid',
+    'arn:aws:iam::123456789012:user/base',
+  ],
 };
 
 const ASSUMED = {
@@ -198,27 +210,99 @@ describe('ResourceInventoryCollectionTask', () => {
 
     expect(ResourceInventoryDAO.prototype.deleteStaleResources).not.toHaveBeenCalled();
   });
+
+  it('does prune a type that succeeded with an empty result', async () => {
+    // The other half of the guard: an empty-but-successful call is a real
+    // answer ("this account has none") and must clear stale rows. The distinction
+    // the task relies on is empty-vs-threw, never empty-vs-non-empty.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
+    vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-4');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+
+    await new ResourceInventoryCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(ResourceInventoryDAO.prototype.deleteStaleResources).toHaveBeenCalledTimes(5);
+    expect(ResourceInventoryDAO.prototype.upsertResource).not.toHaveBeenCalled();
+  });
 });
 
 describe('CredentialCacheRefreshTask', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const collector of stubCollectors.values()) {
+      collector.collect.mockResolvedValue([]);
+    }
   });
+
+  function primeRefreshMocks(chain = CHAIN): void {
+    vi.mocked(CredentialsCacheDAO.prototype.storeCachedCredential).mockResolvedValue(undefined);
+    vi.mocked(CredentialCacheConfigDAO.prototype.updateLastCachedTime).mockResolvedValue(undefined);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(chain);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-5');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+  }
 
   it('refreshes due principals and summarizes', async () => {
     vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
-    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
-    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
-    vi.mocked(CredentialsCacheDAO.prototype.storeCachedCredential).mockResolvedValue(undefined);
-    vi.mocked(CredentialCacheConfigDAO.prototype.updateLastCachedTime).mockResolvedValue(undefined);
-    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-5');
-    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+    primeRefreshMocks(CHAIN_WITH_INTERMEDIATE);
 
     await new CredentialCacheRefreshTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
     expect(CredentialsCacheDAO.prototype.storeCachedCredential).toHaveBeenCalledTimes(1);
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
       'run-5',
       expect.objectContaining({ itemsProcessed: 1, itemsFailed: 0 }),
+    );
+  });
+
+  it('never caches the target role or the base keys, and caches each intermediate hop under its own ARN', async () => {
+    // Regression: the loop cached `principalArn` (the target) on every iteration,
+    // so every write overwrote the same key and the cache was never usable —
+    // `findClosestCachedCredential` and `getCredentialChainToFirstCachedPrincipal`
+    // both skip index 0.
+    const mid = 'arn:aws:iam::123456789012:role/Mid';
+    const lower = 'arn:aws:iam::123456789012:role/Lower';
+    vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    primeRefreshMocks({ ...CHAIN, principalArns: ['arn:aws:iam::123456789012:role/Dev', mid, lower, 'arn:aws:iam::123456789012:user/base'] });
+
+    await new CredentialCacheRefreshTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    const cachedArns = vi.mocked(CredentialsCacheDAO.prototype.storeCachedCredential).mock.calls.map(([entry]) => entry.principalArn);
+    expect(cachedArns).toEqual([lower, mid]);
+    expect(new Set(cachedArns).size).toBe(cachedArns.length);
+  });
+
+  it('advances last_cached_at even when a single-hop chain has nothing to pre-warm', async () => {
+    // A one-hop chain (target + base) has no cacheable intermediate. Bumping
+    // last_cached_at per hop instead would leave the principal permanently due
+    // and re-resolve its chain on every cron tick forever.
+    vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    primeRefreshMocks();
+
+    await new CredentialCacheRefreshTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(CredentialsCacheDAO.prototype.storeCachedCredential).not.toHaveBeenCalled();
+    expect(CredentialCacheConfigDAO.prototype.updateLastCachedTime).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates one unresolvable principal from the rest of the batch', async () => {
+    vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Bad',
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
+    primeRefreshMocks(CHAIN_WITH_INTERMEDIATE);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockRejectedValueOnce(new Error('chain is a cycle'));
+
+    await new CredentialCacheRefreshTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
+      'run-5',
+      expect.objectContaining({ itemsProcessed: 1, itemsFailed: 1 }),
     );
   });
 });

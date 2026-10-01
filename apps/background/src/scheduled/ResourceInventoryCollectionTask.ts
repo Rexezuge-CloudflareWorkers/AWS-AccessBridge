@@ -39,18 +39,22 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
     const resourceDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
     const collectedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
 
-    // Collect from every registered collector; one provider failing must not fail
-    // the account — but it must also not lose the account's previously collected
-    // resources of that type, so track which collectors actually reported.
+    // Collect from every registered collector. One provider failing must not fail
+    // the account — but it must also not cost the account its previously
+    // collected resources of that type, so a type only joins `collectedTypes`
+    // when its collector actually returned. `BaseAwsCollector` throws rather than
+    // resolving to `[]` on a non-OK response precisely so that "denied" cannot be
+    // mistaken for "empty" here: an empty-but-successful call is a real answer
+    // and prunes, a failed one is unknown and must not.
     const allItems: ResourceDiscoveryItem[] = [];
-    const succeededTypes = new Set<string>();
+    const collectedTypes = new Set<string>();
     for (const collector of collectors.values()) {
       try {
         const items: ResourceDiscoveryItem[] = await collector.collect(credentials);
         allItems.push(...items);
-        succeededTypes.add(collector.resourceType);
-      } catch (e) {
-        console.warn(`${collector.resourceType} collection failed:`, e);
+        collectedTypes.add(collector.resourceType);
+      } catch (error: unknown) {
+        console.warn(`${collector.resourceType} collection failed; its previously recorded resources are left untouched:`, error);
       }
     }
 
@@ -68,14 +72,12 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
       await resourceDAO.upsertResource(resource);
     }
 
-    // Clean stale resources, but only for types we actually collected this run.
-    // Pruning a type whose collector failed would delete every previously
-    // recorded row of that type, turning a transient AWS error into data loss.
-    for (const resourceType of succeededTypes) {
+    // Prune stale rows only for the types we successfully read this run.
+    for (const resourceType of collectedTypes) {
       await resourceDAO.deleteStaleResources(accountId, resourceType, collectedAt);
     }
 
-    console.log(`Resource inventory collected for ${principalArn}: ${allItems.length} resources`);
+    console.log(`Resource inventory collected for ${principalArn}: ${allItems.length} resources across ${collectedTypes.size}/${collectors.size} type(s)`);
     return allItems.length;
   }
 }

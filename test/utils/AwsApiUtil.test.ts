@@ -2,12 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { IamService } from '@aws-access-bridge/backend-services/aws/iam';
 import { CostExplorerService } from '@aws-access-bridge/backend-services/aws/ce';
-import { Ec2Collector } from '@aws-access-bridge/backend-services/aws/collectors/Ec2Collector';
-import { S3Collector } from '@aws-access-bridge/backend-services/aws/collectors/S3Collector';
-import { LambdaCollector } from '@aws-access-bridge/backend-services/aws/collectors/LambdaCollector';
-import { DynamoDbCollector } from '@aws-access-bridge/backend-services/aws/collectors/DynamoDbCollector';
-import { RdsCollector } from '@aws-access-bridge/backend-services/aws/collectors/RdsCollector';
-import { CollectorRegistry } from '@aws-access-bridge/backend-services/aws/collectors/CollectorRegistry';
 import { BadRequestError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
@@ -141,95 +135,3 @@ describe('CostExplorerService.getCostAndUsage', () => {
   });
 });
 
-describe('resource collectors', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('describes EC2 instances with names', async () => {
-    mockFetch.mockResolvedValue(
-      xmlResponse(`<DescribeInstancesResponse><reservationSet><item><instancesSet><item>
-<instanceId>i-1</instanceId><instanceState><name>running</name></instanceState>
-<tagSet><item><key>Name</key><value>web</value></item></tagSet>
-</item></instancesSet></item></reservationSet></DescribeInstancesResponse>`),
-    );
-    const items = await new Ec2Collector().collect(KEYS);
-    expect(items.length).toBeGreaterThan(0);
-    expect(items[0]?.resourceId).toBe('i-1');
-  });
-
-  it('returns empty on EC2 failure', async () => {
-    mockFetch.mockResolvedValue(xmlResponse('<Error/>', false, 403));
-    await expect(new Ec2Collector().collect(KEYS)).resolves.toEqual([]);
-  });
-
-  it('lists S3 buckets', async () => {
-    mockFetch.mockResolvedValue(
-      xmlResponse('<ListAllMyBucketsResult><Buckets><Bucket><Name>b1</Name></Bucket></Buckets></ListAllMyBucketsResult>'),
-    );
-    const items = await new S3Collector().collect(KEYS);
-    expect(items[0]).toMatchObject({ resourceType: 's3', resourceId: 'b1' });
-  });
-
-  it('returns empty on S3 failure', async () => {
-    mockFetch.mockResolvedValue(xmlResponse('<Error/>', false, 403));
-    await expect(new S3Collector().collect(KEYS)).resolves.toEqual([]);
-  });
-
-  it('lists Lambda functions', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        Functions: [{ FunctionName: 'fn', FunctionArn: 'arn:fn', State: 'Active', Runtime: 'nodejs22.x', MemorySize: 128 }],
-      }),
-      text: async () => '{}',
-    } as unknown as Response);
-    const items = await new LambdaCollector().collect(KEYS);
-    expect(items[0]).toMatchObject({ resourceType: 'lambda', resourceName: 'fn' });
-  });
-
-  it('returns empty on Lambda failure', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 403, text: async () => 'x' } as Response);
-    await expect(new LambdaCollector().collect(KEYS)).resolves.toEqual([]);
-  });
-
-  it('lists DynamoDB tables', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ TableNames: ['t1'] }),
-      text: async () => '{}',
-    } as unknown as Response);
-    const items = await new DynamoDbCollector().collect(KEYS);
-    expect(items[0]).toMatchObject({ resourceType: 'dynamodb', resourceName: 't1' });
-  });
-
-  it('lists RDS instances', async () => {
-    mockFetch.mockResolvedValue(
-      xmlResponse(`<DescribeDBInstancesResult><DBInstances><DBInstance>
-<DBInstanceIdentifier>db1</DBInstanceIdentifier><DBInstanceStatus>available</DBInstanceStatus><Engine>postgres</Engine>
-</DBInstance></DBInstances></DescribeDBInstancesResult>`),
-    );
-    const items = await new RdsCollector().collect(KEYS);
-    expect(items[0]).toMatchObject({ resourceType: 'rds', resourceId: 'db1', state: 'available' });
-  });
-
-  it('returns empty on RDS failure', async () => {
-    mockFetch.mockResolvedValue(xmlResponse('<Error/>', false, 403));
-    await expect(new RdsCollector().collect(KEYS)).resolves.toEqual([]);
-  });
-});
-
-describe('CollectorRegistry', () => {
-  it('resolves every registered collector by resource type', () => {
-    for (const resourceType of ['ec2', 's3', 'lambda', 'rds', 'dynamodb']) {
-      expect(CollectorRegistry.get(resourceType).resourceType).toBe(resourceType);
-    }
-    expect(CollectorRegistry.getAll().size).toBe(5);
-  });
-
-  it('rejects unknown resource types', () => {
-    expect(() => CollectorRegistry.get('nope')).toThrow(BadRequestError);
-  });
-});

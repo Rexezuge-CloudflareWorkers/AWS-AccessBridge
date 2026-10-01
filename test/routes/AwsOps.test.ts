@@ -81,6 +81,39 @@ describe('AssumeRoleRoute', () => {
     await new AssumeRoleRoute({} as never).handle(c as never);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
+
+  it('authorizes a pathed role against its full path-qualified name', async () => {
+    // Regression: `getRoleNameFromArn` truncated at the first '/', so a role with
+    // an IAM path was checked against (and granted as) a *different* role name
+    // than the one actually assumed.
+    const pathed = 'arn:aws:iam::123456789012:role/team/dev/DeveloperRole';
+    vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
+    vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
+    vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
+      if (arn === pathed) {
+        return { principalArn: pathed, assumedBy: 'arn:aws:iam::123456789012:user/base' };
+      }
+      return { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
+    });
+    vi.mocked(UserMetadataDAO.prototype.getOrCreateFederationUsername).mockResolvedValue('federated-user');
+    vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockResolvedValue(undefined);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue({
+      accessKeyId: 'ASIA',
+      secretAccessKey: 'shh',
+      sessionToken: 'tok',
+      expiration: '2025-01-01T00:00:00Z',
+    });
+
+    const c = createRouteContext({ method: 'POST', body: { principalArn: pathed }, env: secretsEnv() });
+    await new AssumeRoleRoute({} as never).handle(c as never);
+
+    expect(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).toHaveBeenCalledWith(
+      expect.anything(),
+      '123456789012',
+      'team/dev/DeveloperRole',
+    );
+    expect(StsService.prototype.assumeRole).toHaveBeenCalledWith(pathed, expect.anything(), expect.any(String), undefined);
+  });
 });
 
 describe('GenerateConsoleUrlRoute', () => {
