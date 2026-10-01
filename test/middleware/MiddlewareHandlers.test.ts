@@ -448,7 +448,29 @@ describe('MiddlewareHandlers', () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ email: 'pat@example.com' });
-      expect(authenticateWithPATSpy).toHaveBeenCalledWith('test-token');
+      // The second argument is the detach seam: the last-used stamp leaves the
+      // response path via `ctx.waitUntil`.
+      expect(authenticateWithPATSpy).toHaveBeenCalledWith('test-token', expect.any(Function));
+    });
+
+    it('detaches the token last-used write instead of blocking the response on it', async () => {
+      const app: TestApp = createApiApp();
+      const authenticateWithPATSpy = vi
+        .spyOn(TokenService.prototype, 'authenticateWithPAT')
+        .mockImplementation(async (_token: string, defer?: (work: Promise<unknown>) => void) => {
+          // The service hands the write over; the middleware owns running it.
+          defer?.(Promise.resolve());
+          return 'pat@example.com';
+        });
+
+      const response: Response = await app.fetch(
+        new Request('https://worker.example.com/api/test', { headers: { Authorization: 'Bearer test-token' } }),
+        createEnv(),
+        createExecutionContext(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(authenticateWithPATSpy).toHaveBeenCalledOnce();
     });
 
     it('returns a 401 response when PAT authentication fails', async () => {

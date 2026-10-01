@@ -31,6 +31,13 @@ type AuthenticatedEnv = Env & {
   AccessBridgeDB: D1DatabaseSession;
 };
 
+/**
+The `{Exception: {Type, Message}}` envelope shared by every error response.
+*/
+function exceptionBody(error: IServiceError): { Exception: { Type: string; Message: string } } {
+  return { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } };
+}
+
 async function validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
   await HMACHandler.validateInternalRequest(c, next);
 }
@@ -72,7 +79,17 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
   const authHeader: string | undefined = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token: string = authHeader.slice(7);
-    return getRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(token);
+    // Detached: the last-used stamp is a D1 write that must not sit on the auth
+    // critical path, and `waitUntil` returns void, so the handler is attached to
+    // the promise here rather than relying on the caller.
+    const deferred = (work: Promise<unknown>): void => {
+      c.executionCtx.waitUntil(
+        work.catch((error: unknown): void => {
+          console.error('Failed to update token last-used timestamp:', error instanceof Error ? error.message : error);
+        }),
+      );
+    };
+    return getRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(token, deferred);
   }
   throw new UnauthorizedError('No personal access token provided in request headers.');
 }
@@ -131,32 +148,34 @@ async function publishAccountId(c: RequestContext, userEmail: string): Promise<v
   }
 }
 
-async function userAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
+/**
+ * Authenticate, publish the principal, and run the rest of the chain, translating
+ * an `IServiceError` into its typed JSON response.
+ *
+ * Shared by the `/user/*` and `/api/*` handlers, which differ only in *how* they
+ * authenticate. The translation used to be copy-pasted across both, so a change
+ * to either shape had to be made twice.
+ */
+async function authenticateAndContinue(c: RequestContext, next: Next, authenticate: (context: RequestContext) => Promise<string>): Promise<Response | void> {
   try {
-    const userEmail: string = await authenticateUserIdentity(c);
+    const userEmail: string = await authenticate(c);
     c.set('AuthenticatedUserEmailAddress', userEmail);
     await publishAccountId(c, userEmail);
     await next();
   } catch (error: unknown) {
     if (error instanceof IServiceError) {
-      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
+      return c.json(exceptionBody(error), error.getErrorCode());
     }
     throw error;
   }
 }
 
+async function userAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
+  return authenticateAndContinue(c, next, authenticateUserIdentity);
+}
+
 async function apiAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
-  try {
-    const userEmail: string = await authenticateApiIdentity(c);
-    c.set('AuthenticatedUserEmailAddress', userEmail);
-    await publishAccountId(c, userEmail);
-    await next();
-  } catch (error: unknown) {
-    if (error instanceof IServiceError) {
-      return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, error.getErrorCode());
-    }
-    throw error;
-  }
+  return authenticateAndContinue(c, next, authenticateApiIdentity);
 }
 
 class MiddlewareHandlers {

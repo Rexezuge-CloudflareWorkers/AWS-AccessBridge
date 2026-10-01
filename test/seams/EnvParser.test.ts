@@ -57,10 +57,20 @@ describe('ConfigurationManager namespaces', () => {
     expect(ConfigurationManager.resource.getCollectionIntervalHours(env)).toBe(17);
     expect(ConfigurationManager.auth.getTeamDomain(env)).toBe('https://x');
     expect(ConfigurationManager.auth.getPolicyAud(env)).toBe('aud');
-    expect(ConfigurationManager.auth.getDevAuthEmail(env)).toBe('dev@example.com');
     expect(ConfigurationManager.auth.isDemoMode(env)).toBe(true);
     expect(ConfigurationManager.internal.getRequestTimeWindowMs(env)).toBe(18);
     expect(ConfigurationManager.spa.isServeFromWorker(env)).toBe(true);
+  });
+
+  it('recognises only the literal "production" as a production environment', () => {
+    // This is the flag that makes the `DEV_AUTH_EMAIL` auth bypass refuse rather
+    // than authenticate, so a near-miss must not read as production either way.
+    expect(ConfigurationManager.environment.isProduction({ ENVIRONMENT: 'production' })).toBe(true);
+    expect(ConfigurationManager.environment.isProduction({ ENVIRONMENT: 'prod' })).toBe(false);
+    expect(ConfigurationManager.environment.isProduction({ ENVIRONMENT: 'Production' })).toBe(false);
+    expect(ConfigurationManager.environment.isProduction({ ENVIRONMENT: 'staging' })).toBe(false);
+    expect(ConfigurationManager.environment.isProduction({})).toBe(false);
+    expect(ConfigurationManager.environment.isProduction(undefined)).toBe(false);
   });
 
   it('falls back to defaults for empty env', () => {

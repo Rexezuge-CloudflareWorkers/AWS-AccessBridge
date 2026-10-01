@@ -28,8 +28,21 @@ class AuditObserverRegistry {
     return this.observers;
   }
 
-  public async notifyAll(event: AuditEvent): Promise<PromiseSettledResult<void>[]> {
-    return Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
+  /**
+   * Notify every observer, isolating failures from each other.
+   *
+   * `allSettled` rather than `all`, so one failing sink cannot prevent the
+   * others from recording. The rejections are logged here rather than returned
+   * for the caller to ignore: the audit trail is a governance control, so a
+   * write that fails must leave a trace even though it cannot fail the request.
+   */
+public async notifyAll(event: AuditEvent): Promise<void> {
+    const results = await Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Audit observer failed to record an event:', result.reason instanceof Error ? result.reason.message : result.reason);
+      }
+    }
   }
 }
 

@@ -31,12 +31,25 @@ class TokenService {
    * `user_id`, the owner's current address is read from the account; a token
    * with no id (written before 0032, or for an account the backfill could not
    * attribute) falls back to the stored address.
+   *
+   * `defer` receives work that should not delay or fail the response. The
+   * last-used stamp is a D1 write on the critical path of every programmatic
+   * call, and `updateLastUsedByToken` throws on failure — so awaiting it meant a
+   * write-side blip turned a perfectly valid token into a 500. Best-effort by
+   * nature: a missing timestamp costs a stale "last used" display, nothing more.
    */
-  public async authenticateWithPAT(token: string): Promise<string> {
+  public async authenticateWithPAT(token: string, defer?: (work: Promise<unknown>) => void): Promise<string> {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByToken(token, true);
     if (tokenData) {
-      await dao.updateLastUsedByToken(token);
+      const stampLastUsed = dao.updateLastUsedByToken(token);
+      if (defer) {
+        defer(stampLastUsed);
+      } else {
+        await stampLastUsed.catch((error: unknown) => {
+          console.error('Failed to update token last-used timestamp:', error instanceof Error ? error.message : error);
+        });
+      }
       if (tokenData.userId) {
         const account = await this.identity.resolveAccountById(tokenData.userId);
         if (account?.email) return account.email;

@@ -20,7 +20,10 @@ class EnvParser {
   }
 
   private static readString(env: unknown, key: string): string | undefined {
-    return (env as Record<string, string | undefined>)[key];
+    // `env` is typed `unknown` because a caller may hold anything; a nullish one
+    // is a legitimate "no configuration" and must read as an absent var rather
+    // than throwing a TypeError out of a settings lookup.
+    return (env as Record<string, string | undefined> | null | undefined)?.[key];
   }
 }
 

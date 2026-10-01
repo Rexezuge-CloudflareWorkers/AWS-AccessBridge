@@ -47,7 +47,7 @@ The workflow holds no logic: every step runs a `scripts/backup/*.ts` entrypoint 
 
 ## Local-only (no default, not in `ConfigurationDefaults.ts`)
 
-`DEV_AUTH_EMAIL` — bypasses Cloudflare Access locally.
+`DEV_AUTH_EMAIL` — bypasses Cloudflare Access locally. Read *before* JWT verification, so it is refused outright when `ENVIRONMENT` is `production` rather than authenticating: a `.dev.vars` promoted by mistake would otherwise grant every caller that address, including super-admin and `/api/aws/assume-role`.
 
 ## Optional vars (defaults in `ConfigurationDefaults.ts`, read via `ConfigurationManager` namespaces)
 
@@ -60,5 +60,6 @@ The workflow holds no logic: every step runs a `scripts/backup/*.ts` entrypoint 
 | SPA        | `SERVE_SPA_FROM_WORKER` (`false`) — `ConfigurationManager.spa`                                                                                                                                             |
 | Internal   | `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` (`1000`) — `ConfigurationManager.internal`                                                                                                               |
 | Misc       | `DEMO_MODE` (`false`) — `ConfigurationManager.auth`                                                                                                                                                        |
+| Environment | `ENVIRONMENT` (`development`) — `ConfigurationManager.environment.isProduction`. Only the literal `production` changes behaviour (it arms the `DEV_AUTH_EMAIL` guard); `prod`/`Production`/unset do not |
 
 Add new env vars in `ConfigurationDefaults.ts` + a `ConfigurationManager` namespace getter, not inline. Never `parseInt(env.X || DEFAULT)` at call sites.

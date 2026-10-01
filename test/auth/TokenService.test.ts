@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TokenService } from '@aws-access-bridge/backend-services/auth/TokenService';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
 import type { AccountIdentity, UserIdentityEnv } from '@aws-access-bridge/backend-services/identity/UserIdentityService';
-import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
 
@@ -36,6 +36,25 @@ describe('TokenService lifecycle', () => {
     vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
     await expect(new TokenService(env(), identity(null)).authenticateWithPAT('pat')).resolves.toBe('user@example.com');
     expect(UserAccessTokenDAO.prototype.updateLastUsedByToken).toHaveBeenCalledWith('pat');
+  });
+
+  it('authenticates even when the last-used write fails', async () => {
+    // `updateLastUsedByToken` throws `DatabaseError` on `!result.success`, and it
+    // used to be awaited on the auth critical path — so a write-side blip turned a
+    // perfectly valid PAT into a 500.
+    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockRejectedValue(new DatabaseError('D1 is busy'));
+    await expect(new TokenService(env(), identity(null)).authenticateWithPAT('pat')).resolves.toBe('user@example.com');
+  });
+
+  it('hands the last-used write to the caller to detach', async () => {
+    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
+    const defer = vi.fn();
+    await new TokenService(env(), identity(null)).authenticateWithPAT('pat', defer);
+    // The middleware passes `ctx.waitUntil`, so the write leaves the response path.
+    expect(defer).toHaveBeenCalledOnce();
+    expect(defer.mock.calls[0]?.[0]).toBeInstanceOf(Promise);
   });
 
   // The whole point of stamping `user_id` on tokens: without this, a token
