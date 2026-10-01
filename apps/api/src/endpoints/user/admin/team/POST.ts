@@ -159,7 +159,7 @@ class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTe
     env: IAdminEnv,
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateTeamResponse> {
-    const team = await getRequestScope(env).get(Tokens.TeamService).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
+    const team = await getRequestScope(cxt).get(Tokens.TeamService).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
     return { success: true, team };
   }
 }

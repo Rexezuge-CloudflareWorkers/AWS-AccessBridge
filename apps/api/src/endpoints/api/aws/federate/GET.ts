@@ -207,8 +207,8 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
     const principalArn: string = buildPrincipalArn(awsAccountId, roleName);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const baseUrl: string = this.getBaseUrl(cxt);
-    const roleConfig: RoleConfig | undefined = await getRequestScope(env).get(Tokens.AccountService).getRoleConfig(awsAccountId, roleName);
-    const hmacSecret: string = await env.INTERNAL_HMAC_SECRET.get();
+    const roleConfig: RoleConfig | undefined = await getRequestScope(cxt).get(Tokens.AccountService).getRoleConfig(awsAccountId, roleName);
+    const hmacSecret: string = await env.INTERNAL_REQUEST_HMAC_SECRET.get();
     const internalRequestHelper: InternalRequestHelper = new InternalRequestHelper(env.SELF, hmacSecret);
     const assumeRoleResponse: Response = await internalRequestHelper.makeRequest(
       '/api/aws/assume-role',
@@ -256,7 +256,7 @@ type FederateResponse = IResponse;
 
 interface FederateEnv extends IEnv {
   SELF: Fetcher;
-  INTERNAL_HMAC_SECRET: SecretsStoreSecret;
+  INTERNAL_REQUEST_HMAC_SECRET: SecretsStoreSecret;
 }
 
 export { FederateRoute };

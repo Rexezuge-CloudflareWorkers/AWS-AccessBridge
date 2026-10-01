@@ -1,5 +1,6 @@
 'use client';
 
+import type { ShowMessage } from '../hooks/useToast';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixTimestamp } from '../lib/format';
@@ -27,7 +28,7 @@ function statusColorStyle(code: number): React.CSSProperties {
 }
 
 interface AuditLogsTabProps {
-  showMessage: (type: 'success' | 'error', text: string) => void;
+  showMessage: ShowMessage;
 }
 
 const styles = {

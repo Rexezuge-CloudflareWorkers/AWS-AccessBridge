@@ -115,7 +115,7 @@ class ListTokensRoute extends IActivityAPIRoute<ListTokensRequest, ListTokensRes
     cxt: ActivityContext<ListTokensEnv>,
   ): Promise<ListTokensResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const tokens: UserAccessTokenMetadata[] = await getRequestScope(env).get(Tokens.TokenService).listTokens(userEmail);
+    const tokens: UserAccessTokenMetadata[] = await getRequestScope(cxt).get(Tokens.TokenService).listTokens(userEmail);
     return { tokens };
   }
 }

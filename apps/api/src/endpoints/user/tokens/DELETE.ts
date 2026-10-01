@@ -56,7 +56,7 @@ class DeleteTokenRoute extends IActivityAPIRoute<DeleteTokenRequest, DeleteToken
   ): Promise<DeleteTokenResponse> {
     if (request.tokenId) {
       const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-      await getRequestScope(env).get(Tokens.TokenService).deleteToken(request.tokenId, userEmail);
+      await getRequestScope(cxt).get(Tokens.TokenService).deleteToken(request.tokenId, userEmail);
       return { success: true };
     }
     throw new BadRequestError('Token ID is required');

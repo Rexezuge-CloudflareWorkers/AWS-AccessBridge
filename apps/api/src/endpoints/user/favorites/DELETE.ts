@@ -52,7 +52,7 @@ class UnfavoriteAccountRoute extends IActivityAPIRoute<UnfavoriteAccountRequest,
     cxt: ActivityContext<UnfavoriteAccountEnv>,
   ): Promise<UnfavoriteAccountResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.UserService).unfavoriteAccount(userEmail, request.awsAccountId);
+    await getRequestScope(cxt).get(Tokens.UserService).unfavoriteAccount(userEmail, request.awsAccountId);
     return { success: true };
   }
 }

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialChainService } from '@aws-access-bridge/backend-services/credential/CredentialChainService';
 import { CredentialStoreService } from '@aws-access-bridge/backend-services/credential/CredentialStoreService';
-import { CredentialService } from '@aws-access-bridge/backend-services/credential/CredentialService';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
@@ -19,7 +18,8 @@ function env() {
   return {
     AccessBridgeDB: {},
     AccessBridgeKV: {},
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     PRINCIPAL_TRUST_CHAIN_LIMIT: '3',
   } as never;
 }
@@ -84,11 +84,20 @@ describe('CredentialChainService', () => {
     await expect(svc.getCredentialChainToFirstCachedPrincipal(BASE)).rejects.toBeInstanceOf(InternalServerError);
   });
 
-  it('throws without an encryption key or cache binding', async () => {
-    await expect(new CredentialChainService({ AccessBridgeDB: {} } as never).getMasterKey()).rejects.toBeInstanceOf(
-      InternalServerError,
-    );
-    await expect(new CredentialChainService({ AccessBridgeDB: {}, AES_ENCRYPTION_KEY_SECRET: { get: async () => 'k' } } as never).createCacheDAO()).rejects.toBeInstanceOf(
+  it('throws without a credential cache KV binding', async () => {
+    // The key resolves, but the cache namespace does not exist — narrowing it to
+    // undefined would fail much later inside STS assume-role with a confusing error.
+    await expect(
+      new CredentialChainService({
+        AccessBridgeDB: {},
+        CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: async () => 'k' },
+      } as never).createCacheDAO(),
+    ).rejects.toBeInstanceOf(InternalServerError);
+  });
+
+  it('throws when no encryption key is configured at all', async () => {
+    // The legacy master key is an optional *fallback*; the feature key is not.
+    await expect(new CredentialChainService({ AccessBridgeDB: {} } as never).createCredentialsDAO()).rejects.toBeInstanceOf(
       InternalServerError,
     );
   });
@@ -106,30 +115,17 @@ describe('CredentialStoreService', () => {
     await expect(svc.removeCredential('')).rejects.toBeInstanceOf(BadRequestError);
   });
 
+  it('rejects a test-chain request with no principal ARN', async () => {
+    // The guard moved here from the deleted `CredentialService` facade, which is
+    // where it used to live.
+    await expect(new CredentialChainService(env()).testChain('')).rejects.toBeInstanceOf(BadRequestError);
+  });
+
   it('maps STS validation failures to BadRequest', async () => {
     const svc = new CredentialStoreService(env());
     vi.mocked(StsService.prototype.validateCredentials).mockRejectedValue(new Error('aws down'));
     await expect(svc.validateCredentials('AK', 'SK')).rejects.toBeInstanceOf(BadRequestError);
     vi.mocked(StsService.prototype.validateCredentials).mockResolvedValue({ arn: BASE, accountId: '1', userId: 'u' });
     await expect(svc.validateCredentials('AK', 'SK')).resolves.toEqual({ arn: BASE, accountId: '1', userId: 'u' });
-  });
-});
-
-describe('CredentialService facade', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('delegates chain + store behavior to the slices', async () => {
-    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue({
-      principalArns: [LEAF],
-      accessKeyId: 'AK',
-      secretAccessKey: 'SK',
-      sessionToken: 'ST',
-    } as never);
-    const svc = new CredentialService(env());
-    expect(svc.getTrustChainLimit()).toBe(3);
-    await expect(svc.getCredentialChain(LEAF)).resolves.toMatchObject({ accessKeyId: 'AK' });
-    await expect(svc.testChain('')).rejects.toBeInstanceOf(BadRequestError);
   });
 });

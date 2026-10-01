@@ -5,7 +5,7 @@ import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
-import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { createRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 interface CollectionTaskEnv extends IEnv {
@@ -24,6 +24,12 @@ interface CollectionTaskEnv extends IEnv {
  * updateLastCollectedTime` loop; only per-item work differed.
  * Subclasses implement `collectionType`, `maxAccounts`, `intervalHours`,
  * and `collectForAccount`.
+ *
+ * Builds a fresh scope per run rather than using `getRequestScope`: a Durable
+ * Object's `env` is stable for the object's lifetime, so an env-keyed cache would
+ * pin the memoized encryption keys for as long as the object lives — after a key
+ * rotation the cron would keep encrypting with the old key while the API worker,
+ * on a fresh scope per request, had moved on.
  */
 abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IScheduledTask<TEnv> {
   protected abstract collectionType(): 'cost' | 'resource';
@@ -50,12 +56,12 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
       return { itemsProcessed: 0, itemsFailed: 0, summary: 'No accounts due for collection' };
     }
 
-    const credentialService = getRequestScope(env).get(Tokens.CredentialService);
+    const credentialChain = createRequestScope(env).get(Tokens.CredentialChainService);
     let succeededItems = 0;
     let failedAccounts = 0;
     for (const principalArn of principalArns) {
       try {
-        const { credentials }: { credentials: AccessKeys } = await credentialService.resolveLeafCredentials(
+        const { credentials }: { credentials: AccessKeys } = await credentialChain.resolveLeafCredentials(
           principalArn,
           this.sessionName(),
         );

@@ -1,6 +1,6 @@
 import { DatabaseError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { Credential, CredentialChain, CredentialInternal } from '@aws-access-bridge/shared/model';
-import { decryptDataOptional, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
+import { decryptDataField, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { EncryptedDAO } from './BaseDAO';
 
@@ -19,8 +19,8 @@ function resolveIv(fieldIv: string | undefined, legacySalt: string | undefined):
 class CredentialsDAO extends EncryptedDAO {
   protected readonly principalTrustChainLimit: number;
 
-  constructor(database: D1Queryable, masterKey: string, principalTrustChainLimit: number) {
-    super(database, masterKey);
+  constructor(database: D1Queryable, encryptionKeys: readonly string[], principalTrustChainLimit: number) {
+    super(database, encryptionKeys);
     this.principalTrustChainLimit = principalTrustChainLimit;
   }
 
@@ -40,20 +40,19 @@ class CredentialsDAO extends EncryptedDAO {
       throw new UnauthorizedError();
     }
 
+    const keys = this.encryptionKeys;
+    // A relationship-only row carries no ciphertext at all, so `decryptDataField`
+    // answers `undefined` for an absent envelope and throws only when an envelope
+    // is present but no key authenticates it.
     return {
       principalArn: result.principal_arn,
       assumedBy: result.assumed_by,
-      accessKeyId: await decryptDataOptional(result.encrypted_access_key_id, result.salt, this.masterKey),
-      secretAccessKey: await decryptDataOptional(
-        result.encrypted_secret_access_key,
-        resolveIv(result.salt_secret_access_key, result.salt),
-        this.masterKey,
-      ),
-      sessionToken: await decryptDataOptional(
-        result.encrypted_session_token,
-        resolveIv(result.salt_session_token, result.salt),
-        this.masterKey,
-      ),
+      // Each field falls back through the key chain independently: a row rewritten
+      // since the per-feature split has all three on the current key, a row
+      // untouched since has all three on the legacy one.
+      accessKeyId: await decryptDataField(result.encrypted_access_key_id, result.salt, keys),
+      secretAccessKey: await decryptDataField(result.encrypted_secret_access_key, resolveIv(result.salt_secret_access_key, result.salt), keys),
+      sessionToken: await decryptDataField(result.encrypted_session_token, resolveIv(result.salt_session_token, result.salt), keys),
     };
   }
 
@@ -98,9 +97,11 @@ class CredentialsDAO extends EncryptedDAO {
     // cancel to the XOR of their plaintexts and would expose the GCM auth
     // subkey. `encryptData` generates each IV, and each travels with its own
     // ciphertext into its own column.
-    const encryptedAccessKeyId = await encryptData(accessKeyId, this.masterKey);
-    const encryptedSecretAccessKey = await encryptData(secretAccessKey, this.masterKey);
-    const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, this.masterKey) : null;
+    // Always the surface's own key: this is what upgrades a legacy row.
+    const key = this.encryptionKey;
+    const encryptedAccessKeyId = await encryptData(accessKeyId, key);
+    const encryptedSecretAccessKey = await encryptData(secretAccessKey, key);
+    const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, key) : null;
     const result: D1Result = await this.database
       .prepare(
         `INSERT OR REPLACE INTO credentials (

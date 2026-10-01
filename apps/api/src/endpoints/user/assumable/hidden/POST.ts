@@ -165,7 +165,7 @@ class HideRoleRoute extends IActivityAPIRoute<HideRoleRequest, HideRoleResponse,
 
   protected async handleRequest(request: HideRoleRequest, env: HideRoleEnv, cxt: ActivityContext<HideRoleEnv>): Promise<HideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.UserService).hideRole(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(cxt).get(Tokens.UserService).hideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

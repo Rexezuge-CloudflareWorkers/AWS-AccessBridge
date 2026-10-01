@@ -178,7 +178,7 @@ class SetAccountNicknameRoute extends IAdminActivityAPIRoute<SetAccountNicknameR
     env: SetAccountNicknameEnv,
     _cxt: ActivityContext<SetAccountNicknameEnv>,
   ): Promise<SetAccountNicknameResponse> {
-    const { accountId, nickname } = await getRequestScope(env).get(Tokens.AccountService).setNickname(request.awsAccountId, request.nickname);
+    const { accountId, nickname } = await getRequestScope(_cxt).get(Tokens.AccountService).setNickname(request.awsAccountId, request.nickname);
 
     return {
       success: true,

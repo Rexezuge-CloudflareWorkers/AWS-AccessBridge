@@ -6,9 +6,10 @@ import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-a
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
-import { CredentialService } from '../../credential';
+import { CredentialChainService } from '../../credential';
 import type { ServiceEnv } from '../../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../../identity/UserIdentityService';
+import { UserIdentityService } from '../../identity/UserIdentityService';
+import { resolveOwner } from '../../identity/resolveOwner';
 
 interface AssumeRoleServiceEnv extends ServiceEnv {
   // Narrowed from optional: chain walking needs the cache binding.
@@ -16,7 +17,7 @@ interface AssumeRoleServiceEnv extends ServiceEnv {
 }
 
 class AssumeRoleService {
-  private readonly credentials: CredentialService;
+  private readonly credentials: CredentialChainService;
   private readonly sts: StsService;
 
   private readonly identity: UserIdentityService;
@@ -24,11 +25,11 @@ class AssumeRoleService {
   constructor(
     private readonly env: AssumeRoleServiceEnv,
     sts?: StsService,
-    credentials?: CredentialService,
+    credentials?: CredentialChainService,
     identity?: UserIdentityService,
   ) {
     this.sts = sts ?? new StsService();
-    this.credentials = credentials ?? new CredentialService(env, this.sts);
+    this.credentials = credentials ?? new CredentialChainService(env, this.sts);
     this.identity = identity ?? new UserIdentityService(env);
   }
 
@@ -40,12 +41,8 @@ class AssumeRoleService {
     const roleName: string = ArnUtil.getRoleNameFromArn(principalArn);
 
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    await assumableRolesDAO.verifyUserHasAccessToRole(
-      { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail },
-      accountId,
-      roleName,
-    );
+    const owner = await resolveOwner(this.identity, userEmail);
+    await assumableRolesDAO.verifyUserHasAccessToRole(owner, accountId, roleName);
     const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(this.env.AccessBridgeDB);
     const roleConfig: RoleConfig | undefined = await roleConfigsDAO.getRoleConfig(accountId, roleName);
 
@@ -55,7 +52,7 @@ class AssumeRoleService {
     // The anchor, not the presented address: the account row is keyed on the
     // anchor, and reading the current address here would return a session name
     // for a row that does not exist and change the STS RoleSessionName.
-    const sessionName: string = await userMetadataDAO.getOrCreateFederationUsername(account?.anchorEmail ?? userEmail);
+    const sessionName: string = await userMetadataDAO.getOrCreateFederationUsername(owner.anchorEmail);
 
     const cacheDAO = await this.credentials.createCacheDAO();
     const { startIndex, credentials } = await this.findClosestCachedCredential(cacheDAO, credentialChain);
@@ -114,13 +111,17 @@ class AssumeRoleService {
       const sessionName: string = i > 0 ? INTERMEDIATE_ROLE_SESSION_NAME : `${ROLE_SESSION_NAME_PREFIX}${userId}`;
       const durationSeconds: number | undefined = i === 0 ? roleSessionDurationSeconds : undefined;
       newCredentials = await this.sts.assumeRole(roleArn, newCredentials, sessionName, durationSeconds);
-      // Cache intermediate credentials (not target role, not base IAM user)
-      if (i > 0 && newCredentials.expiration) {
+      // Cache intermediate credentials (not the target role, not the base IAM
+      // user). Both halves of the entry are required: a credential with an
+      // expiration but no session token is unusable as a cache entry — the next
+      // reader would take the short-circuit and get something it cannot pass to
+      // STS. Skipping it just means the next walk re-derives the hop.
+      if (i > 0 && newCredentials.expiration && newCredentials.sessionToken) {
         await credentialsCacheDAO.storeCachedCredential({
           principalArn: roleArn,
           accessKeyId: newCredentials.accessKeyId,
           secretAccessKey: newCredentials.secretAccessKey,
-          sessionToken: newCredentials.sessionToken!,
+          sessionToken: newCredentials.sessionToken,
           expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(newCredentials.expiration),
         });
       }

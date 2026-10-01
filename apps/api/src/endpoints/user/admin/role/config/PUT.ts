@@ -260,7 +260,7 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
     env: SetRoleConfigEnv,
     _cxt: ActivityContext<SetRoleConfigEnv>,
   ): Promise<SetRoleConfigResponse> {
-    await getRequestScope(env).get(Tokens.AccountService).setRoleConfig(
+    await getRequestScope(_cxt).get(Tokens.AccountService).setRoleConfig(
       request.awsAccountId,
       request.roleName,
       request.destinationPath,

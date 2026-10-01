@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -145,8 +146,9 @@ class EnableDataCollectionRoute extends IAdminActivityAPIRoute<EnableDataCollect
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: EnableDataCollectionRequest, env: IAdminEnv): Promise<EnableDataCollectionResponse> {
-    await getRequestScope(env).get(Tokens.CostService).enableCollection(request.principalArn, request.collectionTypes);
+  protected async handleAdminRequest(request: EnableDataCollectionRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<EnableDataCollectionResponse> {
+    await getRequestScope(cxt).get(Tokens.CostService).enableCollection(request.principalArn, request.collectionTypes);
     return { success: true, message: `Data collection enabled for ${request.collectionTypes.join(', ')}.` };
   }
 }

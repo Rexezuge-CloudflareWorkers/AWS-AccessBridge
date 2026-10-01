@@ -57,26 +57,6 @@ class UserMetadataDAO extends BaseDAO {
   }
 
   /**
-   * Provision a new account, stamping the 0032 identity columns in the same
-   * statement.
-   *
-   * The anchor is the address itself whenever it is free, which keeps a fresh
-   * row shaped like every pre-0032 one. `INSERT OR IGNORE` makes a second call
-   * with an anchor that is already taken a no-op rather than an error, so
-   * `UserIdentityService` can retry with a different anchor when a released
-   * address is still held.
-   */
-  public async createUser(input: { id: string; anchor: string; loginEmail: string }): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email) VALUES (?, ?, ?)')
-      .bind(input.anchor, input.id, input.loginEmail.toLowerCase())
-      .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to create user: ${result.error}`);
-    }
-  }
-
-  /**
    * Account behind a stable id. The inverse of the address lookups, for
    * callers that already hold a key (a token, a team membership) and need the
    * address the account signs in with today.

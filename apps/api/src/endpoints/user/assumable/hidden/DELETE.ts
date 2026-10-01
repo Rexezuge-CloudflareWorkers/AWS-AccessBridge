@@ -169,7 +169,7 @@ class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleRes
     cxt: ActivityContext<UnhideRoleEnv>,
   ): Promise<UnhideRoleResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.UserService).unhideRole(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(cxt).get(Tokens.UserService).unhideRole(userEmail, request.awsAccountId, request.roleName);
     return { success: true };
   }
 }

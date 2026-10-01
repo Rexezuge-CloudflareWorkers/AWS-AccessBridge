@@ -192,7 +192,7 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
     const endDate: string | undefined = url.searchParams.get('endDate') || undefined;
     const startDate: string | undefined = url.searchParams.get('startDate') || undefined;
 
-    return getRequestScope(env).get(Tokens.CostService).getAccountCost(userEmail, awsAccountId, startDate, endDate);
+    return getRequestScope(cxt).get(Tokens.CostService).getAccountCost(userEmail, awsAccountId, startDate, endDate);
   }
 }
 

@@ -191,8 +191,9 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
     cxt: ActivityContext<ListAuditLogsEnv>,
   ): Promise<ListAuditLogsResponse> {
     const url: URL = new URL(cxt.req.url);
+    const userEmail: string | undefined = url.searchParams.get('userEmail') || undefined;
     const filters: AuditLogQueryFilters = {
-      userEmail: url.searchParams.get('userEmail') || undefined,
+      userEmail,
       action: url.searchParams.get('action') || undefined,
       startTime: url.searchParams.get('startTime') ? parseInt(url.searchParams.get('startTime')!) : undefined,
       endTime: url.searchParams.get('endTime') ? parseInt(url.searchParams.get('endTime')!) : undefined,
@@ -200,8 +201,29 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
     const limit: number = Pagination.limit(url.searchParams.get('limit'));
     const offset: number = Pagination.offset(url.searchParams.get('offset'));
 
-    const auditService = getRequestScope(env).get(Tokens.AuditService);
-    const { logs, total } = await auditService.queryLogs(filters, limit, offset);
+    const scope = getRequestScope(cxt);
+    // An address filter alone only matches rows written *since* the account
+    // changed address — the address-keyed arm of the predicate is the
+    // `user_id IS NULL` fallback, which an attributed row never takes. Resolve the
+    // caller's account id so `AuditLogDAO.query` uses its id-keyed arm, which
+    // matches every row the account ever wrote. The address still narrows the
+    // unattributed ones.
+    if (userEmail) {
+      const userId: string | null = await scope
+        .get(Tokens.UserIdentityService)
+        .resolveUserId(userEmail)
+        .catch((error: unknown) => {
+          // Best-effort: an unresolvable address simply means no id arm, which is
+          // the behaviour that predates this.
+          console.warn('Could not resolve an account id for the audit-log filter:', error instanceof Error ? error.message : error);
+          return null;
+        });
+      // `null` means the address resolved to no account, so there is no id to
+      // match on; the address arm alone still applies.
+      filters.userId = userId ?? undefined;
+    }
+
+    const { logs, total } = await scope.get(Tokens.AuditService).queryLogs(filters, limit, offset);
     return { logs, total };
   }
 }

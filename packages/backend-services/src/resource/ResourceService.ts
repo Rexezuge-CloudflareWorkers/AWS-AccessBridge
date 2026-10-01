@@ -4,7 +4,8 @@ import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity/UserIdentityService';
+import { resolveOwner } from '../identity/resolveOwner';
 
 type ResourceServiceEnv = ServiceEnv;
 
@@ -38,14 +39,9 @@ class ResourceService {
     this.identity = identity ?? new UserIdentityService(env);
   }
 
-  /**
-   * The id-keyed read target for `assumable_roles`. An unresolvable address
-   * still yields an owner with a null id, so an unknown actor reads as "no
-   * accounts" rather than erroring.
-   */
-  private async ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
-    const account = await this.identity.resolveAccount(userEmail);
-    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
+
+  private ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
+    return resolveOwner(this.identity, userEmail);
   }
 
   public async searchResources(userEmail: string, filters: ResourceSearchFilters = {}): Promise<ResourceList> {

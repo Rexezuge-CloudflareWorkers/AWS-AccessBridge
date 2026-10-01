@@ -49,4 +49,5 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'DELETE:/user/admin/team/account': 'REMOVE_TEAM_ACCOUNT',
   'GET:/user/admin/team/accounts': 'LIST_TEAM_ACCOUNTS',
   'POST:/user/admin/maintenance/cleanup-orphaned': 'MAINTENANCE_CLEANUP_ORPHANED_DATA',
+  'GET:/user/admin/maintenance/task-runs': 'LIST_TASK_RUNS',
 };

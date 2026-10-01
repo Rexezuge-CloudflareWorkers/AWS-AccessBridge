@@ -2,10 +2,12 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { AccessKeys, Credential, CredentialCache, CredentialChain } from '@aws-access-bridge/shared/model';
-import { ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService } from '../aws/sts';
 import { ChainTestWalker, LeafCredentialsWalker } from './CredentialChainWalker';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { resolveCredentialKeys } from '../composition/encryptionKeys';
+import type { CredentialKeyProvider } from '../composition/encryptionKeys';
 
 type CredentialChainServiceEnv = ServiceEnv;
 
@@ -20,6 +22,14 @@ class CredentialChainService {
   constructor(
     private readonly env: CredentialChainServiceEnv,
     sts?: StsService,
+    /**
+     * The ordered encryption-key chains for both surfaces. Injected by the
+     * composition root from the *same* scope that constructed this service, so the
+     * keys are memoized once per request. A service must not look up a scope
+     * itself: it only holds `env`, which is not the request's identity, so it
+     * would build a second scope and defeat the memo.
+     */
+    private readonly encryptionKeys: CredentialKeyProvider = defaultKeyProvider(env),
   ) {
     this.sts = sts ?? new StsService();
   }
@@ -28,22 +38,24 @@ class CredentialChainService {
     return ConfigurationManager.credential.getTrustChainLimit(this.env);
   }
 
-  public async getMasterKey(): Promise<string> {
-    if (!this.env.AES_ENCRYPTION_KEY_SECRET) {
-      throw new InternalServerError('Credential encryption key is not configured for this environment.');
-    }
-    return this.env.AES_ENCRYPTION_KEY_SECRET.get();
+  /**
+  The ordered keys for each encrypted surface: own key first, legacy master key after.
+  */
+  private async resolveKeys(): Promise<{ credentials: readonly string[]; cache: readonly string[] }> {
+    return this.encryptionKeys();
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {
-    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getMasterKey(), this.getTrustChainLimit());
+    const { credentials } = await this.resolveKeys();
+    return new CredentialsDAO(this.env.AccessBridgeDB, credentials, this.getTrustChainLimit());
   }
 
   public async createCacheDAO(): Promise<CredentialsCacheDAO> {
     if (!this.env.AccessBridgeKV) {
       throw new InternalServerError('Credential cache is not configured for this environment.');
     }
-    return new CredentialsCacheDAO(this.env.AccessBridgeKV, await this.getMasterKey());
+    const { cache } = await this.resolveKeys();
+    return new CredentialsCacheDAO(this.env.AccessBridgeKV, cache);
   }
 
   public async getCredentialChain(principalArn: string): Promise<CredentialChain> {
@@ -114,9 +126,21 @@ class CredentialChainService {
     principalArn: string,
     sessionName = 'AccessBridge-ChainTest',
   ): Promise<{ success: boolean; chain: Array<{ arn: string; status: string }> }> {
+    if (!principalArn) {
+      throw new BadRequestError('Missing required field: principalArn.');
+    }
     const credentialChain: CredentialChain = await this.getCredentialChain(principalArn);
     return new ChainTestWalker(this.sts).walk(credentialChain, sessionName);
   }
+}
+
+/**
+ * Reads the two key chains straight from `env`, for a service constructed outside
+ * a request scope (tests, ops scripts). The composition root injects the memoized
+ * provider instead on the request path.
+ */
+function defaultKeyProvider(env: CredentialChainServiceEnv): CredentialKeyProvider {
+  return async () => resolveCredentialKeys(env);
 }
 
 export { CredentialChainService };

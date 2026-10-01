@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -152,8 +153,9 @@ class UpdateTeamMemberRoleRoute extends IAdminActivityAPIRoute<UpdateRoleRequest
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: UpdateRoleRequest, env: IAdminEnv): Promise<UpdateRoleResponse> {
-    await getRequestScope(env).get(Tokens.TeamService).updateMemberRole(request.teamId, request.userEmail, request.role);
+  protected async handleAdminRequest(request: UpdateRoleRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<UpdateRoleResponse> {
+    await getRequestScope(cxt).get(Tokens.TeamService).updateMemberRole(request.teamId, request.userEmail, request.role);
     return { success: true, message: 'Role updated.' };
   }
 }

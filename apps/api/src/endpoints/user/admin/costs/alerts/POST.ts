@@ -181,7 +181,7 @@ class CreateSpendAlertRoute extends IAdminActivityAPIRoute<CreateSpendAlertReque
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateSpendAlertResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const alert = await getRequestScope(env).get(Tokens.CostService).createAlert(
+    const alert = await getRequestScope(cxt).get(Tokens.CostService).createAlert(
       request.awsAccountId,
       request.thresholdAmount,
       request.periodType || 'monthly',

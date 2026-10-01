@@ -39,7 +39,7 @@ describe('CredentialsCacheDAO', () => {
   }
 
   it('round-trips a credential with a distinct IV per field', async () => {
-    const dao = new CredentialsCacheDAO(kv, key);
+    const dao = new CredentialsCacheDAO(kv, [key]);
     const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + 3600;
     await dao.storeCachedCredential({ principalArn: PRINCIPAL_ARN, accessKeyId: 'AKIAIOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG', sessionToken: 'session-token', expiresAt });
 
@@ -59,7 +59,7 @@ describe('CredentialsCacheDAO', () => {
     // Backward-read compatibility for cache entries written before IVs were
     // split per field: one `salt` encrypted all three fields and the per-field
     // salt columns are absent entirely.
-    const dao = new CredentialsCacheDAO(kv, key);
+    const dao = new CredentialsCacheDAO(kv, [key]);
     const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + 3600;
     const sharedIv = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(12))));
     store.set(
@@ -83,7 +83,7 @@ describe('CredentialsCacheDAO', () => {
   it('accepts a credential with no session token', async () => {
     // An absent session token must not be mistaken for a corrupt entry — only
     // a present-but-unreadable field is corruption.
-    const dao = new CredentialsCacheDAO(kv, key);
+    const dao = new CredentialsCacheDAO(kv, [key]);
     const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + 3600;
     const accessKeyId = await encryptData('AKIA', key);
     const secretAccessKey = await encryptData('SECRET', key);
@@ -104,7 +104,7 @@ describe('CredentialsCacheDAO', () => {
   it('treats an undecryptable entry as a miss and evicts it', async () => {
     // A corrupt or key-rotated entry must not break the assume-role path; the
     // chain can always be re-resolved for the principal ARN.
-    const dao = new CredentialsCacheDAO(kv, key);
+    const dao = new CredentialsCacheDAO(kv, [key]);
     const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + 3600;
     const other = await generateAESGCMKey();
     const foreign = await encryptData('AKIAIOSFODNN7EXAMPLE', other);
@@ -126,7 +126,7 @@ describe('CredentialsCacheDAO', () => {
   });
 
   it('evicts an expired entry', async () => {
-    const dao = new CredentialsCacheDAO(kv, key);
+    const dao = new CredentialsCacheDAO(kv, [key]);
     await dao.storeCachedCredential({ principalArn: PRINCIPAL_ARN, accessKeyId: 'AKIA', secretAccessKey: 'SECRET', sessionToken: 'TOKEN', expiresAt: TimestampUtil.getCurrentUnixTimestampInSeconds() - 10 });
     await expect(dao.getCachedCredential(PRINCIPAL_ARN)).resolves.toBeUndefined();
     expect(store.has(cacheKey())).toBe(false);

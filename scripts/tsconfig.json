@@ -9,5 +9,11 @@
     "noUncheckedIndexedAccess": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  // `functions/` is a Cloudflare Pages entrypoint, so it needs the generated
+  // Workers types (`PagesFunction`, `Fetcher`) rather than Node's. It was
+  // previously outside every tsconfig, so it was neither typechecked nor held to
+  // the lint rules — and re-declared the forwarded-header constants it needed
+  // because it could not import them.
+  "include": ["**/*.ts"],
+  "exclude": ["../functions/**/*"]
 }

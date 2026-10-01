@@ -56,8 +56,12 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
   protected async readRunRequest(request: Request): Promise<CronTasksRunRequest> {
     try {
       return await request.json();
-    } catch (_err: unknown) {
-      console.debug(_err);
+    } catch (error: unknown) {
+      // `warn`, not `debug`: a malformed body means the *trigger* was wrong, which
+      // is exactly what someone needs to see in a production log tail. A debug
+      // line is invisible there, and the empty fallback still lets the run proceed
+      // with a synthesized cron expression — so the failure has to be visible.
+      console.warn('Cron trigger body was not valid JSON; falling back to defaults:', error instanceof Error ? error.message : error);
       return {};
     }
   }

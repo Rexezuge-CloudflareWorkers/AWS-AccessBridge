@@ -1,16 +1,45 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { inlineFaviconInto } from './inlineFavicon';
 
 const apiGeneratedDir = path.resolve(__dirname, '../../apps/api/src/generated');
 const apiSpaShellPath = path.resolve(apiGeneratedDir, 'spa-shell.ts');
+const publicDir = path.resolve(__dirname, 'public');
+
+/**
+ * Inline `public/favicon.svg` into the document as a `data:` URI.
+ *
+ * The Worker serves the SPA itself, so `href="/favicon.svg"` costs a request that
+ * the Worker must answer — either from the static-asset binding or, worse, by
+ * falling through the SPA catch-all and being served 845 bytes of HTML as an icon.
+ * A data URI makes the browser zero requests for it.
+ *
+ * The transform itself lives in `inlineFavicon.ts` so it can be unit-tested
+ * without a build; this wrapper only supplies the file.
+ */
+function faviconInlinePlugin(): Plugin {
+  const source: string = path.join(publicDir, 'favicon.svg');
+  return {
+    name: 'favicon-inline',
+    transformIndexHtml(html) {
+      if (!existsSync(source)) {
+        // Fail the build rather than ship an SPA with no icon. A missing asset is
+        // otherwise a 404 in the browser console, long after the deploy succeeded.
+        throw new Error(`favicon-inline: ${source} is missing; the SPA would ship without an icon.`);
+      }
+      return inlineFaviconInto(html, readFileSync(source, 'utf8'));
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    faviconInlinePlugin(),
     {
       name: 'spa-shell-embed',
       closeBundle() {

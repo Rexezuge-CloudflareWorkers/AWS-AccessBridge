@@ -38,7 +38,7 @@ describe('CredentialsDAO', () => {
 
   describe('getCredentialByPrincipalArn', () => {
     it('throws UnauthorizedError when credential not found', async () => {
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await expect(dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(UnauthorizedError);
     });
 
@@ -51,7 +51,7 @@ describe('CredentialsDAO', () => {
         encrypted_session_token: undefined,
         salt: undefined,
       });
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       const result = await dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/TestRole');
       expect(result.principalArn).toBe('arn:aws:iam::123456789012:role/TestRole');
       expect(result.assumedBy).toBe('arn:aws:iam::123456789012:user/TestUser');
@@ -63,7 +63,7 @@ describe('CredentialsDAO', () => {
   describe('storeCredential', () => {
     it('throws DatabaseError when insert fails', async () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'insert fail' } as unknown as D1Result);
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       // storeCredential calls encryptData which needs crypto.subtle - this test verifies error path
       // We need to mock the crypto calls or use real ones; since we're in Workers runtime, crypto.subtle exists
       await expect(dao.storeCredential('arn:aws:iam::123456789012:role/TestRole', 'AKID', 'SECRET')).rejects.toThrow(DatabaseError);
@@ -74,7 +74,7 @@ describe('CredentialsDAO', () => {
       // made the CTR keystream repeat, so XORing two ciphertexts leaked the XOR
       // of their plaintexts and the GCM auth subkey became recoverable.
       const key = await generateAESGCMKey();
-      const dao = new CredentialsDAO(mockDb, key, 3);
+      const dao = new CredentialsDAO(mockDb, [key], 3);
       await dao.storeCredential('arn:aws:iam::123456789012:role/TestRole', 'AKIAIOSFODNN7EXAMPLE', 'wJalrXUtnFEMI/K7MDENG', 'session-token');
 
       const [, ...bound] = vi.mocked(mockStmt.bind).mock.calls[0] as unknown as string[];
@@ -120,7 +120,7 @@ describe('CredentialsDAO', () => {
         salt: sharedIv,
       } as never);
 
-      const dao = new CredentialsDAO(mockDb, key, 3);
+      const dao = new CredentialsDAO(mockDb, [key], 3);
       const result = await dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Legacy');
       expect(result.accessKeyId).toBe('AKIAIOSFODNN7EXAMPLE');
       expect(result.secretAccessKey).toBe('wJalrXUtnFEMI/K7MDENG');
@@ -138,7 +138,7 @@ describe('CredentialsDAO', () => {
         salt_secret_access_key: correct.iv,
       } as never);
 
-      const dao = new CredentialsDAO(mockDb, key, 3);
+      const dao = new CredentialsDAO(mockDb, [key], 3);
       await expect(dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Upgraded')).resolves.toMatchObject({
         secretAccessKey: 'wJalrXUtnFEMI/K7MDENG',
       });
@@ -147,7 +147,7 @@ describe('CredentialsDAO', () => {
 
   describe('storeCredentialRelationship', () => {
     it('stores a principal-to-parent relationship', async () => {
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await dao.storeCredentialRelationship('arn:aws:iam::123456789012:role/Child', 'arn:aws:iam::123456789012:user/Parent');
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR REPLACE'));
       expect(mockStmt.bind).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/Child', 'arn:aws:iam::123456789012:user/Parent');
@@ -155,14 +155,14 @@ describe('CredentialsDAO', () => {
 
     it('throws DatabaseError on failure', async () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'fail' } as unknown as D1Result);
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await expect(dao.storeCredentialRelationship('arn1', 'arn2')).rejects.toThrow(DatabaseError);
     });
   });
 
   describe('removeCredential', () => {
     it('deletes a credential by principal ARN', async () => {
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await dao.removeCredential('arn:aws:iam::123456789012:role/TestRole');
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('DELETE'));
       expect(mockStmt.bind).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/TestRole');
@@ -170,14 +170,14 @@ describe('CredentialsDAO', () => {
 
     it('throws DatabaseError on failure', async () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'fail' } as unknown as D1Result);
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await expect(dao.removeCredential('arn')).rejects.toThrow(DatabaseError);
     });
   });
 
   describe('getCredentialChainByPrincipalArn', () => {
     it('throws UnauthorizedError when first credential not found', async () => {
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await expect(dao.getCredentialChainByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(UnauthorizedError);
     });
 
@@ -190,7 +190,7 @@ describe('CredentialsDAO', () => {
         encrypted_session_token: undefined,
         salt: undefined,
       });
-      const dao = new CredentialsDAO(mockDb, masterKey, 3);
+      const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       // Chain with only 1 credential (the user itself, no assumed_by, no keys) -> InternalServerError
       await expect(dao.getCredentialChainByPrincipalArn('arn:aws:iam::123456789012:user/User')).rejects.toThrow(InternalServerError);
     });

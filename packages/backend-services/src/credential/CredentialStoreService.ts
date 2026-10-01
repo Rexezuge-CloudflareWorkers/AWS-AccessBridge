@@ -2,12 +2,25 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { StsService, type CallerIdentity } from '../aws/sts';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { resolveCredentialKeys } from '../composition/encryptionKeys';
 
-const PRINCIPAL_ARN_PATTERN = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
+/**
+ * The canonical principal-ARN matcher, not a local copy. The non-capturing group
+ * in the previous local definition was cosmetically different from
+ * `shared/schema`'s capturing one, which is exactly how two definitions of one
+ * validation drift.
+ */
+const PRINCIPAL_ARN_PATTERN: RegExp = AWS_IAM_PRINCIPAL_ARN_PATTERN;
 
 type CredentialStoreServiceEnv = ServiceEnv;
+
+async function defaultCredentialKeyProvider(env: CredentialStoreServiceEnv): Promise<readonly string[]> {
+  const keys = await resolveCredentialKeys(env);
+  return keys.credentials;
+}
 
 /**
  * Store/relationship CRUD + STS validation slice of the previous
@@ -19,20 +32,26 @@ class CredentialStoreService {
   constructor(
     private readonly env: CredentialStoreServiceEnv,
     sts?: StsService,
+    /**
+     * The ordered key chain for the `credentials` table, injected by the
+     * composition root from the same scope that constructed this service. See
+     * `CredentialChainService`'s equivalent for why it is injected.
+     */
+    private readonly credentialKeys: () => Promise<readonly string[]> = (): Promise<readonly string[]> => defaultCredentialKeyProvider(env),
   ) {
     this.sts = sts ?? new StsService();
   }
 
-  public async getMasterKey(): Promise<string> {
-    if (!this.env.AES_ENCRYPTION_KEY_SECRET) {
-      throw new InternalServerError('Credential encryption key is not configured for this environment.');
-    }
-    return this.env.AES_ENCRYPTION_KEY_SECRET.get();
+  /**
+  The ordered keys for the `credentials` table: own key first, legacy master key after.
+  */
+  public async getEncryptionKeys(): Promise<readonly string[]> {
+    return this.credentialKeys();
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {
     const limit = ConfigurationManager.credential.getTrustChainLimit(this.env);
-    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getMasterKey(), limit);
+    return new CredentialsDAO(this.env.AccessBridgeDB, await this.getEncryptionKeys(), limit);
   }
 
   public async storeCredential(principalArn: string, accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<void> {

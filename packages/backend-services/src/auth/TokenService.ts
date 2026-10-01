@@ -5,7 +5,8 @@ import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-e
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
 import type { ServiceEnv } from '../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity/UserIdentityService';
+import { resolveOwner } from '../identity/resolveOwner';
 
 type TokenServiceEnv = ServiceEnv;
 
@@ -63,14 +64,12 @@ class TokenService {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
     const maxExpiryInDays: number = ConfigurationManager.token.getMaxExpiryDays(this.env);
-    const account = await this.identity.resolveAccount(userEmail);
+    const owner = await resolveOwner(this.identity, userEmail);
     // Quota applies to usable tokens only: expired rows are never cleaned up in
     // the background, so counting them would lock a user out permanently.
-    const accountId: string | null = idOf(account);
-    const activeTokenCount: number =
-      accountId && account
-        ? await dao.countActiveByUserId(accountId, account.anchorEmail)
-        : await dao.countActiveByUserEmail(userEmail);
+    const activeTokenCount: number = owner.userId
+      ? await dao.countActiveByUserId(owner.userId, owner.anchorEmail)
+      : await dao.countActiveByUserEmail(userEmail);
     if (activeTokenCount >= maxTokens) {
       throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
     }
@@ -83,7 +82,7 @@ class TokenService {
     const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), effectiveExpiryInDays);
     // The anchor goes in the `user_email` column because the foreign key on
     // that column is the one thing the schema cannot repoint.
-    await dao.create(tokenId, account?.anchorEmail ?? userEmail, token, name, expiresAt, accountId);
+    await dao.create(tokenId, owner.anchorEmail, token, name, expiresAt, owner.userId);
     return { tokenId, token, name, expiresAt };
   }
 
@@ -98,8 +97,8 @@ class TokenService {
 
   public async deleteToken(tokenId: string, userEmail: string): Promise<void> {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    await dao.delete(tokenId, account?.anchorEmail ?? userEmail, idOf(account));
+    const owner = await resolveOwner(this.identity, userEmail);
+    await dao.delete(tokenId, owner.anchorEmail, owner.userId);
   }
 }
 export { TokenService };

@@ -170,7 +170,7 @@ class TestCredentialChainRoute extends IAdminActivityAPIRoute<
     env: TestCredentialChainEnv,
     _cxt: ActivityContext<TestCredentialChainEnv>,
   ): Promise<TestCredentialChainResponse> {
-    const { success, chain } = await getRequestScope(env).get(Tokens.CredentialService).testChain(request.principalArn);
+    const { success, chain } = await getRequestScope(_cxt).get(Tokens.CredentialChainService).testChain(request.principalArn);
     return { success, chain };
   }
 }

@@ -211,7 +211,7 @@ class StoreCredentialRelationshipRoute extends IAdminActivityAPIRoute<
     env: StoreCredentialRelationshipEnv,
     _cxt: ActivityContext<StoreCredentialRelationshipEnv>,
   ): Promise<StoreCredentialRelationshipResponse> {
-    await getRequestScope(env).get(Tokens.CredentialService).storeCredentialRelationship(request.principalArn, request.assumedBy);
+    await getRequestScope(_cxt).get(Tokens.CredentialStoreService).storeCredentialRelationship(request.principalArn, request.assumedBy);
 
     return {
       success: true,

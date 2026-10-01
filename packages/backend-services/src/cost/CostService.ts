@@ -5,7 +5,8 @@ import type { CostData, SpendAlert } from '@aws-access-bridge/shared/model';
 import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import type { ServiceEnv } from '../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity/UserIdentityService';
+import { resolveOwner } from '../identity/resolveOwner';
 
 type CostServiceEnv = ServiceEnv;
 
@@ -52,14 +53,9 @@ class CostService {
     this.identity = identity ?? new UserIdentityService(env);
   }
 
-  /**
-   * The id-keyed read target for `assumable_roles`. An unresolvable address
-   * still yields an owner with a null id, so an unknown actor reads as "no
-   * accounts" instead of erroring.
-   */
-  private async ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
-    const account = await this.identity.resolveAccount(userEmail);
-    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
+
+  private ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
+    return resolveOwner(this.identity, userEmail);
   }
 
   public async getSummary(userEmail: string, lookbackDays: number = 30): Promise<CostSummary> {

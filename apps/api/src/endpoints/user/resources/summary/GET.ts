@@ -102,7 +102,7 @@ class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryReques
     cxt: ActivityContext<IEnv>,
   ): Promise<GetResourceSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return getRequestScope(env).get(Tokens.ResourceService).getSummary(userEmail);
+    return getRequestScope(cxt).get(Tokens.ResourceService).getSummary(userEmail);
   }
 }
 

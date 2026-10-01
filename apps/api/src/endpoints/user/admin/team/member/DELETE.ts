@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -143,8 +144,9 @@ class RemoveTeamMemberRoute extends IAdminActivityAPIRoute<RemoveTeamMemberReque
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: RemoveTeamMemberRequest, env: IAdminEnv): Promise<RemoveTeamMemberResponse> {
-    await getRequestScope(env).get(Tokens.TeamService).removeMember(request.teamId, request.userEmail);
+  protected async handleAdminRequest(request: RemoveTeamMemberRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<RemoveTeamMemberResponse> {
+    await getRequestScope(cxt).get(Tokens.TeamService).removeMember(request.teamId, request.userEmail);
     return { success: true, message: 'Member removed.' };
   }
 }

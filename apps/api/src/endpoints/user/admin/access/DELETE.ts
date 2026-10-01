@@ -235,7 +235,7 @@ class RevokeAccessRoute extends IAdminActivityAPIRoute<RevokeAccessRequest, Revo
     cxt: ActivityContext<RevokeAccessEnv>,
   ): Promise<RevokeAccessResponse> {
     const userEmail: string = request.userEmail || this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.AccessService).revokeAccess(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(cxt).get(Tokens.AccessService).revokeAccess(userEmail, request.awsAccountId, request.roleName);
     return {
       success: true,
       message: 'Access revoked successfully',

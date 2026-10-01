@@ -172,7 +172,7 @@ class StoreCredentialRoute extends IAdminActivityAPIRoute<StoreCredentialRequest
     env: StoreCredentialEnv,
     _cxt: ActivityContext<StoreCredentialEnv>,
   ): Promise<StoreCredentialResponse> {
-    await getRequestScope(env).get(Tokens.CredentialService).storeCredential(
+    await getRequestScope(_cxt).get(Tokens.CredentialStoreService).storeCredential(
       request.principalArn,
       request.accessKeyId,
       request.secretAccessKey,
