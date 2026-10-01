@@ -407,9 +407,9 @@ curl -I https://<your-worker-url>/
 # Are there any errors in the worker log tail?
 pnpm exec wrangler tail
 
-# Is the scheduled handler delegating to the cron Durable Object?
-# Requires a signed-in super-admin session (Cloudflare Access); it returns 404 otherwise.
-curl "https://<your-worker-url>/__scheduled?cron=*/10+*+*+*+*"
+# Is the cron Durable Object reachable? Locally, drive a scheduled event by hand:
+pnpm exec wrangler dev --test-scheduled
+curl "http://localhost:8787/__scheduled?cron=*%2F10+*+*+*+*"
 
 # Is the OpenAPI doc rendering?
 open https://<your-worker-url>/docs
@@ -421,7 +421,7 @@ open https://<your-worker-url>/docs
 - **Admin tab is missing** — you haven't been promoted to superadmin yet. See Step 7 of the manual guide.
 - **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync (note: the check only fires when the template declares `$minimumVersion`).
 - **`wrangler deploy` OOMs in CI** — the workflow hides stray `open-next.config.ts` / `next.config.ts` files before deploying so wrangler doesn't delegate to the OpenNext Next.js build (the repo currently ships neither file, so this is defensive).
-- **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45). You can force a cycle via `GET /__scheduled?cron=*/10+*+*+*+*` (super-admin only).
+- **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45), so a rotation takes up to that long to take effect. To force a cycle locally, run `pnpm exec wrangler dev --test-scheduled` and hit `/__scheduled`. There is no production trigger: the scheduled pipeline runs only from Cloudflare's `triggers.crons`.
 
 ---
 

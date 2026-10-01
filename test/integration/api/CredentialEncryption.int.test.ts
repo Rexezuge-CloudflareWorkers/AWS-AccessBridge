@@ -97,23 +97,16 @@ describe('Credential encryption against real D1', () => {
   });
 });
 
-describe('Manual scheduled trigger authorization', () => {
+describe('No manual scheduled trigger', () => {
   beforeAll(async () => {
     await applyMigrations(env.AccessBridgeDB);
   });
 
-  it('refuses an unauthenticated /__scheduled trigger', async () => {
-    // The trigger is handled ahead of the Hono app, so no route middleware runs
-    // for it. Without the explicit super-admin grant it must be unreachable, or
-    // anyone could drive the privileged cron pipeline.
-    const response: Response = await SELF.fetch('http://localhost/__scheduled', { method: 'POST' });
-    expect(response.status).toBe(404);
-  });
-
-  it('refuses /__scheduled for a non-super-admin identity', async () => {
-    // The integration env authenticates as DEV_AUTH_EMAIL, which is not a
-    // super-admin, so this exercises the second denial branch.
-    const response: Response = await SELF.fetch('http://localhost/__scheduled?cron=*/10+*+*+*+*', { method: 'POST' });
+  it.each(['', '?cron=*/10+*+*+*+*'])('404s /__scheduled%s from the deployed worker', async (query) => {
+    // The trigger used to be handled ahead of the Hono app behind its own
+    // super-admin gate. It no longer exists: the cron pipeline is reachable only
+    // from Cloudflare's `triggers.crons`, so the HTTP surface cannot drive it.
+    const response: Response = await SELF.fetch(`http://localhost/__scheduled${query}`, { method: 'POST' });
     expect(response.status).toBe(404);
   });
 });

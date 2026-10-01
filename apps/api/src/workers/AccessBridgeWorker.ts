@@ -55,11 +55,6 @@ import {
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
-import { isDemoModeEnv } from '@/endpoints/route-helpers';
-
-
-import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
-import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -235,37 +230,6 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
 
   protected async onRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return this.app.fetch(request, env, ctx);
-  }
-
-  /**
-   * `GET/POST /__scheduled` runs the privileged cron pipeline before any route
-   * middleware, so it is gated here on the same bar as `/user/admin/*`:
-   * Cloudflare Access identity plus super-admin. Denials are deliberately
-   * uniform so the endpoint cannot be used to probe for valid identities.
-   */
-  protected override async authorizeScheduledTrigger(request: Request, env: CloudflareEnv): Promise<Response | undefined> {
-    const denied: Response = new Response('Not Found', { status: 404 });
-    if (isDemoModeEnv(env)) {
-      return denied;
-    }
-    let userEmail: string;
-    try {
-      userEmail = await getRequestScope(env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(request, {});
-    } catch (error: unknown) {
-      console.warn('Rejected /__scheduled trigger: authentication failed:', error instanceof Error ? error.message : error);
-      return denied;
-    }
-    try {
-      if (!(await getRequestScope(env).get(Tokens.UserService).isSuperAdmin(userEmail))) {
-        console.warn(`Rejected /__scheduled trigger: ${userEmail} is not a super admin.`);
-        return denied;
-      }
-    } catch (error: unknown) {
-      console.error('Rejected /__scheduled trigger: super-admin lookup failed:', error);
-      return denied;
-    }
-    console.log(`🕐 Manual scheduled trigger accepted for ${userEmail}`);
-    return undefined;
   }
 
   protected onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {

@@ -32,45 +32,38 @@ function createEnv(overrides: Partial<TestEnv> = {}): Env {
 }
 
 describe('AccessBridgeWorker', () => {
-  describe('manual scheduled trigger authorization', () => {
-    // /__scheduled runs the privileged cron pipeline (real AWS calls with
-    // stored credentials, D1 writes, retention pruning) before any route
-    // middleware, so it must never be reachable unauthenticated.
-    it('denies an unauthenticated trigger with 404 and never runs the pipeline', async () => {
-      const worker = new AccessBridgeWorker();
-      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
-
-      const response: Response = await worker.fetch(new Request('https://worker.example.com/__scheduled', { method: 'POST' }), createEnv(), createExecutionContext());
-
-      expect(response.status).toBe(404);
-      expect(scheduled).not.toHaveBeenCalled();
-    });
-
-    it('denies the trigger in demo mode', async () => {
+  describe('no manual scheduled trigger', () => {
+    /**
+     * `/__scheduled` used to run the privileged cron pipeline (real AWS calls with
+     * stored credentials, D1 writes, retention pruning) before any route
+     * middleware, behind its own bespoke auth gate. The pipeline is now reachable
+     * only from Cloudflare's `triggers.crons`, so the HTTP surface has no way into
+     * it at all — these assert the path is simply gone rather than gated.
+     */
+    it.each(['', '?cron=*%2F10+*+*+*+*'])('404s /__scheduled%s and never runs the pipeline', async (query) => {
       const worker = new AccessBridgeWorker();
       const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
 
       const response: Response = await worker.fetch(
-        new Request('https://worker.example.com/__scheduled', { method: 'POST' }),
-        createEnv({ DEMO_MODE: 'true' }),
-        createExecutionContext(),
-      );
-
-      expect(response.status).toBe(404);
-      expect(scheduled).not.toHaveBeenCalled();
-    });
-
-    it('denies a non-super-admin identity without revealing that it authenticated', async () => {
-      const worker = new AccessBridgeWorker();
-      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
-
-      const response: Response = await worker.fetch(
-        new Request('https://worker.example.com/__scheduled', { method: 'POST' }),
+        new Request(`https://worker.example.com/__scheduled${query}`, { method: 'POST' }),
         createEnv({ DEV_AUTH_EMAIL: 'regular@example.com' }),
         createExecutionContext(),
       );
 
-      // Same status/body as the unauthenticated case: no identity oracle.
+      expect(response.status).toBe(404);
+      expect(scheduled).not.toHaveBeenCalled();
+    });
+
+    it('404s the trigger even for a super-admin identity', async () => {
+      const worker = new AccessBridgeWorker();
+      const scheduled = vi.spyOn(worker as unknown as { scheduled: () => Promise<void> }, 'scheduled');
+
+      const response: Response = await worker.fetch(
+        new Request('https://worker.example.com/__scheduled', { method: 'POST' }),
+        createEnv({ DEV_AUTH_EMAIL: 'admin@example.com' }),
+        createExecutionContext(),
+      );
+
       expect(response.status).toBe(404);
       expect(scheduled).not.toHaveBeenCalled();
     });
