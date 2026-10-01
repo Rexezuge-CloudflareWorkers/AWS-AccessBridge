@@ -21,7 +21,7 @@ The run is split into four jobs so a broken destination never blocks the other:
 > [!IMPORTANT]
 >
 > - **Encryption is required, not optional.** `AccessBridgeDB` stores `user_access_tokens.access_token` in plaintext — bearer tokens for the `/api/*` routes are matched against that column directly — along with `user_metadata` email addresses, audit logs, and team membership. An unencrypted dump is a live credential leak, so the workflow refuses to run without `BACKUP_ENCRYPTION_KEY`. See [What a backup contains](#what-a-backup-contains).
-> - **Manual trigger required for the first run:** scheduled workflows only start after you run the workflow once from the Actions tab (GitHub → Actions → Backup D1 Database (S3/WebDAV) → Run workflow).
+> - **Manual trigger required for the first run:** scheduled workflows only start after you run the workflow once from the Actions tab (GitHub → Actions → Backup D1 Database → Run workflow).
 > - **Keep backups off this Cloudflare account.** The Worker, its D1 database, and the Secrets Store holding the IAM encryption key all live in one account. Storing backups in R2 in that _same_ account means a single suspension or ban takes down production and recovery alike. Use a different S3-compatible provider (AWS S3, Backblaze B2, MinIO) or a separate Cloudflare account.
 > - **If you configure no destination at all, every backup job skips silently.** That is the intended state for a repository that does not want off-site backups — not a failure.
 
@@ -84,6 +84,26 @@ Keep the bucket private. The workflow uploads with the `aws s3 cp` CLI, so bucke
 - **No plaintext ever leaves the job.** The unencrypted SQL is deleted before the artifact is stored, and only the `.enc` file is handed to the upload jobs.
 - **Automatic cleanup** past `BACKUP_RETENTION_DAYS` in each destination. The S3 prune only ever deletes `*.sql.gz` / `*.sql.gz.enc` inside the `aws-access-bridge/production/` prefix.
 - **Empty-database guard:** if `prepare-wrangler-config.ts` had to create the D1 database, the `database_id` is still the template placeholder and the run aborts rather than uploading an empty dump as a "backup".
+
+### Where the logic lives
+
+The workflow is only a job graph; each step delegates to a script in `scripts/backup/`, so the rules are testable without running Actions:
+
+| Script                           | Step                           | Notes                                                                         |
+| -------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| `evaluate-destination-config.ts` | Detect Configured Destinations | Decides which jobs run; holds the fail-closed encryption policy               |
+| `resolve-d1-target.ts`           | Resolve D1 Database            | Reads `wrangler.jsonc` with `jsonc-parser`; enforces the empty-database guard |
+| `encrypt-backup.ts`              | Compress And Encrypt Backup    | Refuses to run without `BACKUP_ENCRYPTION_KEY`; deletes the plaintext         |
+| `upload-s3.ts`                   | Upload To S3                   | Upload, then prune only `*.sql.gz[.enc]` in the backup prefix                 |
+| `upload-webdav.ts`               | Upload To WebDAV               | Configures the rclone remote, uploads, then prunes by age                     |
+
+Run one locally to see what it would do in CI, for example:
+
+```bash
+pnpm exec tsx scripts/backup/evaluate-destination-config.ts
+```
+
+The exported helpers (`evaluateConfig`, `resolveD1Target`, `shouldDeleteBackup`) are covered by `test/backup/`.
 
 ### Backup file location
 
