@@ -296,8 +296,8 @@ To enable it, add these repository secrets (`Settings → Secrets and variables 
 
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` — already present for deployment; nothing new.
 - `BACKUP_ENCRYPTION_KEY` — **required**. The D1 database stores API bearer tokens (`user_access_tokens.access_token`) and user addresses in plaintext, so the workflow refuses to run or upload anything unencrypted.
-- Destination credentials: `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` / `S3_REGION` (plus optional `S3_ENDPOINT` for R2, MinIO, B2) and/or `WEBDAV_URL` / `WEBDAV_USER` / `WEBDAV_PASSWORD`.
-- Optional: `BACKUP_RETENTION_DAYS` (default 30) and `WEBDAV_BASE_PATH` (default `aws-access-bridge`).
+- Destination credentials: `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` and/or `WEBDAV_URL` / `WEBDAV_USER` / `WEBDAV_PASSWORD`.
+- Optional: `S3_ENDPOINT` (required for R2, MinIO, B2), `S3_REGION` (defaults to `auto`; set only for providers that need a concrete region), `BACKUP_RETENTION_DAYS` (default 30), `WEBDAV_BASE_PATH` (default `aws-access-bridge`).
 
 Run it once from the Actions tab to enable the schedule. Store backups outside your Cloudflare account — the Worker, D1, and the Secrets Store holding your IAM encryption key all live in one account. Full setup, restore, and Time Travel instructions: **[Database Backup, Restore, and Time Travel](./docs/db-backup-recovery.md)**.
 
