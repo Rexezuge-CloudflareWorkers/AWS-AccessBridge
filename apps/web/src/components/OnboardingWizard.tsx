@@ -1,5 +1,6 @@
 'use client';
 
+import type { ShowMessage } from '../hooks/useToast';
 import { useOnboardingWizard } from '../hooks/useOnboardingWizard';
 import WizardProgress from './onboarding/WizardProgress';
 import AccountStep from './onboarding/AccountStep';
@@ -10,7 +11,7 @@ import UsersStep from './onboarding/UsersStep';
 import SummaryStep from './onboarding/SummaryStep';
 
 interface OnboardingWizardProps {
-  showMessage: (type: 'success' | 'error', text: string) => void;
+  showMessage: ShowMessage;
 }
 
 /**

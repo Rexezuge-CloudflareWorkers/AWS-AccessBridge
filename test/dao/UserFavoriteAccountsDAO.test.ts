@@ -89,7 +89,11 @@ describe('UserFavoriteAccountsDAO', () => {
     });
   });
 
-  describe('getFavoriteAccounts', () => {
+  // `getFavoriteAccounts` (the address-keyed read) was removed: `getByUserId` is
+  // the only reader, and an address-keyed read would not survive an address
+  // change anyway. The mapping tests live on `getByUserId`, which is the shape
+  // callers actually receive.
+  describe('getByUserId mapping', () => {
     it('returns favorite accounts with nicknames', async () => {
       vi.mocked(mockStmt.all).mockResolvedValue({
         results: [
@@ -98,24 +102,22 @@ describe('UserFavoriteAccountsDAO', () => {
         ],
       } as unknown as D1Result);
       const dao = new UserFavoriteAccountsDAO(mockDb);
-      const result = await dao.getFavoriteAccounts('user@test.com');
-      expect(result).toEqual([
+      await expect(dao.getByUserId('usr_abc', 'user@test.com')).resolves.toEqual([
         { awsAccountId: '111111111111', nickname: 'Dev' },
+        // A null nickname maps to `undefined`, so the UI can test presence.
         { awsAccountId: '222222222222', nickname: undefined },
       ]);
     });
 
-    it('returns empty array when no favorites', async () => {
+    it('returns an empty array when no favorites', async () => {
       const dao = new UserFavoriteAccountsDAO(mockDb);
-      const result = await dao.getFavoriteAccounts('user@test.com');
-      expect(result).toEqual([]);
+      await expect(dao.getByUserId('usr_abc', 'user@test.com')).resolves.toEqual([]);
     });
 
-    it('returns empty array when results is null', async () => {
+    it('returns an empty array when results is null', async () => {
       vi.mocked(mockStmt.all).mockResolvedValue(null as unknown as D1Result);
       const dao = new UserFavoriteAccountsDAO(mockDb);
-      const result = await dao.getFavoriteAccounts('user@test.com');
-      expect(result).toEqual([]);
+      await expect(dao.getByUserId('usr_abc', 'user@test.com')).resolves.toEqual([]);
     });
   });
 });

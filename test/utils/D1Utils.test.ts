@@ -74,13 +74,27 @@ describe('executeD1WithRetry', () => {
 });
 
 describe('createD1SessionEnv', () => {
-  it('binds sessions with default and explicit constraints', () => {
+  it('binds a first-unconstrained session by default', () => {
+    // Not `first-primary`: a route that writes through the session and then reads
+    // back needs the session to still be writable.
     const session = { fake: true };
     const db = { withSession: vi.fn().mockReturnValue(session) };
     const scoped = createD1SessionEnv({ AccessBridgeDB: db, other: 1 } as never);
     expect(scoped.AccessBridgeDB).toBe(session);
+    expect(db.withSession).toHaveBeenCalledWith('first-unconstrained');
+    // Every other binding is carried through.
+    expect((scoped as { other: number }).other).toBe(1);
+  });
+
+  it('honours an explicit constraint', () => {
+    const db = { withSession: vi.fn().mockReturnValue({ fake: true }) };
+    createD1SessionEnv({ AccessBridgeDB: db } as never, 'first-primary');
     expect(db.withSession).toHaveBeenCalledWith('first-primary');
-    createD1SessionEnv({ AccessBridgeDB: db } as never, 'first-unconstrained');
-    expect(db.withSession).toHaveBeenLastCalledWith('first-unconstrained');
+  });
+
+  it('passes env through when the binding has no withSession', () => {
+    // A test double or a legacy binding must degrade, not throw mid-request.
+    const env = { AccessBridgeDB: {}, other: 1 } as never;
+    expect(createD1SessionEnv(env)).toBe(env);
   });
 });

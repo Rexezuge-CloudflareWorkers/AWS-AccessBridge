@@ -54,8 +54,8 @@ function requireCredentialCacheKv(env: RequestScopeEnvShape): KVNamespace {
 // `getRequestScope(env)` so a request shares one set of instances.
 function createRequestScope(env: RequestScopeEnvShape): Container {
   const scope = new Container();
-  scope.bindValue(Tokens.Env, env);
-  scope.bindValue(Tokens.Db, env.AccessBridgeDB);
+  // `Tokens.Env`/`Tokens.Db` were removed: they were bound on every request and
+  // never `get()`, so each one cost a WeakMap entry to hold a value nobody read.
 
   const masterKey = memoize(() => {
     if (!env.AES_ENCRYPTION_KEY_SECRET) {

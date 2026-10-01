@@ -1,4 +1,3 @@
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { Token } from '@aws-access-bridge/backend-runtime/di';
 import type { ServiceEnv } from './ServiceEnv';
 import type { AccessService } from '../access/AccessService';
@@ -31,8 +30,6 @@ import type { UserService } from '../user/UserService';
 type RequestScopeEnvShape = ServiceEnv;
 
 const Tokens = {
-  Env: Symbol('Env') as Token<RequestScopeEnvShape>,
-  Db: Symbol('Db') as Token<D1Queryable>,
   MasterKey: Symbol('MasterKey') as Token<() => Promise<string>>,
   CollectorRegistry: Symbol('CollectorRegistry') as Token<InjectableCollectorRegistry>,
   CredentialService: Symbol('CredentialService') as Token<CredentialService>,

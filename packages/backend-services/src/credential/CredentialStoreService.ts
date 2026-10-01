@@ -1,11 +1,18 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
+import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { StsService, type CallerIdentity } from '../aws/sts';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
-const PRINCIPAL_ARN_PATTERN = /^arn:aws:iam::\d{12}:(?:role|user)\/.+$/;
+/**
+ * The canonical principal-ARN matcher, not a local copy. The non-capturing group
+ * in the previous local definition was cosmetically different from
+ * `shared/schema`'s capturing one, which is exactly how two definitions of one
+ * validation drift.
+ */
+const PRINCIPAL_ARN_PATTERN: RegExp = AWS_IAM_PRINCIPAL_ARN_PATTERN;
 
 type CredentialStoreServiceEnv = ServiceEnv;
 

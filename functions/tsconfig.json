@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // No `types: ["node"]`: this is a Cloudflare Pages Function, so it needs the
+    // generated Workers types (`PagesFunction`, `Fetcher`, `Headers`), which
+    // `worker-configuration.d.ts` supplies at the repo root.
+    "types": [],
+    // The Pages runtime is ES2022-compatible; the repo default already matches.
+    "lib": ["ES2022", "DOM"]
+  },
+  // `worker-configuration.d.ts` at the repo root is the generated binding source
+  // of truth and is where `PagesFunction` and `Fetcher` come from — the same file
+  // `apps/api/src/types.d.ts` references.
+  "include": ["**/*.ts", "../worker-configuration.d.ts"]
+}

@@ -8,7 +8,8 @@ import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
 import { CredentialService } from '../../credential';
 import type { ServiceEnv } from '../../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../../identity/UserIdentityService';
+import { UserIdentityService } from '../../identity/UserIdentityService';
+import { resolveOwner } from '../../identity/resolveOwner';
 
 interface AssumeRoleServiceEnv extends ServiceEnv {
   // Narrowed from optional: chain walking needs the cache binding.
@@ -40,12 +41,8 @@ class AssumeRoleService {
     const roleName: string = ArnUtil.getRoleNameFromArn(principalArn);
 
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    await assumableRolesDAO.verifyUserHasAccessToRole(
-      { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail },
-      accountId,
-      roleName,
-    );
+    const owner = await resolveOwner(this.identity, userEmail);
+    await assumableRolesDAO.verifyUserHasAccessToRole(owner, accountId, roleName);
     const roleConfigsDAO: RoleConfigsDAO = new RoleConfigsDAO(this.env.AccessBridgeDB);
     const roleConfig: RoleConfig | undefined = await roleConfigsDAO.getRoleConfig(accountId, roleName);
 
@@ -55,7 +52,7 @@ class AssumeRoleService {
     // The anchor, not the presented address: the account row is keyed on the
     // anchor, and reading the current address here would return a session name
     // for a row that does not exist and change the STS RoleSessionName.
-    const sessionName: string = await userMetadataDAO.getOrCreateFederationUsername(account?.anchorEmail ?? userEmail);
+    const sessionName: string = await userMetadataDAO.getOrCreateFederationUsername(owner.anchorEmail);
 
     const cacheDAO = await this.credentials.createCacheDAO();
     const { startIndex, credentials } = await this.findClosestCachedCredential(cacheDAO, credentialChain);

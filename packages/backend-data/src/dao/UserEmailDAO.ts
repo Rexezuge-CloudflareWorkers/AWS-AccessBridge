@@ -23,7 +23,7 @@ class UserEmailDAO extends BaseDAO {
    *
    * An existing verified row is left alone: the address already belongs to
    * someone, and silently re-pointing it would hand one account's identity to
-   * another. Callers check `resolveVerified` first and reject on a hit.
+   * another. The `'already-claimed'` return is the check — callers reject on it.
    * An unverified (revoked) row is re-pointed, which releases the address.
    */
   public async register(input: { email: string; userId: string; isVerified: boolean; now: number }): Promise<'claimed' | 'already-claimed'> {
@@ -52,16 +52,6 @@ class UserEmailDAO extends BaseDAO {
    */
   public async get(email: string): Promise<UserEmailRow | null> {
     return this.database.prepare('SELECT * FROM user_emails WHERE email = ? LIMIT 1').bind(email).first<UserEmailRow>();
-  }
-
-  /**
-   * Login resolution: only a verified address identifies an account.
-   */
-  public async resolveVerified(email: string): Promise<UserEmailRow | null> {
-    return this.database
-      .prepare('SELECT * FROM user_emails WHERE email = ? AND is_verified = 1 LIMIT 1')
-      .bind(email.toLowerCase())
-      .first<UserEmailRow>();
   }
 
   public async listByUserId(userId: string): Promise<UserEmailRow[]> {

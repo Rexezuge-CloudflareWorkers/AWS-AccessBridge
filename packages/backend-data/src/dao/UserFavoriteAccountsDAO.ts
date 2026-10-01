@@ -36,16 +36,6 @@ class UserFavoriteAccountsDAO extends BaseDAO {
     }
   }
 
-  public async getFavoriteAccounts(userEmail: string): Promise<Array<{ awsAccountId: string; nickname?: string }>> {
-    return this.runListQuery(
-      `SELECT ufa.aws_account_id, aa.aws_account_nickname
-       FROM user_favorite_accounts ufa
-       LEFT JOIN aws_accounts aa ON ufa.aws_account_id = aa.aws_account_id
-       WHERE ufa.user_email = ?`,
-      [userEmail],
-    );
-  }
-
   /**
    * Favourites for an account id.
    *

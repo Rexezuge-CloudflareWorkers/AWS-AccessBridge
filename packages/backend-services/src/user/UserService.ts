@@ -4,7 +4,8 @@ import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
 import { LocaleUtil } from '@aws-access-bridge/shared/utils';
 import type { ServiceEnv } from '../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity/UserIdentityService';
+import { resolveOwner } from '../identity/resolveOwner';
 
 type UserServiceEnv = ServiceEnv;
 
@@ -40,6 +41,10 @@ class UserService {
     this.identity = identity ?? new UserIdentityService(env);
   }
 
+  private ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
+    return resolveOwner(this.identity, userEmail);
+  }
+
   public async getCurrentUser(userEmail: string): Promise<CurrentUser> {
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
 
@@ -47,7 +52,8 @@ class UserService {
     // Provision against the anchor, not the presented address: the account row
     // is keyed on the frozen anchor, and writing the current address here would
     // fork a second account the moment the two differ.
-    const provisioningKey: string = account?.anchorEmail ?? userEmail;
+    const owner = await this.ownerFor(userEmail);
+    const provisioningKey: string = owner.anchorEmail;
 
     const [, isSuperAdmin, storedLanguage]: [void, boolean, string | null] = await Promise.all([
       userMetadataDAO.ensureUserEmailExists(provisioningKey),
@@ -61,8 +67,8 @@ class UserService {
 
   public async updatePreferredLanguage(userEmail: string, preferredLanguage: string | null): Promise<string | null> {
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    const provisioningKey: string = account?.anchorEmail ?? userEmail;
+    const owner = await this.ownerFor(userEmail);
+    const provisioningKey: string = owner.anchorEmail;
     await userMetadataDAO.ensureUserEmailExists(provisioningKey);
     const trimmed = preferredLanguage?.trim() || null;
     const normalized: string | null = trimmed ? LocaleUtil.normalize(trimmed) : null;
@@ -72,23 +78,23 @@ class UserService {
 
   public async isSuperAdmin(userEmail: string): Promise<boolean> {
     const userMetadataDAO: UserMetadataDAO = new UserMetadataDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    return userMetadataDAO.isSuperAdmin(account?.anchorEmail ?? userEmail);
+    const owner = await this.ownerFor(userEmail);
+    return userMetadataDAO.isSuperAdmin(owner.anchorEmail);
   }
 
   public async favoriteAccount(userEmail: string, awsAccountId: string): Promise<void> {
     const favoritesDAO: UserFavoriteAccountsDAO = new UserFavoriteAccountsDAO(this.env.AccessBridgeDB);
     const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
+    const owner = await this.ownerFor(userEmail);
 
     await accountsDAO.ensureAccountExists(awsAccountId);
-    await favoritesDAO.favoriteAccount(account?.anchorEmail ?? userEmail, awsAccountId, idOf(account));
+    await favoritesDAO.favoriteAccount(owner.anchorEmail, awsAccountId, owner.userId);
   }
 
   public async unfavoriteAccount(userEmail: string, awsAccountId: string): Promise<void> {
     const favoritesDAO: UserFavoriteAccountsDAO = new UserFavoriteAccountsDAO(this.env.AccessBridgeDB);
-    const account = await this.identity.resolveAccount(userEmail);
-    await favoritesDAO.unfavoriteAccount(account?.anchorEmail ?? userEmail, awsAccountId, idOf(account));
+    const owner = await this.ownerFor(userEmail);
+    await favoritesDAO.unfavoriteAccount(owner.anchorEmail, awsAccountId, owner.userId);
   }
 
   public async hideRole(userEmail: string, awsAccountId: string, roleName: string): Promise<void> {
@@ -122,17 +128,6 @@ class UserService {
     return assumableRolesDAO.searchAccountsByQuery(owner, query.trim(), showHidden);
   }
 
-  /**
-   * The id-keyed read target for `assumable_roles`.
-   *
-   * An unresolvable address still yields an owner — with a null id — so an
-   * unknown actor reads as "no rows" rather than erroring, which is how a deleted
-   * or pre-0032 account keeps rendering as itself.
-   */
-  private async ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
-    const account = await this.identity.resolveAccount(userEmail);
-    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
-  }
 }
 export { UserService };
 export type { AssumableListOptions, CurrentUser, UserServiceEnv };

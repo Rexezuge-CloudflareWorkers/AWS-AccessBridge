@@ -4,7 +4,8 @@ import type { TeamMemberOwner } from '@aws-access-bridge/backend-data/dao';
 import type { Team, TeamMember } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
-import { UserIdentityService, idOf } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity/UserIdentityService';
+import { resolveOwner } from '../identity/resolveOwner';
 
 const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -18,6 +19,10 @@ class TeamService {
     identity?: UserIdentityService,
   ) {
     this.identity = identity ?? new UserIdentityService(env);
+  }
+
+  private ownerFor(userEmail: string): Promise<TeamMemberOwner> {
+    return resolveOwner(this.identity, userEmail);
   }
 
   public async createTeam(teamName: string, createdBy: string): Promise<Team> {
@@ -64,18 +69,6 @@ class TeamService {
     await new TeamMembersDAO(this.env.AccessBridgeDB).updateMemberRole(teamId, owner, role);
   }
 
-  /**
-   * The id-keyed read/write target for `team_members`.
-   *
-   * An unresolvable address still yields an owner with a null id, so a membership
-   * operation against an unknown actor matches only the legacy rows that
-   * pre-0032 could not attribute — it cannot silently retarget someone else's
-   * membership.
-   */
-  private async ownerFor(userEmail: string): Promise<TeamMemberOwner> {
-    const account = await this.identity.resolveAccount(userEmail);
-    return { userId: idOf(account), anchorEmail: account?.anchorEmail ?? userEmail };
-  }
 
   public async addAccount(teamId: string, awsAccountId: string): Promise<void> {
     if (!teamId || !awsAccountId) throw new BadRequestError('Missing required fields.');

@@ -1,5 +1,5 @@
 import { BaseUrlUtil } from '@aws-access-bridge/backend-services/aws';
-import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED } from '@aws-access-bridge/backend-data/constants/d1';
+import { createD1SessionEnv } from '@aws-access-bridge/backend-data/utils';
 import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
 
 /**
@@ -8,11 +8,16 @@ import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
  * `IActivityAPIRoute` keeps `handle/toResponse/toErrorResponse`;
  * auth/session/env concerns live here.
  */
-function withUnconstrainedD1Session<TEnv>(env: TEnv): TEnv {
-  const db = (env as Record<string, { withSession?: (constraint: unknown) => unknown }>).AccessBridgeDB;
-  return db && typeof db.withSession === 'function'
-    ? ({ ...(env as object), AccessBridgeDB: db.withSession(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED) } as TEnv)
-    : env;
+
+/**
+ * Route reads through a first-replica session, for read-your-writes.
+ *
+ * Delegates to `createD1SessionEnv`, which was duplicated here inline. Takes a
+ * loose env shape because `IEnv.AccessBridgeDB` is already narrowed to
+ * `D1DatabaseSession` by the route base.
+ */
+function withUnconstrainedD1Session<TEnv extends { AccessBridgeDB: D1Database | D1DatabaseSession }>(env: TEnv): TEnv {
+  return createD1SessionEnv(env as unknown as { AccessBridgeDB: D1Database }) as unknown as TEnv;
 }
 
 function isDemoModeEnv(env: unknown): boolean {

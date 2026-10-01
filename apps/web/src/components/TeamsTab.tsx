@@ -1,5 +1,6 @@
 'use client';
 
+import type { ShowMessage } from '../hooks/useToast';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTeams } from '../hooks/useTeams';
@@ -15,7 +16,7 @@ const styles = {
 };
 
 interface TeamsTabProps {
-  showMessage: (type: 'success' | 'error', text: string) => void;
+  showMessage: ShowMessage;
 }
 
 /**
