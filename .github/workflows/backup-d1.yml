@@ -59,7 +59,10 @@ jobs:
             echo "⚠️ Encryption key: disabled (BACKUP_ENCRYPTION_KEY is not set)"
           fi
 
-          if [[ -n "$S3_ACCESS_KEY_ID" && -n "$S3_SECRET_ACCESS_KEY" && -n "$S3_BUCKET" && -n "$S3_REGION" ]]; then
+          # S3_REGION is deliberately not required: R2 and MinIO have no meaningful
+          # region (the S3 job defaults AWS_DEFAULT_REGION to `auto`). Requiring it
+          # would silently disable backups for anyone using such a provider.
+          if [[ -n "$S3_ACCESS_KEY_ID" && -n "$S3_SECRET_ACCESS_KEY" && -n "$S3_BUCKET" ]]; then
             S3_ENABLED=true
             echo "✅ S3 destination: enabled"
           else
@@ -231,7 +234,9 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
+      # `auto` is what R2 expects, and `aws` refuses to run with no region at all.
+      # Set S3_REGION only for providers that need a concrete value (B2, Wasabi, ...).
+      AWS_DEFAULT_REGION: ${{ secrets.S3_REGION || 'auto' }}
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
     steps:

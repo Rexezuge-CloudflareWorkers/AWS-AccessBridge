@@ -46,13 +46,13 @@ These already exist for Continuous Deployment; the same values work here.
 
 #### S3-compatible storage (optional)
 
-| Secret                 | Required     | Description                                                                        |
-| ---------------------- | ------------ | ---------------------------------------------------------------------------------- |
-| `S3_ACCESS_KEY_ID`     | yes (for S3) | S3 access key ID                                                                   |
-| `S3_SECRET_ACCESS_KEY` | yes (for S3) | S3 secret access key                                                               |
-| `S3_BUCKET`            | yes (for S3) | Bucket name                                                                        |
-| `S3_REGION`            | yes (for S3) | Region (e.g. `us-east-1`); use `auto` if unsure                                    |
-| `S3_ENDPOINT`          | no           | Custom endpoint URL. Required for S3-compatible services (MinIO, R2, Backblaze B2) |
+| Secret                 | Required     | Description                                                                                                                                  |
+| ---------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `S3_ACCESS_KEY_ID`     | yes (for S3) | S3 access key ID                                                                                                                             |
+| `S3_SECRET_ACCESS_KEY` | yes (for S3) | S3 secret access key                                                                                                                         |
+| `S3_BUCKET`            | yes (for S3) | Bucket name                                                                                                                                  |
+| `S3_REGION`            | no           | Defaults to `auto`, which is what R2 expects. Set it only for providers that need a concrete region (Backblaze B2: `us-west-000`, Wasabi, …) |
+| `S3_ENDPOINT`          | no           | Custom endpoint URL. Required for S3-compatible services (MinIO, R2, Backblaze B2)                                                           |
 
 Keep the bucket private. The workflow uploads with the `aws s3 cp` CLI, so bucket policy must allow `PutObject` and `DeleteObject` for the configured key.
 
