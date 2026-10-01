@@ -18,8 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Checks
+  # Typecheck and lint are separate jobs rather than one job running both, so a
+  # failure names the tool that broke and a retry re-runs only that half. They
+  # share nothing: `noEmit` everywhere, no project references, and ESLint builds
+  # its own TS program via `projectService`, so neither consumes the other's
+  # output.
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
 
     steps:
@@ -29,10 +34,27 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
 
-      - name: Run Type Check and Lint
+      - name: Run Typecheck
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm run typecheck && pnpm run lint
+          command: pnpm run typecheck
+          max_attempts: '2'
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      - name: Run Lint
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run lint
           max_attempts: '2'
 
   migrations:
@@ -46,11 +68,11 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
 
-      # Its own job rather than a step in `checks`, so a failure names migrations
-      # instead of arriving inside a typecheck or lint log. Editing an
-      # already-applied migration is invisible to every other check: the deploy
-      # succeeds, fresh databases pick up the edited statements, and production
-      # keeps the schema it had.
+      # Its own job rather than a step in `typecheck` or `lint`, so a failure
+      # names migrations instead of arriving inside a typecheck or lint log.
+      # Editing an already-applied migration is invisible to every other check:
+      # the deploy succeeds, fresh databases pick up the edited statements, and
+      # production keeps the schema it had.
       - name: Verify Migration Lock
         uses: ./.github/actions/retry-step
         with:
@@ -120,8 +142,11 @@ jobs:
           command: pnpm run test:integration
           max_attempts: '2'
 
-  build:
-    name: Build
+  # Only the SPA build. The API worker is typechecked by the `typecheck` job
+  # (`pnpm -r typecheck` reaches `apps/api`), so repeating it here ran the same
+  # `tsc --noEmit` against the same tsconfig a second time.
+  build-web:
+    name: Build Web App
     runs-on: ubuntu-latest
 
     steps:
@@ -134,19 +159,17 @@ jobs:
       - name: Build Web App
         run: pnpm --filter @aws-access-bridge/web build
 
-      - name: Type Check API Worker
-        run: pnpm --filter @aws-access-bridge/api typecheck
-
   dependabot-auto-merge:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.state == 'open' && !github.event.repository.fork }}
     name: Auto-Merge Dependabot PR
     needs:
-      - checks
+      - typecheck
+      - lint
       - migrations
       - locales
       - unit-tests
       - integration-tests
-      - build
+      - build-web
     permissions:
       contents: write
       pull-requests: write
@@ -169,12 +192,13 @@ jobs:
     if: ${{ github.event_name == 'repository_dispatch' && github.event.action == 'Upstream Sync' }}
     name: Dispatch Upstream Sync Deployment
     needs:
-      - checks
+      - typecheck
+      - lint
       - migrations
       - locales
       - unit-tests
       - integration-tests
-      - build
+      - build-web
     permissions:
       contents: write
     runs-on: ubuntu-latest

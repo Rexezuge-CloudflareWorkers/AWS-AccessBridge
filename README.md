@@ -442,16 +442,16 @@ pnpm exec wrangler dev --config ./wrangler.jsonc   # Local Cloudflare Workers ru
 
 Useful scripts (see root `package.json` and `apps/web/package.json`):
 
-| Command                                          | What it does                                                 |
-| ------------------------------------------------ | ------------------------------------------------------------ |
-| `pnpm run checks`                                | Typecheck all workspaces + lint + unit + integration         |
-| `pnpm -r typecheck`                              | Type-check every workspace                                   |
-| `pnpm run lint`                                  | ESLint autofix (`--fix --quiet`)                             |
-| `pnpm run prettier`                              | Prettier format                                              |
-| `pnpm run test` / `pnpm run test:coverage`       | Run the vitest suite, optionally with coverage               |
-| `pnpm run test:integration`                      | Run the Workers integration suite                            |
-| `pnpm --filter @aws-access-bridge/web run build` | Build the SPA with Vite (also embeds it into the API worker) |
-| `pnpm run typegen`                               | Regenerate `worker-configuration.d.ts` from the API template |
+| Command                                          | What it does                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------- |
+| `pnpm run checks`                                | Typecheck all workspaces + lint + migrations + locales + unit + integration |
+| `pnpm -r typecheck`                              | Type-check every workspace                                                  |
+| `pnpm run lint`                                  | ESLint autofix (`--fix --quiet`)                                            |
+| `pnpm run prettier`                              | Prettier format                                                             |
+| `pnpm run test` / `pnpm run test:coverage`       | Run the vitest suite, optionally with coverage                              |
+| `pnpm run test:integration`                      | Run the Workers integration suite                                           |
+| `pnpm --filter @aws-access-bridge/web run build` | Build the SPA with Vite (also embeds it into the API worker)                |
+| `pnpm run typegen`                               | Regenerate `worker-configuration.d.ts` from the API template                |
 
 ---
 
