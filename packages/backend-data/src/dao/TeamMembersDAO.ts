@@ -1,6 +1,8 @@
+import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { TeamMember, TeamMemberInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
+import { ownerClause } from './AssumableRolesQueries';
 
 /**
  * Who a user-keyed `team_members` statement is about.
@@ -17,15 +19,11 @@ interface TeamMemberOwner {
 class TeamMembersDAO extends BaseDAO {
   /**
    * The owner predicate, shared by every statement so the id-keyed and
-   * address-keyed paths cannot drift.
-   *
-   * The `user_id IS NULL` guard is load-bearing: without it, an address one
-   * account has moved away from — but which still sits in that account's legacy
-   * `user_email` column — would also match a *different* account's row that the
-   * backfill did attribute.
+   * address-keyed paths cannot drift. Delegates to `AssumableRolesQueries`
+   * so this security-critical SQL has exactly one definition in the codebase.
    */
   private static ownerClause(alias: string): string {
-    return `(${alias}.user_id = ? OR (${alias}.user_id IS NULL AND ${alias}.user_email = ?))`;
+    return ownerClause(alias);
   }
 
   public async addMember(teamId: string, owner: TeamMemberOwner, role: string = 'member'): Promise<void> {
@@ -35,7 +33,7 @@ class TeamMembersDAO extends BaseDAO {
       .bind(teamId, owner.anchorEmail, owner.userId, role, joinedAt)
       .run();
     if (!result.success) {
-      throw new Error(`Failed to add team member: ${result.error}`);
+      throw new DatabaseError(`Failed to add team member: ${result.error}`);
     }
   }
 
@@ -45,7 +43,7 @@ class TeamMembersDAO extends BaseDAO {
       .bind(teamId, owner.userId, owner.anchorEmail)
       .run();
     if (!result.success) {
-      throw new Error(`Failed to remove team member: ${result.error}`);
+      throw new DatabaseError(`Failed to remove team member: ${result.error}`);
     }
   }
 
@@ -112,7 +110,7 @@ class TeamMembersDAO extends BaseDAO {
       .bind(newRole, teamId, owner.userId, owner.anchorEmail)
       .run();
     if (!result.success) {
-      throw new Error(`Failed to update team member role: ${result.error}`);
+      throw new DatabaseError(`Failed to update team member role: ${result.error}`);
     }
   }
 }

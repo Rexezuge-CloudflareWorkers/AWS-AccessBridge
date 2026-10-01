@@ -1,36 +1,44 @@
 import type { ResourceInventoryItem, ResourceInventoryItemInternal } from '@aws-access-bridge/shared/model';
+import { LIKEUtil } from '../utils/LIKEUtil';
 import { BaseDAO } from './BaseDAO';
+import { ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
 
 class ResourceInventoryDAO extends BaseDAO {
   public async upsertResource(item: ResourceInventoryItem): Promise<void> {
-    await this.database
-      .prepare(
-        'INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      )
-      .bind(
-        item.awsAccountId,
-        item.region,
-        item.resourceType,
-        item.resourceId,
-        item.resourceName,
-        item.state,
-        JSON.stringify(item.metadata),
-        item.collectedAt,
-      )
-      .run();
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          )
+          .bind(
+            item.awsAccountId,
+            item.region,
+            item.resourceType,
+            item.resourceId,
+            item.resourceName,
+            item.state,
+            JSON.stringify(item.metadata),
+            item.collectedAt,
+          )
+          .run(),
+      'upsert resource',
+    );
   }
 
   public async deleteStaleResources(awsAccountId: string, resourceType: string, olderThan: number): Promise<void> {
-    await this.database
-      .prepare('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?')
-      .bind(awsAccountId, resourceType, olderThan)
-      .run();
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?')
+          .bind(awsAccountId, resourceType, olderThan)
+          .run(),
+      'delete stale resources',
+    );
   }
 
   public async deleteOrphaned(): Promise<number> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM resource_inventory WHERE aws_account_id NOT IN (SELECT DISTINCT aws_account_id FROM assumable_roles)')
-      .run();
+    const result: D1Result = await this.deleteOrphanedRows('resource_inventory', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;
   }
 
@@ -52,8 +60,10 @@ class ResourceInventoryDAO extends BaseDAO {
       bindings.push(resourceType);
     }
     if (query) {
-      conditions.push('(resource_name LIKE ? OR resource_id LIKE ?)');
-      bindings.push(`%${query}%`, `%${query}%`);
+      // Escaped: an unescaped `%` in the search box would match every row.
+      conditions.push(`(resource_name LIKE ? ${LIKEUtil.escapeClause} OR resource_id LIKE ? ${LIKEUtil.escapeClause})`);
+      const pattern = LIKEUtil.contains(query);
+      bindings.push(pattern, pattern);
     }
 
     const whereClause: string = `WHERE ${conditions.join(' AND ')}`;

@@ -66,7 +66,9 @@ describe('UserFavoriteAccountsDAO', () => {
     it('restricts the address arm to unattributed rows when no id was resolved', async () => {
       const dao = new UserFavoriteAccountsDAO(mockDb);
       await dao.unfavoriteAccount('user@test.com', '123456789012', null);
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('user_id IS NULL AND user_email = ?'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+      expect.stringContaining('user_favorite_accounts.user_id IS NULL AND user_favorite_accounts.user_email = ?'),
+    );
     });
 
     it('throws DatabaseError on failure', async () => {

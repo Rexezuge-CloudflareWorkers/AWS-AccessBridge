@@ -4,6 +4,9 @@ import { isD1ErrorRetryable } from './D1ErrorClassifier';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 100;
 
+/**
+Backoff only; module-private, since nothing outside the retry loop needs it.
+*/
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve: (value: void) => void): unknown => setTimeout(resolve, ms));
 }
@@ -65,4 +68,4 @@ async function executeD1WithRetry(
   throw lastError ?? new DatabaseError(`Failed to ${context} after ${maxRetries + 1} attempts`);
 }
 
-export { assertD1Success, executeD1WithRetry, sleep };
+export { assertD1Success, executeD1WithRetry };

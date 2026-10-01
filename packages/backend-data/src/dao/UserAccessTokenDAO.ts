@@ -2,6 +2,7 @@ import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenInternal } from '@aws-access-bridge/shared/model';
 import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
 class UserAccessTokenDAO extends BaseDAO {
@@ -191,13 +192,14 @@ class UserAccessTokenDAO extends BaseDAO {
    * caller delete the token.
    */
   public async delete(tokenId: string, anchorEmail: string, userId: string | null = null): Promise<void> {
-    const ownerClause: string =
-      userId === null
-        ? 'token_id = ? AND user_id IS NULL AND user_email = ?'
-        : 'token_id = ? AND (user_id = ? OR (user_id IS NULL AND user_email = ?))';
+    // A null id narrows to the address arm on its own; a resolved id gets the
+    // shared `ownerClause`. Aliased to this table so the shared predicate — the
+    // `user_id IS NULL` guard this security control depends on — has a single
+    // definition without an empty alias leaking `.user_id` into the SQL.
+    const ownership: string = userId === null ? `user_access_tokens.user_id IS NULL AND user_access_tokens.user_email = ?` : ownerClause('user_access_tokens');
     const bindings: unknown[] = userId === null ? [tokenId, anchorEmail] : [tokenId, userId, anchorEmail];
     const result: D1Result = await this.database
-      .prepare(`DELETE FROM user_access_tokens WHERE ${ownerClause}`)
+      .prepare(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`)
       .bind(...bindings)
       .run();
     if (!result.success) {

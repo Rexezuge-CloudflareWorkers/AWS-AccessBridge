@@ -106,16 +106,33 @@ describe('UserMetadataDAO', () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await expect(dao.getOrCreateFederationUsername('user@example.com')).resolves.toBe('STORED');
-      // INSERT, not UPDATE: callers reaching this before any other metadata
-      // write have no row, and an UPDATE would match nothing — the generated
-      // name would be returned but never stored, so the STS RoleSessionName
-      // would change on every assume-role.
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO user_metadata'));
-      // Both SELECTs bind only the ARN; the INSERT binds (user_email, username).
-      const insertBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call as unknown[]).length === 2) as unknown as [string, string];
-      expect(insertBind[0]).toBe('user@example.com');
+      // The row is provisioned first: without it the UPDATE below would match
+      // nothing, so the generated name would be returned but never stored and the
+      // STS RoleSessionName would change on every assume-role.
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email)'));
+      // `COALESCE` so a concurrent writer's value is never overwritten.
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('SET federation_username = COALESCE(federation_username, ?)'));
+      const updateBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call as unknown[])[1] === 'user@example.com' && /^[0-9A-F]{32}$/.test(String((call as unknown[])[0]))) as unknown as [string, string];
       // The generated candidate is uppercase hex without dashes (32 chars).
-      expect(insertBind[1]).toMatch(/^[0-9A-F]{32}$/);
+      expect(updateBind[0]).toMatch(/^[0-9A-F]{32}$/);
+    });
+
+    it('provisions the identity columns before writing the federation username', async () => {
+      // Regression: the INSERT used to create the row itself, without `id` or
+      // `current_email`. A row created after 0032 is never backfilled again, so
+      // that left a permanently unresolvable account — and D1 does not enforce
+      // foreign keys by default, so an `assumable_roles` row can exist with no
+      // metadata row and this path becomes the first writer.
+      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'STORED' });
+      vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
+      const dao = new UserMetadataDAO(mockDb);
+      await dao.getOrCreateFederationUsername('new@example.com');
+
+      const order = vi.mocked(mockDb.prepare).mock.calls.map(([sql]) => String(sql));
+      const provisionIndex = order.findIndex((sql) => sql.includes('id, current_email'));
+      const updateIndex = order.findIndex((sql) => sql.includes('COALESCE(federation_username'));
+      expect(provisionIndex).toBeGreaterThanOrEqual(0);
+      expect(updateIndex).toBeGreaterThan(provisionIndex);
     });
 
     it('returns the stored username on a concurrent insert instead of the losing candidate', async () => {

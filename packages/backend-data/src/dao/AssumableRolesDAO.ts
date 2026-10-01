@@ -3,6 +3,7 @@ import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { mapRowsToAssumableMap } from './AssumableRolesMapper';
 import type { AssumableRoleRow } from './AssumableRolesMapper';
 import { buildListRolesQuery, buildSearchRolesQuery, hiddenFilterClause, ownerClause } from './AssumableRolesQueries';
+import { LIKEUtil } from '../utils/LIKEUtil';
 import { BaseDAO } from './BaseDAO';
 
 /**
@@ -227,7 +228,9 @@ class AssumableRolesDAO extends BaseDAO {
   ): Promise<AssumableAccountsMap> {
     const results: D1Result<AssumableRoleRow> = await this.database
       .prepare(buildSearchRolesQuery(showHidden))
-      .bind(owner.userId, owner.anchorEmail, owner.userId, owner.anchorEmail, `%${query}%`, `%${query}%`)
+      // LIKE metacharacters escaped: an unescaped `%` in the search box matched
+      // every role instead of searching for a literal `%`.
+      .bind(owner.userId, owner.anchorEmail, owner.userId, owner.anchorEmail, LIKEUtil.contains(query), LIKEUtil.contains(query))
       .all<AssumableRoleRow>();
     return results?.results ? mapRowsToAssumableMap(results.results) : {};
   }

@@ -7,10 +7,18 @@ class TeamsDAO extends BaseDAO {
   public async createTeam(teamName: string, createdBy: string): Promise<Team> {
     const teamId: string = UUIDUtil.getRandomUUID();
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    await this.database
-      .prepare('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)')
-      .bind(teamId, teamName, createdAt, createdBy)
-      .run();
+    // `teams.team_name` is UNIQUE, and D1 resolves a failed statement with
+    // `{success: false}` rather than throwing. Without this check a duplicate name
+    // returned 200 with a teamId that resolves to no row, and every later member
+    // or account write targeted a team that does not exist.
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)')
+          .bind(teamId, teamName, createdAt, createdBy)
+          .run(),
+      'create team',
+    );
     return { teamId, teamName, createdAt, createdBy };
   }
 
@@ -47,7 +55,7 @@ class TeamsDAO extends BaseDAO {
   }
 
   public async updateTeamName(teamId: string, newName: string): Promise<void> {
-    await this.database.prepare('UPDATE teams SET team_name = ? WHERE team_id = ?').bind(newName, teamId).run();
+    await this.withRetry(() => this.database.prepare('UPDATE teams SET team_name = ? WHERE team_id = ?').bind(newName, teamId).run(), 'rename team');
   }
 }
 
