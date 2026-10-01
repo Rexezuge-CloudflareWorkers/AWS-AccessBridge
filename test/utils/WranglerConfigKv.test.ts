@@ -1,6 +1,6 @@
 import { parse } from 'jsonc-parser';
 import { describe, expect, it } from 'vitest';
-import { ensureRequiredKvBindings, getRequiredKvBindings } from '../../scripts/prepare-wrangler-config';
+import { ensureRequiredKvBindings, getRequiredKvBindings } from '../../scripts/lib/wrangler-config/resources';
 
 const PLACEHOLDER_ID = '00000000000000000000000000000000';
 

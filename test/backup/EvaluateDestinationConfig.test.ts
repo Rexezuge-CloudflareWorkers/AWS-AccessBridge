@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateConfig } from '../../scripts/backup/evaluate-destination-config';
+import { evaluateConfig } from '../../scripts/backup/destination-config';
 
 const CLOUDFLARE = { CLOUDFLARE_API_TOKEN: 'cf-token', CLOUDFLARE_ACCOUNT_ID: 'account-id' } as const;
 const KEY = { BACKUP_ENCRYPTION_KEY: 'passphrase' } as const;

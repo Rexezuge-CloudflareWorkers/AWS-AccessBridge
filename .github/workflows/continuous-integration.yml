@@ -32,7 +32,7 @@ jobs:
       - name: Run Type Check and Lint
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm -r typecheck && pnpm run lint
+          command: pnpm run typecheck && pnpm run lint
           max_attempts: '2'
 
   unit-tests:

@@ -79,23 +79,25 @@ Keep the bucket private. The workflow uploads with the `aws s3 cp` CLI, so bucke
 
 - **Automatic daily backups** at 04:15 UTC, with a `check-secrets` preflight so misconfiguration fails fast with a named missing secret.
 - **Manual trigger** from the Actions tab — same code path, useful before a risky migration.
-- **Same database as the deploy.** The export job runs `scripts/prepare-wrangler-config.ts` exactly like Continuous Deployment, honoring `WRANGLER_JSONC`, `WRANGLER_PATCH_JSON`, and `WRANGLER_VARS_PATCH_JSON`. Whatever `AccessBridgeDB` resolves to at deploy time is what gets exported.
-- **Compression then encryption:** gzip, then AES-256-CBC (PBKDF2, 100k iterations, random salt).
+- **Same database as the deploy.** The export job runs `scripts/deploy/prepare-wrangler-config.ts` exactly like Continuous Deployment, honoring `WRANGLER_JSONC`, `WRANGLER_PATCH_JSON`, and `WRANGLER_VARS_PATCH_JSON`. Whatever `AccessBridgeDB` resolves to at deploy time is what gets exported.
+- **Compression then encryption:** xz (`-T0 -6`), then AES-256-CBC (PBKDF2, 100k iterations, random salt).
 - **No plaintext ever leaves the job.** The unencrypted SQL is deleted before the artifact is stored, and only the `.enc` file is handed to the upload jobs.
-- **Automatic cleanup** past `BACKUP_RETENTION_DAYS` in each destination. The S3 prune only ever deletes `*.sql.gz` / `*.sql.gz.enc` inside the `aws-access-bridge/production/` prefix.
+- **Automatic cleanup** past `BACKUP_RETENTION_DAYS` in each destination. The S3 prune only ever deletes `*.sql.xz` / `*.sql.xz.enc` (and the pre-xz `*.sql.gz[.enc]`) inside the `aws-access-bridge/production/` prefix.
 - **Empty-database guard:** if `prepare-wrangler-config.ts` had to create the D1 database, the `database_id` is still the template placeholder and the run aborts rather than uploading an empty dump as a "backup".
 
 ### Where the logic lives
 
-The workflow is only a job graph; each step delegates to a script in `scripts/backup/`, so the rules are testable without running Actions:
+The workflow is only a job graph; each step delegates to an entrypoint in `scripts/backup/`, so the rules are testable without running Actions:
 
-| Script                           | Step                           | Notes                                                                         |
-| -------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Entrypoint                      | Step                           | Notes                                                                         |
+| ------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
 | `evaluate-destination-config.ts` | Detect Configured Destinations | Decides which jobs run; holds the fail-closed encryption policy               |
 | `resolve-d1-target.ts`           | Resolve D1 Database            | Reads `wrangler.jsonc` with `jsonc-parser`; enforces the empty-database guard |
 | `encrypt-backup.ts`              | Compress And Encrypt Backup    | Refuses to run without `BACKUP_ENCRYPTION_KEY`; deletes the plaintext         |
-| `upload-s3.ts`                   | Upload To S3                   | Upload, then prune only `*.sql.gz[.enc]` in the backup prefix                 |
+| `upload-s3.ts`                   | Upload To S3                   | Upload, then prune only `*.sql.xz[.enc]` in the backup prefix                 |
 | `upload-webdav.ts`               | Upload To WebDAV               | Configures the rclone remote, uploads, then prunes by age                     |
+
+Each entrypoint carries a `#!` line and exports nothing; the guards it calls live in sibling modules without a shebang (`destination-config.ts`, `d1-target.ts`, `naming.ts`, `s3-prune.ts`, `webdav-target.ts`, `retention.ts`). See `scripts/README.md`.
 
 Run one locally to see what it would do in CI, for example:
 
@@ -109,10 +111,10 @@ The exported helpers (`evaluateConfig`, `resolveD1Target`, `shouldDeleteBackup`)
 
 ```
 # S3
-s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc
+s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc
 
 # WebDAV (WEBDAV_BASE_PATH defaults to aws-access-bridge)
-<WEBDAV_URL>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc
+<WEBDAV_URL>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc
 ```
 
 ### What a backup contains
@@ -127,7 +129,7 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 | `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                    |
 | `background_task_runs`                            | Cron phase history.                                                                                                                           |
 
-This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.gz` is a working set of API credentials.
+This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working set of API credentials.
 
 ### Decrypting a backup
 
@@ -135,12 +137,14 @@ This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useles
 export BACKUP_ENCRYPTION_KEY='your passphrase'
 
 openssl enc -aes-256-cbc -d -pbkdf2 -iter 100000 \
-  -in access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc \
-  -out backup.sql.gz \
+  -in access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc \
+  -out backup.sql.xz \
   -pass env:BACKUP_ENCRYPTION_KEY
 
-gunzip backup.sql.gz   # → backup.sql
+unxz backup.sql.xz   # → backup.sql
 ```
+
+Backups taken before the switch to xz end in `.sql.gz.enc`; decrypt those the same way and finish with `gunzip backup.sql.gz`.
 
 ### Restoring the database
 
@@ -148,7 +152,7 @@ There is no committed `wrangler.jsonc` in this repository, so materialize one fi
 
 ```bash
 pnpm install
-pnpm exec tsx scripts/prepare-wrangler-config.ts   # honors WRANGLER_JSONC / WRANGLER_PATCH_JSON if set
+pnpm exec tsx scripts/deploy/prepare-wrangler-config.ts   # honors WRANGLER_JSONC / WRANGLER_PATCH_JSON if set
 ```
 
 #### Option A — Time Travel (usually the right answer)
@@ -161,15 +165,15 @@ Fastest path, and it needs no download. See [D1 Time Travel](#d1-time-travel-poi
 
 ```bash
 # 1. Download the backup (custom endpoint for R2, MinIO, B2, …)
-aws s3 cp s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc ./
+aws s3 cp s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc ./
 # …or from WebDAV
-rclone copy webdav:aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc ./
+rclone copy webdav:aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc ./
 
 # 2. Decrypt and decompress
 export BACKUP_ENCRYPTION_KEY='your passphrase'
 openssl enc -aes-256-cbc -d -pbkdf2 -iter 100000 \
-  -in access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc -out backup.sql.gz -pass env:BACKUP_ENCRYPTION_KEY
-gunzip backup.sql.gz
+  -in access-bridge_prod_YYYY-MM-DD_HH-MM-SS.sql.xz.enc -out backup.sql.xz -pass env:BACKUP_ENCRYPTION_KEY
+unxz backup.sql.xz
 
 # 3. Create the replacement database and import into it
 pnpm exec wrangler d1 create aws-access-bridge-db-restored

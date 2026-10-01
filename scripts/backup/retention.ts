@@ -6,17 +6,23 @@
  * are worse than a failed run that names the problem.
  */
 
-import { fail } from './github-output';
+import { fail } from '../lib/github-actions';
 
-/** `YYYY-MM-DD`, `days` before `now`. */
+/**
+ * `YYYY-MM-DD`, `days` before `now`.
+ */
 export function retentionCutoff(now: Date, days: number): string {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/** Read `BACKUP_RETENTION_DAYS` from the environment, rejecting bad values. */
+/**
+ * Read `BACKUP_RETENTION_DAYS` from the environment, rejecting bad values.
+ */
 export function requireRetentionDays(): number {
   const raw = process.env.BACKUP_RETENTION_DAYS;
-  const days = Number.parseInt(raw ?? '', 10);
+  // Number() rather than parseInt(): parseInt('30d') yields 30, which would
+  // silently accept a mistyped value and prune against the wrong window.
+  const days = Number(raw);
   if (!Number.isFinite(days) || days <= 0) {
     fail(`BACKUP_RETENTION_DAYS must be a positive number, got ${JSON.stringify(raw)}.`);
   }

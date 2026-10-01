@@ -1,0 +1,6 @@
+{
+  "name": "@aws-access-bridge/scripts",
+  "private": true,
+  "type": "module",
+  "description": "Repo tooling. Not a workspace package; `type` is here so `node` loads these .ts files as ES modules."
+}

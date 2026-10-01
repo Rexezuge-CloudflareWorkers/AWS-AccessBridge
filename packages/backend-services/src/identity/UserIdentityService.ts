@@ -231,7 +231,7 @@ class UserIdentityService {
    *
    * No route exposes this yet. Proof of control for the new address (a confirm
    * step performed while authenticated as that address) has to land first;
-   * `scripts/change-email.ts` applies the same sequence out of band.
+   * `scripts/ops/change-email.ts` applies the same sequence out of band.
    */
   public async setPrimaryEmail(userId: string, newEmail: string): Promise<AccountIdentity> {
     const email: string = newEmail.trim();

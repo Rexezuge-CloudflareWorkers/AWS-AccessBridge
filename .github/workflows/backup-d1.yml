@@ -67,7 +67,7 @@ jobs:
       - name: Prepare Wrangler Configuration
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm exec tsx scripts/prepare-wrangler-config.ts
+          command: pnpm exec tsx scripts/deploy/prepare-wrangler-config.ts
           max_attempts: '3'
         env:
           WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
@@ -109,7 +109,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: d1-backup
-          path: access-bridge_prod_*.sql.gz.enc
+          path: access-bridge_prod_*.sql.xz.enc
           if-no-files-found: error
           retention-days: 1
 

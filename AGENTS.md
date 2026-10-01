@@ -8,7 +8,7 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 
 - **Core**: Cloudflare Zero Trust on `/user/*` (JWT `cf-access-jwt-assertion` verified against `POLICY_AUD`/`TEAM_DOMAIN`, with platform `ctx.access` fallback when vars are unset); programmatic access under `/api/*` via Bearer PATs or HMAC-signed internal self-calls; users assume AWS roles across accounts and mint temporary Console URLs. See `apps/api/AGENTS.md`.
 - **Credentials**: encrypted IAM credentials with multi-hop assumption chains (up to `PRINCIPAL_TRUST_CHAIN_LIMIT`), KV credential caching. See `docs/agents/features/credential-chains/AGENTS.md`.
-- **Identity**: the sign-in email is decoupled from the account key. `user_metadata.id` (`usr_<hex>`) is the stable identity; `user_email` is a frozen anchor that existing foreign keys still target; `user_emails` is the address registry; every user-keyed table carries `user_id`. Applied by `migrations/0032_user_identity.sql` (purely additive — see `packages/backend-data/AGENTS.md` for why the anchor is frozen) with `UserIdentityService` + `scripts/change-email.ts` for address changes.
+- **Identity**: the sign-in email is decoupled from the account key. `user_metadata.id` (`usr_<hex>`) is the stable identity; `user_email` is a frozen anchor that existing foreign keys still target; `user_emails` is the address registry; every user-keyed table carries `user_id`. Applied by `migrations/0032_user_identity.sql` (purely additive — see `packages/backend-data/AGENTS.md` for why the anchor is frozen) with `UserIdentityService` + `scripts/ops/change-email.ts` for address changes.
 - **Analytics**: Cost Explorer collection with spend alerts; EC2/S3/Lambda/RDS/DynamoDB inventory. See `docs/agents/features/cost-analytics/AGENTS.md` and `docs/agents/features/resource-inventory/AGENTS.md`.
 - **Teams**: multi-tenant team workspaces scoping AWS accounts. See `docs/agents/features/teams/AGENTS.md`.
 - **Assume-role flows**: browser + programmatic + federate fan-out. See `docs/agents/features/assume-role/AGENTS.md`.
@@ -35,16 +35,16 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 
 ## Commands
 
-Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
+Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration`. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
 
 ```bash
 pnpm install
-pnpm run checks   # shorthand for: pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
+pnpm run checks   # shorthand for: pnpm run typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
 pnpm --filter @aws-access-bridge/web run build   # only web has a build script
 pnpm --filter @aws-access-bridge/web run dev     # vite dev server
 pnpm run typegen   # after changing wrangler bindings (also runs via postinstall)
 # No committed wrangler.jsonc — materialize it first from apps/api/wrangler.template.jsonc
-# (scripts/prepare-wrangler-config.ts, also run by CI), then from the repo root:
+# (scripts/deploy/prepare-wrangler-config.ts, also run by CI), then from the repo root:
 pnpm exec wrangler dev --config ./wrangler.jsonc
 pnpm exec wrangler deploy --config ./wrangler.jsonc
 ```

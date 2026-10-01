@@ -51,13 +51,13 @@ resolved **anchor**, never the presented address.
 ## Changing an address
 
 Service method `UserIdentityService.setPrimaryEmail`, ops script
-`scripts/change-email.ts` (same claim → move → revoke sequence). Claiming before
+`scripts/ops/change-email.ts` (same claim → move → revoke sequence). Claiming before
 revoking is the safety property: a brief dual-auth window, never a lockout.
 
 **No route exposes this yet.** Cloudflare Access is the only authenticator, so a
 self-service change needs a proof-of-control confirm step — performed while
 authenticated as the _new_ address — before it can be exposed. Until that lands,
-`scripts/change-email.ts` is the only supported path.
+`scripts/ops/change-email.ts` is the only supported path.
 
 ## Case-variant accounts
 
@@ -73,4 +73,4 @@ SELECT user_email FROM user_metadata WHERE current_email IS NULL;
 ```
 
 They still authenticate via their anchor. Merge them deliberately before any
-address change (`scripts/change-email.ts` refuses an account with no `id`).
+address change (`scripts/ops/change-email.ts` refuses an account with no `id`).
