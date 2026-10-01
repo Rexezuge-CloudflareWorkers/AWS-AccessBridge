@@ -3,16 +3,8 @@ export { AssumableRolesDAO } from './AssumableRolesDAO';
 export type { AssumableRoleOwner } from './AssumableRolesDAO';
 export { mapRowsToAssumableMap } from './AssumableRolesMapper';
 export type { AssumableRoleRow } from './AssumableRolesMapper';
-export {
-  ASSUMABLE_ROLES_FROM_JOIN,
-  ASSUMABLE_ROLES_ORDER_BY,
-  ASSUMABLE_ROLES_SELECT,
-  buildListRolesQuery,
-  buildSearchRolesQuery,
-  hiddenFilterClause,
-  ownerClause,
-} from './AssumableRolesQueries';
-export { AwsAccountsDAO } from './AwsAccountsDAO';
+export { buildListRolesQuery, buildSearchRolesQuery, hiddenFilterClause, ownerClause } from './AssumableRolesQueries';
+export { AwsAccountsDAO, ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
 export { BackgroundTaskRunDAO } from './BackgroundTaskRunDAO';
 export { CredentialCacheConfigDAO } from './CredentialCacheConfigDAO';
 export { CredentialsCacheDAO } from './CredentialsCacheDAO';

@@ -1,4 +1,5 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
 class UserFavoriteAccountsDAO extends BaseDAO {
@@ -57,7 +58,7 @@ class UserFavoriteAccountsDAO extends BaseDAO {
       `SELECT ufa.aws_account_id, aa.aws_account_nickname
        FROM user_favorite_accounts ufa
        LEFT JOIN aws_accounts aa ON ufa.aws_account_id = aa.aws_account_id
-       WHERE ufa.user_id = ? OR (ufa.user_id IS NULL AND ufa.user_email = ?)`,
+       WHERE ${ownerClause('ufa')}`,
       [userId, anchorEmail],
     );
   }
@@ -86,7 +87,13 @@ class UserFavoriteAccountsDAO extends BaseDAO {
    * from matching a different account's rows.
    */
   private static ownerPredicate(userId: string | null, userEmail: string): { clause: string; bindings: unknown[] } {
-    return userId === null ? { clause: 'user_id IS NULL AND user_email = ?', bindings: [userEmail] } : { clause: '(user_id = ? OR (user_id IS NULL AND user_email = ?))', bindings: [userId, userEmail] };
+    // Null id narrows to the address arm on its own; a resolved id gets the shared
+    // two-arm predicate. Both delegate to `ownerClause` so the `user_id IS NULL`
+    // guard — the part that stops a moved-off address matching another account's
+    // row — has a single definition.
+    return userId === null
+      ? { clause: 'user_favorite_accounts.user_id IS NULL AND user_favorite_accounts.user_email = ?', bindings: [userEmail] }
+      : { clause: ownerClause('user_favorite_accounts'), bindings: [userId, userEmail] };
   }
 }
 

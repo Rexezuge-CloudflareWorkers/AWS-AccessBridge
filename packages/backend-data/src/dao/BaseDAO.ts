@@ -32,7 +32,9 @@ abstract class BaseDAO {
 
   // Generic orphan-row delete for the 7× `deleteOrphaned(): Promise<number>`
   // implementations (AwsAccounts/RoleConfigs/CostData/DataCollectionConfig/
-  // TeamAccounts/ResourceInventory/SpendAlertDAO shared shape).
+  // TeamAccounts/ResourceInventory/SpendAlertDAO shared shape). All seven now
+  // route through here, which is what gives them the `withRetry` and the
+  // `DatabaseError` on `!result.success` that each previously omitted.
   protected deleteOrphanedRows(
     table: string,
     orphanCondition: string,

@@ -106,15 +106,18 @@ class AuditLogDAO extends BaseDAO {
     return { logs, total };
   }
 
-  public async deleteOlderThan(cutoffTimestamp: number): Promise<void> {
-    await this.database.prepare('DELETE FROM audit_logs WHERE timestamp < ?').bind(cutoffTimestamp).run();
-  }
-
   public async deleteOlderThanBatch(cutoffTimestamp: number, batchSize: number): Promise<number> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM audit_logs WHERE timestamp < ? LIMIT ?')
-      .bind(cutoffTimestamp, batchSize)
-      .run();
+    // Checked: `AbstractPruningTask` reads the returned count to decide whether
+    // to loop, so a `{success: false}` result resolving as 0 rows made retention
+    // log "pruned 0" and exit as a success while the table grew unbounded.
+    const result: D1Result = await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM audit_logs WHERE timestamp < ? LIMIT ?')
+          .bind(cutoffTimestamp, batchSize)
+          .run(),
+      'delete old audit logs',
+    );
     return result.meta?.changes ?? 0;
   }
 }

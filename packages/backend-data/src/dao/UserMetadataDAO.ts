@@ -157,6 +157,14 @@ class UserMetadataDAO extends BaseDAO {
       return result.federation_username;
     }
     const federationUsername: string = crypto.randomUUID().replaceAll('-', '').toUpperCase();
+    // `ensureUserEmailExists` first, because the INSERT below has to stamp the
+    // 0032 identity columns: a row created here without `id`/`current_email` is
+    // never backfilled again, so the account would be permanently unresolvable
+    // (`current_email IS NULL`, `id IS NULL`) and its rows would carry a NULL
+    // `user_id` that fails the foreign keys added alongside them. D1 does not
+    // enforce foreign keys by default, so an `assumable_roles` row can exist with
+    // no metadata row at all and this path then becomes the first writer.
+    await this.ensureUserEmailExists(userEmail);
     // INSERT rather than UPDATE: callers that reach here before any other
     // metadata write (e.g. token creation) have no row yet, and an UPDATE would
     // match nothing — the generated name would be returned but never persisted,
@@ -164,8 +172,8 @@ class UserMetadataDAO extends BaseDAO {
     // defeating CloudTrail correlation. ON CONFLICT keeps concurrent callers on
     // the single stored value rather than racing to overwrite it.
     const insertResult: D1Result = await this.database
-      .prepare('INSERT INTO user_metadata (user_email, federation_username) VALUES (?, ?) ON CONFLICT(user_email) DO UPDATE SET federation_username = COALESCE(user_metadata.federation_username, excluded.federation_username)')
-      .bind(userEmail, federationUsername)
+      .prepare('UPDATE user_metadata SET federation_username = COALESCE(federation_username, ?) WHERE user_email = ?')
+      .bind(federationUsername, userEmail)
       .run();
     if (!insertResult.success) {
       throw new DatabaseError(`Failed to store federation username: ${insertResult.error}`);

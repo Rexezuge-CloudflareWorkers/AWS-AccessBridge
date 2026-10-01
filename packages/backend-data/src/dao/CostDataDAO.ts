@@ -1,23 +1,28 @@
 import type { CostData, CostDataInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
+import { ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
 
 class CostDataDAO extends BaseDAO {
   public async upsertCostData(data: CostData): Promise<void> {
-    await this.database
-      .prepare(
-        'INSERT OR REPLACE INTO cost_data (aws_account_id, period_start, period_end, total_cost, currency, service_breakdown, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      )
-      .bind(
-        data.awsAccountId,
-        data.periodStart,
-        data.periodEnd,
-        data.totalCost,
-        data.currency,
-        JSON.stringify(data.serviceBreakdown),
-        TimestampUtil.getCurrentUnixTimestampInSeconds(),
-      )
-      .run();
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'INSERT OR REPLACE INTO cost_data (aws_account_id, period_start, period_end, total_cost, currency, service_breakdown, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          )
+          .bind(
+            data.awsAccountId,
+            data.periodStart,
+            data.periodEnd,
+            data.totalCost,
+            data.currency,
+            JSON.stringify(data.serviceBreakdown),
+            TimestampUtil.getCurrentUnixTimestampInSeconds(),
+          )
+          .run(),
+      'upsert cost data',
+    );
   }
 
   public async getCostDataByAccount(awsAccountId: string, startDate: string, endDate: string): Promise<CostData[]> {
@@ -43,9 +48,7 @@ class CostDataDAO extends BaseDAO {
   }
 
   public async deleteOrphaned(): Promise<number> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM cost_data WHERE aws_account_id NOT IN (SELECT DISTINCT aws_account_id FROM assumable_roles)')
-      .run();
+    const result: D1Result = await this.deleteOrphanedRows('cost_data', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;
   }
 

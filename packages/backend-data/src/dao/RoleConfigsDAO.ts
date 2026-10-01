@@ -1,6 +1,6 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { RoleConfig, RoleConfigInternal } from '@aws-access-bridge/shared/model';
 import { BaseDAO } from './BaseDAO';
+import { ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
 
 class RoleConfigsDAO extends BaseDAO {
   public async getRoleConfig(awsAccountId: string, roleName: string): Promise<RoleConfig | undefined> {
@@ -29,31 +29,31 @@ class RoleConfigsDAO extends BaseDAO {
     destinationRegion?: string,
     roleSessionDurationSeconds?: number,
   ): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        'INSERT OR REPLACE INTO role_configs (aws_account_id, role_name, destination_path, destination_region, role_session_duration_seconds) VALUES (?, ?, ?, ?, ?)',
-      )
-      .bind(awsAccountId, roleName, destinationPath || null, destinationRegion || null, roleSessionDurationSeconds ?? null)
-      .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to set role config: ${result.error}`);
-    }
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'INSERT OR REPLACE INTO role_configs (aws_account_id, role_name, destination_path, destination_region, role_session_duration_seconds) VALUES (?, ?, ?, ?, ?)',
+          )
+          .bind(awsAccountId, roleName, destinationPath || null, destinationRegion || null, roleSessionDurationSeconds ?? null)
+          .run(),
+      'set role config',
+    );
   }
 
   public async deleteRoleConfig(awsAccountId: string, roleName: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM role_configs WHERE aws_account_id = ? AND role_name = ?')
-      .bind(awsAccountId, roleName)
-      .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to delete role config: ${result.error}`);
-    }
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM role_configs WHERE aws_account_id = ? AND role_name = ?')
+          .bind(awsAccountId, roleName)
+          .run(),
+      'delete role config',
+    );
   }
 
   public async deleteOrphaned(): Promise<number> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM role_configs WHERE aws_account_id NOT IN (SELECT DISTINCT aws_account_id FROM assumable_roles)')
-      .run();
+    const result: D1Result = await this.deleteOrphanedRows('role_configs', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;
   }
 }

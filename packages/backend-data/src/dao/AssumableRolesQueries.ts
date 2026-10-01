@@ -1,3 +1,5 @@
+import { LIKEUtil } from '../utils/LIKEUtil';
+
 /**
  * Shared SQL fragments + row-mapping for `AssumableRolesDAO`.
  * Previously `getAllRolesByUserEmail` vs `searchAccountsByQuery` duplicated
@@ -27,6 +29,22 @@
  * the ambiguous mixed-case accounts 0032 leaves unresolved — visible instead of
  * silently dropping them. Without the `IS NULL` guard the address arm would
  * double-count a row the id arm already matched.
+ */
+/**
+ * The owner predicate for a user-keyed query.
+ *
+ * `id OR (id IS NULL AND address)` is deliberate on both arms. The id arm matches
+ * every row the backfill attributed, regardless of which address was current at
+ * write time, so a grant survives an address change. The `id IS NULL` arm keeps
+ * rows the backfill could not attribute — an unknown or deleted actor, or one of
+ * the ambiguous mixed-case accounts 0032 leaves unresolved — visible instead of
+ * silently dropping them. Without the `IS NULL` guard the address arm would
+ * double-count a row the id arm already matched.
+ *
+ * This is the single definition of that predicate. `TeamMembersDAO`,
+ * `UserFavoriteAccountsDAO`, and `UserAccessTokenDAO` all used to carry their own
+ * copy of the same SQL, each with its own prose explanation — so a fix to the
+ * `IS NULL` guard could silently miss the other four.
  */
 function ownerClause(alias: string): string {
   return `(${alias}.user_id = ? OR (${alias}.user_id IS NULL AND ${alias}.user_email = ?))`;
@@ -58,19 +76,14 @@ function buildListRolesQuery(showHidden: boolean): string {
 
 function buildSearchRolesQuery(showHidden: boolean): string {
   const hiddenFilter: string = hiddenFilterClause(showHidden);
+  // `ESCAPE` is required for the caller's escaped pattern to be honoured; without
+  // it a literal `\%` would not match a backslash-then-percent.
+  const escape: string = LIKEUtil.escapeClause;
   return `${ASSUMABLE_ROLES_SELECT}
           ${ASSUMABLE_ROLES_FROM_JOIN}
           WHERE ${ownerClause('ar')} ${hiddenFilter}
-            AND (ar.aws_account_id LIKE ? OR aa.aws_account_nickname LIKE ?)
+            AND (ar.aws_account_id LIKE ? ${escape} OR aa.aws_account_nickname LIKE ? ${escape})
           ${ASSUMABLE_ROLES_ORDER_BY}`;
 }
 
-export {
-  ASSUMABLE_ROLES_FROM_JOIN,
-  ASSUMABLE_ROLES_ORDER_BY,
-  ASSUMABLE_ROLES_SELECT,
-  buildListRolesQuery,
-  buildSearchRolesQuery,
-  hiddenFilterClause,
-  ownerClause,
-};
+export { buildListRolesQuery, buildSearchRolesQuery, hiddenFilterClause, ownerClause };
