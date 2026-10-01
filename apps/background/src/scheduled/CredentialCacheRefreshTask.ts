@@ -62,25 +62,31 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
       sessionToken: credentialChain.sessionToken,
     };
     let refreshed: number = 0;
-    for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
+    // `principalArns[0]` is the target role and the highest index is the base IAM
+    // user; the walk runs base -> target, mirroring `AssumeRoleService.assumeRoleChain`.
+    // Only the *intermediate* hops are pre-warmed: index 0 is the role the caller
+    // is asking for (never reused), and index `length - 1` is the base's own
+    // long-term keys, which `assumeRoleChain` does not assume from.
+    for (let i = credentialChain.principalArns.length - 2; i > 0; i--) {
       const roleArn: string = credentialChain.principalArns[i];
       const assumedCredentials: AccessKeysWithExpiration = await sts.assumeRole(roleArn, credential, CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME);
       if (assumedCredentials.sessionToken && assumedCredentials.expiration) {
-        const credentialCache: CredentialCache = {
-          principalArn,
+        await credentialsCacheDAO.storeCachedCredential({
+          principalArn: roleArn,
           accessKeyId: assumedCredentials.accessKeyId,
           secretAccessKey: assumedCredentials.secretAccessKey,
           sessionToken: assumedCredentials.sessionToken,
           expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(assumedCredentials.expiration),
-        };
-        await Promise.all([
-          credentialsCacheDAO.storeCachedCredential(credentialCache),
-          credentialCacheConfigDAO.updateLastCachedTime(principalArn),
-        ]);
+        });
         refreshed += 1;
       }
       credential = assumedCredentials;
     }
+    // Advanced once per principal, after the walk, rather than per hop: a
+    // single-hop chain has nothing cacheable but still resolved fine, and
+    // bumping it per hop would leave it permanently due and re-resolve the chain
+    // on every cron tick forever.
+    await credentialCacheConfigDAO.updateLastCachedTime(principalArn);
     return refreshed;
   }
 }

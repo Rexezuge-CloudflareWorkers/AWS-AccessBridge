@@ -73,6 +73,9 @@ const UuidSchema = z.string().regex(UUID_PATTERN, 'Value must be a valid UUID.')
 const BooleanQuerySchema = z.enum(['true', 'false']);
 
 export {
+  AWS_ACCOUNT_ID_PATTERN,
+  AWS_IAM_PRINCIPAL_ARN_PATTERN,
+  AWS_REGION_PATTERN,
   AwsAccessKeyIdSchema,
   AwsAccountIdSchema,
   AwsDestinationPathSchema,

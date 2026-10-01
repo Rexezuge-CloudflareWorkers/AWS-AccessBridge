@@ -1,3 +1,4 @@
+export { AwsCollectionError } from './AwsCollectionError';
 export { BadRequestError } from './BadRequestError';
 export { ConflictError } from './ConflictError';
 export { DatabaseError } from './DatabaseError';

@@ -60,9 +60,14 @@ describe('ArnUtil', () => {
       expect(() => ArnUtil.getRoleNameFromArn('arn:aws:iam::123456789012:role/')).toThrow('Role name not found in ARN');
     });
 
-    it('extracts role name from ARN with path prefix', () => {
-      // ARN split on ':' gives 'role/path/MyRole', split on '/' gives index [1] = 'path'
-      expect(ArnUtil.getRoleNameFromArn('arn:aws:iam::123456789012:role/path/MyRole')).toBe('path');
+    it('keeps the IAM path as part of the role name', () => {
+      // The path is part of the role's identity in IAM and is what
+      // `assumable_roles.role_name` stores, so it must survive extraction.
+      expect(ArnUtil.getRoleNameFromArn('arn:aws:iam::123456789012:role/path/MyRole')).toBe('path/MyRole');
+    });
+
+    it('keeps a nested IAM path as part of the role name', () => {
+      expect(ArnUtil.getRoleNameFromArn('arn:aws:iam::123456789012:role/team/dev/DeveloperRole')).toBe('team/dev/DeveloperRole');
     });
   });
 });
