@@ -35,11 +35,11 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 
 ## Commands
 
-Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration`. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
+Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run typecheck && pnpm run lint && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration`. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
 
 ```bash
 pnpm install
-pnpm run checks   # shorthand for: pnpm run typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
+pnpm run checks   # shorthand for: pnpm run typecheck && pnpm run lint && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration
 pnpm --filter @aws-access-bridge/web run build   # only web has a build script
 pnpm --filter @aws-access-bridge/web run dev     # vite dev server
 pnpm run typegen   # after changing wrangler bindings (also runs via postinstall)

@@ -3,15 +3,15 @@
 Repo tooling, grouped by who runs it. Every script is TypeScript and is covered
 by `pnpm run lint` and `pnpm run typecheck:scripts`.
 
-| Directory      | Runs from             | Purpose                                                               |
-| -------------- | --------------------- | --------------------------------------------------------------------- |
-| `lib/`         | imported              | Reusable helpers. No side effects on import.                          |
-| `build/`       | `pnpm install`        | Keeps a fresh clone typecheckable before the first build.             |
-| `deploy/`      | `deploy-worker` job   | Materialize `wrangler.jsonc` and provision its resources and secrets. |
-| `backup/`      | `backup-d1.yml`       | One entrypoint per workflow step.                                     |
-| `ops/`         | a human at a terminal | Destructive or data-touching operations.                              |
-| `i18n/`        | a human, or CI        | Web locale validation (also in `checks` and the `locales` CI job).      |
-| `migrations/`  | a human, or CI        | The migration checksum lock. See `../docs/agents/runtime/AGENTS.md`.   |
+| Directory     | Runs from             | Purpose                                                                     |
+| ------------- | --------------------- | --------------------------------------------------------------------------- |
+| `lib/`        | imported              | Reusable helpers. No side effects on import.                                |
+| `build/`      | `pnpm install`        | Keeps a fresh clone typecheckable before the first build.                   |
+| `deploy/`     | `deploy-worker` job   | Materialize `wrangler.jsonc` and provision its resources and secrets.       |
+| `backup/`     | `backup-d1.yml`       | One entrypoint per workflow step.                                           |
+| `ops/`        | a human at a terminal | Destructive or data-touching operations.                                    |
+| `i18n/`       | a human, or CI        | Web locale validation (also in `pnpm run checks` and the `locales` CI job). |
+| `migrations/` | a human, or CI        | The migration checksum lock. See `../docs/agents/runtime/AGENTS.md`.        |
 
 ## Entrypoint vs module convention
 
@@ -38,7 +38,7 @@ ordered calls into `lib/wrangler-config/`.
 | `wrangler-config/resources.ts` | Create missing D1 / KV / Secrets Store resources and patch their ids in.                              |
 | `wrangler-table.ts`            | Parses the `cli-table3` output `wrangler secrets-store` prints.                                       |
 | `github-actions.ts`            | `setOutput`, `logError`, `fail`. No `@actions/*` dependency, so scripts stay runnable locally.        |
-| `cli-args.ts`                  | Flag parsing for `ops/` and `migrations/` scripts.                                                   |
+| `cli-args.ts`                  | Flag parsing for `ops/` and `migrations/` scripts.                                                    |
 
 `DEFAULT_UUID` is the single definition of the placeholder D1 id. `deploy/`
 writes a real id over it and `backup/` refuses to export while it is still
