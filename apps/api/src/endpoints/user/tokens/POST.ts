@@ -63,7 +63,7 @@ class CreateTokenRoute extends IActivityAPIRoute<CreateTokenRequest, CreateToken
     cxt: ActivityContext<CreateTokenEnv>,
   ): Promise<CreateTokenResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return getRequestScope(env).get(Tokens.TokenService).createToken(userEmail, request.name, request.expiresInDays);
+    return getRequestScope(cxt).get(Tokens.TokenService).createToken(userEmail, request.name, request.expiresInDays);
   }
 }
 

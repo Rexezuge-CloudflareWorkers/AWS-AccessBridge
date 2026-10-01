@@ -158,7 +158,7 @@ class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesReque
     env: ListAccountRolesEnv,
     _cxt: ActivityContext<ListAccountRolesEnv>,
   ): Promise<ListAccountRolesResponse> {
-    return getRequestScope(env).get(Tokens.AccountService).listAccountRoles(request.principalArn);
+    return getRequestScope(_cxt).get(Tokens.AccountService).listAccountRoles(request.principalArn);
   }
 }
 

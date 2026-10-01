@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -143,8 +144,9 @@ class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, 
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: AddTeamAccountRequest, env: IAdminEnv): Promise<AddTeamAccountResponse> {
-    await getRequestScope(env).get(Tokens.TeamService).addAccount(request.teamId, request.awsAccountId);
+  protected async handleAdminRequest(request: AddTeamAccountRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<AddTeamAccountResponse> {
+    await getRequestScope(cxt).get(Tokens.TeamService).addAccount(request.teamId, request.awsAccountId);
     return { success: true, message: 'Account added to team.' };
   }
 }

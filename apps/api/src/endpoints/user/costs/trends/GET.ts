@@ -113,7 +113,7 @@ class GetCostTrendsRoute extends IActivityAPIRoute<GetCostTrendsRequest, GetCost
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
     const months: number = Math.min(parseInt(url.searchParams.get('months') || '6'), 12);
-    return getRequestScope(env).get(Tokens.CostService).getTrends(userEmail, months);
+    return getRequestScope(cxt).get(Tokens.CostService).getTrends(userEmail, months);
   }
 }
 

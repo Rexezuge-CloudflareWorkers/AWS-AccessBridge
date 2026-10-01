@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -136,8 +137,9 @@ class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertReque
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: DeleteSpendAlertRequest, env: IAdminEnv): Promise<DeleteSpendAlertResponse> {
-    await getRequestScope(env).get(Tokens.CostService).deleteAlert(request.alertId);
+  protected async handleAdminRequest(request: DeleteSpendAlertRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<DeleteSpendAlertResponse> {
+    await getRequestScope(cxt).get(Tokens.CostService).deleteAlert(request.alertId);
     return { success: true, message: 'Alert deleted.' };
   }
 }

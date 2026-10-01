@@ -52,11 +52,10 @@ function hasInternalHeadersFor(headers: Headers): boolean {
 }
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
-  const env: AuthenticatedEnv = c.env as AuthenticatedEnv;
   // Forward the Workers ExecutionContext so AccessAuthService can read the
   // platform-verified identity (`ctx.access`) when POLICY_AUD/TEAM_DOMAIN
   // are unset (Worker-level Access, same-account deploys).
-  return getRequestScope(env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
+  return getRequestScope(c).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
 }
 
 function isInternalRequest(c: RequestContext): boolean {
@@ -89,7 +88,7 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
         }),
       );
     };
-    return getRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(token, deferred);
+    return getRequestScope(c).get(Tokens.TokenService).authenticateWithPAT(token, deferred);
   }
   throw new UnauthorizedError('No personal access token provided in request headers.');
 }
@@ -110,7 +109,7 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
       // changes address. Optional: a database without 0032 leaves it unset and
       // the entry is written address-keyed, exactly as before.
       const userId: string | null = c.get('AuthenticatedUserId') ?? null;
-      const auditService = getRequestScope({ AccessBridgeDB: c.env.AccessBridgeDB }).get(Tokens.AuditService);
+      const auditService = getRequestScope(c).get(Tokens.AuditService);
       const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env, userId);
       // `waitUntil` returns void, so the promise it is handed is detached: a
       // rejection here would escape as an unhandled rejection in the runtime
@@ -138,7 +137,7 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
  */
 async function publishAccountId(c: RequestContext, userEmail: string): Promise<void> {
   try {
-    const identity = getRequestScope(c.env as AuthenticatedEnv).get(Tokens.UserIdentityService);
+    const identity = getRequestScope(c).get(Tokens.UserIdentityService);
     const userId: string | null = await identity.resolveUserId(userEmail);
     if (userId) {
       c.set('AuthenticatedUserId', userId);

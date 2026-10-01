@@ -80,7 +80,7 @@ jobs:
           max_attempts: '2'
 
   god-files:
-    name: God-Files
+    name: God Files
     runs-on: ubuntu-latest
 
     steps:
@@ -94,7 +94,7 @@ jobs:
       # limit is invisible to typecheck, lint, and the tests — they all pass
       # perfectly well on a 500-line component. A separate job so the failure says
       # "god-file" rather than arriving inside a lint log.
-      - name: Check God-Files
+      - name: Check God Files
         uses: ./.github/actions/retry-step
         with:
           command: pnpm run check:god-files

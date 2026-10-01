@@ -1,6 +1,6 @@
 
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
-import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
+import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
@@ -117,8 +117,8 @@ class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse,
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(_request: IRequest, env: IAdminEnv): Promise<ListTeamsResponse> {
-    const teams: Team[] = await getRequestScope(env).get(Tokens.TeamService).listTeams();
+  protected async handleAdminRequest(_request: IRequest, env: IAdminEnv, cxt: ActivityContext<IAdminEnv>): Promise<ListTeamsResponse> {
+    const teams: Team[] = await getRequestScope(cxt).get(Tokens.TeamService).listTeams();
     return { teams };
   }
 }

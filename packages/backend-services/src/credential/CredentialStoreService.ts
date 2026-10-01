@@ -4,9 +4,8 @@ import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/bac
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { StsService, type CallerIdentity } from '../aws/sts';
-import { getRequestScope } from '../composition';
-import { Tokens } from '../composition/tokens';
 import type { ServiceEnv } from '../composition/ServiceEnv';
+import { resolveCredentialKeys } from '../composition/encryptionKeys';
 
 /**
  * The canonical principal-ARN matcher, not a local copy. The non-capturing group
@@ -18,6 +17,11 @@ const PRINCIPAL_ARN_PATTERN: RegExp = AWS_IAM_PRINCIPAL_ARN_PATTERN;
 
 type CredentialStoreServiceEnv = ServiceEnv;
 
+async function defaultCredentialKeyProvider(env: CredentialStoreServiceEnv): Promise<readonly string[]> {
+  const keys = await resolveCredentialKeys(env);
+  return keys.credentials;
+}
+
 /**
  * Store/relationship CRUD + STS validation slice of the previous
  * `CredentialService` god-class. Pure persistence; no chain walking.
@@ -28,16 +32,21 @@ class CredentialStoreService {
   constructor(
     private readonly env: CredentialStoreServiceEnv,
     sts?: StsService,
+    /**
+     * The ordered key chain for the `credentials` table, injected by the
+     * composition root from the same scope that constructed this service. See
+     * `CredentialChainService`'s equivalent for why it is injected.
+     */
+    private readonly credentialKeys: () => Promise<readonly string[]> = (): Promise<readonly string[]> => defaultCredentialKeyProvider(env),
   ) {
     this.sts = sts ?? new StsService();
   }
 
   /**
-   * The ordered keys for the `credentials` table: the surface's own key first,
-   * then the legacy master key for rows written before the split.
-   */
+  The ordered keys for the `credentials` table: own key first, legacy master key after.
+  */
   public async getEncryptionKeys(): Promise<readonly string[]> {
-    return getRequestScope(this.env).get(Tokens.CredentialKey)();
+    return this.credentialKeys();
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {

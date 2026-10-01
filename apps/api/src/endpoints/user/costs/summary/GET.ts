@@ -99,7 +99,7 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
     cxt: ActivityContext<GetCostSummaryEnv>,
   ): Promise<GetCostSummaryResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return getRequestScope(env).get(Tokens.CostService).getSummary(userEmail);
+    return getRequestScope(cxt).get(Tokens.CostService).getSummary(userEmail);
   }
 }
 

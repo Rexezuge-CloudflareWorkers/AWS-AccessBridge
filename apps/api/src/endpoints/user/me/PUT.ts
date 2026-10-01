@@ -93,7 +93,7 @@ class UpdateCurrentUserRoute extends IActivityAPIRoute<UpdateCurrentUserRequest,
     } else if (raw !== null && typeof raw !== 'string') {
       throw new BadRequestError('Unsupported language.');
     }
-    const preferredLanguage: string | null = await getRequestScope(env).get(Tokens.UserService).updatePreferredLanguage(userEmail, raw);
+    const preferredLanguage: string | null = await getRequestScope(cxt).get(Tokens.UserService).updatePreferredLanguage(userEmail, raw);
     return { success: true, preferredLanguage };
   }
 }

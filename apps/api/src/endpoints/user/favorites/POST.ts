@@ -52,7 +52,7 @@ class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, Fav
     cxt: ActivityContext<FavoriteAccountEnv>,
   ): Promise<FavoriteAccountResponse> {
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.UserService).favoriteAccount(userEmail, request.awsAccountId);
+    await getRequestScope(cxt).get(Tokens.UserService).favoriteAccount(userEmail, request.awsAccountId);
     return { success: true };
   }
 }

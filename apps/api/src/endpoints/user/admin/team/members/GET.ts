@@ -157,7 +157,7 @@ class ListTeamMembersRoute extends IAdminActivityAPIRoute<IRequest, ListTeamMemb
   ): Promise<ListTeamMembersResponse> {
     const teamId: string | null = new URL(cxt.req.url).searchParams.get('teamId');
     if (!teamId) throw new BadRequestError('Missing required parameter: teamId.');
-    const members: TeamMember[] = await getRequestScope(env).get(Tokens.TeamService).listMembers(teamId);
+    const members: TeamMember[] = await getRequestScope(cxt).get(Tokens.TeamService).listMembers(teamId);
     return { members };
   }
 }

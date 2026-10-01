@@ -226,7 +226,7 @@ class GrantAccessRoute extends IAdminActivityAPIRoute<GrantAccessRequest, GrantA
     cxt: ActivityContext<GrantAccessEnv>,
   ): Promise<GrantAccessResponse> {
     const userEmail: string = request.userEmail || this.getAuthenticatedUserEmailAddress(cxt);
-    await getRequestScope(env).get(Tokens.AccessService).grantAccess(userEmail, request.awsAccountId, request.roleName);
+    await getRequestScope(cxt).get(Tokens.AccessService).grantAccess(userEmail, request.awsAccountId, request.roleName);
     return {
       success: true,
       message: 'Access granted successfully',

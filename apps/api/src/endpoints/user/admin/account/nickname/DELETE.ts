@@ -162,7 +162,7 @@ class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
     env: RemoveAccountNicknameEnv,
     _cxt: ActivityContext<RemoveAccountNicknameEnv>,
   ): Promise<RemoveAccountNicknameResponse> {
-    const { accountId } = await getRequestScope(env).get(Tokens.AccountService).removeNickname(request.awsAccountId);
+    const { accountId } = await getRequestScope(_cxt).get(Tokens.AccountService).removeNickname(request.awsAccountId);
 
     return {
       success: true,

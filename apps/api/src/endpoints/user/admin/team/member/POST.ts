@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -153,8 +154,9 @@ class AddTeamMemberRoute extends IAdminActivityAPIRoute<AddTeamMemberRequest, Ad
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: AddTeamMemberRequest, env: IAdminEnv): Promise<AddTeamMemberResponse> {
-    await getRequestScope(env).get(Tokens.TeamService).addMember(request.teamId, request.userEmail, request.role || 'member');
+  protected async handleAdminRequest(request: AddTeamMemberRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<AddTeamMemberResponse> {
+    await getRequestScope(cxt).get(Tokens.TeamService).addMember(request.teamId, request.userEmail, request.role || 'member');
     return { success: true, message: 'Member added.' };
   }
 }

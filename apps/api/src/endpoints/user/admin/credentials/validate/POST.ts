@@ -170,7 +170,7 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
     _env: ValidateCredentialsEnv,
     _cxt: ActivityContext<ValidateCredentialsEnv>,
   ): Promise<ValidateCredentialsResponse> {
-    const identity = await getRequestScope(_env).get(Tokens.CredentialStoreService).validateCredentials(
+    const identity = await getRequestScope(_cxt).get(Tokens.CredentialStoreService).validateCredentials(
       request.accessKeyId,
       request.secretAccessKey,
       request.sessionToken,

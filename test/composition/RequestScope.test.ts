@@ -136,4 +136,59 @@ describe('getRequestScope', () => {
   it('does not share services across different env objects', () => {
     expect(getRequestScope(scopeEnv())).not.toBe(getRequestScope(scopeEnv()));
   });
+
+  /**
+   * Regression: the cache was keyed on `env`, but no caller actually passed that
+   * object through — `withUnconstrainedD1Session` spreads `c.env` into a *new*
+   * object and the audit middleware passed an inline
+   * `{ AccessBridgeDB: c.env.AccessBridgeDB }` literal. So the `WeakMap` missed on
+   * every request, building two or three containers where there should be one:
+   * two or three secret fetches, and the `UserIdentityService` address→account memo
+   * re-running the same resolution two or three times.
+   *
+   * Request handlers therefore key on the Hono *context*, which is genuinely one
+   * object per request and reaches the handler whether or not `env` was copied.
+   */
+  it('shares one scope across every handler of a request, even when env is copied', () => {
+    const env = scopeEnv();
+    // Two "handlers" of the same request: one sees the raw env, the other a
+    // session-wrapped spread copy, exactly as the middleware and routes did.
+    const first = { env };
+    const second = { env: { ...env, AccessBridgeDB: { prepare: () => undefined } } };
+
+    const scope = getRequestScope(first);
+    expect(getRequestScope(second)).not.toBe(scope);
+
+    // The context, however, is stable for the request.
+    const context = { env };
+    expect(getRequestScope(context)).toBe(getRequestScope(context));
+    expect(getRequestScope(context).get(Tokens.TeamService)).toBe(getRequestScope(context).get(Tokens.TeamService));
+  });
+
+  it('keeps the context and env caches separate', () => {
+    // Same env, two keying strategies: a context-keyed scope must not be handed to
+    // a caller that passed the env, or the per-request memo would outlive its
+    // request.
+    const env = scopeEnv();
+    expect(getRequestScope({ env })).not.toBe(getRequestScope(env));
+  });
+
+  it('fetches the encryption keys once per request scope, not once per call', async () => {
+    const credential = vi.fn().mockResolvedValue('k');
+    const context = { env: { ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: credential } } as never };
+    await getRequestScope(context).get(Tokens.CredentialKey)();
+    await getRequestScope(context).get(Tokens.CredentialKey)();
+    expect(credential).toHaveBeenCalledTimes(1);
+  });
+
+  it('injects the same memoized keys into the credential services', async () => {
+    // The services hold only `env`, which is not the request's identity, so the
+    // composition root passes the keys in rather than letting them look a scope up.
+    const get = vi.fn().mockResolvedValue('k');
+    const scope = createRequestScope({ ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get } } as never);
+    const store = scope.get(Tokens.CredentialStoreService);
+    await store.createCredentialsDAO();
+    await store.createCredentialsDAO();
+    expect(get).toHaveBeenCalledTimes(1);
+  });
 });

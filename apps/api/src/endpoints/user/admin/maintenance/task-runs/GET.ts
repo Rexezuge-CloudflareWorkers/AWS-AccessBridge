@@ -160,7 +160,7 @@ class ListTaskRunsRoute extends IAdminActivityAPIRoute<ListTaskRunsRequest, List
     const status: string | undefined = url.searchParams.get('status') || undefined;
     const limit: number = Pagination.limit(url.searchParams.get('limit'));
 
-    const runs: BackgroundTaskRun[] = await getRequestScope(env).get(Tokens.MaintenanceService).listTaskRuns({ taskType, status, limit });
+    const runs: BackgroundTaskRun[] = await getRequestScope(cxt).get(Tokens.MaintenanceService).listTaskRuns({ taskType, status, limit });
     return { runs };
   }
 }

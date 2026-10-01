@@ -49,26 +49,38 @@ function requireCredentialCacheKv(env: RequestScopeEnvShape): KVNamespace {
   return env.AccessBridgeKV;
 }
 
-// Composition root: builds a per-request scope wiring env → services. This is
-// the single place services are constructed; every caller goes through
-// `getRequestScope(env)` so a request shares one set of instances.
+/**
+ * Composition root: builds a scope wiring env -> services. This is the single
+ * place services are constructed; every caller reaches it through
+ * `getRequestScope`.
+ */
 function createRequestScope(env: RequestScopeEnvShape): Container {
   const scope = new Container();
+
   // Per-feature encryption keys. Each resolves to the ordered chain for its
   // surface (own key first, legacy master key as a read fallback) and is
   // memoized, so resolving one key never fetches another and a failing binding
   // is not retried per lookup.
   const keys = createEncryptionKeys(env);
-  scope.bindValue(Tokens.CredentialKey, memoize(() => keyChain(keys.credentialKey, keys.legacyMasterKey)));
-  scope.bindValue(Tokens.CredentialCacheKey, memoize(() => keyChain(keys.credentialCacheKey, keys.legacyMasterKey)));
+  const credentialKey = memoize(() => keyChain(keys.credentialKey, keys.legacyMasterKey));
+  const credentialCacheKey = memoize(() => keyChain(keys.credentialCacheKey, keys.legacyMasterKey));
+  scope.bindValue(Tokens.CredentialKey, credentialKey);
+  scope.bindValue(Tokens.CredentialCacheKey, credentialCacheKey);
   scope.bindValue(Tokens.CollectorRegistry, InjectableCollectorRegistry.withDefaults());
 
   scope.bind(Tokens.StsService, () => new StsService());
   scope.bind(Tokens.IamService, () => new IamService());
   scope.bind(Tokens.CostExplorerService, () => new CostExplorerService());
   scope.bind(Tokens.ConsoleService, () => new ConsoleService());
-  scope.bind(Tokens.CredentialChainService, () => new CredentialChainService(env));
-  scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env));
+  // The key providers are injected rather than looked up: these services hold only
+  // `env`, which is not the request's identity, so a lookup inside one would build
+  // a second scope and fetch the secrets again.
+  const keyProvider = async (): Promise<{ credentials: readonly string[]; cache: readonly string[] }> => ({
+    credentials: await credentialKey(),
+    cache: await credentialCacheKey(),
+  });
+  scope.bind(Tokens.CredentialChainService, () => new CredentialChainService(env, undefined, keyProvider));
+  scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env, undefined, () => credentialKey()));
   scope.bind(Tokens.AssumeRoleService, () => new AssumeRoleService({ ...env, AccessBridgeKV: requireCredentialCacheKv(env) }));
   scope.bind(Tokens.CostService, () => new CostService(env));
   scope.bind(Tokens.ResourceService, () => new ResourceService(env));
@@ -88,33 +100,44 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
 }
 
 /**
- * Per-env scope cache.
- *
- * Workers hand the same `env` object to every handler in a request, so keying
- * on it gives one scope — and therefore one set of service instances, one
- * `AES_ENCRYPTION_KEY_SECRET.get()`, one collector registry — per request, and
- * nothing is retained across requests.
+ * Scope caches, one per keying strategy. Both are `WeakMap`s, so nothing is
+ * retained beyond the lifetime of the key.
  */
+const scopesByContext = new WeakMap<object, Container>();
 const scopesByEnv = new WeakMap<object, Container>();
 
 /**
- * Resolve the service scope for `env`, creating it on first use.
+ * The composition scope for the current unit of work.
  *
- * Production call sites use `getRequestScope(env).get(Tokens.X)`. Previously
- * each route did `XServiceFactory.create(env)`, which constructed a fresh
- * service — and re-fetched `AES_ENCRYPTION_KEY_SECRET` — on every call.
+ * Accepts either a Hono context or a bare env, because the two callers have
+ * genuinely different identities available:
+ *
+ * - **Request handlers** pass the context. Keying on `env` looked right — Workers
+ *   hand the same object to every handler in a request — but nothing passed that
+ *   object through: `withUnconstrainedD1Session` spreads `c.env` into a *new*
+ *   object, so an env-keyed lookup missed on every request, building two or three
+ *   containers where there should be one. That cost two or three secret fetches
+ *   instead of one and defeated the `UserIdentityService` address-to-account memo.
+ *   The context is genuinely one object per request and reaches the handler
+ *   whether or not `env` was copied.
+ * - **Cron and Durable Object tasks** pass `env` directly; there is no context
+ *   object to key on.
  */
-function getRequestScope(env: RequestScopeEnvShape): Container {
-  const cached: Container | undefined = scopesByEnv.get(env);
+function getRequestScope<TEnv extends RequestScopeEnvShape>(source: TEnv | { env: TEnv }): Container {
+  const isContext: boolean = 'env' in (source as object);
+  const cache: WeakMap<object, Container> = isContext ? scopesByContext : scopesByEnv;
+  // Both shapes are their own cache key — a context and an env are different
+  // objects, which is exactly why they need different maps.
+  const key: object = source;
+
+  const cached: Container | undefined = cache.get(key);
   if (cached) {
     return cached;
   }
-  const scope: Container = createRequestScope(env);
-  scopesByEnv.set(env, scope);
+  const scope: Container = createRequestScope(isContext ? (source as { env: TEnv }).env : (source as TEnv));
+  cache.set(key, scope);
   return scope;
 }
 
 export { createRequestScope, getRequestScope };
-
-
-export {type RequestScopeEnvShape} from './tokens';
+export type { RequestScopeEnvShape } from './tokens';

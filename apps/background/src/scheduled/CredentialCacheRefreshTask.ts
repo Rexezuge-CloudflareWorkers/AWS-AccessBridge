@@ -1,7 +1,7 @@
 import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
-import { getRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
+import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import type { CredentialChainService } from '@aws-access-bridge/backend-services/credential';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
@@ -23,7 +23,10 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
     const refreshBatchSize: number = ConfigurationManager.credential.getRefreshBatchSize(env);
     const cutoffTime: number = TimestampUtil.subtractMinutes(TimestampUtil.getCurrentUnixTimestampInSeconds(), refreshIntervalMinutes);
     const credentialCacheConfigDAO: CredentialCacheConfigDAO = new CredentialCacheConfigDAO(env.AccessBridgeDB);
-    const chainService = getRequestScope(env).get(Tokens.CredentialChainService);
+    // A fresh scope per run, not `getRequestScope`: a Durable Object's `env` is
+    // stable for the object's lifetime, so a cached scope would pin the memoized
+    // encryption keys and the cron would keep using the old key after a rotation.
+    const chainService = createRequestScope(env).get(Tokens.CredentialChainService);
     const credentialsCacheDAO = await chainService.createCacheDAO();
     const sts = new StsService();
     const principalArns: string[] = await credentialCacheConfigDAO.getPrincipalArnsNeedingUpdate(refreshBatchSize, cutoffTime);

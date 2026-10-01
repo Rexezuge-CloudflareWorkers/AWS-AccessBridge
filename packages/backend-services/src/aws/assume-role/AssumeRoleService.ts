@@ -111,13 +111,17 @@ class AssumeRoleService {
       const sessionName: string = i > 0 ? INTERMEDIATE_ROLE_SESSION_NAME : `${ROLE_SESSION_NAME_PREFIX}${userId}`;
       const durationSeconds: number | undefined = i === 0 ? roleSessionDurationSeconds : undefined;
       newCredentials = await this.sts.assumeRole(roleArn, newCredentials, sessionName, durationSeconds);
-      // Cache intermediate credentials (not target role, not base IAM user)
-      if (i > 0 && newCredentials.expiration) {
+      // Cache intermediate credentials (not the target role, not the base IAM
+      // user). Both halves of the entry are required: a credential with an
+      // expiration but no session token is unusable as a cache entry — the next
+      // reader would take the short-circuit and get something it cannot pass to
+      // STS. Skipping it just means the next walk re-derives the hop.
+      if (i > 0 && newCredentials.expiration && newCredentials.sessionToken) {
         await credentialsCacheDAO.storeCachedCredential({
           principalArn: roleArn,
           accessKeyId: newCredentials.accessKeyId,
           secretAccessKey: newCredentials.secretAccessKey,
-          sessionToken: newCredentials.sessionToken!,
+          sessionToken: newCredentials.sessionToken,
           expiresAt: TimestampUtil.convertIsoToUnixTimestampInSeconds(newCredentials.expiration),
         });
       }

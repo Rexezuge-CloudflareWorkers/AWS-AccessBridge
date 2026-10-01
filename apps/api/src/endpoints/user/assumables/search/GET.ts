@@ -187,7 +187,7 @@ class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, Searc
     }
 
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
-    return getRequestScope(env).get(Tokens.UserService).searchAccounts(userEmail, query, showHidden);
+    return getRequestScope(cxt).get(Tokens.UserService).searchAccounts(userEmail, query, showHidden);
   }
 }
 

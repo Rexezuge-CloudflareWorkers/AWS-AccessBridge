@@ -151,7 +151,7 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
 
-    return getRequestScope(env).get(Tokens.ResourceService).searchResources(userEmail, {
+    return getRequestScope(cxt).get(Tokens.ResourceService).searchResources(userEmail, {
       search: url.searchParams.get('search') || undefined,
       type: url.searchParams.get('type') || undefined,
       limit: parseInt(url.searchParams.get('limit') || '50'),

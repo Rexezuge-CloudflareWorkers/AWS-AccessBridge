@@ -248,7 +248,7 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
     }
 
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return getRequestScope(env).get(Tokens.AssumeRoleService).assumeRoleForUser(userEmail, request.principalArn);
+    return getRequestScope(cxt).get(Tokens.AssumeRoleService).assumeRoleForUser(userEmail, request.principalArn);
   }
 }
 

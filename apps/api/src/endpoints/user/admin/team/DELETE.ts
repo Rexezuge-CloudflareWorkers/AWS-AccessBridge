@@ -1,4 +1,5 @@
 
+import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -137,8 +138,9 @@ class DeleteTeamRoute extends IAdminActivityAPIRoute<DeleteTeamRequest, DeleteTe
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: DeleteTeamRequest, env: IAdminEnv): Promise<DeleteTeamResponse> {
-    await getRequestScope(env).get(Tokens.TeamService).deleteTeam(request.teamId);
+  protected async handleAdminRequest(request: DeleteTeamRequest, env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>): Promise<DeleteTeamResponse> {
+    await getRequestScope(cxt).get(Tokens.TeamService).deleteTeam(request.teamId);
     return { success: true, message: 'Team deleted.' };
   }
 }

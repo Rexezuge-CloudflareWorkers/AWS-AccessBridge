@@ -3,13 +3,17 @@ import { IScheduledTask } from '@aws-access-bridge/background/scheduled/ISchedul
 import { AbstractCollectionTask } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
-import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
+import { createRequestScope } from '@aws-access-bridge/backend-services/composition';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO');
 vi.mock('@aws-access-bridge/backend-services/composition', () => ({
-  getRequestScope: vi.fn(),
+  // The cron tasks build a fresh scope per run rather than using
+  // `getRequestScope`: a Durable Object's `env` is stable for the object's
+  // lifetime, so a cached scope would pin the memoized encryption keys and the
+  // cron would keep using the old key after a rotation.
+  createRequestScope: vi.fn(),
   Tokens: { CredentialChainService: Symbol('CredentialChainService') },
 }));
 
@@ -96,7 +100,7 @@ describe('AbstractCollectionTask template', () => {
       'arn:aws:iam::123456789012:role/Dev',
       'arn:aws:iam::123456789012:role/Ops',
     ]);
-    vi.mocked(getRequestScope).mockReturnValue({
+    vi.mocked(createRequestScope).mockReturnValue({
       get: vi.fn().mockReturnValue({
         resolveLeafCredentials: vi.fn().mockResolvedValue({ credentials: { accessKeyId: 'A' } as AccessKeys }),
       }),
@@ -115,6 +119,6 @@ describe('AbstractCollectionTask template', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-4');
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
     await new StubCollectionTask().handle(event(), { AccessBridgeDB: {} } as unknown as Env, {} as ExecutionContext);
-    expect(getRequestScope).not.toHaveBeenCalled();
+    expect(createRequestScope).not.toHaveBeenCalled();
   });
 });

@@ -115,5 +115,26 @@ async function keyChain(featureKey: KeyResolver, legacyKey: KeyResolver): Promis
   return legacy === undefined || legacy === current ? [current] : [current, legacy];
 }
 
-export { createEncryptionKeys, keyChain };
-export type { KeyChain, KeyResolver };
+/**
+ * Both surfaces' key chains, read straight from `env`.
+ *
+ * The fallback for a service constructed outside a request scope — tests, ops
+ * scripts. On the request path the composition root injects a memoized provider
+ * instead, so the secrets are fetched once.
+ */
+async function resolveCredentialKeys(env: RequestScopeEnvShape): Promise<{ credentials: KeyChain; cache: KeyChain }> {
+  const keys = createEncryptionKeys(env);
+  const [credentials, cache] = await Promise.all([keyChain(keys.credentialKey, keys.legacyMasterKey), keyChain(keys.credentialCacheKey, keys.legacyMasterKey)]);
+  return { credentials, cache };
+}
+
+export { createEncryptionKeys, keyChain, resolveCredentialKeys };
+export type { CredentialKeyProvider, KeyChain, KeyResolver };
+
+/**
+ * Supplies both surfaces' key chains.
+ *
+ * Injected rather than looked up, so a service resolves keys from the same scope
+ * that constructed it — a service holding only `env` cannot identify its request.
+ */
+type CredentialKeyProvider = () => Promise<{ credentials: KeyChain; cache: KeyChain }>;

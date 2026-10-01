@@ -19,7 +19,7 @@ abstract class IAdminActivityAPIRoute<
       throw new MethodNotAllowedError('Admin operations are disabled in demo mode.');
     }
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const isSuperAdmin: boolean = await getRequestScope(env).get(Tokens.UserService).isSuperAdmin(userEmail);
+    const isSuperAdmin: boolean = await getRequestScope(cxt).get(Tokens.UserService).isSuperAdmin(userEmail);
     if (!isSuperAdmin) {
       // 403, not 401: the caller *is* authenticated — Cloudflare Access already
       // established who they are — they simply lack the role. 401 would tell them

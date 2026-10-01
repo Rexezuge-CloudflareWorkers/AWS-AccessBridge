@@ -225,7 +225,7 @@ class DeleteRoleConfigRoute extends IAdminActivityAPIRoute<DeleteRoleConfigReque
     env: DeleteRoleConfigEnv,
     _cxt: ActivityContext<DeleteRoleConfigEnv>,
   ): Promise<DeleteRoleConfigResponse> {
-    await getRequestScope(env).get(Tokens.AccountService).deleteRoleConfig(request.awsAccountId, request.roleName);
+    await getRequestScope(_cxt).get(Tokens.AccountService).deleteRoleConfig(request.awsAccountId, request.roleName);
 
     return {
       success: true,

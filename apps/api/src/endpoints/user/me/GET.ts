@@ -131,7 +131,7 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
   ): Promise<GetCurrentUserResponse> {
     const demoMode: boolean = this.isDemoMode(cxt);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    const currentUser = await getRequestScope(env).get(Tokens.UserService).getCurrentUser(userEmail);
+    const currentUser = await getRequestScope(cxt).get(Tokens.UserService).getCurrentUser(userEmail);
 
     return {
       email: currentUser.email,

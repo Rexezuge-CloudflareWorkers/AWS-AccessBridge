@@ -24,6 +24,13 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
     }
   }
 
+  /**
+   * The context is always the third argument, even when a handler does not need
+   * it: it is the request's identity, and without it a handler cannot reach the
+   * per-request composition scope (`getRequestScope(cxt)`). Omitting it is how
+   * handlers ended up rebuilding a scope from `env` and fetching the encryption
+   * secrets twice.
+   */
   protected abstract handleRequest(
     request: TRequest,
     env: TEnv,

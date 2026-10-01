@@ -219,7 +219,7 @@ class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListA
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
     const limit: number = Pagination.limit(url.searchParams.get('limit'));
     const offset: number = Pagination.offset(url.searchParams.get('offset'));
-    return getRequestScope(env).get(Tokens.UserService).listAssumables(userEmail, { showHidden, limit, offset });
+    return getRequestScope(cxt).get(Tokens.UserService).listAssumables(userEmail, { showHidden, limit, offset });
   }
 }
 

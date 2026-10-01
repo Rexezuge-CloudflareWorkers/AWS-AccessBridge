@@ -139,8 +139,14 @@ class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
     env: CleanupOrphanedDataEnv,
     _cxt: ActivityContext<CleanupOrphanedDataEnv>,
   ): Promise<CleanupOrphanedDataResponse> {
-    const result: OrphanCleanupResult = await getRequestScope(env).get(Tokens.MaintenanceService).cleanupOrphanedData();
-    return { deletedCounts: result.deletedCounts, totalDeleted: result.totalDeleted };
+    const result: OrphanCleanupResult = await getRequestScope(_cxt).get(Tokens.MaintenanceService).cleanupOrphanedData();
+    // A partial run still answers 200, with the failures named. Throwing here would
+    // tell the administrator nothing happened, when six of the seven tables were in
+    // fact cleaned — the next run would retry the whole thing either way.
+    if (result.failures.length > 0) {
+      console.warn(`Orphan cleanup completed with ${result.failures.length} failed table(s):`, result.failures);
+    }
+    return { deletedCounts: result.deletedCounts, totalDeleted: result.totalDeleted, failures: result.failures };
   }
 }
 
@@ -160,6 +166,13 @@ interface DeletedCounts {
 interface CleanupOrphanedDataResponse extends IResponse {
   deletedCounts: DeletedCounts;
   totalDeleted: number;
+  /**
+   * Tables whose delete failed, with the reason. Empty on a clean run.
+   *
+   * The seven deletes are settled independently, so a failure in one does not abort
+   * the rest — this is how the caller learns which part did not happen.
+   */
+  failures: Array<{ table: keyof DeletedCounts; error: string }>;
 }
 
 interface CleanupOrphanedDataEnv extends IAdminEnv {
