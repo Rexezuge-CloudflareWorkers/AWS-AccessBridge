@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRequestGuard } from './useRequestGuard';
 import {
   addTeamAccount,
   addTeamMember,
@@ -55,11 +56,11 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
-  // Monotonic request ids: switching teams quickly fires overlapping requests,
-  // and without a guard the slower earlier one can resolve last and render the
-  // previously-selected team's members/accounts under the new selection.
-  const membersRequestId = useRef(0);
-  const accountsRequestId = useRef(0);
+  // Switching teams quickly fires overlapping requests, and without a guard the
+  // slower earlier one can resolve last and render the previously-selected
+  // team's members/accounts under the new selection.
+  const membersGuard = useRequestGuard();
+  const accountsGuard = useRequestGuard();
 
   const refreshTeams = useCallback(async () => {
     setIsLoading(true);
@@ -74,46 +75,46 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
 
   const refreshMembers = useCallback(
     async (teamId: string) => {
-      const requestId = ++membersRequestId.current;
+      const request = membersGuard.begin();
       setMembersLoading(true);
       try {
         const result = await listTeamMembers(teamId);
-        if (requestId === membersRequestId.current) {
+        if (membersGuard.isCurrent(request)) {
           setMembers(result);
         }
       } catch (err) {
-        if (requestId === membersRequestId.current) {
+        if (membersGuard.isCurrent(request)) {
           onError(err instanceof Error ? err.message : 'Failed to load members');
         }
       } finally {
-        if (requestId === membersRequestId.current) {
+        if (membersGuard.isCurrent(request)) {
           setMembersLoading(false);
         }
       }
     },
-    [onError],
+    [onError, membersGuard],
   );
 
   const refreshAccounts = useCallback(
     async (teamId: string) => {
-      const requestId = ++accountsRequestId.current;
+      const request = accountsGuard.begin();
       setAccountsLoading(true);
       try {
         const result = await listTeamAccounts(teamId);
-        if (requestId === accountsRequestId.current) {
+        if (accountsGuard.isCurrent(request)) {
           setAccounts(result);
         }
       } catch (err) {
-        if (requestId === accountsRequestId.current) {
+        if (accountsGuard.isCurrent(request)) {
           onError(err instanceof Error ? err.message : 'Failed to load accounts');
         }
       } finally {
-        if (requestId === accountsRequestId.current) {
+        if (accountsGuard.isCurrent(request)) {
           setAccountsLoading(false);
         }
       }
     },
-    [onError],
+    [onError, accountsGuard],
   );
 
   useEffect(() => {
@@ -138,20 +139,23 @@ function useTeams(onError: (message: string) => void): UseTeamsResult {
     (teamId: string | null) => {
       setSelectedTeamId(teamId);
       if (teamId) {
-        void refreshMembers(teamId).catch(() => undefined);
-        void refreshAccounts(teamId).catch(() => undefined);
+        // `refresh*` report their own failures via `onError` and never reject, so
+        // the trailing `.catch` would be a no-op guard that only reads as if the
+        // swallow were deliberate.
+        void refreshMembers(teamId);
+        void refreshAccounts(teamId);
       } else {
         // Invalidate any in-flight request for the previously selected team so
         // it cannot repopulate members/accounts after the selection is cleared.
-        membersRequestId.current += 1;
-        accountsRequestId.current += 1;
+        membersGuard.invalidate();
+        accountsGuard.invalidate();
         setMembers([]);
         setAccounts([]);
         setMembersLoading(false);
         setAccountsLoading(false);
       }
     },
-    [refreshAccounts, refreshMembers],
+    [refreshAccounts, refreshMembers, membersGuard, accountsGuard],
   );
 
   return {

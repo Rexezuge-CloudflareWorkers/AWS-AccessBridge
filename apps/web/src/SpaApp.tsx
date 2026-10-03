@@ -236,6 +236,7 @@ export default function SpaApp() {
                 pageSize={pageSize}
                 currentPage={currentPage}
                 setTotalAccounts={handleSetTotalAccounts}
+                showMessage={showMessage}
               />
             </>
           )}

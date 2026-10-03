@@ -1,9 +1,10 @@
 'use client';
 
 import type { ShowMessage } from '../hooks/useToast';
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixTimestamp } from '../lib/format';
+import { useRequestGuard } from '../hooks/useRequestGuard';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
 import { queryAuditLogs } from '../services/auditService';
@@ -65,8 +66,13 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
   const [page, setPage] = useState(0);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const pageSize = 25;
+  // Typing a filter and paging both retrigger the query, so responses can arrive
+  // out of order; without the guard a slow earlier query rendered under a newer
+  // filter selection.
+  const { begin, isCurrent } = useRequestGuard();
 
   useEffect(() => {
+    const request = begin();
     queryAuditLogs({
       userEmail: filterEmail.trim() || undefined,
       action: filterAction.trim() || undefined,
@@ -74,16 +80,21 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
       offset: page * pageSize,
     })
       .then((result) => {
+        if (!isCurrent(request)) return;
         setLogs(result.logs);
         setTotal(result.total);
         setError(null);
         setIsLoading(false);
       })
-      .catch(() => {
-        setError(t('audit.loadError', 'Failed to load audit logs'));
+      .catch((err: unknown) => {
+        if (!isCurrent(request)) return;
+        // Show the API's own message when there is one: a bare "Failed to load
+        // audit logs" hid the difference between an expired session, a rejected
+        // admin action, and a backend error the user could report.
+        setError(err instanceof Error && err.message ? err.message : t('audit.loadError', 'Failed to load audit logs'));
         setIsLoading(false);
       });
-  }, [filterEmail, filterAction, page, refreshIndex, t]);
+  }, [filterEmail, filterAction, page, refreshIndex, t, begin, isCurrent]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -189,9 +200,13 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
             </thead>
             <tbody>
               {logs.map((log) => (
-                <>
+                // Keyed `Fragment`, not `<>…</>`: a bare fragment in a list has no
+                // key of its own, so React could not tell one log's two rows from
+                // another's and warned on every render. The inner `key`s did not
+                // help — they key children *within* the fragment, not the array
+                // element itself.
+                <Fragment key={log.logId}>
                   <tr
-                    key={log.logId}
                     className="cursor-pointer"
                     style={{
                       ...styles.td,
@@ -222,7 +237,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                     </td>
                   </tr>
                   {expandedLog === log.logId && (
-                    <tr key={`${log.logId}-detail`}>
+                    <tr>
                       <td colSpan={6} style={styles.expandedRow}>
                         <div className="text-xs" style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#d1d5db' }}>
                           <div>
@@ -265,7 +280,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -27,6 +27,7 @@ export default function ResourceInventory() {
   const { t } = useTranslation();
   const {
     summary,
+    summaryError,
     resources,
     total,
     rolesByAccount,
@@ -63,6 +64,11 @@ export default function ResourceInventory() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Summary Cards */}
+      {/* Distinguishable from "no resources match", which renders no summary panel
+          at all — a failed summary call previously looked identical. */}
+      {summaryError && (
+        <div style={{ color: '#f87171', fontSize: '0.875rem' }}>{summaryError}</div>
+      )}
       {summary && (
         <div
           style={{
