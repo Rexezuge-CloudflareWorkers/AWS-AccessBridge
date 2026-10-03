@@ -32,10 +32,6 @@ class Container {
     return this;
   }
 
-  public has<T>(token: Token<T>): boolean {
-    return this.singletons.has(token) || this.factories.has(token);
-  }
-
   public get<T>(token: Token<T>): T {
     if (this.singletons.has(token)) {
       return this.singletons.get(token) as T;
@@ -47,25 +43,6 @@ class Container {
     const instance = (factory as Factory<T>)(this);
     this.singletons.set(token, instance);
     return instance;
-  }
-
-  /**
-   * Resolve without memoizing — for request-scoped objects.
-   */
-  public resolve<T>(token: Token<T>): T {
-    const factory = this.factories.get(token);
-    return factory ? (factory as Factory<T>)(this) : this.get(token);
-  }
-
-  public createChild(): Container {
-    const child = new Container();
-    for (const [token, value] of this.singletons) {
-      child.bindValue(token, value);
-    }
-    for (const [token, factory] of this.factories) {
-      child.bind(token, factory);
-    }
-    return child;
   }
 }
 

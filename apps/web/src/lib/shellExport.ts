@@ -1,10 +1,11 @@
 /**
- * Shell export formatting (presentation). Canonical home for the
- * `export AWS_*=...` snippet previously in
- * `@aws-access-bridge/shared/utils/aws.ts` (`exportEnv` — a presentation
- * leak into the shared domain layer). That function now delegates here
- * in spirit; kept as a deprecated re-export for compat. Web components
- * import from here.
+ * Shell export formatting (presentation).
+ *
+ * This was a presentation concern living in `@aws-access-bridge/shared/utils/aws.ts`
+ * as `exportEnv`, where it had no production caller and leaked into the shared
+ * domain layer. It is now here, where the only consumer is, and
+ * `AccessKeyModal` renders the same string it hands the clipboard so the
+ * displayed and copied snippets cannot drift.
  */
 function formatShellExport(accessKeyId: string, secretAccessKey: string, sessionToken?: string): string {
   const lines = [`export AWS_ACCESS_KEY_ID="${accessKeyId}"`, `export AWS_SECRET_ACCESS_KEY="${secretAccessKey}"`];

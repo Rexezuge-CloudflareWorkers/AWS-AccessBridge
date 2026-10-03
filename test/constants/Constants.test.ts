@@ -19,7 +19,6 @@ import {
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT,
-  DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES,
   DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH,
   DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
   DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
@@ -59,10 +58,6 @@ describe('Constants', () => {
     // hands back for a text binding; `ConfigurationManager` parses them.
     // Previously a parallel set of numeric twins existed here that nothing in
     // production read.
-    it('has credential expiry buffer of 5 minutes', () => {
-      expect(DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES).toBe('5');
-    });
-
     it('has 10 credentials to refresh per batch', () => {
       expect(DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH).toBe('10');
     });

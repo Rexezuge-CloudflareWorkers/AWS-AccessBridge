@@ -1,10 +1,20 @@
+import { SYSTEM_CLOCK, type Clock } from './Clock';
+
 class TimestampUtil {
-  public static getCurrentUnixTimestampInMilliseconds(): number {
-    return Date.now();
+  /**
+   * @param clock Inject a `FixedClock` to pin "now" in a test; production leaves
+   * it defaulted.
+   */
+  public static getCurrentUnixTimestampInMilliseconds(clock: Clock = SYSTEM_CLOCK): number {
+    return clock.now();
   }
 
-  public static getCurrentUnixTimestampInSeconds(): number {
-    return Math.floor(Date.now() / 1000);
+  /**
+   * @param clock Inject a `FixedClock` to pin "now" in a test; production leaves
+   * it defaulted.
+   */
+  public static getCurrentUnixTimestampInSeconds(clock: Clock = SYSTEM_CLOCK): number {
+    return Math.floor(clock.now() / 1000);
   }
 
   public static addMinutes(timestamp: number, minutes: number): number {

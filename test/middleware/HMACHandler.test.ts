@@ -8,6 +8,8 @@ import {
 import { INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { generateHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
+import { FixedClock } from '@aws-access-bridge/shared/utils/Clock';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 
 // Test the error cases of HMACHandler by testing behavior at the constant/logic level
 // Full integration tests with Hono context require more complex setup
@@ -42,7 +44,7 @@ describe('HMACHandler constants and validation logic', () => {
     const SECRET = 'test-hmac-secret';
 
     async function signedContext(overrides?: { timestamp?: string; signature?: string; omitAuth?: boolean }) {
-      const timestamp = overrides?.timestamp ?? Date.now().toString();
+      const timestamp = overrides?.timestamp ?? NOW.toString();
       const body = '{"principalArn":"arn:aws:iam::123456789012:role/Dev"}';
       const signedHeaders: Record<string, string> = {
         'x-internal-user-email': 'user@example.com',
@@ -68,31 +70,69 @@ describe('HMACHandler constants and validation logic', () => {
       };
     }
 
+    /**
+     * One frozen instant for the whole suite, injected via `Clock`. These
+     * assertions previously read `Date.now()` directly, which made the
+     * *boundary* of the replay window untestable — the only way to probe it was
+     * to sleep and hope, or to assert only a comfortably-outside case. With a
+     * `FixedClock` the exact edge is just another number.
+     */
+    const NOW = 1_704_067_200_000;
+    const WINDOW_MS = ConfigurationManager.internal.getRequestTimeWindowMs({});
+
     it('calls next for valid signatures', async () => {
       const next = vi.fn();
       const c = (await signedContext()) as never;
-      await HMACHandler.validateInternalRequest(c, next);
+      await HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW));
       expect(next).toHaveBeenCalledOnce();
     });
 
     it('throws missing-headers error without auth headers', async () => {
       const next = vi.fn();
       const c = (await signedContext({ omitAuth: true })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next)).rejects.toThrow(HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS);
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(
+        HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
+      );
       expect(next).not.toHaveBeenCalled();
     });
 
     it('throws time-window error for stale timestamps', async () => {
       const next = vi.fn();
-      const c = (await signedContext({ timestamp: (Date.now() - 60_000).toString() })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next)).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      const c = (await signedContext({ timestamp: (NOW - 60_000).toString() })) as never;
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('rejects a timestamp from the future past the window', async () => {
+      // The window is symmetric via `Math.abs`, so a far-future timestamp must
+      // be refused too — otherwise a client could set an arbitrarily large clock
+      // skew and have its signatures accepted indefinitely.
+      const next = vi.fn();
+      const c = (await signedContext({ timestamp: (NOW + 60_000).toString() })) as never;
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('accepts a request exactly on the window edge', async () => {
+      // The comparison is `<=`, so the boundary itself is in-window. Without a
+      // pinned clock this is the assertion that could not be written at all.
+      const next = vi.fn();
+      const c = (await signedContext({ timestamp: (NOW - WINDOW_MS).toString() })) as never;
+      await HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW));
+      expect(next).toHaveBeenCalledOnce();
+    });
+
+    it('rejects one millisecond past the window edge', async () => {
+      const next = vi.fn();
+      const c = (await signedContext({ timestamp: (NOW - WINDOW_MS - 1).toString() })) as never;
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
       expect(next).not.toHaveBeenCalled();
     });
 
     it('throws signature-invalid error for forged signatures', async () => {
       const next = vi.fn();
       const c = (await signedContext({ signature: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next)).rejects.toThrow(HMAC_HANDLER_ERROR_SIGNATURE_INVALID);
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_SIGNATURE_INVALID);
       expect(next).not.toHaveBeenCalled();
     });
   });

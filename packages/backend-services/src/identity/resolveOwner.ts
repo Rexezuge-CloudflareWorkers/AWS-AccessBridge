@@ -37,4 +37,3 @@ async function resolveOwner(identity: UserIdentityService, userEmail: string): P
 }
 
 export { resolveOwner };
-export type { Owner };

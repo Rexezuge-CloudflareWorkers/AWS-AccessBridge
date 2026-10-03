@@ -4,7 +4,7 @@ import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAcce
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
 import { UnauthorizedError, InternalServerError } from '@aws-access-bridge/backend-errors';
-import { buildPrincipalArn, exportEnv } from '@aws-access-bridge/shared/utils/aws';
+import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
 
@@ -93,11 +93,5 @@ describe('InternalRequestHelper', () => {
 describe('shared aws utils', () => {
   it('builds principal ARNs', () => {
     expect(buildPrincipalArn('123456789012', 'Dev')).toBe('arn:aws:iam::123456789012:role/Dev');
-  });
-
-  it('exports shell env assignments', () => {
-    const script = exportEnv('AKIA', 'secret', 'token');
-    expect(script).toContain('AWS_ACCESS_KEY_ID="AKIA"');
-    expect(script).toContain('AWS_SESSION_TOKEN="token"');
   });
 });

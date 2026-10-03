@@ -9,13 +9,20 @@ import { INTERNAL_HEADER_PREFIX, INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_H
 import { verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import type { Clock } from '@aws-access-bridge/shared/utils';
 
 class HMACHandler {
-  public static async validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
+  /**
+   * @param clock Injected so a test can place a signed request inside or outside
+   * the replay window deterministically. Asserting the window edge otherwise
+   * means either freezing time globally or sleeping, and a test that sleeps is a
+   * test that flakes.
+   */
+  public static async validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next, clock?: Clock): Promise<void> {
     const signature: string | undefined = c.req.header(INTERNAL_SIGNATURE_HEADER);
     const timestamp: string | undefined = c.req.header(INTERNAL_TIMESTAMP_HEADER);
     if (signature && timestamp) {
-      const now: number = TimestampUtil.getCurrentUnixTimestampInMilliseconds();
+      const now: number = TimestampUtil.getCurrentUnixTimestampInMilliseconds(clock);
       const requestTime: number = parseInt(timestamp);
       if (Math.abs(now - requestTime) <= ConfigurationManager.internal.getRequestTimeWindowMs(c.env)) {
         const clonedRequest = c.req.raw.clone();

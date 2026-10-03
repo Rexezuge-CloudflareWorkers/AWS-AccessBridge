@@ -274,39 +274,14 @@ const RequestInputSchemas = {
   'GET /user/admin/team/accounts': { query: TeamIdQuerySchema },
 } as const satisfies RequestSchemaMap;
 
-export {
-  AccountCostQuerySchema,
-  AccountRoleBodySchema,
-  AddTeamMemberBodySchema,
-  AuditLogsQuerySchema,
-  AwsCredentialsBodySchema,
-  CreateSpendAlertBodySchema,
-  CreateTeamBodySchema,
-  CreateTokenBodySchema,
-  CredentialRelationshipBodySchema,
-  DeleteSpendAlertBodySchema,
-  DeleteTokenBodySchema,
-  DisableDataCollectionBodySchema,
-  EnableDataCollectionBodySchema,
-  FavoriteAccountBodySchema,
-  FederateQuerySchema,
-  GenerateConsoleUrlBodySchema,
-  HiddenRoleBodySchema,
-  ListAssumablesQuerySchema,
-  ListResourcesQuerySchema,
-  OptionalUserAccountRoleBodySchema,
-  PrincipalArnBodySchema,
-  RequestInputSchemas,
-  RoleConfigBodySchema,
-  SearchAssumablesQuerySchema,
-  SetAccountNicknameBodySchema,
-  TeamAccountBodySchema,
-  TeamIdBodySchema,
-  TeamIdQuerySchema,
-  TaskRunsQuerySchema,
-  TeamMemberBodySchema,
-  UpdateCurrentUserBodySchema,
-  UpdateTeamMemberRoleBodySchema,
-  UpdateTeamNameBodySchema,
-};
+/**
+ * The only value export: `RequestInputSchemas` is the whole contract.
+ *
+ * The individual schemas used to be re-exported here, and nothing outside this
+ * file ever imported one — the only consumer reads them out of this map by
+ * `METHOD /path`. Reachable three times over (via `shared/schema`, `shared`, and
+ * `apps/api/src/schema`), that presented 33 names as public API with no reader.
+ * Each schema stays declared above, where the map is what makes it meaningful.
+ */
+export { RequestInputSchemas };
 export type { RequestInputSchema, RequestSchemaMap };
