@@ -199,7 +199,7 @@ class StubHttpClient implements IHttpClient {
 import type {   AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
 
 export { FetchHttpClient, HttpFetchError, RetryingAwsClient, StubHttpClient, isRetryableHttpStatus };
-export type { IHttpClient, StubHttpHandler };
+export type { IHttpClient };
 
 
 export {type AwsClientFactory, type AwsClientOptions, type AwsSignedClient} from '@aws-access-bridge/provider-clients/aws';

@@ -3,7 +3,6 @@ import {
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
   DEFAULT_COST_COLLECTION_INTERVAL_HOURS,
   DEFAULT_COST_LOOKBACK_DAYS,
-  DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES,
   DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
   DEFAULT_DEMO_MODE,
   DEFAULT_ENVIRONMENT,
@@ -23,8 +22,6 @@ class ConfigurationManager {
   public static readonly credential = {
     getTrustChainLimit: (env: unknown): number =>
       EnvParser.positiveInt(env, 'PRINCIPAL_TRUST_CHAIN_LIMIT', DEFAULT_PRINCIPAL_TRUST_CHAIN_LIMIT),
-    getExpiryBufferMinutes: (env: unknown): number =>
-      EnvParser.nonNegativeInt(env, 'CREDENTIAL_EXPIRY_BUFFER_MINUTES', DEFAULT_CREDENTIAL_EXPIRY_BUFFER_MINUTES),
     getRefreshBatchSize: (env: unknown): number =>
       EnvParser.positiveInt(env, 'NUMBER_OF_CREDENTIALS_TO_REFRESH', DEFAULT_NUMBER_OF_CREDENTIALS_TO_REFRESH),
     getRefreshIntervalMinutes: (env: unknown): number =>

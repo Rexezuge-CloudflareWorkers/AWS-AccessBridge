@@ -47,7 +47,6 @@ interface ServiceEnv {
 
   // Credential chains
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
-  CREDENTIAL_EXPIRY_BUFFER_MINUTES?: string;
   CREDENTIAL_REFRESH_INTERVAL_MINUTES?: string;
   NUMBER_OF_CREDENTIALS_TO_REFRESH?: string;
 

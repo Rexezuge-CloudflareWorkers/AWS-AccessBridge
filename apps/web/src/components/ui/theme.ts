@@ -81,7 +81,6 @@ const btnBase: React.CSSProperties = {
 
 export const btnBlueStyle: React.CSSProperties = { ...btnBase, background: theme.blue };
 export const btnGreenStyle: React.CSSProperties = { ...btnBase, background: theme.green };
-export const btnRedStyle: React.CSSProperties = { ...btnBase, background: theme.red };
 export const btnSmallStyle: React.CSSProperties = {
   padding: '6px 12px',
   borderRadius: '6px',
