@@ -15,9 +15,35 @@ const cloudflareWorkersMockPath = fileURLToPath(new URL('test/mocks/cloudflare-w
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'node',
-    include: ['test/**/*.test.ts'],
-    exclude: ['test/integration/**'],
+    // Two projects, because `environment` is per-project and the DOM stack cannot
+    // be switched per file. `node` keeps the fast suite for the backend and for
+    // web logic that needs no renderer; `jsdom` covers React hooks and
+    // components. A `.tsx` file is the marker for the second one, so the split
+    // is by extension rather than by directory — otherwise a component test
+    // written as `.ts` would silently run in `node` and fail on `document`.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          globals: true,
+          environment: 'node',
+          include: ['test/**/*.test.ts'],
+          exclude: ['test/integration/**'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          globals: true,
+          environment: 'jsdom',
+          include: ['test/**/*.test.tsx'],
+          exclude: ['test/integration/**'],
+          setupFiles: ['test/setup/dom.ts'],
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
@@ -25,8 +51,10 @@ export default defineConfig({
       include: [
         'apps/api/src/**/*.ts',
         'apps/background/src/**/*.ts',
-        // Web: services + lib only (components/hooks need jsdom +
-        // @testing-library/react — documented follow-up, not silently omitted).
+        // Web: services and lib are pure enough for the node project. Hooks and
+        // components are covered by the `dom` project but stay out of this
+        // umbrella: they are JSX-heavy and mostly markup, and including them
+        // would move the aggregate without adding meaningful signal.
         'apps/web/src/services/**/*.ts',
         'apps/web/src/lib/**/*.ts',
         'packages/**/src/**/*.ts',
