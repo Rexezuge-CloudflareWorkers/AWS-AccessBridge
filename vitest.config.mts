@@ -47,15 +47,15 @@ export default defineConfig({
         'packages/backend-services/src/composition/ServiceEnv.ts',
         'packages/backend-services/src/composition/tokens.ts',
       ],
-      // Raised as coverage improved (was 90/77/89/90). A threshold that is never
-      // approached stops being a signal; these sit a little under the measured
-      // figures so ordinary churn does not fail the build, but a real regression
-      // does.
+      // Raised as coverage improved (was 91/78/93/92, before that 90/77/89/90).
+      // A threshold that is never approached stops being a signal; these sit a
+      // little under the measured figures so ordinary churn does not fail the
+      // build, but a real regression does.
       thresholds: {
-        statements: 91,
-        branches: 78,
-        functions: 93,
-        lines: 92,
+        statements: 92,
+        branches: 80,
+        functions: 94,
+        lines: 93,
       },
     },
   },
