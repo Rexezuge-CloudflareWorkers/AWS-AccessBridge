@@ -15,7 +15,7 @@ import { useToast } from './hooks/useToast';
 
 export default function SpaApp() {
   const { t } = useTranslation();
-  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail, user, setUser } = useAuth();
+  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail, user, loadError, setUser } = useAuth();
   const { message: toastMessage, showMessage, dismiss: dismissToast } = useToast();
   const { language, languageStatus, languagePending, handleLanguageChange } = useSpaLanguage({ user, setUser, showMessage });
   const { currentView, adminTab, navigateTo } = useRouter();
@@ -79,7 +79,7 @@ export default function SpaApp() {
   }
 
   if (!isAuthorized) {
-    return <Unauthorized />;
+    return <Unauthorized reason={loadError} />;
   }
 
   return (

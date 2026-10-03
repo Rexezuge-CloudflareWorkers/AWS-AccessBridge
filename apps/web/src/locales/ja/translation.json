@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Cloudflare Zero Trustで認証",
     "description": "このアプリケーションにアクセスするにはCloudflare Zero Trustで認証してください。",
-    "required": "認証が必要です"
+    "loadFailedDescription": "セッションが有効である可能性があります。再読み込みして再試行してください。解決しない場合は管理者にお問い合わせください。",
+    "loadFailedTitle": "プロファイルを読み込めませんでした",
+    "required": "認証が必要です",
+    "retry": "再読み込み"
   },
   "common": {
     "add": "追加",

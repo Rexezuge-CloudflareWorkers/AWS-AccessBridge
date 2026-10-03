@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Authenticeren met Cloudflare Zero Trust",
     "description": "Authenticeer u met Cloudflare Zero Trust om toegang te krijgen tot deze applicatie.",
-    "required": "Authenticatie vereist"
+    "loadFailedDescription": "Uw sessie is mogelijk nog geldig. Herlaad de pagina om het opnieuw te proberen. Neem contact op met een beheerder als dit aanhoudt.",
+    "loadFailedTitle": "Kan uw profiel niet laden",
+    "required": "Authenticatie vereist",
+    "retry": "Herladen"
   },
   "common": {
     "add": "Toevoegen",

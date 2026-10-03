@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Cloudflare Zero Trust로 인증",
     "description": "이 애플리케이션에 액세스하려면 Cloudflare Zero Trust로 인증하세요.",
-    "required": "인증 필요"
+    "loadFailedDescription": "세션이 아직 유효할 수 있습니다. 새로 고침하여 다시 시도하세요. 문제가 계속되면 관리자에게 문의하세요.",
+    "loadFailedTitle": "프로필을 불러올 수 없습니다",
+    "required": "인증 필요",
+    "retry": "새로 고침"
   },
   "common": {
     "add": "추가",

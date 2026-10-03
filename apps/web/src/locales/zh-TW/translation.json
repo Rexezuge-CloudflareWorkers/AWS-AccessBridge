@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "使用Cloudflare Zero Trust進行驗證",
     "description": "請使用Cloudflare Zero Trust進行驗證以存取此應用程式。",
-    "required": "需要驗證"
+    "loadFailedDescription": "您的工作階段可能仍然有效。請重新載入再試；若問題持續，請聯絡管理員。",
+    "loadFailedTitle": "無法載入您的個人資料",
+    "required": "需要驗證",
+    "retry": "重新載入"
   },
   "common": {
     "add": "新增",

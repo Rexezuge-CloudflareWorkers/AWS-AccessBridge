@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Autenticati con Cloudflare Zero Trust",
     "description": "Autenticati con Cloudflare Zero Trust per accedere a questa applicazione.",
-    "required": "Autenticazione richiesta"
+    "loadFailedDescription": "La sessione potrebbe essere ancora valida. Ricarica la pagina per riprovare. Se il problema persiste, contatta un amministratore.",
+    "loadFailedTitle": "Impossibile caricare il tuo profilo",
+    "required": "Autenticazione richiesta",
+    "retry": "Ricarica"
   },
   "common": {
     "add": "Aggiungi",

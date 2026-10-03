@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "使用Cloudflare Zero Trust进行身份验证",
     "description": "请使用Cloudflare Zero Trust进行身份验证以访问此应用。",
-    "required": "需要身份验证"
+    "loadFailedDescription": "您的会话可能仍然有效。请重新加载重试；若问题持续，请联系管理员。",
+    "loadFailedTitle": "无法加载您的个人资料",
+    "required": "需要身份验证",
+    "retry": "重新加载"
   },
   "common": {
     "add": "添加",
