@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Uwierzytelnij się w Cloudflare Zero Trust",
     "description": "Uwierzytelnij się w Cloudflare Zero Trust, aby uzyskać dostęp do tej aplikacji.",
-    "required": "Wymagane uwierzytelnienie"
+    "loadFailedDescription": "Twoja sesja może być nadal ważna. Odśwież stronę, aby spróbować ponownie. Jeśli problem będzie się powtarzał, skontaktuj się z administratorem.",
+    "loadFailedTitle": "Nie można wczytać profilu",
+    "required": "Wymagane uwierzytelnienie",
+    "retry": "Odśwież"
   },
   "common": {
     "add": "Dodaj",

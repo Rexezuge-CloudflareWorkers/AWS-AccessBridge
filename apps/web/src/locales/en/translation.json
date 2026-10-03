@@ -23,7 +23,10 @@
   "auth": {
     "authenticate": "Authenticate with Cloudflare Zero Trust",
     "description": "Please authenticate with Cloudflare Zero Trust to access this application.",
-    "required": "Authentication Required"
+    "loadFailedDescription": "Your session may still be valid. Reload to try again; if this persists, contact an administrator.",
+    "loadFailedTitle": "Could Not Load Your Profile",
+    "required": "Authentication Required",
+    "retry": "Reload"
   },
   "common": {
     "add": "Add",
