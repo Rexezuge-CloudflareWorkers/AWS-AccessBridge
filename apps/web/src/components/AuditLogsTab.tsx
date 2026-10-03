@@ -5,6 +5,7 @@ import { Fragment, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixTimestamp } from '../lib/format';
 import { useRequestGuard } from '../hooks/useRequestGuard';
+import { httpStatusColor } from '../lib/presentation';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
 import { queryAuditLogs } from '../services/auditService';
@@ -22,10 +23,6 @@ interface AuditLog {
   detail?: string;
   ipAddress?: string;
   userAgent?: string;
-}
-
-function statusColorStyle(code: number): React.CSSProperties {
-  return code < 300 ? { color: '#4ade80' } : ({ color: code < 400 ? '#facc15' : '#f87171' });
 }
 
 interface AuditLogsTabProps {
@@ -229,7 +226,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
                       {log.action}
                     </td>
                     <td style={{ ...styles.td, color: '#9ca3af' }}>{log.method}</td>
-                    <td className="font-mono" style={{ ...styles.td, ...statusColorStyle(log.statusCode) }}>
+                    <td className="font-mono" style={{ ...styles.td, color: httpStatusColor(log.statusCode) }}>
                       {log.statusCode}
                     </td>
                     <td className="text-xs" style={{ ...styles.td, color: '#6b7280' }}>

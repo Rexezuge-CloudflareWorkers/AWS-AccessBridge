@@ -7,14 +7,7 @@ import { getConsoleDestination } from '../services/resourceService';
 import { buildFederateUrl } from '../services/accountService';
 import type { ConsoleDestination, ResourceItem } from '../services/resourceService';
 import { useResources } from '../hooks/useResources';
-
-function stateColor(state: string): string {
-  return ['running', 'active', 'Active', 'available'].includes(state)
-    ? '#4ade80'
-    : ['stopped', 'inactive'].includes(state)
-      ? '#f87171'
-      : '#facc15';
-}
+import { resourceStateColor } from '../lib/presentation';
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
   ec2: 'resources.typeEc2',
@@ -284,7 +277,7 @@ export default function ResourceInventory() {
                       {r.awsAccountId}
                     </td>
                     <td style={{ padding: '12px', color: '#9ca3af' }}>{r.region}</td>
-                    <td style={{ padding: '12px', color: stateColor(r.state) }}>{r.state}</td>
+                    <td style={{ padding: '12px', color: resourceStateColor(r.state) }}>{r.state}</td>
                     <td style={{ padding: '12px' }}>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <select
