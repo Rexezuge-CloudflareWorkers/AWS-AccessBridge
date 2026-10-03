@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Assumé par ARN",
     "auditLogsTab": "Journaux d'audit",
     "cleanupFailed": "Échec de l'exécution du nettoyage",
+    "cleanupFailedTables": "Nettoyage impossible : {{tables}}",
+    "cleanupPartial": "Nettoyage terminé avec {{failed}} table(s) en échec — {{count}} ligne(s) supprimée(s)",
     "collectionDisableFailed": "Échec de la désactivation de la collecte de données",
     "collectionEnableFailed": "Échec de l'activation de la collecte de données",
     "collectionHint": "Activez la collecte en arrière-plan des coûts et/ou de l'inventaire des ressources pour des identifiants. Les identifiants doivent disposer des autorisations AWS requises.",

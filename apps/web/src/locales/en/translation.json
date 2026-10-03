@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Assumed By ARN",
     "auditLogsTab": "Audit Logs",
     "cleanupFailed": "Failed to run cleanup",
+    "cleanupFailedTables": "Could not clean: {{tables}}",
+    "cleanupPartial": "Cleanup finished with {{failed}} table(s) failing — {{count}} row(s) removed",
     "collectionDisableFailed": "Failed to disable data collection",
     "collectionEnableFailed": "Failed to enable data collection",
     "collectionHint": "Enable background cost and/or resource inventory collection for a credential. The credential must have the required AWS permissions.",

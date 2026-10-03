@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { removeAccountNickname, setAccountNickname } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function AccountsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -22,37 +21,24 @@ export default function AccountsTab({ showMessage }: { showMessage: ShowMessage 
   const handleSetNickname = async () => {
     if (!isSetNicknameValid) return;
 
-    const result = await apiFetch('/user/admin/account/nickname', {
-      method: 'PUT',
-      body: {
-        awsAccountId: nicknameForm.awsAccountId,
-        nickname: nicknameForm.nickname,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await setAccountNickname(nicknameForm.awsAccountId, nicknameForm.nickname);
       showMessage('success', t('admin.nicknameSet', 'Account nickname set successfully'));
       setNicknameForm({ awsAccountId: '', nickname: '' });
-    } else {
-      showMessage('error', result.error || t('admin.nicknameSetFailed', 'Failed to set nickname'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.nicknameSetFailed', 'Failed to set nickname'));
     }
   };
 
   const handleRemoveNickname = async () => {
     if (!isRemoveNicknameValid) return;
 
-    const result = await apiFetch('/user/admin/account/nickname', {
-      method: 'DELETE',
-      body: {
-        awsAccountId: nicknameForm.awsAccountId,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await removeAccountNickname(nicknameForm.awsAccountId);
       showMessage('success', t('admin.nicknameRemoved', 'Account nickname removed successfully'));
       setNicknameForm({ awsAccountId: '', nickname: '' });
-    } else {
-      showMessage('error', result.error || t('admin.nicknameRemoveFailed', 'Failed to remove nickname'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.nicknameRemoveFailed', 'Failed to remove nickname'));
     }
   };
 

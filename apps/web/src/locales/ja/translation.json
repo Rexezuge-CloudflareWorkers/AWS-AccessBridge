@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "引き受け元ARN",
     "auditLogsTab": "監査ログ",
     "cleanupFailed": "クリーンアップを実行できませんでした",
+    "cleanupFailedTables": "クリーンアップできませんでした: {{tables}}",
+    "cleanupPartial": "クリーンアップは{{failed}}件のテーブルで失敗しました — {{count}}行を削除しました",
     "collectionDisableFailed": "データ収集を無効化できませんでした",
     "collectionEnableFailed": "データ収集を有効化できませんでした",
     "collectionHint": "認証情報のバックグラウンドでのコストやリソースインベントリ収集を有効にします。認証情報には必要なAWS権限が必要です。",

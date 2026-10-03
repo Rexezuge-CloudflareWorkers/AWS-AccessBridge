@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { disableDataCollection, enableDataCollection } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle, inputStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function DataCollectionTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -31,44 +30,24 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
     if (enableForm.costEnabled) collectionTypes.push('cost');
     if (enableForm.resourceEnabled) collectionTypes.push('resource');
 
-    const result = await apiFetch('/user/admin/collection/config', {
-      method: 'POST',
-      body: {
-        principalArn: enableForm.principalArn,
-        collectionTypes,
-      },
-    });
-
-    if (result.ok) {
-      showMessage(
-        'success',
-        t('admin.collectionEnabledFor', 'Data collection enabled for {{types}}', { types: collectionTypes.join(', ') }),
-      );
+    try {
+      await enableDataCollection(enableForm.principalArn, collectionTypes);
+      showMessage('success', t('admin.collectionEnabledFor', 'Data collection enabled for {{types}}', { types: collectionTypes.join(', ') }));
       setEnableForm({ principalArn: '', costEnabled: true, resourceEnabled: true });
-    } else {
-      showMessage('error', result.error || t('admin.collectionEnableFailed', 'Failed to enable data collection'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.collectionEnableFailed', 'Failed to enable data collection'));
     }
   };
 
   const handleDisableCollection = async () => {
     if (!isDisableValid) return;
 
-    const result = await apiFetch('/user/admin/collection/config', {
-      method: 'DELETE',
-      body: {
-        principalArn: disableForm.principalArn,
-        collectionType: disableForm.collectionType,
-      },
-    });
-
-    if (result.ok) {
-      showMessage(
-        'success',
-        t('admin.collectionDisabledFor', 'Data collection disabled for {{type}}', { type: disableForm.collectionType }),
-      );
+    try {
+      await disableDataCollection(disableForm.principalArn, disableForm.collectionType);
+      showMessage('success', t('admin.collectionDisabledFor', 'Data collection disabled for {{type}}', { type: disableForm.collectionType }));
       setDisableForm({ principalArn: '', collectionType: 'cost' });
-    } else {
-      showMessage('error', result.error || t('admin.collectionDisableFailed', 'Failed to disable data collection'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.collectionDisableFailed', 'Failed to disable data collection'));
     }
   };
 

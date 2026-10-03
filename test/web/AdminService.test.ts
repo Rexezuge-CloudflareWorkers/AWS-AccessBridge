@@ -87,8 +87,35 @@ describe('adminService', () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ roles: [{ roleName: 'Dev', arn: 'arn:role/Dev', description: 'dev' }] }));
     await expect(discoverAccountRoles('arn:role')).resolves.toEqual({ roles: [{ roleName: 'Dev', arn: 'arn:role/Dev', description: 'dev' }] });
 
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ deleted: 7 }));
-    await expect(cleanupOrphaned()).resolves.toEqual({ deleted: 7 });
+    // The route returns per-table counts plus a `failures` list, not a single
+    // `deleted` number — `cleanupOrphanedData` settles each table independently
+    // so a partial run can still answer 200 and report what failed. This test
+    // previously asserted a `{deleted: 7}` shape that the route never produced.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        deletedCounts: { awsAccounts: 1, roleConfigs: 2, teamAccounts: 1, spendAlerts: 1, costData: 1, resourceInventory: 1, dataCollectionConfig: 0 },
+        totalDeleted: 7,
+        failures: [],
+      }),
+    );
+    await expect(cleanupOrphaned()).resolves.toEqual({
+      deletedCounts: { awsAccounts: 1, roleConfigs: 2, teamAccounts: 1, spendAlerts: 1, costData: 1, resourceInventory: 1, dataCollectionConfig: 0 },
+      totalDeleted: 7,
+      failures: [],
+    });
+  });
+
+  it('surfaces per-table failures from a partial cleanup', async () => {
+    // A partial run is a 200, not an error — the caller must be able to tell the
+    // administrator which tables were missed rather than reporting success.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        deletedCounts: { awsAccounts: 1, roleConfigs: 0, teamAccounts: 0, spendAlerts: 0, costData: 0, resourceInventory: 0, dataCollectionConfig: 0 },
+        totalDeleted: 1,
+        failures: ['spend_alerts'],
+      }),
+    );
+    await expect(cleanupOrphaned()).resolves.toMatchObject({ totalDeleted: 1, failures: ['spend_alerts'] });
   });
 
   it('flattens the spend alert id out of its envelope, tolerating a missing one', async () => {
@@ -122,16 +149,47 @@ describe('adminService', () => {
   });
 
   it('toggles data collection and spend alerts', async () => {
-    await enableDataCollection('arn:role', 'cost');
-    expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/collection/config', method: 'POST', body: { principalArn: 'arn:role', collectionType: 'cost' } });
+    // `collectionTypes` is plural on purpose: `POST /user/admin/collection/config`
+    // declares `required: ['principalArn', 'collectionTypes']` and applies the
+    // list in one call. This test previously asserted a singular
+    // `collectionType`, locking in a mismatch that had no caller to expose it.
+    await enableDataCollection('arn:role', ['cost', 'resource']);
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/collection/config',
+      method: 'POST',
+      body: { principalArn: 'arn:role', collectionTypes: ['cost', 'resource'] },
+    });
 
     vi.mocked(fetch).mockClear();
     await disableDataCollection('arn:role', 'cost');
-    expect(lastRequest(vi.mocked(fetch)).method).toBe('DELETE');
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/collection/config',
+      method: 'DELETE',
+      body: { principalArn: 'arn:role', collectionType: 'cost' },
+    });
 
     vi.mocked(fetch).mockClear();
     await deleteSpendAlert('alert-1');
     expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/costs/alerts', method: 'DELETE', body: { alertId: 'alert-1' } });
+  });
+
+  it('sends an omitted userEmail as absent, not empty, so the route can fall back', async () => {
+    // The route falls back to the authenticated admin only when `userEmail` is
+    // absent; an empty string would be sent as a real (invalid) address.
+    await grantAccess(undefined, '123456789012', 'Admin');
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/access',
+      method: 'POST',
+      body: { userEmail: undefined, awsAccountId: '123456789012', roleName: 'Admin' },
+    });
+  });
+
+  it('omits a blank session token rather than sending an empty one', async () => {
+    // An empty session token would be stored as a real value on the credentials
+    // row instead of marking the credentials long-lived.
+    await storeCredentials('arn:role', 'AK', 'SK');
+    const body = lastRequest(vi.mocked(fetch)).body as { sessionToken?: string };
+    expect(body.sessionToken).toBeUndefined();
   });
 
   it('propagates ApiError so callers can distinguish 401 from 500', async () => {

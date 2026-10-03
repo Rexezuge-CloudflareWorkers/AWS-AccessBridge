@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, apiFetch, apiRequest, isUnauthorized, throwForResponse } from '@aws-access-bridge/web/lib/api';
+import { ApiError, apiRequest, isUnauthorized, throwForResponse } from '@aws-access-bridge/web/lib/api';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -61,39 +61,6 @@ describe('apiRequest', () => {
 
     vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(json({}, 403)));
     expect(isUnauthorized(await apiRequest('/x').catch((err: unknown) => err))).toBe(false);
-  });
-});
-
-describe('apiFetch (compat result model)', () => {
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(json({}))))
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('reports a 2xx JSON body', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(json({ a: 1 })));
-    await expect(apiFetch<{ a: number }>('/x')).resolves.toMatchObject({ ok: true, status: 200, data: { a: 1 } });
-  });
-
-  it('reports a network failure as ok:false with status 0 rather than throwing', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.reject(new Error('offline')));
-    const result = await apiFetch('/x');
-    expect(result).toMatchObject({ ok: false, status: 0 });
-    expect(result.error).toContain('offline');
-  });
-
-  it('reports a non-2xx response as ok:false with the status', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(json({ Exception: { Message: 'nope' } }, 500)));
-    const result = await apiFetch('/x');
-    expect(result).toMatchObject({ ok: false, status: 500 });
-    expect(result.error).toContain('nope');
-  });
-
-  it('handles an empty 2xx body', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response('', { status: 200 })));
-    await expect(apiFetch('/x')).resolves.toMatchObject({ ok: true, data: null });
   });
 });
 

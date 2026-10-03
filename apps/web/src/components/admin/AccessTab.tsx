@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { grantAccess, revokeAccess } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function AccessTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -22,40 +21,27 @@ export default function AccessTab({ showMessage }: { showMessage: ShowMessage })
   const handleGrantAccess = async () => {
     if (!isFormValid) return;
 
-    const result = await apiFetch('/user/admin/access', {
-      method: 'POST',
-      body: {
-        userEmail: accessForm.userEmail || undefined,
-        awsAccountId: accessForm.awsAccountId,
-        roleName: accessForm.roleName,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      // `undefined` rather than `''`: the route falls back to the authenticated
+      // admin only when the field is absent, so an empty string would be sent
+      // as a real (invalid) address.
+      await grantAccess(accessForm.userEmail || undefined, accessForm.awsAccountId, accessForm.roleName);
       showMessage('success', t('admin.accessGranted', 'Access granted successfully'));
       setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
-    } else {
-      showMessage('error', result.error || t('admin.accessGrantFailed', 'Failed to grant access'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.accessGrantFailed', 'Failed to grant access'));
     }
   };
 
   const handleRevokeAccess = async () => {
     if (!isFormValid) return;
 
-    const result = await apiFetch('/user/admin/access', {
-      method: 'DELETE',
-      body: {
-        userEmail: accessForm.userEmail || undefined,
-        awsAccountId: accessForm.awsAccountId,
-        roleName: accessForm.roleName,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await revokeAccess(accessForm.userEmail || undefined, accessForm.awsAccountId, accessForm.roleName);
       showMessage('success', t('admin.accessRevoked', 'Access revoked successfully'));
       setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
-    } else {
-      showMessage('error', result.error || t('admin.accessRevokeFailed', 'Failed to revoke access'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.accessRevokeFailed', 'Failed to revoke access'));
     }
   };
 

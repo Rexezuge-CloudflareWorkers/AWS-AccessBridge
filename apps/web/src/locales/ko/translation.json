@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "수임자 ARN",
     "auditLogsTab": "감사 로그",
     "cleanupFailed": "정리를 실행하지 못했습니다",
+    "cleanupFailedTables": "정리할 수 없음: {{tables}}",
+    "cleanupPartial": "{{failed}}개 테이블에서 실패하여 정리가 끝났습니다 — {{count}}개 행이 삭제되었습니다",
     "collectionDisableFailed": "데이터 수집을 비활성화하지 못했습니다",
     "collectionEnableFailed": "데이터 수집을 활성화하지 못했습니다",
     "collectionHint": "자격 증명의 백그라운드 비용 및/또는 리소스 인벤토리 수집을 활성화하세요. 자격 증명에 필요한 AWS 권한이 있어야 합니다.",
