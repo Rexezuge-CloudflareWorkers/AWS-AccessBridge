@@ -2,7 +2,7 @@ import { AwsAccountsDAO, RoleConfigsDAO } from '@aws-access-bridge/backend-data/
 
 import type { AccessKeys, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import { AWS_ACCOUNT_ID_PATTERN } from '../access';
+import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared/utils/aws';
 import { CredentialChainService } from '../credential';
 import { IamService, type DiscoveredRole } from '../aws/iam';
 import { StsService } from '../aws/sts';
@@ -30,8 +30,8 @@ class AccountService {
     if (!awsAccountId || !nickname) {
       throw new BadRequestError('Missing required fields.');
     }
-    if (!AWS_ACCOUNT_ID_PATTERN.test(awsAccountId)) {
-      throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
+    if (!isAwsAccountId(awsAccountId)) {
+      throw new BadRequestError(AWS_ACCOUNT_ID_ERROR_MESSAGE);
     }
     if (nickname.trim().length === 0) {
       throw new BadRequestError('Nickname cannot be empty.');
@@ -49,8 +49,8 @@ class AccountService {
     if (!awsAccountId) {
       throw new BadRequestError('Missing required fields.');
     }
-    if (!AWS_ACCOUNT_ID_PATTERN.test(awsAccountId)) {
-      throw new BadRequestError('Invalid AWS Account ID format. Must be exactly 12 digits.');
+    if (!isAwsAccountId(awsAccountId)) {
+      throw new BadRequestError(AWS_ACCOUNT_ID_ERROR_MESSAGE);
     }
     const accountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
     // No `ensureAccountExists` here: removing a nickname from an unknown account

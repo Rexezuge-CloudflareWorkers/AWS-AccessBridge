@@ -2,6 +2,7 @@
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
+import { DEFAULT_TEAM_ID } from '@aws-access-bridge/shared/constants';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
@@ -38,7 +39,7 @@ class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse,
                 value: {
                   teams: [
                     {
-                      id: '00000000-0000-0000-0000-000000000000',
+                      id: DEFAULT_TEAM_ID,
                       name: 'Default',
                       createdBy: 'system',
                       createdAt: 1_700_000_000,

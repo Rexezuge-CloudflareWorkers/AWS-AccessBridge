@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
 import { getConsoleDestination } from '../services/resourceService';
+import { buildFederateUrl } from '../services/accountService';
 import type { ConsoleDestination, ResourceItem } from '../services/resourceService';
 import { useResources } from '../hooks/useResources';
 
@@ -50,15 +51,7 @@ export default function ResourceInventory() {
     const destination: ConsoleDestination | null = getConsoleDestination(resource);
     if (!role || !destination) return;
 
-    const params = new URLSearchParams({
-      awsAccountId: resource.awsAccountId,
-      role,
-      destinationPath: destination.path,
-    });
-    if (destination.region) {
-      params.set('destinationRegion', destination.region);
-    }
-    window.open(`/user/aws/federate?${params.toString()}`, '_blank', 'noopener,noreferrer');
+    window.open(buildFederateUrl(resource.awsAccountId, role, { destinationPath: destination.path, destinationRegion: destination.region }), '_blank', 'noopener,noreferrer');
   };
 
   return (

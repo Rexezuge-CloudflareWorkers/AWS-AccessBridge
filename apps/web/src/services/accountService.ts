@@ -79,9 +79,36 @@ async function assumeRoleKeys(accountId: string, role: string): Promise<AccessKe
   return readJson<AccessKeysResponse>(assumeRes);
 }
 
-function buildFederateUrl(accountId: string, role: string): string {
-  return `/user/aws/federate?awsAccountId=${accountId}&role=${encodeURIComponent(role)}`;
+/**
+ * The console-destination parameters `GET /user/aws/federate` accepts alongside
+ * the required pair. `FederateQuerySchema` on the server defines which are legal;
+ * this is the client half of that contract.
+ */
+interface FederateDestination {
+  destinationPath?: string;
+  destinationRegion?: string;
 }
 
-export type { RoleMap, AccountsResult, ListAccountsOptions };
+/**
+ * Builds the federate URL.
+ *
+ * Previously this took only `(accountId, role)` while `ResourceInventory` built
+ * the same endpoint by hand with `URLSearchParams` to add the two destination
+ * parameters — two string builders against one server-side schema, which is how a
+ * parameter name or an encoding difference would go unnoticed. `URLSearchParams`
+ * handles encoding for every value, so a role name containing `&` or `#` cannot
+ * truncate the query.
+ */
+function buildFederateUrl(accountId: string, role: string, destination?: FederateDestination): string {
+  const params = new URLSearchParams({ awsAccountId: accountId, role });
+  if (destination?.destinationPath) {
+    params.set('destinationPath', destination.destinationPath);
+  }
+  if (destination?.destinationRegion) {
+    params.set('destinationRegion', destination.destinationRegion);
+  }
+  return `/user/aws/federate?${params.toString()}`;
+}
+
+export type { FederateDestination, RoleMap, AccountsResult, ListAccountsOptions };
 export { listAccounts, setFavorite, setRoleHidden, assumeRoleKeys, buildFederateUrl };

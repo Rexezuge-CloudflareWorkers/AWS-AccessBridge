@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { AWS_ACCOUNT_ID_ERROR_MESSAGE, AWS_ACCOUNT_ID_PATTERN } from '../utils/aws';
 
-const AWS_ACCOUNT_ID_PATTERN: RegExp = /^\d{12}$/;
 const AWS_IAM_PRINCIPAL_ARN_PATTERN: RegExp = /^arn:aws:iam::\d{12}:(role|user)\/.+$/;
 const AWS_REGION_PATTERN: RegExp = /^[a-z]{2}(-gov)?-[a-z]+-\d$/;
 const UUID_PATTERN: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +49,7 @@ const isoDateQuerySchema = (fieldName: string) =>
     .regex(/^\d{4}-\d{2}-\d{2}$/, `${fieldName} must use YYYY-MM-DD format.`)
     .refine(hasRealDateParts, `${fieldName} must be a valid calendar date.`);
 
-const AwsAccountIdSchema = z.string().regex(AWS_ACCOUNT_ID_PATTERN, 'AWS Account ID must be exactly 12 digits.');
+const AwsAccountIdSchema = z.string().regex(AWS_ACCOUNT_ID_PATTERN, AWS_ACCOUNT_ID_ERROR_MESSAGE);
 const AwsIamPrincipalArnSchema = z.string().regex(AWS_IAM_PRINCIPAL_ARN_PATTERN, 'Principal ARN must be an AWS IAM role or user ARN.');
 const AwsRoleNameSchema = nonEmptyStringSchema('roleName', 128);
 const AwsAccessKeyIdSchema = nonEmptyStringSchema('accessKeyId', 128);
@@ -72,8 +72,11 @@ const PeriodTypeSchema = z.enum(['daily', 'monthly']);
 const UuidSchema = z.string().regex(UUID_PATTERN, 'Value must be a valid UUID.');
 const BooleanQuerySchema = z.enum(['true', 'false']);
 
+// Re-exported so `schema/common` stays the import site for callers that want the
+// pattern and the zod schema together. The definitions live in `utils/aws`, which
+// is zod-free so the web app can validate without pulling in the library.
+export { AWS_ACCOUNT_ID_ERROR_MESSAGE, AWS_ACCOUNT_ID_PATTERN, isAwsAccountId } from '../utils/aws';
 export {
-  AWS_ACCOUNT_ID_PATTERN,
   AWS_IAM_PRINCIPAL_ARN_PATTERN,
   AWS_REGION_PATTERN,
   AwsAccessKeyIdSchema,

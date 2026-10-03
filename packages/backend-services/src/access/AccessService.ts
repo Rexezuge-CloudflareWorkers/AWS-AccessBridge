@@ -4,8 +4,7 @@ import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';
-
-const AWS_ACCOUNT_ID_PATTERN = /^\d{12}$/;
+import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared/utils/aws';
 
 type AccessServiceEnv = ServiceEnv;
 
@@ -23,8 +22,8 @@ class AccessService {
     if (!awsAccountId || !roleName) {
       throw new BadRequestError('Missing required fields.');
     }
-    if (!AWS_ACCOUNT_ID_PATTERN.test(awsAccountId)) {
-      throw new BadRequestError('AWS Account ID must be exactly 12 digits.');
+    if (!isAwsAccountId(awsAccountId)) {
+      throw new BadRequestError(AWS_ACCOUNT_ID_ERROR_MESSAGE);
     }
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
@@ -37,8 +36,8 @@ class AccessService {
     if (!awsAccountId || !roleName) {
       throw new BadRequestError('Missing required fields.');
     }
-    if (!AWS_ACCOUNT_ID_PATTERN.test(awsAccountId)) {
-      throw new BadRequestError('AWS Account ID must be exactly 12 digits.');
+    if (!isAwsAccountId(awsAccountId)) {
+      throw new BadRequestError(AWS_ACCOUNT_ID_ERROR_MESSAGE);
     }
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     // No `ensureAccountExists` here: revoking access for an account that was
@@ -47,5 +46,5 @@ class AccessService {
     const owner = await resolveOwner(this.identity, userEmail);
     await assumableRolesDAO.revokeUserAccessToRole(owner, awsAccountId, roleName);
   }
-}export { AccessService, AWS_ACCOUNT_ID_PATTERN };
+}export { AccessService };
 export type { AccessServiceEnv };
