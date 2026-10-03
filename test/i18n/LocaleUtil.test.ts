@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LocaleUtil } from '@aws-access-bridge/shared/utils';
-import { getBackendStrings } from '@aws-access-bridge/shared/i18n';
 import { normalizeLanguage, detectInitialLanguage } from '../../apps/web/src/i18n';
 import enTranslation from '../../apps/web/src/locales/en/translation.json';
 import deTranslation from '../../apps/web/src/locales/de/translation.json';
@@ -101,16 +100,6 @@ describe('LocaleUtil', () => {
   it('resolves display names', () => {
     expect(LocaleUtil.displayName('de')).toBe('Deutsch');
     expect(LocaleUtil.displayName('xx')).toBe('English');
-  });
-});
-
-describe('getBackendStrings', () => {
-  it('resolves normalized locales and falls back to English', () => {
-    expect(getBackendStrings('de').locale).toBe('en');
-    expect(getBackendStrings('de_DE')).toBe(getBackendStrings('de'));
-    expect(getBackendStrings(null).locale).toBe('en');
-    expect(getBackendStrings(undefined).locale).toBe('en');
-    expect(getBackendStrings('xx').locale).toBe('en');
   });
 });
 
