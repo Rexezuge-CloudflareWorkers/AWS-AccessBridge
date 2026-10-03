@@ -31,3 +31,28 @@ export function formatCurrency(amount: number, currency: string, lng: string): s
   }
 }
 
+/**
+ * Formats an amount whose currency may be unknown.
+ *
+ * `null` means the total spans more than one currency, so no symbol can honestly
+ * be attached. Rendering a `$` anyway is worse than rendering nothing: it is a
+ * confident wrong answer, where a bare number is visibly incomplete and a reader
+ * knows to ask. Compact formatting is for chart labels, where the exact cent is
+ * noise and horizontal space is scarce.
+ */
+export function formatAmount(amount: number, currency: string | null, lng: string, compact = false): string {
+  if (currency === null) {
+    const magnitudeLabel = new Intl.NumberFormat(lng, compact ? { notation: 'compact' } : {}).format(compact ? Math.round(amount) : amount);
+    return compact ? `~${magnitudeLabel}` : `${magnitudeLabel} (mixed currency)`;
+  }
+  try {
+    const options: Intl.NumberFormatOptions = { style: 'currency', currency };
+    if (compact) {
+      options.notation = 'compact';
+    }
+    return new Intl.NumberFormat(lng, options).format(amount);
+  } catch {
+    return `${currency} ${compact ? Math.round(amount) : amount.toFixed(2)}`;
+  }
+}
+

@@ -3,7 +3,7 @@ import { listAccounts, setFavorite, setRoleHidden, assumeRoleKeys, buildFederate
 import { loadSummary as loadCostSummary, loadTrends } from '@aws-access-bridge/web/services/costService';
 import { loadSummary as loadResourceSummary, listResources, getConsoleDestination } from '@aws-access-bridge/web/services/resourceService';
 import { loadCurrentUser, updatePreferredLanguage } from '@aws-access-bridge/web/services/authService';
-import { formatMonthLabel, formatCurrency } from '@aws-access-bridge/web/lib/format';
+import { formatMonthLabel, formatCurrency, formatAmount, formatUnixDate, formatUnixTimestamp } from '@aws-access-bridge/web/lib/format';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
@@ -98,5 +98,52 @@ describe('lib/format', () => {
     expect(formatMonthLabel('2025-13', 'en')).toBe('13');
     expect(formatCurrency(12.5, 'USD', 'en')).toContain('12.50');
     expect(formatCurrency(12.5, 'NOPE-NOT-A-CURRENCY', 'en')).toBe('NOPE-NOT-A-CURRENCY 12.50');
+  });
+
+  it('formats the unix timestamp and date helpers', () => {
+    // These back AuditLogsTab and both team sections, and take seconds, not ms.
+    expect(formatUnixTimestamp(1_700_000_000, 'en')).toBe(new Date(1_700_000_000_000).toLocaleString('en'));
+    expect(formatUnixDate(1_700_000_000, 'en')).toBe(new Date(1_700_000_000_000).toLocaleDateString('en'));
+  });
+});
+
+describe('formatAmount', () => {
+  it('uses the currency symbol when the currency is known', () => {
+    expect(formatAmount(12.5, 'USD', 'en')).toBe(formatCurrency(12.5, 'USD', 'en'));
+    expect(formatAmount(12.5, 'EUR', 'de')).toContain('12,50');
+  });
+
+  it('refuses to invent a symbol when the currency is unknown', () => {
+    // Regression guard: the dashboard hardcoded `$` on a total the API never
+    // said was USD. A mixed-currency sum with a `$` on it is a confident wrong
+    // answer; a visibly-incomplete one prompts the reader to ask.
+    const mixed = formatAmount(2365.52, null, 'en');
+    expect(mixed).not.toContain('$');
+    expect(mixed).toContain('2,365.52');
+    expect(mixed).toContain('mixed currency');
+  });
+
+  it('marks an approximate figure when compacting a mixed-currency total', () => {
+    // Chart labels round to a magnitude, so `~` is what distinguishes a rounded
+    // label from an exact one.
+    const compact = formatAmount(2365, null, 'en', true);
+    expect(compact.startsWith('~')).toBe(true);
+    expect(compact).not.toContain('$');
+  });
+
+  it('compacts a known currency without the tilde', () => {
+    const compact = formatAmount(2365, 'USD', 'en', true);
+    expect(compact.startsWith('~')).toBe(false);
+    expect(compact).toContain('$');
+  });
+
+  it('falls back rather than throwing on an unusable currency', () => {
+    expect(formatAmount(12.5, 'NOPE-NOT-A-CURRENCY', 'en')).toContain('12.50');
+    expect(formatAmount(12.5, 'NOPE-NOT-A-CURRENCY', 'en', true)).toContain('13');
+  });
+
+  it('treats zero like any other amount', () => {
+    expect(formatAmount(0, null, 'en')).toContain('0');
+    expect(formatAmount(0, 'USD', 'en')).toContain('0.00');
   });
 });

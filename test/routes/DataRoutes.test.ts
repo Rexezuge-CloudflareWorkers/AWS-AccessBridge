@@ -55,7 +55,9 @@ describe('cost routes', () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue([]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/summary', env: userEnv() });
     await new GetCostSummaryRoute({} as never).handle(c as never);
-    expect(c.json).toHaveBeenCalledWith({ accounts: {}, grandTotal: 0 });
+    // `currency: null` — with no rows there is no currency to report, and the
+    // client must not render a symbol for it.
+    expect(c.json).toHaveBeenCalledWith({ accounts: {}, grandTotal: 0, currency: null });
   });
 
   it('GET /user/costs/account enforces account access', async () => {

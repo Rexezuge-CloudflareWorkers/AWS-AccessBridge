@@ -68,6 +68,7 @@
     "accessKeysTitle": "访问密钥",
     "copied": "已复制!",
     "copyAll": "全部复制",
+    "copyFailed": "剪贴板访问被阻止。请选中上面的代码片段并手动复制。",
     "expiresLabel": "过期时间: {{expiration}}"
   },
   "costs": {

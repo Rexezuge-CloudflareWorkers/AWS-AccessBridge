@@ -68,6 +68,7 @@
     "accessKeysTitle": "Clés d'accès",
     "copied": "Copié !",
     "copyAll": "Tout copier",
+    "copyFailed": "L'accès au presse-papiers a été bloqué. Sélectionnez l'extrait ci-dessus et copiez-le manuellement.",
     "expiresLabel": "Expire : {{expiration}}"
   },
   "costs": {

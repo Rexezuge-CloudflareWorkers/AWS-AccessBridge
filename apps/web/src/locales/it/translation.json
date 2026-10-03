@@ -68,6 +68,7 @@
     "accessKeysTitle": "Chiavi di accesso",
     "copied": "Copiato!",
     "copyAll": "Copia tutto",
+    "copyFailed": "L'accesso agli appunti è stato bloccato. Seleziona lo snippet sopra e copialo manualmente.",
     "expiresLabel": "Scade: {{expiration}}"
   },
   "costs": {

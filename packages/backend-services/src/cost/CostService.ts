@@ -28,6 +28,13 @@ interface AccountCostSummary {
 interface CostSummary {
   accounts: Record<string, AccountCostSummary>;
   grandTotal: number;
+  /**
+   * The currency `grandTotal` is denominated in. The total is a plain sum across
+   * accounts, so it only has a currency if they agree; when they do not, this is
+   * `null` and the client must not render a symbol, because a `$` on a mixed-EUR
+   * sum would be a confident wrong answer rather than an obvious omission.
+   */
+  currency: string | null;
 }
 
 interface AccountCost {
@@ -62,7 +69,7 @@ class CostService {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
 
-    if (accountIds.length === 0) return { accounts: {}, grandTotal: 0 };
+    if (accountIds.length === 0) return { accounts: {}, grandTotal: 0, currency: null };
 
     const { startDate, endDate } = MoneyUtil.lookbackWindow(lookbackDays);
 
@@ -71,6 +78,7 @@ class CostService {
 
     const accounts: Record<string, AccountCostSummary> = {};
     let grandTotal: number = 0;
+    let summaryCurrency: string | null = null;
 
     for (const data of costData) {
       if (accounts[data.awsAccountId] === undefined) {
@@ -78,13 +86,21 @@ class CostService {
       }
       accounts[data.awsAccountId].totalCost += data.totalCost;
       grandTotal += data.totalCost;
+      // Track agreement rather than taking the first account's currency: a
+      // sum that silently spans USD and EUR is arithmetically meaningless, and
+      // the honest answer is to report no currency at all.
+      if (summaryCurrency === null) {
+        summaryCurrency = data.currency;
+      } else if (summaryCurrency !== data.currency) {
+        summaryCurrency = null;
+      }
     }
 
     for (const accountId in accounts) {
       accounts[accountId].totalCost = MoneyUtil.round(accounts[accountId].totalCost);
     }
 
-    return { accounts, grandTotal: MoneyUtil.round(grandTotal) };
+    return { accounts, grandTotal: MoneyUtil.round(grandTotal), currency: summaryCurrency };
   }
 
   public async getAccountCost(userEmail: string, awsAccountId: string, startDate?: string, endDate?: string): Promise<AccountCost> {

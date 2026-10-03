@@ -68,6 +68,7 @@
     "accessKeysTitle": "Klucze dostępu",
     "copied": "Skopiowano!",
     "copyAll": "Kopiuj wszystko",
+    "copyFailed": "Dostęp do schowka został zablokowany. Zaznacz fragment powyżej i skopiuj go ręcznie.",
     "expiresLabel": "Wygasa: {{expiration}}"
   },
   "costs": {

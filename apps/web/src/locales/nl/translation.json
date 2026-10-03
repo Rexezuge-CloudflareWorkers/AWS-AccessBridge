@@ -68,6 +68,7 @@
     "accessKeysTitle": "Toegangssleutels",
     "copied": "Gekopieerd!",
     "copyAll": "Alles kopiëren",
+    "copyFailed": "Toegang tot het klembord is geblokkeerd. Selecteer het fragment hierboven en kopieer het handmatig.",
     "expiresLabel": "Verloopt: {{expiration}}"
   },
   "costs": {

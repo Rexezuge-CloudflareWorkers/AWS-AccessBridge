@@ -68,6 +68,7 @@
     "accessKeysTitle": "Chaves de acesso",
     "copied": "Copiado!",
     "copyAll": "Copiar tudo",
+    "copyFailed": "O acesso à área de transferência foi bloqueado. Selecione o trecho acima e copie-o manualmente.",
     "expiresLabel": "Expira: {{expiration}}"
   },
   "costs": {

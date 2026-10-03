@@ -11,20 +11,28 @@
  * user has switched teams.
  *
  * This is a factory rather than a hook so the ordering rule is testable without
- * a React renderer: `useRequestGuard` holds one of these in a ref and does
+ * a React renderer: `useRequestGuard` holds one of these in state and does
  * nothing else. Keeping the rule here (instead of inside the hook) is also why
  * `AccountList` and `AuditLogsTab` could adopt it — a fourth and fifth
  * hand-rolled copy of the same three lines is how the guard came to be missing
  * from those two in the first place.
  */
 interface RequestGuard {
-  /** Starts a new request and returns its id. */
+  /**
+   * Starts a new request and returns its id.
+   */
   begin: () => number;
-  /** Whether `id` is still the newest request. */
+  /**
+   * Whether `id` is still the newest request.
+   */
   isCurrent: (id: number) => boolean;
-  /** Retires every in-flight request without starting a new one. */
+  /**
+   * Retires every in-flight request without starting a new one.
+   */
   invalidate: () => void;
-  /** The current id, exposed for tests and diagnostics. */
+  /**
+   * The current id, exposed for tests and diagnostics.
+   */
   current: () => number;
 }
 

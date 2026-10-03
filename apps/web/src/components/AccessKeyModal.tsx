@@ -76,14 +76,25 @@ const modalStyles = {
 export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionToken, expiration, onClose }: Props) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const shellExport = formatShellExport(accessKeyId, secretAccessKey, sessionToken);
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      setCopyFailed(false);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
+      // Previously `console.error` only, so the user clicked "Copy All" and
+      // nothing happened at all — no state change, no explanation. Clipboard
+      // access is denied in several real cases (non-secure context, no
+      // permission, a Firefox focus quirk), so this path is reachable in
+      // production, not theoretical. The snippet is on screen; saying so lets
+      // the user copy it by hand.
       console.error('Failed to copy:', err);
+      setCopied(false);
+      setCopyFailed(true);
     }
   };
 
@@ -110,11 +121,23 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
           {t('modal.accessKeysTitle', 'Access Keys')}
         </h2>
         <pre className="text-sm font-mono" style={{ ...modalStyles.preBlock, whiteSpace: 'pre-wrap' }}>
-          export AWS_ACCESS_KEY_ID="{accessKeyId}"<br />
-          export AWS_SECRET_ACCESS_KEY="{secretAccessKey}"<br />
-          export AWS_SESSION_TOKEN="{sessionToken}"<br />
+          {/* `shellExport` is the same string the Copy All button hands the
+              clipboard, so the displayed snippet and the copied one cannot
+              drift — they were previously spelled twice. */}
+          {shellExport.split('\n').map((line, index) => (
+            <span key={line}>
+              {line}
+              {index < shellExport.split('\n').length - 1 && <br />}
+            </span>
+          ))}
+          <br />
           <span style={{ color: '#6b7280' }}># {t('modal.expiresLabel', 'Expires: {{expiration}}', { expiration })}</span>
         </pre>
+        {copyFailed && (
+          <p style={{ color: '#fca5a5', fontSize: '0.75rem', marginTop: '8px' }}>
+            {t('modal.copyFailed', 'Clipboard access was blocked. Select the snippet above and copy it manually.')}
+          </p>
+        )}
         <div style={modalStyles.btnRow}>
           <button
             className="font-medium"

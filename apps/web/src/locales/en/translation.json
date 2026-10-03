@@ -68,6 +68,7 @@
     "accessKeysTitle": "Access Keys",
     "copied": "Copied!",
     "copyAll": "Copy All",
+    "copyFailed": "Clipboard access was blocked. Select the snippet above and copy it manually.",
     "expiresLabel": "Expires: {{expiration}}"
   },
   "costs": {

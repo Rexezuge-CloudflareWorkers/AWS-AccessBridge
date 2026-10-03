@@ -68,6 +68,7 @@
     "accessKeysTitle": "Zugriffsschlüssel",
     "copied": "Kopiert!",
     "copyAll": "Alle kopieren",
+    "copyFailed": "Zwischenablagezugriff wurde blockiert. Markieren Sie das Snippet oben und kopieren Sie es manuell.",
     "expiresLabel": "Läuft ab: {{expiration}}"
   },
   "costs": {
