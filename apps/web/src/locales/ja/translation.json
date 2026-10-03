@@ -68,6 +68,7 @@
     "accessKeysTitle": "アクセスキー",
     "copied": "コピーしました!",
     "copyAll": "すべてコピー",
+    "copyFailed": "クリップボードへのアクセスがブロックされました。上のスニペットを選択して手動でコピーしてください。",
     "expiresLabel": "有効期限: {{expiration}}"
   },
   "costs": {

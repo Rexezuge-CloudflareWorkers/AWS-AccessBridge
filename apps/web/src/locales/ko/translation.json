@@ -68,6 +68,7 @@
     "accessKeysTitle": "액세스 키",
     "copied": "복사됨!",
     "copyAll": "모두 복사",
+    "copyFailed": "클립보드 접근이 차단되었습니다. 위의 스니펫을 선택하여 직접 복사하세요.",
     "expiresLabel": "만료: {{expiration}}"
   },
   "costs": {

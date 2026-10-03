@@ -8,9 +8,11 @@ import type { HideDialogInfo } from './AccountRoleRow';
 import HideRoleConfirmDialog from './HideRoleConfirmDialog';
 import Spinner from './ui/Spinner';
 import { isUnauthorized } from '../lib/api';
+import { useRequestGuard } from '../hooks/useRequestGuard';
 import { assumeRoleKeys, buildFederateUrl, listAccounts, setFavorite, setRoleHidden } from '../services/accountService';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
 import type { RoleMap } from '../services/accountService';
+import type { ShowMessage } from '../hooks/useToast';
 
 interface AccountListProps {
   showHidden: boolean;
@@ -18,9 +20,10 @@ interface AccountListProps {
   pageSize: number;
   currentPage: number;
   setTotalAccounts: (count: number) => void;
+  showMessage: ShowMessage;
 }
 
-export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts }: AccountListProps) {
+export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, showMessage }: AccountListProps) {
   const { t } = useTranslation();
   const [rolesData, setRolesData] = useState<RoleMap>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -29,10 +32,23 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
   const [loadingKeys, setLoadingKeys] = useState<string | null>(null);
   const [loadingConsole, setLoadingConsole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // The search box and pagination both retrigger this fetch, so responses can
+  // arrive out of order and a slow earlier one would render under a newer query.
+  const { begin, isCurrent } = useRequestGuard();
+
+  // One failure path for every action below. `alert()` was duplicated four times
+  // here, which is why these failures were easy to miss in review: the toast is
+  // the app's established channel and the user actually sees it.
+  const reportFailure = (thrown: unknown): void => {
+    const message = thrown instanceof Error ? thrown.message : t('accounts.unknownError', 'Unknown error occurred');
+    showMessage('error', `${t('common.errorPrefix', 'Error')}: ${message}`);
+  };
 
   useEffect(() => {
+    const request = begin();
     listAccounts({ showHidden, searchTerm, pageSize, currentPage })
       .then(({ roles, total }) => {
+        if (!isCurrent(request)) return;
         setRolesData(roles);
         setTotalAccounts(total);
         setExpanded(Object.fromEntries(Object.keys(roles).map((id) => [id, false])));
@@ -40,6 +56,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
         setIsLoading(false);
       })
       .catch((err: unknown) => {
+        if (!isCurrent(request)) return;
         if (isUnauthorized(err)) {
           globalThis.location.reload();
           return;
@@ -47,7 +64,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
         setError(err instanceof Error ? err.message : t('accounts.loadError', 'Failed to load AWS accounts'));
         setIsLoading(false);
       });
-  }, [showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, t]);
+  }, [showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, t, begin, isCurrent]);
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -66,10 +83,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
         },
       }));
     } catch (error) {
-      console.error(error);
-      alert(
-        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
-      );
+      reportFailure(error);
     }
   };
 
@@ -90,10 +104,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
       await setRoleHidden(accountId, role, !currentlyHidden);
     } catch (error) {
       setRolesData((prev) => ({ ...prev, [accountId]: previous }));
-      console.error(error);
-      alert(
-        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
-      );
+      reportFailure(error);
     }
   };
 
@@ -109,10 +120,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
         globalThis.location.reload();
         return;
       }
-      console.error(error);
-      alert(
-        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
-      );
+      reportFailure(error);
     } finally {
       setLoadingKeys(null);
     }
@@ -124,10 +132,7 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     try {
       window.open(buildFederateUrl(accountId, role), '_blank');
     } catch (error) {
-      console.error(error);
-      alert(
-        `${t('common.errorPrefix', 'Error')}: ${error instanceof Error ? error.message : t('accounts.unknownError', 'Unknown error occurred')}`,
-      );
+      reportFailure(error);
     } finally {
       setLoadingConsole(null);
     }

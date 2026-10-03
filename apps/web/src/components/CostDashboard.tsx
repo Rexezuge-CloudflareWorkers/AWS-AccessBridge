@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
-import { formatMonthLabel } from '../lib/format';
+import { formatAmount, formatCurrency, formatMonthLabel } from '../lib/format';
 import { isUnauthorized } from '../lib/api';
 import { loadSummary, loadTrends } from '../services/costService';
 import type { CostSummary, TrendMonth } from '../services/costService';
 
 export default function CostDashboard() {
   const { t, i18n } = useTranslation();
+  const lng = i18n.resolvedLanguage ?? 'en';
   const [summary, setSummary] = useState<CostSummary | null>(null);
   const [trends, setTrends] = useState<TrendMonth[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +57,7 @@ export default function CostDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         <div style={{ background: '#1e2433', borderRadius: '12px', padding: '24px' }}>
           <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>{t('costs.totalSpend', 'Total Spend (30d)')}</p>
-          <p style={{ color: '#fff', fontSize: '30px', fontWeight: 700 }}>${summary?.grandTotal?.toFixed(2) || '0.00'}</p>
+          <p style={{ color: '#fff', fontSize: '30px', fontWeight: 700 }}>{formatAmount(summary?.grandTotal ?? 0, summary?.currency ?? null, lng)}</p>
         </div>
         <div style={{ background: '#1e2433', borderRadius: '12px', padding: '24px' }}>
           <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>{t('costs.accountsTracked', 'Accounts Tracked')}</p>
@@ -77,7 +78,7 @@ export default function CostDashboard() {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '192px' }}>
             {trends.map((month) => (
               <div key={month.period} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>${month.total.toFixed(0)}</span>
+                <span style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>{formatAmount(month.total, summary?.currency ?? null, lng, true)}</span>
                 <div
                   style={{
                     width: '100%',
@@ -89,7 +90,7 @@ export default function CostDashboard() {
                   }}
                 />
                 <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-                  {formatMonthLabel(month.period, i18n.resolvedLanguage ?? 'en')}
+                  {formatMonthLabel(month.period, lng)}
                 </span>
               </div>
             ))}
@@ -122,7 +123,7 @@ export default function CostDashboard() {
                     {accountId}
                   </span>
                   <span style={{ fontWeight: 600, color: '#fff' }}>
-                    ${data.totalCost.toFixed(2)} {data.currency}
+                    {formatCurrency(data.totalCost, data.currency, lng)}
                   </span>
                 </div>
               ))}

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isUnauthorized } from '../lib/api';
+import { useRequestGuard } from './useRequestGuard';
 import { listResources, loadSummary } from '../services/resourceService';
 import type { ResourceItem, ResourceSummary } from '../services/resourceService';
 
@@ -12,6 +13,7 @@ import type { ResourceItem, ResourceSummary } from '../services/resourceService'
  */
 function useResources() {
   const [summary, setSummary] = useState<ResourceSummary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [total, setTotal] = useState(0);
   const [rolesByAccount, setRolesByAccount] = useState<Record<string, string[]>>({});
@@ -21,24 +23,30 @@ function useResources() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const pageSize = 25;
-  // Monotonic request id, the guard `useTeams` already uses. Typing in the search
-  // box fires overlapping requests; without it a slower earlier one can resolve
-  // last and render page 0's rows under the page-2 selection.
-  const requestId = useRef(0);
+  // Typing in the search box fires overlapping requests; without the guard a
+  // slower earlier one can resolve last and render page 0's rows under the page-2
+  // selection.
+  const { begin, isCurrent } = useRequestGuard();
 
   useEffect(() => {
     loadSummary()
       .then((data) => {
         if (data) setSummary(data);
       })
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        // The summary is supplementary — the table below still works — so this
+        // must not blank the whole view. Previously swallowed with no record,
+        // which made "no resources match" and "the summary call failed"
+        // indistinguishable in the UI. Surfacing it lets the panel say so.
+        setSummaryError(err instanceof Error ? err.message : 'Failed to load the resource summary.');
+      });
   }, []);
 
   useEffect(() => {
-    const currentRequest: number = ++requestId.current;
+    const currentRequest: number = begin();
     listResources({ filterType, searchQuery, pageSize, page })
       .then((data) => {
-        if (currentRequest !== requestId.current) {
+        if (!isCurrent(currentRequest)) {
           return;
         }
         setResources(data.items);
@@ -63,7 +71,7 @@ function useResources() {
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (currentRequest !== requestId.current) {
+        if (!isCurrent(currentRequest)) {
           return;
         }
         if (isUnauthorized(err)) {
@@ -72,10 +80,11 @@ function useResources() {
         }
         setIsLoading(false);
       });
-  }, [filterType, searchQuery, page]);
+  }, [filterType, searchQuery, page, begin, isCurrent]);
 
   return {
     summary,
+    summaryError,
     resources,
     total,
     rolesByAccount,

@@ -137,6 +137,7 @@ export function ensureMinimumConfigVersion(): void {
       `wrangler.jsonc version (${typeof currentVersion === 'number' ? currentVersion : 'missing'}) is below minimum template version (${template.$minimumVersion}). Regenerate it from apps/api/wrangler.template.jsonc.`,
     );
   }
+  console.log(`Config version ${currentVersion} meets minimum ${template.$minimumVersion}.`);
 }
 
 /**

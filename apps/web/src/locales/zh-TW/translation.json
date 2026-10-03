@@ -68,6 +68,7 @@
     "accessKeysTitle": "存取金鑰",
     "copied": "已複製!",
     "copyAll": "全部複製",
+    "copyFailed": "剪貼簿存取被封鎖。請選取上面的程式碼片段並手動複製。",
     "expiresLabel": "到期時間: {{expiration}}"
   },
   "costs": {

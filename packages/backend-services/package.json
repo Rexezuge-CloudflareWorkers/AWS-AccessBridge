@@ -26,6 +26,8 @@
     "./error/*": "./src/error/*.ts",
     "./http": "./src/http/index.ts",
     "./http/*": "./src/http/*.ts",
+    "./identity": "./src/identity/index.ts",
+    "./identity/*": "./src/identity/*.ts",
     "./maintenance": "./src/maintenance/index.ts",
     "./maintenance/*": "./src/maintenance/*.ts",
     "./resource": "./src/resource/index.ts",

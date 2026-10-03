@@ -68,6 +68,7 @@
     "accessKeysTitle": "Claves de acceso",
     "copied": "¡Copiado!",
     "copyAll": "Copiar todo",
+    "copyFailed": "El acceso al portapapeles fue bloqueado. Seleccione el fragmento de arriba y cópielo manualmente.",
     "expiresLabel": "Vence: {{expiration}}"
   },
   "costs": {

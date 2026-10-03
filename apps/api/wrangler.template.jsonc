@@ -1,6 +1,13 @@
 {
   // "$version": 1777605456,
-  // "$minimumVersion": 1777605456,
+  // Arm the fork-staleness guard. Bump both together whenever a deploy needs a
+  // binding or var that an older `WRANGLER_JSONC` variable would not carry: an
+  // omitted `INTERNAL_REQUEST_HMAC_SECRET` breaks every internal self-call, and
+  // an omitted `ENVIRONMENT: "production"` leaves the `DEV_AUTH_EMAIL` bypass
+  // armed in production. `scripts/lib/wrangler-config/patches.ts` refuses to
+  // deploy a config below this line, naming the fix, instead of letting it fail
+  // later against a live environment.
+  "$minimumVersion": 1777605456,
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "aws-access-bridge",
   "main": "apps/api/src/index.ts",

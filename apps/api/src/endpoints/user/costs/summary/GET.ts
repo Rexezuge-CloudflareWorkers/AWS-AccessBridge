@@ -30,6 +30,12 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
                   },
                 },
                 grandTotal: { type: 'number' as const, description: 'Sum of all account costs, rounded to 2 decimal places' },
+                currency: {
+                  type: 'string' as const,
+                  nullable: true,
+                  description:
+                    "Currency the grand total is denominated in, or null when the accounts do not all share one. Null means the sum spans currencies and no symbol should be shown.",
+                },
               },
             },
             examples: {
@@ -41,11 +47,23 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
                     '987654321098': { totalCost: 823.15, currency: 'USD' },
                   },
                   grandTotal: 2365.52,
+                  currency: 'USD',
+                },
+              },
+              'mixed-currency': {
+                summary: 'Accounts reporting different currencies',
+                value: {
+                  accounts: {
+                    '123456789012': { totalCost: 1542.37, currency: 'USD' },
+                    '987654321098': { totalCost: 823.15, currency: 'EUR' },
+                  },
+                  grandTotal: 2365.52,
+                  currency: null,
                 },
               },
               'no-access': {
                 summary: 'User has no accessible accounts',
-                value: { accounts: {}, grandTotal: 0 },
+                value: { accounts: {}, grandTotal: 0, currency: null },
               },
             },
           },
@@ -108,6 +126,7 @@ type GetCostSummaryRequest = IRequest;
 interface GetCostSummaryResponse extends IResponse {
   accounts: Record<string, { totalCost: number; currency: string }>;
   grandTotal: number;
+  currency: string | null;
 }
 
 type GetCostSummaryEnv = IEnv;
