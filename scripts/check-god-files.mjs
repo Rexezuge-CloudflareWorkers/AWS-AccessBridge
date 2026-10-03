@@ -17,7 +17,15 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const SOFT = 300;
 const HARD = 400;
 const EXCLUDE_DIRS = new Set(['node_modules', 'dist', '.wrangler', 'coverage', 'coverage-integration', '.git']);
-const EXCLUDE_SUFFIX = ['.test.ts', '.spec.ts', '.int.test.ts', '.d.ts'];
+// `.tsx` variants matter: the walker collects both, so a list that only named
+// `.test.ts` let every React test file through the guard and reported them as
+// god files. The suffix set is built from the extensions rather than enumerated,
+// so a new test extension cannot silently escape.
+const TEST_SUFFIX = ['test', 'spec'];
+const EXCLUDE_SUFFIX = [
+  ...TEST_SUFFIX.flatMap((kind) => ['.ts', '.tsx', '.js', '.jsx', '.mjs'].map((ext) => `.${kind}${ext}`)),
+  '.d.ts',
+];
 
 /**
 Paths relative to ROOT, so the patterns below can match on directory too.
@@ -31,7 +39,16 @@ function shouldSkip(rel) {
   // Matched on a path segment rather than `/scripts/` because `relative()` yields
   // `scripts/...` with no leading separator for a top-level directory.
   if (/(?:^|\/)scripts\//.test(path)) return true;
-  if (/\.config\.(?:m?[jt]s|cjs)$/.test(path) || path.endsWith('.json') || path.endsWith('.sql') || path.endsWith('.md') || EXCLUDE_SUFFIX.some((s) => path.endsWith(s))) return true;
+  if (
+    /\.config\.(?:m?[jt]s|cjs)$/.test(path) ||
+    path.endsWith('.json') ||
+    path.endsWith('.sql') ||
+    path.endsWith('.md') ||
+    // Directory-based test roots, for files not named `*.test.ts`.
+    /\/(?:test|tests|__tests__)\//.test(path) ||
+    EXCLUDE_SUFFIX.some((s) => path.endsWith(s))
+  )
+    return true;
   return false;
 }
 

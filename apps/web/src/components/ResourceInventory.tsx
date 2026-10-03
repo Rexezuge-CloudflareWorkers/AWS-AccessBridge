@@ -3,19 +3,12 @@
 import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
+import ResourceRow from './ResourceRow';
+import ResourceSummaryCards from './ResourceSummaryCards';
 import { getConsoleDestination } from '../services/resourceService';
 import { buildFederateUrl } from '../services/accountService';
 import type { ConsoleDestination, ResourceItem } from '../services/resourceService';
 import { useResources } from '../hooks/useResources';
-import { resourceStateColor } from '../lib/presentation';
-
-const TYPE_LABEL_KEYS: Record<string, string> = {
-  ec2: 'resources.typeEc2',
-  s3: 'resources.typeS3',
-  lambda: 'resources.typeLambda',
-  rds: 'resources.typeRds',
-  dynamodb: 'resources.typeDynamodb',
-};
 
 export default function ResourceInventory() {
   const { t } = useTranslation();
@@ -55,49 +48,7 @@ export default function ResourceInventory() {
       {summaryError && (
         <div style={{ color: '#f87171', fontSize: '0.875rem' }}>{summaryError}</div>
       )}
-      {summary && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${1 + Object.keys(summary.byType).length}, 1fr)`,
-            gap: '12px',
-          }}
-        >
-          <div
-            style={{
-              background: '#1e2433',
-              padding: '16px',
-              borderRadius: '12px',
-              textAlign: 'center',
-            }}
-          >
-            <p className="text-2xl font-bold" style={{ color: '#fff' }}>
-              {summary.totalResources}
-            </p>
-            <p className="text-xs" style={{ color: '#9ca3af', marginTop: '4px' }}>
-              {t('resources.total', 'Total')}
-            </p>
-          </div>
-          {Object.entries(summary.byType).map(([type, count]) => (
-            <div
-              key={type}
-              style={{
-                background: '#1e2433',
-                padding: '16px',
-                borderRadius: '12px',
-                textAlign: 'center',
-              }}
-            >
-              <p className="text-2xl font-bold" style={{ color: '#fff' }}>
-                {count}
-              </p>
-              <p className="text-xs" style={{ color: '#9ca3af', marginTop: '4px' }}>
-                {t(TYPE_LABEL_KEYS[type] ?? 'resources.typeLabel', type)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      {summary && <ResourceSummaryCards summary={summary} />}
 
       {/* Filters */}
       <div
@@ -252,94 +203,16 @@ export default function ResourceInventory() {
             </thead>
             <tbody>
               {resources.map((r, idx) => {
-                const accountRoles: string[] = rolesByAccount[r.awsAccountId] || [];
-                const selectedRole: string = selectedRoles[r.awsAccountId] || accountRoles[0] || '';
-                const canOpen: boolean = Boolean(selectedRole && getConsoleDestination(r));
                 return (
-                  <tr
+                  <ResourceRow
                     key={`${r.awsAccountId}-${r.resourceType}-${r.resourceId}`}
-                    style={{
-                      borderTop: idx === 0 ? 'none' : '1px solid #2d3748',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = '#252d3d';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    }}
-                  >
-                    <td className="font-medium uppercase text-xs" style={{ padding: '12px', color: '#d1d5db' }}>
-                      {r.resourceType}
-                    </td>
-                    <td style={{ padding: '12px', color: '#fff' }}>{r.resourceName}</td>
-                    <td className="font-mono text-xs" style={{ padding: '12px', color: '#9ca3af' }}>
-                      {r.awsAccountId}
-                    </td>
-                    <td style={{ padding: '12px', color: '#9ca3af' }}>{r.region}</td>
-                    <td style={{ padding: '12px', color: resourceStateColor(r.state) }}>{r.state}</td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <select
-                          value={selectedRole}
-                          disabled={accountRoles.length === 0}
-                          onChange={(e) => setSelectedRoles((previous) => ({ ...previous, [r.awsAccountId]: e.target.value }))}
-                          className="text-xs"
-                          aria-label={t('resources.roleForResource', 'Role for {{name}}', { name: r.resourceName || r.resourceId })}
-                          style={{
-                            maxWidth: '150px',
-                            padding: '7px 8px',
-                            background: '#111827',
-                            borderRadius: '8px',
-                            border: '1px solid #374151',
-                            color: '#e5e7eb',
-                            outline: 'none',
-                            opacity: accountRoles.length === 0 ? 0.45 : 1,
-                          }}
-                        >
-                          {accountRoles.length === 0 ? (
-                            <option value="">{t('resources.noRole', 'No role')}</option>
-                          ) : (
-                            accountRoles.map((role) => (
-                              <option key={role} value={role}>
-                                {role}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenResource(r)}
-                          disabled={!canOpen}
-                          className="text-xs font-medium"
-                          title={
-                            canOpen
-                              ? t('resources.openConsole', 'Open in AWS Console')
-                              : t('resources.selectRoleFirst', 'Select a role first')
-                          }
-                          style={{
-                            padding: '8px 12px',
-                            background: canOpen ? '#2563eb' : '#374151',
-                            borderRadius: '8px',
-                            border: 'none',
-                            color: '#fff',
-                            cursor: canOpen ? 'pointer' : 'default',
-                            opacity: canOpen ? 1 : 0.5,
-                            whiteSpace: 'nowrap',
-                            transition: 'background 0.15s',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (canOpen) (e.currentTarget as HTMLElement).style.background = '#1d4ed8';
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.background = canOpen ? '#2563eb' : '#374151';
-                          }}
-                        >
-                          Open
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                    resource={r}
+                    accountRoles={rolesByAccount[r.awsAccountId] || []}
+                    selectedRole={selectedRoles[r.awsAccountId] || (rolesByAccount[r.awsAccountId] || [])[0] || ''}
+                    isFirst={idx === 0}
+                    onSelectRole={(awsAccountId, role) => setSelectedRoles((previous) => ({ ...previous, [awsAccountId]: role }))}
+                    onOpen={handleOpenResource}
+                  />
                 );
               })}
             </tbody>
