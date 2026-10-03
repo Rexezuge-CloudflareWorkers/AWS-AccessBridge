@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { createSpendAlert, deleteSpendAlert } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle, inputStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -24,39 +23,28 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
   const handleCreateAlert = async () => {
     if (!isCreateValid) return;
 
-    const result = await apiFetch<{ alert?: { id?: string } }>('/user/admin/costs/alerts', {
-      method: 'POST',
-      body: {
+    try {
+      const created = await createSpendAlert({
         awsAccountId: createForm.awsAccountId,
         thresholdAmount: Number(createForm.thresholdAmount),
         periodType: createForm.periodType,
-      },
-    });
-
-    if (result.ok) {
-      showMessage(
-        'success',
-        t('admin.alertCreatedWithId', 'Spend alert created (ID: {{id}})', { id: result.data?.alert?.id || 'unknown' }),
-      );
+      });
+      showMessage('success', t('admin.alertCreatedWithId', 'Spend alert created (ID: {{id}})', { id: created.id || 'unknown' }));
       setCreateForm({ awsAccountId: '', thresholdAmount: '', periodType: 'monthly' });
-    } else {
-      showMessage('error', result.error || t('admin.alertCreateFailed', 'Failed to create spend alert'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.alertCreateFailed', 'Failed to create spend alert'));
     }
   };
 
   const handleDeleteAlert = async () => {
     if (!isDeleteValid) return;
 
-    const result = await apiFetch('/user/admin/costs/alerts', {
-      method: 'DELETE',
-      body: { alertId: deleteAlertId.trim() },
-    });
-
-    if (result.ok) {
+    try {
+      await deleteSpendAlert(deleteAlertId.trim());
       showMessage('success', t('admin.alertDeleted', 'Spend alert deleted'));
       setDeleteAlertId('');
-    } else {
-      showMessage('error', result.error || t('admin.alertDeleteFailed', 'Failed to delete spend alert'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.alertDeleteFailed', 'Failed to delete spend alert'));
     }
   };
 

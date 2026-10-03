@@ -2,26 +2,12 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { cleanupOrphaned, type CleanupOrphanedResult } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import { cardStyle } from '../ui/theme';
+import type { ShowMessage } from '../../hooks/useToast';
 
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
-
-interface CleanupResult {
-  deletedCounts: {
-    dataCollectionConfig: number;
-    roleConfigs: number;
-    teamAccounts: number;
-    spendAlerts: number;
-    costData: number;
-    resourceInventory: number;
-    awsAccounts: number;
-  };
-  totalDeleted: number;
-}
-
-const CLEANUP_ROW_LABELS: Array<{ key: keyof CleanupResult['deletedCounts']; label: string }> = [
+const CLEANUP_ROW_LABELS: Array<{ key: keyof CleanupOrphanedResult['deletedCounts']; label: string }> = [
   { key: 'awsAccounts', label: 'aws_accounts' },
   { key: 'roleConfigs', label: 'role_configs' },
   { key: 'teamAccounts', label: 'team_accounts' },
@@ -34,22 +20,32 @@ const CLEANUP_ROW_LABELS: Array<{ key: keyof CleanupResult['deletedCounts']; lab
 export default function MaintenanceTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
   const [confirmed, setConfirmed] = useState(false);
-  const [lastResult, setLastResult] = useState<CleanupResult | null>(null);
+  const [lastResult, setLastResult] = useState<CleanupOrphanedResult | null>(null);
 
   const handleRunCleanup = async () => {
     if (!confirmed) return;
 
-    const result = await apiFetch<CleanupResult>('/user/admin/maintenance/cleanup-orphaned', {
-      method: 'POST',
-    });
-
-    if (result.ok && result.data) {
-      const data: CleanupResult = result.data;
+    try {
+      const data = await cleanupOrphaned();
       setLastResult(data);
       setConfirmed(false);
-      showMessage('success', t('admin.cleanupDone', 'Cleanup complete — {{count}} orphaned row(s) removed', { count: data.totalDeleted }));
-    } else {
-      showMessage('error', result.error || t('admin.cleanupFailed', 'Failed to run cleanup'));
+      // A partial run still answers 200 by design — `cleanupOrphanedData` settles
+      // each table independently and reports what failed. Reporting plain
+      // "complete" here would tell the admin six of seven tables were cleaned
+      // when one was not.
+      if (data.failures.length > 0) {
+        showMessage(
+          'error',
+          t('admin.cleanupPartial', 'Cleanup finished with {{failed}} table(s) failing — {{count}} row(s) removed', {
+            failed: data.failures.length,
+            count: data.totalDeleted,
+          }),
+        );
+      } else {
+        showMessage('success', t('admin.cleanupDone', 'Cleanup complete — {{count}} orphaned row(s) removed', { count: data.totalDeleted }));
+      }
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.cleanupFailed', 'Failed to run cleanup'));
     }
   };
 
@@ -144,6 +140,14 @@ export default function MaintenanceTab({ showMessage }: { showMessage: ShowMessa
             />
             <div style={{ color: '#d1d5db', fontWeight: 600 }}>{t('admin.totalDeleted', 'Total deleted')}</div>
             <div style={{ color: '#ffffff', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{lastResult.totalDeleted}</div>
+            {/* Name the tables that failed. The route reports them precisely so an
+                administrator can retry or investigate; dropping them left the
+                per-table counts looking like a complete success. */}
+            {lastResult.failures.length > 0 && (
+              <div style={{ gridColumn: '1 / -1', color: '#fca5a5', fontSize: '0.875rem', marginTop: '8px' }}>
+                {t('admin.cleanupFailedTables', 'Could not clean: {{tables}}', { tables: lastResult.failures.join(', ') })}
+              </div>
+            )}
           </div>
         </div>
       )}

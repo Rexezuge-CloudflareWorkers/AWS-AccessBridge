@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { formatShellExport } from '@aws-access-bridge/web/lib/shellExport';
-import { ApiError, apiCall, apiFetch, apiRequest, isUnauthorized, readJson } from '@aws-access-bridge/web/lib/api';
+import { ApiError, apiRequest, isUnauthorized, readJson } from '@aws-access-bridge/web/lib/api';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
@@ -42,18 +42,6 @@ describe('lib/api', () => {
     expect((error as ApiError).status).toBe(403);
     expect(isUnauthorized(error)).toBe(false);
     expect(isUnauthorized(new ApiError(401, 'nope'))).toBe(true);
-  });
-
-  it('apiFetch/apiCall preserve the legacy Result model', async () => {
-    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse({ ok: true })));
-    const fetched = await apiFetch<Record<string, boolean>>('/x');
-    expect(fetched.ok).toBe(true);
-    const called = await apiCall('/x', 'GET');
-    expect(called.ok).toBe(true);
-    vi.mocked(fetch).mockRejectedValue(new Error('down'));
-    const failed = await apiFetch('/x');
-    expect(failed.ok).toBe(false);
-    expect(failed.error).toContain('Network error');
   });
 
   it('readJson passes through parsed bodies', async () => {

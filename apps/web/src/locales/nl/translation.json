@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Aangenomen door ARN",
     "auditLogsTab": "Auditlogs",
     "cleanupFailed": "Opschoning kon niet worden uitgevoerd",
+    "cleanupFailedTables": "Kan niet opschonen: {{tables}}",
+    "cleanupPartial": "Opschonen voltooid met {{failed}} mislukte tabel(len) — {{count}} rij/rijen verwijderd",
     "collectionDisableFailed": "Gegevensverzameling kon niet worden uitgeschakeld",
     "collectionEnableFailed": "Gegevensverzameling kon niet worden ingeschakeld",
     "collectionHint": "Schakel achtergrondverzameling van kosten- en/of resource-inventarisgegevens in voor referenties. De referenties moeten over de vereiste AWS-machtigingen beschikken.",

@@ -278,7 +278,7 @@ A second job, `deploy-pages`, builds the SPA and deploys it to Cloudflare Pages 
 
 ### Keeping `WRANGLER_JSONC` up to date
 
-The template evolves (new bindings, new vars). If CI reports a version error, update your `WRANGLER_JSONC` GitHub variable to match the latest `apps/api/wrangler.template.jsonc`. (The `$version`/`$minimumVersion` staleness check only fires when the template declares a `$minimumVersion` — currently commented out, so the check passes through.)
+The template evolves (new bindings, new vars). If CI reports a version error, update your `WRANGLER_JSONC` GitHub variable to match the latest `apps/api/wrangler.template.jsonc`. (The `$version`/`$minimumVersion` staleness check fires whenever the template declares a `$minimumVersion`, which it does — bump both together when a deploy needs a binding or var an older config would not carry.)
 
 ## Continuous Deployment Variables
 
@@ -425,7 +425,7 @@ open https://<your-worker-url>/docs
 
 - **"Unauthorized" on every request** — if you use a self-hosted Access application or a cross-account setup (Cloudflare for SaaS), make sure `POLICY_AUD` and `TEAM_DOMAIN` are set and match the owning account's Zero Trust application. If you rely on Worker-level Access instead, make sure it is enabled on the worker — with the vars unset, requests authenticate via the platform identity.
 - **Admin tab is missing** — you haven't been promoted to superadmin yet. See Step 7 of the manual guide.
-- **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync (note: the check only fires when the template declares `$minimumVersion`).
+- **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync. The guard fires whenever the template declares `$minimumVersion`, which it does.
 - **`wrangler deploy` OOMs in CI** — the workflow hides stray `open-next.config.ts` / `next.config.ts` files before deploying so wrangler doesn't delegate to the OpenNext Next.js build (the repo currently ships neither file, so this is defensive).
 - **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45), so a rotation takes up to that long to take effect. To force a cycle locally, run `pnpm exec wrangler dev --test-scheduled` and hit `/__scheduled`. There is no production trigger: the scheduled pipeline runs only from Cloudflare's `triggers.crons`.
 

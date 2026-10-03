@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Assunto da ARN",
     "auditLogsTab": "Log di audit",
     "cleanupFailed": "Impossibile eseguire la pulizia",
+    "cleanupFailedTables": "Impossibile pulire: {{tables}}",
+    "cleanupPartial": "Pulizia completata con {{failed}} tabella/e non riuscita/e — {{count}} riga/e rimossa/e",
     "collectionDisableFailed": "Impossibile disabilitare la raccolta dati",
     "collectionEnableFailed": "Impossibile abilitare la raccolta dati",
     "collectionHint": "Abilita la raccolta in background dei costi e/o dell'inventario delle risorse per delle credenziali. Le credenziali devono disporre delle autorizzazioni AWS necessarie.",

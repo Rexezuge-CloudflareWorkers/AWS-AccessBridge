@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "代入方ARN",
     "auditLogsTab": "稽核日誌",
     "cleanupFailed": "執行清理失敗",
+    "cleanupFailedTables": "無法清理：{{tables}}",
+    "cleanupPartial": "清理完成，但有 {{failed}} 個表格失敗 — 已刪除 {{count}} 列",
     "collectionDisableFailed": "停用資料收集失敗",
     "collectionEnableFailed": "啟用資料收集失敗",
     "collectionHint": "為憑證啟用背景費用和/或資源清單收集。憑證必須具有所需的AWS權限。",

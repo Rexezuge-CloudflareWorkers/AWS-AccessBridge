@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Przyjęte przez ARN",
     "auditLogsTab": "Logi audytu",
     "cleanupFailed": "Nie można wykonać czyszczenia",
+    "cleanupFailedTables": "Nie można wyczyścić: {{tables}}",
+    "cleanupPartial": "Czyszczenie zakończone z błędem w {{failed}} tabeli/ach — usunięto {{count}} wierszy",
     "collectionDisableFailed": "Nie można wyłączyć zbierania danych",
     "collectionEnableFailed": "Nie można włączyć zbierania danych",
     "collectionHint": "Włącz zbieranie w tle kosztów i/lub inwentaryzacji zasobów dla poświadczeń. Poświadczenia muszą mieć wymagane uprawnienia AWS.",

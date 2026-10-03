@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Assumido por ARN",
     "auditLogsTab": "Logs de auditoria",
     "cleanupFailed": "Falha ao executar limpeza",
+    "cleanupFailedTables": "Não foi possível limpar: {{tables}}",
+    "cleanupPartial": "A limpeza terminou com {{failed}} tabela(s) com falha — {{count}} linha(s) removida(s)",
     "collectionDisableFailed": "Falha ao desabilitar coleta de dados",
     "collectionEnableFailed": "Falha ao habilitar coleta de dados",
     "collectionHint": "Habilite a coleta em segundo plano de custos e/ou inventário de recursos para credenciais. As credenciais devem ter as permissões AWS necessárias.",

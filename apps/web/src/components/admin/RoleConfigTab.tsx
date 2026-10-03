@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { deleteRoleConfig, setRoleConfig } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -25,43 +24,33 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
   const handleSetConfig = async () => {
     if (!isSetConfigValid) return;
 
-    const result = await apiFetch('/user/admin/role/config', {
-      method: 'PUT',
-      body: {
-        awsAccountId: configForm.awsAccountId,
-        roleName: configForm.roleName,
+    try {
+      // Blank optional fields are omitted rather than sent empty: the route
+      // distinguishes "not supplied" from "set to empty", so forwarding `''`
+      // would blank a destination the admin meant to leave alone.
+      await setRoleConfig(configForm.awsAccountId, configForm.roleName, {
         ...(configForm.destinationPath && { destinationPath: configForm.destinationPath }),
         ...(configForm.destinationRegion && { destinationRegion: configForm.destinationRegion }),
         ...(configForm.roleSessionDurationSeconds && {
           roleSessionDurationSeconds: Number(configForm.roleSessionDurationSeconds),
         }),
-      },
-    });
-
-    if (result.ok) {
+      });
       showMessage('success', t('admin.roleConfigSet', 'Role configuration set successfully'));
       setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
-    } else {
-      showMessage('error', result.error || t('admin.roleConfigSetFailed', 'Failed to set role configuration'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.roleConfigSetFailed', 'Failed to set role configuration'));
     }
   };
 
   const handleDeleteConfig = async () => {
     if (!isDeleteConfigValid) return;
 
-    const result = await apiFetch('/user/admin/role/config', {
-      method: 'DELETE',
-      body: {
-        awsAccountId: configForm.awsAccountId,
-        roleName: configForm.roleName,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await deleteRoleConfig(configForm.awsAccountId, configForm.roleName);
       showMessage('success', t('admin.roleConfigDeleted', 'Role configuration deleted successfully'));
       setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
-    } else {
-      showMessage('error', result.error || t('admin.roleConfigDeleteFailed', 'Failed to delete role configuration'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.roleConfigDeleteFailed', 'Failed to delete role configuration'));
     }
   };
 

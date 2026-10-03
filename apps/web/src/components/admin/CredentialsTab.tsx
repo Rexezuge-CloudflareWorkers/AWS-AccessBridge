@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../../lib/api';
+import { removeCredentialRelationship, storeCredentialRelationship, storeCredentials } from '../../services/adminService';
 import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
-
-type ShowMessage = (type: 'success' | 'error', text: string) => void;
+import type { ShowMessage } from '../../hooks/useToast';
 
 export default function CredentialsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -30,58 +29,43 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
   const handleAddCredentials = async () => {
     if (!isCredFormValid) return;
 
-    const result = await apiFetch('/user/admin/credentials', {
-      method: 'POST',
-      body: {
-        principalArn: credForm.principalArn,
-        accessKeyId: credForm.accessKeyId,
-        secretAccessKey: credForm.secretAccessKey,
-        ...(credForm.sessionToken && { sessionToken: credForm.sessionToken }),
-      },
-    });
-
-    if (result.ok) {
+    try {
+      // Omitted rather than sent empty: the route treats an absent session token
+      // as "long-lived credentials", so a blank string would be a real value.
+      await storeCredentials(
+        credForm.principalArn,
+        credForm.accessKeyId,
+        credForm.secretAccessKey,
+        credForm.sessionToken || undefined,
+      );
       showMessage('success', t('admin.credentialsAdded', 'Credentials added successfully'));
       setCredForm({ principalArn: '', accessKeyId: '', secretAccessKey: '', sessionToken: '' });
-    } else {
-      showMessage('error', result.error || t('admin.credentialsAddFailed', 'Failed to add credentials'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.credentialsAddFailed', 'Failed to add credentials'));
     }
   };
 
   const handleAddRelation = async () => {
     if (!isRelationFormValid) return;
 
-    const result = await apiFetch('/user/admin/credentials/relationship', {
-      method: 'POST',
-      body: {
-        principalArn: relationForm.principalArn,
-        assumedBy: relationForm.assumedBy,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await storeCredentialRelationship(relationForm.principalArn, relationForm.assumedBy);
       showMessage('success', t('admin.relationshipAdded', 'Credential relationship added successfully'));
       setRelationForm({ principalArn: '', assumedBy: '' });
-    } else {
-      showMessage('error', result.error || t('admin.relationshipAddFailed', 'Failed to add relationship'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.relationshipAddFailed', 'Failed to add relationship'));
     }
   };
 
   const handleRemoveRelation = async () => {
     if (!isRemoveRelationFormValid) return;
 
-    const result = await apiFetch('/user/admin/credentials/relationship', {
-      method: 'DELETE',
-      body: {
-        principalArn: relationForm.principalArn,
-      },
-    });
-
-    if (result.ok) {
+    try {
+      await removeCredentialRelationship(relationForm.principalArn);
       showMessage('success', t('admin.relationshipRemoved', 'Credential relationship removed successfully'));
       setRelationForm({ principalArn: '', assumedBy: '' });
-    } else {
-      showMessage('error', result.error || t('admin.relationshipRemoveFailed', 'Failed to remove relationship'));
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : t('admin.relationshipRemoveFailed', 'Failed to remove relationship'));
     }
   };
 

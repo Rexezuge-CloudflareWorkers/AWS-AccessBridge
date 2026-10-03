@@ -187,6 +187,8 @@
     "assumedByPlaceholder": "Übernommen von ARN",
     "auditLogsTab": "Prüfprotokolle",
     "cleanupFailed": "Bereinigung konnte nicht ausgeführt werden",
+    "cleanupFailedTables": "Bereinigung nicht möglich: {{tables}}",
+    "cleanupPartial": "Bereinigung mit {{failed}} fehlgeschlagenen Tabelle(n) abgeschlossen — {{count}} Zeile(n) entfernt",
     "collectionDisableFailed": "Datenerfassung konnte nicht deaktiviert werden",
     "collectionEnableFailed": "Datenerfassung konnte nicht aktiviert werden",
     "collectionHint": "Aktivieren Sie die Hintergrund-Erfassung von Kosten- und/oder Ressourcenbestandsdaten für Anmeldedaten. Die Anmeldedaten müssen über die erforderlichen AWS-Berechtigungen verfügen.",
