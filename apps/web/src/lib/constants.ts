@@ -5,6 +5,4 @@
 // Access redirects back to the application home.
 export const ZERO_TRUST_AUTHENTICATION_PATH = '/user/';
 
-// The built-in team that always exists. It cannot be deleted; the UI locks
-// its delete action and the API rejects deletion (see TeamService).
-export const DEFAULT_TEAM_ID = '00000000-0000-0000-0000-000000000000';
+export { DEFAULT_TEAM_ID } from '@aws-access-bridge/shared';

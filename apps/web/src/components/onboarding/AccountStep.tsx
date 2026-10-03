@@ -3,6 +3,7 @@
 import { useTranslation } from 'react-i18next';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
 import { getBtnPrimary, getBtnSuccess, getInputStyle, wizardStyles } from './wizardStyles';
+import { isAwsAccountId } from '@aws-access-bridge/shared';
 
 /**
  * Step 1: AWS account (extracted from `OnboardingWizard.tsx` god file).
@@ -43,9 +44,9 @@ export default function AccountStep({ wizard }: { wizard: OnboardingWizard }) {
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <button
             onClick={wizard.handleSaveAccount}
-            disabled={wizard.isLoading || !/^\d{12}$/.test(wizard.awsAccountId)}
+            disabled={wizard.isLoading || !isAwsAccountId(wizard.awsAccountId)}
             className="font-medium"
-            style={getBtnPrimary(wizardStyles, wizard.isLoading || !/^\d{12}$/.test(wizard.awsAccountId))}
+            style={getBtnPrimary(wizardStyles, wizard.isLoading || !isAwsAccountId(wizard.awsAccountId))}
           >
             {wizard.isLoading ? t('onboarding.saving', 'Saving...') : t('onboarding.saveAccount', 'Save Account')}
           </button>

@@ -11,6 +11,7 @@ import {
   testCredentialChain,
   validateCredentials,
 } from '../services/adminService';
+import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared';
 
 interface DiscoveredRole {
   roleName: string;
@@ -67,8 +68,8 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
 
   const handleSaveAccount = async () => {
-    if (!/^\d{12}$/.test(awsAccountId)) {
-      showMessage('error', 'AWS Account ID must be exactly 12 digits.');
+    if (!isAwsAccountId(awsAccountId)) {
+      showMessage('error', AWS_ACCOUNT_ID_ERROR_MESSAGE);
       return;
     }
     setIsValidating(true);

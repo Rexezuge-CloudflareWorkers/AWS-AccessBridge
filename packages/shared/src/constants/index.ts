@@ -4,3 +4,4 @@ export * from './HmacMessages';
 export * from './Hostnames';
 export * from './RoleSessionNames';
 export * from './StsMessages';
+export * from './Teams';
