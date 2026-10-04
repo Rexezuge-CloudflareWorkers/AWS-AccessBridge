@@ -163,6 +163,76 @@ jobs:
           command: pnpm run test:integration
           max_attempts: '2'
 
+  # The only job with a service container. Everything else in this workflow runs
+  # offline; this one puts the real AWS parsers in front of Floci, a
+  # LocalStack-compatible emulator, so a drifted response shape fails here
+  # instead of in production. Every other suite feeds our clients hand-written
+  # stub bodies, which by construction cannot tell us AWS stopped matching the
+  # regexes in `provider-clients`.
+  #
+  # `test/floci/**` is excluded from the root Vitest projects, so `pnpm test` and
+  # `pnpm run checks` stay container-free and this job is the only thing that
+  # needs the emulator. No Docker socket is mounted on purpose: every operation
+  # the suite exercises is in-process in Floci, including `CreateDBInstance`,
+  # which reaches `available` as metadata with no reachable daemon.
+  floci-smoke:
+    name: Floci Smoke Tests
+    runs-on: ubuntu-latest
+    # Same value the harness defaults to; stated here because a service
+    # container's published port is the contract between the two halves of this
+    # job, and a reader should not have to open the helper to find it. Job-level
+    # because a composite action cannot take `env` on its `uses` step.
+    env:
+      FLOCI_ENDPOINT: http://127.0.0.1:4566
+
+    services:
+      floci:
+        image: floci/floci:latest
+        ports:
+          - 4566:4566
+        # No `options:` — deliberately no health-check override. `latest` is the
+        # *native* image, built on `registry.access.redhat.com/ubi9-micro`: no
+        # shell, no `curl`, no `wget`. Two failed runs established this the hard
+        # way, and the failure mode is invisible from the outside: a
+        # `--health-cmd` naming a missing binary makes Docker mark the container
+        # unhealthy on the first probe, and GitHub reports only "Failed to
+        # initialize container floci/floci:latest", which reads like a broken
+        # image rather than a broken health command.
+        #
+        # Overriding is not merely unnecessary but unsafe. Docker runs a
+        # `--health-cmd` string through `/bin/sh -c` *inside* the container, and
+        # ubi9-micro ships no `/bin/sh`, so even a correct script path wrapped in
+        # `|| exit 1` would fail. The image already declares its own check in
+        # exec form — `HEALTHCHECK CMD ["/usr/local/bin/healthcheck.sh"]`, a
+        # bash `/dev/tcp` probe written specifically because the base has no
+        # HTTP client — so omitting `options:` both keeps fail-fast and removes
+        # our dependence on the image's internals entirely.
+        #
+        # Readiness that the container check does not cover is absorbed by the
+        # suite's own probe (`test/floci/global-setup.ts`), which retries for 60s
+        # and names the container-health-check case explicitly.
+        #
+        # Not overriding the container command either: the shipped `CMD` binds
+        # 0.0.0.0 under `-Dfloci.security.allow-unsafe-network-exposure`, which is
+        # what makes a published port reachable at all.
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      # Floci is a moving tag, so a red run here right after an upstream release
+      # is worth re-running once against a pinned tag before treating it as a
+      # regression in our parsers. `max_attempts: 2` covers the ordinary case of
+      # a slow first boot.
+      - name: Run Floci Smoke Tests
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run test:floci
+          max_attempts: '2'
+
   # Only the SPA build. The API worker is typechecked by the `typecheck` job
   # (`pnpm -r typecheck` reaches `apps/api`), so repeating it here ran the same
   # `tsc --noEmit` against the same tsconfig a second time.
@@ -191,6 +261,7 @@ jobs:
       - locales
       - unit-tests
       - integration-tests
+      - floci-smoke
       - build-web
     permissions:
       contents: write
@@ -221,6 +292,7 @@ jobs:
       - locales
       - unit-tests
       - integration-tests
+      - floci-smoke
       - build-web
     permissions:
       contents: write

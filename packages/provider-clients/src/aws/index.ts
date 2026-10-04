@@ -1,4 +1,4 @@
-export { defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
+export { AWS_QUERY_FORM_CONTENT_TYPE, awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 export type { AwsClientFactory, AwsClientOptions, AwsSignedClient } from './AwsSignedFetcher';
 export { StsClient } from './StsClient';
 export type { CallerIdentity } from './StsClient';

@@ -1,4 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { awsQueryRequest } from '@aws-access-bridge/provider-clients/aws';
 import { matchAll } from '@aws-access-bridge/shared/utils';
 import { BaseAwsCollector } from './BaseAwsCollector';
 import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
@@ -8,7 +9,8 @@ class RdsCollector extends BaseAwsCollector {
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     const params: URLSearchParams = new URLSearchParams({ Action: 'DescribeDBInstances', Version: '2014-10-31' });
-    const xmlText: string = await this.fetchText(`https://rds.${region}.amazonaws.com/?${params.toString()}`, 'rds', region, accessKeys);
+    const request: { url: string; init: RequestInit } = awsQueryRequest(`https://rds.${region}.amazonaws.com/`, params);
+    const xmlText: string = await this.fetchText(request.url, 'rds', region, accessKeys, request.init);
 
     const ids: string[] = matchAll(xmlText, /<DBInstanceIdentifier>([^<]+)<\/DBInstanceIdentifier>/g);
     const statuses: string[] = matchAll(xmlText, /<DBInstanceStatus>([^<]+)<\/DBInstanceStatus>/g);

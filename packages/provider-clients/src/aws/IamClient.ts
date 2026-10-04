@@ -1,8 +1,7 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
 import type { AwsClientFactory } from './AwsSignedFetcher';
-import { defaultAwsClientFactory } from './AwsSignedFetcher';
-import { parseXmlTag } from './AwsSignedFetcher';
+import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 
 interface DiscoveredRole {
   roleName: string;
@@ -30,8 +29,8 @@ class IamClient {
       MaxItems: '100',
     });
 
-    const url: string = `https://iam.amazonaws.com/?${queryParams.toString()}`;
-    const response: Response = await iamClient.fetch(url, { method: 'GET' });
+    const request: { url: string; init: RequestInit } = awsQueryRequest('https://iam.amazonaws.com/', queryParams);
+    const response: Response = await iamClient.fetch(request.url, request.init);
     const xmlText: string = await response.text();
 
     if (!response.ok) {

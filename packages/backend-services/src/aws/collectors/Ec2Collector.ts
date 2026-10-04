@@ -1,4 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { awsQueryRequest } from '@aws-access-bridge/provider-clients/aws';
 import { matchAll } from '@aws-access-bridge/shared/utils';
 import { BaseAwsCollector } from './BaseAwsCollector';
 import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
@@ -8,7 +9,8 @@ class Ec2Collector extends BaseAwsCollector {
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     const params: URLSearchParams = new URLSearchParams({ Action: 'DescribeInstances', Version: '2016-11-15' });
-    const xmlText: string = await this.fetchText(`https://ec2.${region}.amazonaws.com/?${params.toString()}`, 'ec2', region, accessKeys);
+    const request: { url: string; init: RequestInit } = awsQueryRequest(`https://ec2.${region}.amazonaws.com/`, params);
+    const xmlText: string = await this.fetchText(request.url, 'ec2', region, accessKeys, request.init);
 
     const instanceIds: string[] = matchAll(xmlText, /<instanceId>([^<]+)<\/instanceId>/g);
     const states: string[] = matchAll(xmlText, /<name>([^<]+)<\/name>/g);
