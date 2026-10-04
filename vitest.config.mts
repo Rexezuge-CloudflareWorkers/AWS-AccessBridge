@@ -21,6 +21,11 @@ export default defineConfig({
     // components. A `.tsx` file is the marker for the second one, so the split
     // is by extension rather than by directory — otherwise a component test
     // written as `.ts` would silently run in `node` and fail on `document`.
+    //
+    // `test/floci/**` is excluded from `node` because those tests need a running
+    // emulator on 127.0.0.1:4566; they run only under `pnpm run test:floci`, from
+    // their own config. Without this exclusion `pnpm test` and `pnpm run checks`
+    // would pass locally and fail in CI for want of a container.
     projects: [
       {
         extends: true,
@@ -29,7 +34,7 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: ['test/**/*.test.ts'],
-          exclude: ['test/integration/**'],
+          exclude: ['test/integration/**', 'test/floci/**'],
         },
       },
       {
@@ -39,7 +44,7 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           include: ['test/**/*.test.tsx'],
-          exclude: ['test/integration/**'],
+          exclude: ['test/integration/**', 'test/floci/**'],
           setupFiles: ['test/setup/dom.ts'],
         },
       },

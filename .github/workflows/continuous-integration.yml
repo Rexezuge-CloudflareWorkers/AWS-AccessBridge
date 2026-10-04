@@ -163,6 +163,56 @@ jobs:
           command: pnpm run test:integration
           max_attempts: '2'
 
+  # The only job with a service container. Everything else in this workflow runs
+  # offline; this one puts the real AWS parsers in front of Floci, a
+  # LocalStack-compatible emulator, so a drifted response shape fails here
+  # instead of in production. Every other suite feeds our clients hand-written
+  # stub bodies, which by construction cannot tell us AWS stopped matching the
+  # regexes in `provider-clients`.
+  #
+  # `test/floci/**` is excluded from the root Vitest projects, so `pnpm test` and
+  # `pnpm run checks` stay container-free and this job is the only thing that
+  # needs the emulator. No Docker socket is mounted on purpose: every operation
+  # the suite exercises is in-process in Floci, including `CreateDBInstance`,
+  # which reaches `available` as metadata with no reachable daemon.
+  floci-smoke:
+    name: Floci Smoke Tests
+    runs-on: ubuntu-latest
+    # Same value the harness defaults to; stated here because a service
+    # container's published port is the contract between the two halves of this
+    # job, and a reader should not have to open the helper to find it. Job-level
+    # because a composite action cannot take `env` on its `uses` step.
+    env:
+      FLOCI_ENDPOINT: http://127.0.0.1:4566
+
+    services:
+      floci:
+        image: floci/floci:latest
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      # Floci is a moving tag, so a red run here right after an upstream release
+      # is worth re-running once against a pinned tag before treating it as a
+      # regression in our parsers. `max_attempts: 2` covers the ordinary case of
+      # a slow first boot.
+      - name: Run Floci Smoke Tests
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run test:floci
+          max_attempts: '2'
+
   # Only the SPA build. The API worker is typechecked by the `typecheck` job
   # (`pnpm -r typecheck` reaches `apps/api`), so repeating it here ran the same
   # `tsc --noEmit` against the same tsconfig a second time.
@@ -191,6 +241,7 @@ jobs:
       - locales
       - unit-tests
       - integration-tests
+      - floci-smoke
       - build-web
     permissions:
       contents: write
@@ -221,6 +272,7 @@ jobs:
       - locales
       - unit-tests
       - integration-tests
+      - floci-smoke
       - build-web
     permissions:
       contents: write
