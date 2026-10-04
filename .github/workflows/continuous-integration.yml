@@ -190,8 +190,25 @@ jobs:
         image: floci/floci:latest
         ports:
           - 4566:4566
+        # `wget` against `/_floci/health`, which is exactly the HEALTHCHECK the
+        # image ships. Both details are load-bearing and were a failed run:
+        #
+        # - `wget`, not `curl`. The image installs only `ca-certificates`,
+        #   `passwd`, `python3`, `python3-pip` and `wget`, and its Dockerfile
+        #   says so outright — "wget stays for the HEALTHCHECK below". A
+        #   `--health-cmd` calling `curl` execs a missing binary, Docker marks
+        #   the container unhealthy on the first probe, and GitHub reports the
+        #   opaque "Failed to initialize container floci/floci:latest" with no
+        #   hint that the health command is the problem.
+        # - `/_floci/health`, not `/_localstack/health`. The parity endpoint is
+        #   advertised for LocalStack tooling, but the endpoint Floci itself
+        #   guarantees is its own.
+        #
+        # Not overriding the container's command is deliberate too: the shipped
+        # CMD binds 0.0.0.0 under `-Dfloci.security.allow-unsafe-network-exposure`,
+        # which is what makes a published port reachable, and `services:` keeps it.
         options: >-
-          --health-cmd "curl -sf http://localhost:4566/_localstack/health || exit 1"
+          --health-cmd "wget -q --spider http://localhost:4566/_floci/health || exit 1"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
