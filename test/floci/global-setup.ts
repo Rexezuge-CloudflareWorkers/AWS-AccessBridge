@@ -46,9 +46,9 @@ async function waitForFloci(): Promise<void> {
 
   const detail: string =
     lastReachable === null
-      ? `nothing is listening on ${FLOCI_ENDPOINT}. Either the container never came up — check the service ` +
-        `container's own health check, which runs *inside* it and can fail on a missing binary or a wrong path — ` +
-        `or nothing is bound to that port.`
+      ? `nothing is listening on ${FLOCI_ENDPOINT}. Either the container never came up — "Failed to initialize ` +
+        `container" from GitHub means the image's own health check failed, not that the image is broken — or ` +
+        `nothing is bound to that port.`
       : `${FLOCI_ENDPOINT} is answering but did not return a usable STS GetCallerIdentity (${lastReachable}). ` +
         `Another AWS emulator, or an unrelated process, already owns that port.`;
   throw new Error(`Floci is not usable after ${READY_TIMEOUT_MS / 1000}s: ${detail}\nStart it with: ${START_HINT}`);

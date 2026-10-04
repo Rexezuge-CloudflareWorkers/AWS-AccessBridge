@@ -190,28 +190,31 @@ jobs:
         image: floci/floci:latest
         ports:
           - 4566:4566
-        # `wget` against `/_floci/health`, which is exactly the HEALTHCHECK the
-        # image ships. Both details are load-bearing and were a failed run:
+        # No `options:` — deliberately no health-check override. `latest` is the
+        # *native* image, built on `registry.access.redhat.com/ubi9-micro`: no
+        # shell, no `curl`, no `wget`. Two failed runs established this the hard
+        # way, and the failure mode is invisible from the outside: a
+        # `--health-cmd` naming a missing binary makes Docker mark the container
+        # unhealthy on the first probe, and GitHub reports only "Failed to
+        # initialize container floci/floci:latest", which reads like a broken
+        # image rather than a broken health command.
         #
-        # - `wget`, not `curl`. The image installs only `ca-certificates`,
-        #   `passwd`, `python3`, `python3-pip` and `wget`, and its Dockerfile
-        #   says so outright — "wget stays for the HEALTHCHECK below". A
-        #   `--health-cmd` calling `curl` execs a missing binary, Docker marks
-        #   the container unhealthy on the first probe, and GitHub reports the
-        #   opaque "Failed to initialize container floci/floci:latest" with no
-        #   hint that the health command is the problem.
-        # - `/_floci/health`, not `/_localstack/health`. The parity endpoint is
-        #   advertised for LocalStack tooling, but the endpoint Floci itself
-        #   guarantees is its own.
+        # Overriding is not merely unnecessary but unsafe. Docker runs a
+        # `--health-cmd` string through `/bin/sh -c` *inside* the container, and
+        # ubi9-micro ships no `/bin/sh`, so even a correct script path wrapped in
+        # `|| exit 1` would fail. The image already declares its own check in
+        # exec form — `HEALTHCHECK CMD ["/usr/local/bin/healthcheck.sh"]`, a
+        # bash `/dev/tcp` probe written specifically because the base has no
+        # HTTP client — so omitting `options:` both keeps fail-fast and removes
+        # our dependence on the image's internals entirely.
         #
-        # Not overriding the container's command is deliberate too: the shipped
-        # CMD binds 0.0.0.0 under `-Dfloci.security.allow-unsafe-network-exposure`,
-        # which is what makes a published port reachable, and `services:` keeps it.
-        options: >-
-          --health-cmd "wget -q --spider http://localhost:4566/_floci/health || exit 1"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
+        # Readiness that the container check does not cover is absorbed by the
+        # suite's own probe (`test/floci/global-setup.ts`), which retries for 60s
+        # and names the container-health-check case explicitly.
+        #
+        # Not overriding the container command either: the shipped `CMD` binds
+        # 0.0.0.0 under `-Dfloci.security.allow-unsafe-network-exposure`, which is
+        # what makes a published port reachable at all.
 
     steps:
       - name: Checkout Repository
