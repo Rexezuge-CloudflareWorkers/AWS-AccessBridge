@@ -9,9 +9,8 @@ import HideRoleConfirmDialog from './HideRoleConfirmDialog';
 import Spinner from './ui/Spinner';
 import { isUnauthorized } from '../lib/api';
 import { useRequestGuard } from '../hooks/useRequestGuard';
-import { assumeRoleKeys, buildFederateUrl, listAccounts, setFavorite, setRoleHidden } from '../services/accountService';
-import type { AccessKeysResponse } from '@aws-access-bridge/shared';
-import type { RoleMap } from '../services/accountService';
+import { useAccountMutations } from '../hooks/useAccountMutations';
+import { listAccounts } from '../services/accountService';
 import type { ShowMessage } from '../hooks/useToast';
 
 interface AccountListProps {
@@ -25,24 +24,16 @@ interface AccountListProps {
 
 export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, showMessage }: AccountListProps) {
   const { t } = useTranslation();
-  const [rolesData, setRolesData] = useState<RoleMap>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [modalData, setModalData] = useState<AccessKeysResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingKeys, setLoadingKeys] = useState<string | null>(null);
-  const [loadingConsole, setLoadingConsole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // The search box and pagination both retrigger this fetch, so responses can
   // arrive out of order and a slow earlier one would render under a newer query.
   const { begin, isCurrent } = useRequestGuard();
-
-  // One failure path for every action below. `alert()` was duplicated four times
-  // here, which is why these failures were easy to miss in review: the toast is
-  // the app's established channel and the user actually sees it.
-  const reportFailure = (thrown: unknown): void => {
-    const message = thrown instanceof Error ? thrown.message : t('accounts.unknownError', 'Unknown error occurred');
-    showMessage('error', `${t('common.errorPrefix', 'Error')}: ${message}`);
-  };
+  // Optimistic mutations and their loading state; see the hook for why the two
+  // toggles roll back on failure.
+  const { rolesData, setRolesData, loadingKeys, loadingConsole, modalData, setModalData, toggleFavorite, toggleHidden, openAccessKeys, openConsole } =
+    useAccountMutations(showMessage, showHidden);
 
   useEffect(() => {
     const request = begin();
@@ -68,74 +59,6 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const toggleFavorite = async (accountId: string) => {
-    const isFavorite = rolesData[accountId]?.favorite;
-
-    try {
-      await setFavorite(accountId, isFavorite);
-      setRolesData((prev) => ({
-        ...prev,
-        [accountId]: {
-          ...prev[accountId],
-          favorite: !isFavorite,
-        },
-      }));
-    } catch (error) {
-      reportFailure(error);
-    }
-  };
-
-  const toggleHidden = async (accountId: string, role: string, currentlyHidden: boolean) => {
-    const previous = rolesData[accountId];
-    if (!previous) return;
-
-    const nextRoles: string[] = currentlyHidden ? [...previous.roles, role] : previous.roles.filter((r) => r !== role);
-    const prevHidden: string[] = previous.hiddenRoles ?? [];
-    const nextHidden: string[] = currentlyHidden ? prevHidden.filter((r) => r !== role) : showHidden ? [...prevHidden, role] : prevHidden;
-
-    setRolesData((prev) => ({
-      ...prev,
-      [accountId]: { ...previous, roles: nextRoles, hiddenRoles: nextHidden },
-    }));
-
-    try {
-      await setRoleHidden(accountId, role, !currentlyHidden);
-    } catch (error) {
-      setRolesData((prev) => ({ ...prev, [accountId]: previous }));
-      reportFailure(error);
-    }
-  };
-
-  const handleAccessKeys = async (accountId: string, role: string) => {
-    const loadingKey = `${accountId}-${role}`;
-
-    setLoadingKeys(loadingKey);
-    try {
-      const creds = await assumeRoleKeys(accountId, role);
-      setModalData(creds);
-    } catch (error) {
-      if (isUnauthorized(error)) {
-        globalThis.location.reload();
-        return;
-      }
-      reportFailure(error);
-    } finally {
-      setLoadingKeys(null);
-    }
-  };
-
-  const handleConsole = (accountId: string, role: string): void => {
-    const loadingKey = `${accountId}-${role}`;
-    setLoadingConsole(loadingKey);
-    try {
-      window.open(buildFederateUrl(accountId, role), '_blank');
-    } catch (error) {
-      reportFailure(error);
-    } finally {
-      setLoadingConsole(null);
-    }
   };
 
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
@@ -294,8 +217,8 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
                       confirmKey={confirmHide?.key ?? null}
                       onHoverRole={setHoveredRole}
                       onHoverEye={setHoveredEye}
-                      onConsole={handleConsole}
-                      onAccessKeys={handleAccessKeys}
+                      onConsole={openConsole}
+                      onAccessKeys={openAccessKeys}
                       onToggleHideDialog={setConfirmHide}
                     />
                   ))}

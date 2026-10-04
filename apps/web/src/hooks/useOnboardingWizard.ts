@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   discoverAccountRoles,
-  grantAccess,
   setAccountNickname,
   storeCredentialRelationship,
   storeCredentials,
@@ -12,6 +11,7 @@ import {
   validateCredentials,
 } from '../services/adminService';
 import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared';
+import { grantSelectedRoles, saveRoleRelationships } from './onboardingBatches';
 
 interface DiscoveredRole {
   roleName: string;
@@ -25,6 +25,11 @@ interface DiscoveredRole {
  * one closure. Steps render from this hook; each step is its own component
  * under `components/onboarding/`.
  */
+/**
+ * The wizard actions that can show their own spinner.
+ */
+type WizardBusyAction = 'validate' | 'store' | 'setChain' | 'testChain';
+
 function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: string) => void) {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
@@ -59,10 +64,14 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
   const [accessGranted, setAccessGranted] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [isStoring, setIsStoring] = useState(false);
-  const [isSettingChain, setIsSettingChain] = useState(false);
-  const [isTestingChain, setIsTestingChain] = useState(false);
+  // One flag per in-flight action, so a button can show its own spinner. They
+  // were five separate `useState` booleans; a keyed record says the same thing in
+  // one line and makes "which actions can be busy" a single question.
+  const [busyAction, setBusyAction] = useState<WizardBusyAction | null>(null);
+  const isValidating: boolean = busyAction === 'validate';
+  const isStoring: boolean = busyAction === 'store';
+  const isSettingChain: boolean = busyAction === 'setChain';
+  const isTestingChain: boolean = busyAction === 'testChain';
 
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
@@ -72,7 +81,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
       showMessage('error', AWS_ACCOUNT_ID_ERROR_MESSAGE);
       return;
     }
-    setIsValidating(true);
+    setBusyAction('validate');
     try {
       if (nickname.trim()) {
         await setAccountNickname(awsAccountId, nickname.trim());
@@ -82,12 +91,12 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     } catch (err) {
       showMessage('error', err instanceof Error ? err.message : 'Failed to save account');
     } finally {
-      setIsValidating(false);
+      setBusyAction(null);
     }
   };
 
   const handleValidateCredentials = async () => {
-    setIsValidating(true);
+    setBusyAction('validate');
     try {
       const result = await validateCredentials(accessKeyId, secretAccessKey, sessionToken || undefined);
       setValidationResult(result);
@@ -98,7 +107,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
       setCredentialValidated(false);
       showMessage('error', err instanceof Error ? err.message : 'Validation failed');
     } finally {
-      setIsValidating(false);
+      setBusyAction(null);
     }
   };
 
@@ -107,7 +116,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
       showMessage('error', t('onboarding.principalRequired', 'Principal ARN is required.'));
       return;
     }
-    setIsStoring(true);
+    setBusyAction('store');
     try {
       await storeCredentials(principalArn, accessKeyId, secretAccessKey, sessionToken || undefined);
       setCredentialStored(true);
@@ -115,7 +124,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     } catch (err) {
       showMessage('error', err instanceof Error ? err.message : 'Failed to store credentials');
     } finally {
-      setIsStoring(false);
+      setBusyAction(null);
     }
   };
 
@@ -124,7 +133,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
       showMessage('error', t('onboarding.intermediateRequired', 'Intermediate Role ARN is required.'));
       return;
     }
-    setIsSettingChain(true);
+    setBusyAction('setChain');
     try {
       await storeCredentialRelationship(intermediateRoleArn, principalArn);
       setChainConfigured(true);
@@ -133,12 +142,12 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     } catch (err) {
       showMessage('error', err instanceof Error ? err.message : 'Failed to configure chain');
     } finally {
-      setIsSettingChain(false);
+      setBusyAction(null);
     }
   };
 
   const handleTestChain = async () => {
-    setIsTestingChain(true);
+    setBusyAction('testChain');
     try {
       const result = await testCredentialChain(roleForDiscovery || principalArn);
       setChainTestResult(result.chain);
@@ -147,7 +156,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     } catch (err) {
       showMessage('error', err instanceof Error ? err.message : 'Chain test failed');
     } finally {
-      setIsTestingChain(false);
+      setBusyAction(null);
     }
   };
 
@@ -184,22 +193,14 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
   };
 
   const handleSaveRoleRelationships = async (): Promise<boolean> => {
-    if (selectedRoles.size === 0) return true;
     const assumedByArn = roleForDiscovery || principalArn;
-    if (!assumedByArn) return true;
+    // Nothing to do is success: an empty selection or an unknown ARN is a state
+    // the wizard must be able to advance past, not an error.
+    if (!assumedByArn || selectedRoles.size === 0) return true;
     setIsLoading(true);
-    let failures = 0;
-    for (const roleName of selectedRoles) {
-      const role = discoveredRoles.find((r) => r.roleName === roleName);
-      if (!role || !role.arn) continue;
-      try {
-        await storeCredentialRelationship(role.arn, assumedByArn);
-      } catch {
-        failures++;
-      }
-    }
+    const { ok, failures } = await saveRoleRelationships(selectedRoles, discoveredRoles, assumedByArn);
     setIsLoading(false);
-    if (failures > 0) {
+    if (!ok) {
       showMessage('error', t('onboarding.rolesSaveFailed', '{{count}} role relationship(s) failed to save.', { count: failures }));
       return false;
     }
@@ -220,16 +221,7 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
       return;
     }
     setIsLoading(true);
-    let failures = 0;
-    for (const email of validEmails) {
-      for (const role of selectedRoles) {
-        try {
-          await grantAccess(email.trim(), awsAccountId, role);
-        } catch {
-          failures++;
-        }
-      }
-    }
+    const { failures } = await grantSelectedRoles(validEmails, selectedRoles, awsAccountId);
     if (failures === 0) {
       setAccessGranted(true);
       showMessage(
@@ -248,6 +240,20 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     setIsLoading(false);
   };
 
+  /**
+   * Editing any credential field invalidates the validation result, so a stale
+   * "validated" badge cannot sit above credentials that no longer match what was
+   * checked. One factory rather than three identical copies — a fourth field
+   * added later would otherwise be the one that forgot to reset.
+   */
+  const withValidationReset =
+    (setter: (value: string) => void) =>
+    (value: string): void => {
+      setter(value);
+      setCredentialValidated(false);
+      setValidationResult(null);
+    };
+
   return {
     step,
     setStep,
@@ -259,23 +265,11 @@ function useOnboardingWizard(showMessage: (type: 'success' | 'error', text: stri
     principalArn,
     setPrincipalArn,
     accessKeyId,
-    setAccessKeyId: (value: string) => {
-      setAccessKeyId(value);
-      setCredentialValidated(false);
-      setValidationResult(null);
-    },
+    setAccessKeyId: withValidationReset(setAccessKeyId),
     secretAccessKey,
-    setSecretAccessKey: (value: string) => {
-      setSecretAccessKey(value);
-      setCredentialValidated(false);
-      setValidationResult(null);
-    },
+    setSecretAccessKey: withValidationReset(setSecretAccessKey),
     sessionToken,
-    setSessionToken: (value: string) => {
-      setSessionToken(value);
-      setCredentialValidated(false);
-      setValidationResult(null);
-    },
+    setSessionToken: withValidationReset(setSessionToken),
     credentialValidated,
     credentialStored,
     validationResult,
