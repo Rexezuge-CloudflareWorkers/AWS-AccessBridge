@@ -22,9 +22,17 @@ import { ACCOUNT_A, FLOCI_ENDPOINT, READY_POLL_MS, READY_TIMEOUT_MS, SECRET, STA
  * through `StsService` means the probe itself is production code, so a probe that
  * passes is also a first, tiny exercise of the thing under test.
  *
- * The two failures are reported separately because they need different fixes: a
- * refused connection means "start the emulator", while a wrong-but-responsive
- * service means "something else owns the port".
+ * The failure text names all three ways this can go wrong, because from outside
+ * the container they look alike, and the third was mistaken for the second while
+ * this was being built:
+ *
+ * 1. nothing listening — the container never came up, or the port is unbound;
+ * 2. something listening that is not an AWS emulator;
+ * 3. an emulator that answered *successfully* with a body we cannot parse. That
+ *    is the subtle one: Floci replies `HTTP 204` with an empty body to a
+ *    Query-protocol call whose parameters are in the query string, `204` is
+ *    `response.ok`, and the caller fails later with a parse error naming the
+ *    response rather than the request.
  */
 async function waitForFloci(): Promise<void> {
   const deadline: number = Date.now() + READY_TIMEOUT_MS;
@@ -49,8 +57,10 @@ async function waitForFloci(): Promise<void> {
       ? `nothing is listening on ${FLOCI_ENDPOINT}. Either the container never came up — "Failed to initialize ` +
         `container" from GitHub means the image's own health check failed, not that the image is broken — or ` +
         `nothing is bound to that port.`
-      : `${FLOCI_ENDPOINT} is answering but did not return a usable STS GetCallerIdentity (${lastReachable}). ` +
-        `Another AWS emulator, or an unrelated process, already owns that port.`;
+      : `${FLOCI_ENDPOINT} answered but did not return a usable STS GetCallerIdentity (${lastReachable}). Either ` +
+        `it is not an AWS emulator — another one, or an unrelated process, may own that port — or it is an ` +
+        `emulator that replied successfully with a body this client cannot parse, which is what a Query-protocol ` +
+        `call with its parameters in the query string looks like from here.`;
   throw new Error(`Floci is not usable after ${READY_TIMEOUT_MS / 1000}s: ${detail}\nStart it with: ${START_HINT}`);
 }
 

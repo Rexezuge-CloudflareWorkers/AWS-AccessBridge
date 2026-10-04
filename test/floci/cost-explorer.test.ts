@@ -38,11 +38,15 @@ describe('Cost Explorer against Floci', () => {
       expect(Number.isFinite(result.totalCost)).toBe(true);
       expect(result.currency).toBe('USD');
       // The client falls back to the requested window when a response omits its
-      // `TimePeriod`, so the exact dates are the emulator's business — Floci may
-      // echo the request or clamp it. What our parser owes is a usable day
-      // string either way, and `undefined` would fail this.
-      expect(result.periodStart).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(result.periodEnd).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // `TimePeriod`, and otherwise passes the service's value through verbatim.
+      // The exact shape is the service's business — AWS and Floci both answer
+      // `2026-10-01T00:00:00Z` rather than a bare day, which an earlier
+      // day-only assertion here got wrong. What our parser owes is a
+      // non-empty, parseable date rather than `undefined`.
+      expect(result.periodStart).toBeTruthy();
+      expect(result.periodEnd).toBeTruthy();
+      expect(Number.isNaN(Date.parse(result.periodStart))).toBe(false);
+      expect(Number.isNaN(Date.parse(result.periodEnd))).toBe(false);
     }
 
     // The parser skips any group at or below zero, so a positive breakdown is

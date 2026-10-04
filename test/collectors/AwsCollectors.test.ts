@@ -121,7 +121,14 @@ describe('Ec2Collector', () => {
       // No Name tag, so the instance id is used.
       { resourceType: 'ec2', resourceId: 'i-2', resourceName: 'i-2', state: 'stopped', region: 'eu-west-1', metadata: {} },
     ]);
-    expect(fetch).toHaveBeenCalledWith('https://ec2.eu-west-1.amazonaws.com/?Action=DescribeInstances&Version=2016-11-15');
+    // Query-protocol parameters ride in the form-encoded BODY, never the query
+    // string: AWS accepts either, but LocalStack-compatible emulators read only
+    // the body, and a query-string `POST` comes back `204` with nothing in it.
+    expect(fetch).toHaveBeenCalledWith('https://ec2.eu-west-1.amazonaws.com/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' },
+      body: 'Action=DescribeInstances&Version=2016-11-15',
+    });
   });
 
   it('defaults to us-east-1 and reports unknown when the state is missing', async () => {
@@ -174,7 +181,11 @@ describe('RdsCollector', () => {
       { resourceType: 'rds', resourceId: 'db-1', resourceName: 'db-1', state: 'available', region: 'eu-west-1', metadata: { engine: 'postgres' } },
       { resourceType: 'rds', resourceId: 'db-2', resourceName: 'db-2', state: 'stopped', region: 'eu-west-1', metadata: { engine: '' } },
     ]);
-    expect(fetch).toHaveBeenCalledWith('https://rds.eu-west-1.amazonaws.com/?Action=DescribeDBInstances&Version=2014-10-31');
+    expect(fetch).toHaveBeenCalledWith('https://rds.eu-west-1.amazonaws.com/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' },
+      body: 'Action=DescribeDBInstances&Version=2014-10-31',
+    });
   });
 });
 

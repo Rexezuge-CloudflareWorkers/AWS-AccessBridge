@@ -1,6 +1,6 @@
 import { AwsCollectionError } from '@aws-access-bridge/backend-errors';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
-import type { AwsClientFactory } from '../../http';
+import type { AwsClientFactory, AwsSignedClient } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
 
@@ -31,18 +31,22 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
   }
 
   /**
-  Signed GET, returning the response body as text. Throws on non-OK.
+  Signed request, returning the response body as text. Throws on non-OK.
+
+  * `init` carries the method, headers and body. It is a parameter rather than
+  * baked in because the Query-protocol collectors need a form-encoded POST while
+  * the S3 collector needs a bare GET, and the base must not choose between them.
   */
-  protected async fetchText(url: string, service: string, region: string, accessKeys: AccessKeys): Promise<string> {
-    const response: Response = await this.send(url, service, region, accessKeys);
+  protected async fetchText(url: string, service: string, region: string, accessKeys: AccessKeys, init?: RequestInit): Promise<string> {
+    const response: Response = await this.send(url, service, region, accessKeys, init);
     return response.text();
   }
 
   /**
-  Signed GET, returning the response body as JSON. Throws on non-OK or a malformed body.
+  Signed request, returning the response body as JSON. Throws on non-OK or a malformed body.
   */
-  protected fetchJson<T>(url: string, service: string, region: string, accessKeys: AccessKeys): Promise<T> {
-    return this.parseJson<T>(() => this.send(url, service, region, accessKeys), service, region);
+  protected fetchJson<T>(url: string, service: string, region: string, accessKeys: AccessKeys, init?: RequestInit): Promise<T> {
+    return this.parseJson<T>(() => this.send(url, service, region, accessKeys, init), service, region);
   }
 
   /**
@@ -57,9 +61,11 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
     }, service, region);
   }
 
-  private async send(url: string, service: string, region: string, accessKeys: AccessKeys): Promise<Response> {
-    const client = this.clientFactory({ service, region, keys: accessKeys });
-    const response: Response = await client.fetch(url);
+  private async send(url: string, service: string, region: string, accessKeys: AccessKeys, init?: RequestInit): Promise<Response> {
+    const client: AwsSignedClient = this.clientFactory({ service, region, keys: accessKeys });
+    // Only pass `init` when a collector supplied one, so the collectors needing no
+    // method, headers or body keep issuing the plain single-argument call.
+    const response: Response = init ? await client.fetch(url, init) : await client.fetch(url);
     this.assertOk(response, service, region);
     return response;
   }

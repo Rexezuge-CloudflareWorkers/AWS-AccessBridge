@@ -2,7 +2,7 @@ import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/sh
 import { BadRequestError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { ASSUME_ROLE_UTIL_ERROR_STS_CALL, ASSUME_ROLE_UTIL_ERROR_STS_RESPONSE_PARSE } from '@aws-access-bridge/shared/constants';
 import type { AwsClientFactory } from './AwsSignedFetcher';
-import { defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
+import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 
 interface CallerIdentity {
   arn: string;
@@ -41,8 +41,8 @@ class StsClient {
       Version: '2011-06-15',
     });
 
-    const url: string = `https://sts.${region}.amazonaws.com/?${queryParams.toString()}`;
-    const response: Response = await stsClient.fetch(url, { method: 'POST' });
+    const request: { url: string; init: RequestInit } = awsQueryRequest(`https://sts.${region}.amazonaws.com/`, queryParams);
+    const response: Response = await stsClient.fetch(request.url, request.init);
     const xmlText: string = await response.text();
 
     if (!response.ok) {
@@ -74,8 +74,8 @@ class StsClient {
       Version: '2011-06-15',
     });
 
-    const url: string = `https://sts.us-east-1.amazonaws.com/?${queryParams.toString()}`;
-    const response: Response = await stsClient.fetch(url, { method: 'POST' });
+    const request: { url: string; init: RequestInit } = awsQueryRequest('https://sts.us-east-1.amazonaws.com/', queryParams);
+    const response: Response = await stsClient.fetch(request.url, request.init);
     const xmlText: string = await response.text();
 
     if (!response.ok) {
