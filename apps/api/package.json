@@ -14,7 +14,7 @@
     "@aws-access-bridge/backend-services": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
     "chanfana": "^3.4.0",
-    "hono": "^4.13.9",
+    "hono": "^4.13.12",
     "zod": "^4.6.5"
   },
   "devDependencies": {
