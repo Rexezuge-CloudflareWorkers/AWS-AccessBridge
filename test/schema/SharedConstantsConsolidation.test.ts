@@ -121,7 +121,7 @@ describe('buildFederateUrl', () => {
     // old template-literal form only encoded `role`, not `awsAccountId`.
     const url = new URL(buildFederateUrl('123456789012', 'Dev&role=admin'), 'https://app.invalid');
     expect(url.searchParams.get('role')).toBe('Dev&role=admin');
-    expect([...url.searchParams.keys()].sort()).toEqual(['awsAccountId', 'role']);
+    expect(url.searchParams.keys().toArray().toSorted((left, right) => left.localeCompare(right))).toEqual(['awsAccountId', 'role']);
   });
 
   it('escapes a hash in a destination path', () => {

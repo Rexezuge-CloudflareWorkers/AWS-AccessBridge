@@ -14,8 +14,8 @@ describe('AES-GCM Crypto', () => {
       expect(typeof key).toBe('string');
       expect(key.length).toBeGreaterThan(0);
       // Base64 decode should give 32 bytes (256 bits)
-      const decoded = Uint8Array.from(atob(key), (c) => c.charCodeAt(0));
-      expect(decoded.length).toBe(32);
+      const decoded = Uint8Array.from(atob(key), (c) => c.codePointAt(0) ?? 0);
+      expect(decoded).toHaveLength(32);
     });
 
     it('generates unique keys', async () => {
@@ -84,7 +84,7 @@ describe('AES-GCM Crypto', () => {
 
     it('encrypts and decrypts long strings', async () => {
       const key = await generateAESGCMKey();
-      const plaintext = 'A'.repeat(10000);
+      const plaintext = 'A'.repeat(10_000);
       const { encrypted, iv } = await encryptData(plaintext, key);
       const decrypted = await decryptData(encrypted, iv, key);
       expect(decrypted).toBe(plaintext);
@@ -161,8 +161,8 @@ describe('AES-GCM Crypto', () => {
     it('returns undefined when the ciphertext is tampered with', async () => {
       const key = await generateAESGCMKey();
       const { encrypted, iv } = await encryptData('secret', key);
-      const bytes = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
-      bytes[0] = bytes[0] ^ 0xff;
+      const bytes = Uint8Array.from(atob(encrypted), (c) => c.codePointAt(0) ?? 0);
+      bytes[0] ^= 0xff;
       await expect(decryptDataTolerant(btoa(String.fromCodePoint(...bytes)), iv, [key])).resolves.toBeUndefined();
     });
 

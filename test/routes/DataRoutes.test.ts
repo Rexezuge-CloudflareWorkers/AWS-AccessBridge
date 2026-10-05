@@ -47,14 +47,14 @@ describe('cost routes', () => {
       },
     ]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/summary', env: userEnv() });
-    await new GetCostSummaryRoute({} as never).handle(c as never);
+    await new GetCostSummaryRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ grandTotal: 1.5 }));
   });
 
   it('GET /user/costs/summary returns empty for users without accounts', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue([]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/summary', env: userEnv() });
-    await new GetCostSummaryRoute({} as never).handle(c as never);
+    await new GetCostSummaryRoute({} as never).handle(c);
     // `currency: null` — with no rows there is no currency to report, and the
     // client must not render a symbol for it.
     expect(c.json).toHaveBeenCalledWith({ accounts: {}, grandTotal: 0, currency: null });
@@ -63,7 +63,7 @@ describe('cost routes', () => {
   it('GET /user/costs/account enforces account access', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue([]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/account?awsAccountId=123456789012', env: userEnv() });
-    await new GetAccountCostRoute({} as never).handle(c as never);
+    await new GetAccountCostRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Forbidden' }) }), 403);
   });
 
@@ -81,7 +81,7 @@ describe('cost routes', () => {
       },
     ]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/account?awsAccountId=123456789012', env: userEnv() });
-    await new GetAccountCostRoute({} as never).handle(c as never);
+    await new GetAccountCostRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ total: 2 }));
   });
 
@@ -99,7 +99,7 @@ describe('cost routes', () => {
       },
     ]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/trends?months=6', env: userEnv() });
-    await new GetCostTrendsRoute({} as never).handle(c as never);
+    await new GetCostTrendsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ months: expect.any(Array) }));
   });
 });
@@ -128,7 +128,7 @@ describe('resource routes', () => {
     });
     vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue(['Dev']);
     const c = createRouteContext({ url: 'https://example.com/user/resources?type=ec2&limit=50&offset=0', env: userEnv() });
-    await new ListResourcesRoute({} as never).handle(c as never);
+    await new ListResourcesRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ total: 1, rolesByAccount: { '123456789012': ['Dev'] } }));
   });
 
@@ -136,7 +136,7 @@ describe('resource routes', () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['123456789012']);
     vi.mocked(ResourceInventoryDAO.prototype.getResourceCounts).mockResolvedValue({ '123456789012': { ec2: 2, s3: 1 } });
     const c = createRouteContext({ url: 'https://example.com/user/resources/summary', env: userEnv() });
-    await new GetResourceSummaryRoute({} as never).handle(c as never);
+    await new GetResourceSummaryRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ totalResources: 3, byType: { ec2: 2, s3: 1 } }));
   });
 });
@@ -150,7 +150,7 @@ describe('audit logs route', () => {
   it('GET /user/admin/audit-logs queries with filters', async () => {
     vi.mocked(AuditLogDAO.prototype.query).mockResolvedValue({ logs: [], total: 0 });
     const c = createRouteContext({ url: 'https://example.com/user/admin/audit-logs?action=ASSUME_ROLE&limit=50&offset=0', env: {} });
-    await new ListAuditLogsRoute({} as never).handle(c as never);
+    await new ListAuditLogsRoute({} as never).handle(c);
     expect(AuditLogDAO.prototype.query).toHaveBeenCalledWith(expect.objectContaining({ action: 'ASSUME_ROLE' }), 50, 0);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ total: 0 }));
   });

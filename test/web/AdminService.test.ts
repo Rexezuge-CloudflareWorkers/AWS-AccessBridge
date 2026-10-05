@@ -21,13 +21,15 @@ import {
 import { formatCurrency, formatMonthLabel, formatUnixDate, formatUnixTimestamp } from '@aws-access-bridge/web/lib/format';
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
+  return Response.json(body, { status });
 }
 
-/** The (url, method, parsed body) of the single request made. */
+/**
+The (url, method, parsed body) of the single request made.
+*/
 function lastRequest(fetchMock: ReturnType<typeof vi.fn>): { url: string; method: string; body: Record<string, unknown> | undefined } {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-  return { url, method: init.method ?? 'GET', body: init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined };
+  return { url, method: init.method ?? 'GET', body: typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined };
 }
 
 describe('adminService', () => {

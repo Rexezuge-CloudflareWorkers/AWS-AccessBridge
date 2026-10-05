@@ -19,7 +19,6 @@ export default tseslint.config(
       'coverage/**',
       'coverage-integration/**',
       'node_modules/**',
-      'test/**',
     ],
   },
 

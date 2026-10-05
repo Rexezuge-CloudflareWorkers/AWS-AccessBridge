@@ -20,9 +20,11 @@ import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsD
  * while the table grew unbounded.
  */
 
-/** A statement that resolves `success: false` for every `.run()`. */
+/**
+A statement that resolves `success: false` for every `.run()`.
+*/
 function failingStatement(): { stmt: Record<string, unknown>; run: ReturnType<typeof vi.fn> } {
-  const run = vi.fn().mockResolvedValue({ success: false, error: 'constraint failed' } as unknown as D1Result);
+  const run = vi.fn().mockResolvedValue({ success: false, error: 'constraint failed' });
   const stmt = { bind: vi.fn(), run, first: vi.fn(), all: vi.fn() };
   // `bind` returns the statement itself, matching the real D1 builder chain.
   stmt.bind.mockReturnValue(stmt);
@@ -182,7 +184,7 @@ describe('D1 writes check result.success', () => {
       const { stmt } = failingStatement();
       // A real 256-bit key: `storeCredential` encrypts before it writes, and a
       // malformed key would fail there instead of at the statement under test.
-      const key = btoa(String.fromCharCode(...new Uint8Array(32)));
+      const key = btoa(String.fromCodePoint(...new Uint8Array(32)));
       await expect(new CredentialsDAO(dbWith(stmt) as never, [key], 3).storeCredential('arn:aws:iam::123456789012:role/Dev', 'AKIA', 'secret')).rejects.toBeInstanceOf(
         DatabaseError,
       );
@@ -192,19 +194,25 @@ describe('D1 writes check result.success', () => {
   describe('retry classification', () => {
     it('marks a busy/locked database retryable and a constraint violation not', async () => {
       const build = (error: string): D1Database => {
-        const stmt = { bind: vi.fn(), run: vi.fn().mockResolvedValue({ success: false, error } as unknown as D1Result) };
+        const stmt = { bind: vi.fn(), run: vi.fn().mockResolvedValue({ success: false, error }) };
         stmt.bind.mockReturnValue(stmt);
         return dbWith(stmt);
       };
 
-      const busy = await new AwsAccountsDAO(build('SQLITE_BUSY: database is locked') as never)
+      // The cast is on the awaited value rather than inside `catch`. `ensureAccountExists`
+      // resolves `void`, so `.catch((error) => error as DatabaseError)` gives
+      // `void | DatabaseError` — the success branch contributes `void`, and reading
+      // `.retryable` off that union is the error this replaces. Catching into the awaited
+      // result says what the test means: *whatever came out is the error being asserted
+      // on*, and the assertion below is what fails if it is not one.
+      const busy = (await new AwsAccountsDAO(build('SQLITE_BUSY: database is locked') as never)
         .ensureAccountExists('123456789012')
-        .catch((error: unknown) => error as DatabaseError);
+        .catch((error: unknown) => error)) as DatabaseError;
       expect(busy.retryable).toBe(true);
 
-      const constraint = await new AwsAccountsDAO(build('UNIQUE constraint failed: teams.team_name') as never)
+      const constraint = (await new AwsAccountsDAO(build('UNIQUE constraint failed: teams.team_name') as never)
         .ensureAccountExists('123456789012')
-        .catch((error: unknown) => error as DatabaseError);
+        .catch((error: unknown) => error)) as DatabaseError;
       expect(constraint.retryable).toBe(false);
     });
   });

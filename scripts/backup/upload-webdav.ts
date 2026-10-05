@@ -15,10 +15,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fail } from '../lib/github-actions';
 import { requireRetentionDays } from './retention';
-import { remoteTargetDir } from './webdav-target';
-
-const DEFAULT_BASE_PATH = 'aws-access-bridge';
-const REMOTE = 'webdav';
+import { DEFAULT_BASE_PATH, REMOTE, remoteTargetDir } from './webdav-target';
 
 function rclone(args: string[]): string {
   // eslint-disable-next-line sonarjs/no-os-command-from-path

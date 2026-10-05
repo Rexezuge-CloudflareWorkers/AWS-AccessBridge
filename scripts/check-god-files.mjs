@@ -29,10 +29,28 @@ const EXCLUDE_SUFFIX = [
 
 /**
 Paths relative to ROOT, so the patterns below can match on directory too.
+
+Every directory pattern is anchored with `(?:^|/)` rather than a bare leading `/`.
+`relative()` yields `test/helpers/x.ts` for this repository's top-level test directory
+and `scripts/lib/x.ts` for the scripts directory — **no leading separator** — so a
+pattern written as `/\/(?:test|tests|__tests__)\//` never matches either one. It looks
+right, it does match when handed an absolute path, and against these two directories
+it is silently a no-op. The `scripts` pattern carries the anchor; the test-directory
+pattern did not, so the exclusion was dead for the exact layout it was written for.
+
+It is latent here rather than active — no `test/` file is currently over the limit, so
+the guard reports the same either way. Fixing it *removes* `test/` from the guard, which
+is the intent: a double modelling the platform grows with the platform's surface, not
+with the complexity of the code it stands in for.
 */
 function shouldSkip(rel) {
   const path = rel;
-  if (path.includes('/locales/') || path.includes('/generated/') || path.includes('/__tests__/') || path.includes('/__mocks__/'))
+  if (
+    /(?:^|\/)(?:locales|generated)\//.test(path) ||
+    // `__tests__`/`__mocks__` can be the last segment of a path too, so matched as
+    // whole segments rather than requiring something after the slash.
+    /(?:^|\/)__(?:tests|mocks)__(?:\/|$)/.test(path)
+  )
     return true;
   // Tooling is not product source: build/lint/test configs and scripts grow
   // with project surface, not complexity. Guard only product + test code.
@@ -44,8 +62,9 @@ function shouldSkip(rel) {
     path.endsWith('.json') ||
     path.endsWith('.sql') ||
     path.endsWith('.md') ||
-    // Directory-based test roots, for files not named `*.test.ts`.
-    /\/(?:test|tests|__tests__)\//.test(path) ||
+    // Directory-based test roots, for files not named `*.test.ts`. This is the
+    // pattern that was previously unanchored, and so never fired.
+    /(?:^|\/)(?:test|tests|__tests__)\//.test(path) ||
     EXCLUDE_SUFFIX.some((s) => path.endsWith(s))
   )
     return true;

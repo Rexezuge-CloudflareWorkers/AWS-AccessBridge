@@ -12,7 +12,9 @@ import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao/TeamMembersD
  * shared helper can still be misapplied by a caller (an empty table alias, say).
  */
 
-/** Captures the SQL and bindings of every prepared statement. */
+/**
+Captures the SQL and bindings of every prepared statement.
+*/
 function capturingDb(): { db: D1Database; sql: () => string[]; bindings: () => unknown[][] } {
   const seenSql: string[] = [];
   const seenBindings: unknown[][] = [];
@@ -21,12 +23,17 @@ function capturingDb(): { db: D1Database; sql: () => string[]; bindings: () => u
       seenBindings.push(values);
       return stmt;
     }),
-    run: vi.fn().mockResolvedValue({ success: true } as D1Result),
+    run: vi.fn().mockResolvedValue({ success: true }),
     first: vi.fn().mockResolvedValue(null),
     all: vi.fn().mockResolvedValue({ results: [] }),
   };
   return {
-    db: { prepare: vi.fn((sql: string) => (seenSql.push(sql), stmt)) } as unknown as D1Database,
+    db: {
+      prepare: vi.fn((sql: string) => {
+        seenSql.push(sql);
+        return stmt;
+      }),
+    } as unknown as D1Database,
     sql: () => seenSql,
     bindings: () => seenBindings,
   };

@@ -3,7 +3,13 @@ import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 
 describe('MoneyUtil.round', () => {
   it('keeps two decimals', () => {
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- exact equality IS the
+       assertion: the value under test is a *rounded* float, so `toBeCloseTo` would
+       pass whether or not the rounding happened. A range assertion cannot tell
+       "rounded to two decimals" from "summed and left alone" — which is the entire
+       claim of a test named for `MoneyUtil.round`. */
     expect(MoneyUtil.round(2.344)).toBe(2.34);
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- as above */
     expect(MoneyUtil.round(12.567)).toBe(12.57);
     expect(MoneyUtil.round(0.999)).toBe(1);
   });
@@ -16,7 +22,11 @@ describe('MoneyUtil.round', () => {
    * with the affected totals in view.
    */
   it('reproduces the float artifact the previous call sites had', () => {
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- exact equality IS the assertion:
+       the value is a *rounded* float, so a range check would pass whether or not the
+       rounding happened, which is the whole claim of a test named for `round`. */
     expect(MoneyUtil.round(1.005)).toBe(1);
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- as above */
     expect(MoneyUtil.round(1.015)).toBe(1.01);
   });
 
@@ -26,6 +36,7 @@ describe('MoneyUtil.round', () => {
   });
 
   it('handles negatives symmetrically', () => {
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- as above */
     expect(MoneyUtil.round(-2.345)).toBe(-2.35);
   });
 });

@@ -56,7 +56,7 @@ export default function MaintenanceTab({ showMessage }: { showMessage: ShowMessa
         <p style={{ color: '#d1d5db', marginBottom: '16px' }}>
           {t(
             'admin.purgeDescription',
-            'Deletes leftover rows for AWS accounts that no user has been granted access to and for credentials that have been removed. An account is treated as active only if at least one user has a grant on it.',
+            'Deletes leftover rows for AWS accounts that no user has been granted access to and for credentials that no longer exist.',
           )}
         </p>
         <div

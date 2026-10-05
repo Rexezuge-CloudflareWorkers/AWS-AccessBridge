@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { UserIdentityService, idOf } from '@aws-access-bridge/backend-services/identity';
 import type { AccountIdentity, UserIdentityEnv } from '@aws-access-bridge/backend-services/identity';
 import { BadRequestError, ConflictError } from '@aws-access-bridge/backend-errors';
 import type { UserEmailRow } from '@aws-access-bridge/backend-data/dao';
+import type { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
+import type { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
 
 const NOW = 1_700_000_000;
 
@@ -18,19 +21,33 @@ function account(overrides: Partial<AccountIdentity> = {}): AccountIdentity {
   return { id: 'usr_abc', email: 'user@example.com', anchorEmail: 'user@example.com', ...overrides };
 }
 
+/**
+ * Every member typed from the DAO method it stands in for.
+ *
+ * These were all `ReturnType<typeof vi.fn>`, which resolves to **`void`**: vitest's
+ * default `Procedure` returns `void`, so `ReturnType` picked that rather than the
+ * `any` the code appeared to get. The consequence was that `mockImplementation(() =>
+ * Promise.resolve('claimed'))` was an arrow returning a promise where a `void` return
+ * was expected — three errors that all read as "this test's callback is wrong" and none
+ * of which was.
+ *
+ * Naming the production method makes the double carry the real signature, so a `register`
+ * that resolved nothing, or took the wrong argument, would be reported here rather than
+ * silently accepted.
+ */
 interface Harness {
   service: UserIdentityService;
   emailDAO: {
-    get: ReturnType<typeof vi.fn>;
-    register: ReturnType<typeof vi.fn>;
-    revokeAllVerified: ReturnType<typeof vi.fn>;
-    listByUserId: ReturnType<typeof vi.fn>;
+    get: MockedFunction<typeof UserEmailDAO.prototype.get>;
+    register: MockedFunction<typeof UserEmailDAO.prototype.register>;
+    revokeAllVerified: MockedFunction<typeof UserEmailDAO.prototype.revokeAllVerified>;
+    listByUserId: MockedFunction<typeof UserEmailDAO.prototype.listByUserId>;
   };
   metadataDAO: {
-    getById: ReturnType<typeof vi.fn>;
-    getByCurrentEmail: ReturnType<typeof vi.fn>;
-    getByAnchor: ReturnType<typeof vi.fn>;
-    setCurrentEmail: ReturnType<typeof vi.fn>;
+    getById: MockedFunction<typeof UserMetadataDAO.prototype.getById>;
+    getByCurrentEmail: MockedFunction<typeof UserMetadataDAO.prototype.getByCurrentEmail>;
+    getByAnchor: MockedFunction<typeof UserMetadataDAO.prototype.getByAnchor>;
+    setCurrentEmail: MockedFunction<typeof UserMetadataDAO.prototype.setCurrentEmail>;
   };
 }
 
@@ -109,7 +126,7 @@ describe('UserIdentityService', () => {
 
     it('returns null for a blank address without touching the database', async () => {
       const { service, emailDAO } = harness();
-      await expect(service.resolveAccount('   ')).resolves.toBeNull();
+      await expect(service.resolveAccount(' '.repeat(3))).resolves.toBeNull();
       expect(emailDAO.get).not.toHaveBeenCalled();
     });
 
@@ -196,7 +213,7 @@ describe('UserIdentityService', () => {
      */
     it('refuses to proceed when the claim check fails, instead of claiming the address', async () => {
       const { service, metadataDAO, emailDAO } = harness();
-      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' });
       vi.mocked(emailDAO.get).mockRejectedValue(new Error('D1_ERROR: database is locked'));
 
       await expect(service.setPrimaryEmail('usr_abc', 'victim@example.com')).rejects.toThrow(/database is locked/);
@@ -207,7 +224,7 @@ describe('UserIdentityService', () => {
 
     it('refuses when only the current_email probe fails', async () => {
       const { service, metadataDAO, emailDAO } = harness();
-      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' });
       vi.mocked(emailDAO.get).mockResolvedValue(null);
       vi.mocked(metadataDAO.getByCurrentEmail).mockRejectedValue(new Error('D1_ERROR: database is locked'));
 
@@ -217,8 +234,8 @@ describe('UserIdentityService', () => {
 
     it('rejects an address that is already verified for another account', async () => {
       const { service, metadataDAO, emailDAO } = harness();
-      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' } as never);
-      vi.mocked(emailDAO.get).mockResolvedValue({ email: 'victim@example.com', user_id: 'usr_other', is_verified: 1 });
+      vi.mocked(metadataDAO.getById).mockResolvedValue({ user_email: 'old@example.com', id: 'usr_abc', current_email: 'old@example.com' });
+      vi.mocked(emailDAO.get).mockResolvedValue({ email: 'victim@example.com', user_id: 'usr_other', is_verified: 1, created_at: NOW });
 
       await expect(service.setPrimaryEmail('usr_abc', 'victim@example.com')).rejects.toThrow(/already in use/);
       expect(emailDAO.register).not.toHaveBeenCalled();

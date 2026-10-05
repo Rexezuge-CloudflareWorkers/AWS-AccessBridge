@@ -13,14 +13,16 @@ import { getRequestInputSchema } from '@/schema';
  * stay aligned by hand.
  */
 
-/** Concrete `METHOD /path` routes: no `ALL` middleware entries, no wildcards. */
+/**
+Concrete `METHOD /path` routes: no `ALL` middleware entries, no wildcards.
+*/
 function registeredRoutes(): Array<{ method: string; path: string }> {
   const app = new AccessBridgeWorker() as unknown as {
     app: { routes: Array<{ method: string; path: string }> };
   };
   return app.app.routes
     .map((route) => ({ method: route.method.toUpperCase(), path: route.path }))
-    .filter((route) => /^(GET|POST|PUT|DELETE|PATCH)$/.test(route.method) && !route.path.includes('*'));
+    .filter((route) => /^(?:GET|POST|PUT|DELETE|PATCH)$/.test(route.method) && !route.path.includes('*'));
 }
 
 /**
@@ -40,7 +42,9 @@ const NON_ENDPOINT_ROUTES: Set<string> = new Set([
   'GET /openapi.yaml',
 ]);
 
-/** The key form `getRouteKey` builds: no trailing slash, upper-case method. */
+/**
+The key form `getRouteKey` builds: no trailing slash, upper-case method.
+*/
 function routeKey(method: string, path: string): string {
   const pathname: string = path.length > 1 ? path.replace(/\/$/, '') : path;
   return `${method.toUpperCase()} ${pathname}`;
@@ -56,13 +60,17 @@ describe('request schema coverage', () => {
   });
 
   it('every schema entry names a route that exists', () => {
-    const keys: string[] = new Set(routes.map((route) => routeKey(route.method, route.path)));
+    // A `Set`, not an array: the very next line calls `.has` on it, which an array does
+    // not have. The annotation said `string[]` while the value was a `Set`, so the file
+    // reported an error on each of the two lines rather than on the declaration that
+    // was actually wrong.
+    const keys: ReadonlySet<string> = new Set(routes.map((route) => routeKey(route.method, route.path)));
     const orphans: string[] = Object.keys(RequestInputSchemas).filter((key) => !keys.has(key));
     expect(orphans).toEqual([]);
   });
 
   it.each(Object.keys(RequestInputSchemas))('resolves %s through getRequestInputSchema', (key) => {
-    const [method, path] = key.split(' ');
+    const [method, path] = key.split(' ', 2);
     const request: Request = new Request(`https://worker.example.com${path}`, { method });
     expect(getRequestInputSchema(request)).toBeDefined();
   });
@@ -82,7 +90,7 @@ describe('request schema coverage', () => {
   ];
 
   it.each(INPUT_FREE_ROUTES)('%s has no schema and reads no input', (key) => {
-    const [method, path] = key.split(' ');
+    const [method, path] = key.split(' ', 2);
     expect(Object.keys(RequestInputSchemas)).not.toContain(key);
     expect(getRequestInputSchema(new Request(`https://worker.example.com${path}`, { method }))).toBeUndefined();
   });

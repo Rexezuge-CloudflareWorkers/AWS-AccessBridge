@@ -3,6 +3,7 @@ import { CostService } from '@aws-access-bridge/backend-services/cost/CostServic
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
 import { CostDataDAO } from '@aws-access-bridge/backend-data/dao/CostDataDAO';
 import { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
+import type { CostData } from '@aws-access-bridge/shared/model';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CostDataDAO');
@@ -22,15 +23,25 @@ function service(): CostService {
   return new CostService(ENV);
 }
 
-interface CostRow {
-  awsAccountId: string;
-  currency: string;
-  totalCost: number;
-  [key: string]: unknown;
-}
-
-function row(awsAccountId: string, totalCost: number, currency = 'USD'): CostRow {
-  return { awsAccountId, currency, totalCost };
+/**
+ * A complete `CostData`, not a partial one.
+ *
+ * This used to be a local `CostRow` carrying `[key: string]: unknown`, which
+ * typechecked as itself and then failed at every `mockResolvedValue` — the index
+ * signature made a shape the DAO cannot return look acceptable. `getSummary` reads
+ * three of these seven fields, and the other four are supplied here so the fixture is
+ * a row the DAO really returns rather than one shaped to slip past the type.
+ */
+function row(awsAccountId: string, totalCost: number, currency = 'USD'): CostData {
+  return {
+    awsAccountId,
+    currency,
+    totalCost,
+    periodStart: '2026-01-01',
+    periodEnd: '2026-01-31',
+    serviceBreakdown: {},
+    collectedAt: 0,
+  };
 }
 
 describe('CostService.getSummary currency', () => {
@@ -45,6 +56,9 @@ describe('CostService.getSummary currency', () => {
     const summary = await service().getSummary('user@example.com');
 
     expect(summary.currency).toBe('USD');
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- exact equality IS the assertion:
+       the value is a *rounded* float, so a range check would pass whether or not the
+       rounding happened, which is the whole claim of a test named for `round`. */
     expect(summary.grandTotal).toBe(2365.52);
   });
 
@@ -93,7 +107,18 @@ describe('CostService.getSummary currency', () => {
 
     const summary = await service().getSummary('user@example.com');
 
+    // Exact on purpose: `0.1 + 0.2` is `0.30000000000000004`, and the claim this test
+    // makes is that the service **rounds** it. `toBeCloseTo(0.3)` would be satisfied by
+    // the unrounded sum, so a range assertion here would pass with the rounding removed
+    // — which is the one thing the test exists to catch.
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- exact equality is the
+       assertion here: the value under test is a *rounded* float, so `toBeCloseTo`
+       would pass whether or not the rounding happened. A range assertion cannot
+       tell "rounded to two decimals" from "summed and left alone", which is the
+       whole claim of this test. */
     expect(summary.accounts['111111111111'].totalCost).toBe(0.3);
+    /* eslint-disable-next-line sonarjs/no-floating-point-equality -- as above: the rounding
+       is the subject, and a range assertion cannot detect its absence. */
     expect(summary.grandTotal).toBe(0.3);
     expect(summary.currency).toBe('USD');
   });

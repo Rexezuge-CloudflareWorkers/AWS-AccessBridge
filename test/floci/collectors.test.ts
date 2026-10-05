@@ -28,7 +28,9 @@ import { createBucketWithObject, createDbInstance } from './helpers/seed';
  * revisited when Floci next lands DynamoDB targets.
  */
 
-/** Every field the collectors promise, so a parser that drops one fails here. */
+/**
+Every field the collectors promise, so a parser that drops one fails here.
+*/
 function expectWellFormed(items: ResourceDiscoveryItem[]): void {
   for (const item of items) {
     expect(item.resourceId).toBeTruthy();

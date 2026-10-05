@@ -63,7 +63,9 @@ async function expectSeeded(response: Response, action: string): Promise<void> {
  */
 const S3_OBJECT_BYTES = 16 * 1024 * 1024;
 
-/** `iam:CreateRole` — the target `sts:AssumeRole` will not invent for itself. */
+/**
+`iam:CreateRole` — the target `sts:AssumeRole` will not invent for itself.
+*/
 async function createRole(roleName: string, keys: AccessKeys = accountKeys(ACCOUNT_A)): Promise<string> {
   const params: URLSearchParams = new URLSearchParams({
     Action: 'CreateRole',
@@ -76,7 +78,9 @@ async function createRole(roleName: string, keys: AccessKeys = accountKeys(ACCOU
   return `arn:aws:iam::${keys.accessKeyId}:role/${roleName}`;
 }
 
-/** `s3:CreateBucket` plus one priced object (see `S3_OBJECT_BYTES`). */
+/**
+`s3:CreateBucket` plus one priced object (see `S3_OBJECT_BYTES`).
+*/
 async function createBucketWithObject(bucket: string, keys: AccessKeys = accountKeys(ACCOUNT_A)): Promise<void> {
   await expectSeeded(await flociFetch('s3', `https://s3.amazonaws.com/${bucket}`, { method: 'PUT' }, keys), `s3:CreateBucket ${bucket}`);
   await expectSeeded(

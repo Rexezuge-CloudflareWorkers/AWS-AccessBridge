@@ -4,7 +4,7 @@ import { queryAuditLogs } from '@aws-access-bridge/web/services/auditService';
 import { setAccountNickname, testCredentialChain, cleanupOrphaned } from '@aws-access-bridge/web/services/adminService';
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
+  return Response.json(body, { status });
 }
 
 describe('web domain services', () => {

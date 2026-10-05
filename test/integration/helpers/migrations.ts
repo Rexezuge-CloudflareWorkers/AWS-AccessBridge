@@ -15,7 +15,6 @@ function splitSql(sql: string): string[] {
   let i = 0;
   while (i < sql.length) {
     const ch = sql[i];
-    const next = sql[i + 1];
 
     if (inLineComment) {
       if (ch === '\n') {
@@ -25,6 +24,11 @@ function splitSql(sql: string): string[] {
       i++;
       continue;
     }
+
+    // Read after the line-comment branch, which never looks at it: the line-comment
+    // branch always continues, so computing `next` before it is work thrown away on
+    // every line of a `--` comment. Every branch below this point does read it.
+    const next = sql[i + 1];
 
     if (inBlockComment) {
       if (ch === '*' && next === '/') {
@@ -107,11 +111,12 @@ declare const __INTEGRATION_MIGRATION_SQL__: string;
  */
 function migrationFiles(): MigrationFile[] {
   const files = typeof __INTEGRATION_MIGRATION_FILES__ === 'undefined' ? null : __INTEGRATION_MIGRATION_FILES__;
-  if (files && files.length > 0) return [...files];
-  return [{ name: 'all.sql', sql: __INTEGRATION_MIGRATION_SQL__ }];
+  return files && files.length > 0 ? [...files] : [{ name: 'all.sql', sql: __INTEGRATION_MIGRATION_SQL__ }];
 }
 
-/** Names of the embedded migration files, in apply order. */
+/**
+Names of the embedded migration files, in apply order.
+*/
 function migrationFileNames(): string[] {
   return migrationFiles().map((f) => f.name);
 }
@@ -147,7 +152,8 @@ export async function applyMigrations(db: D1Database, range?: { from?: string; t
   const end = indexOf(range?.to, files.length - 1);
   const key = `${start}:${end}`;
   if (appliedDatabases.get(db) === key) return;
-  for (const file of files.slice(start, end + 1)) {
+  const applicable = files.slice(start, end + 1);
+  for (const file of applicable) {
     for (const statement of splitSql(file.sql)) {
       if (statement.length === 0) continue;
       await db.prepare(statement).run();

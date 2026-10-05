@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IScheduledTask } from '@aws-access-bridge/background/scheduled/IScheduledTask';
 import { AbstractCollectionTask } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
+import type { CollectionTaskEnv } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao/DataCollectionConfigDAO';
 import { createRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -31,7 +32,18 @@ class StubTask extends IScheduledTask<{ AccessBridgeDB: D1Database }> {
   }
 }
 
-class StubCollectionTask extends AbstractCollectionTask<{ AccessBridgeDB: D1Database } & Record<string, unknown>> {
+/**
+ * Parameterised on the production `CollectionTaskEnv` rather than on a restatement of
+ * it.
+ *
+ * The stub used to declare `{ AccessBridgeDB: D1Database } & Record<string, unknown>`,
+ * which satisfies the index signature and the database but is missing two members the
+ * constraint requires — `AES_ENCRYPTION_KEY_SECRET` and `AccessBridgeKV`. Naming the
+ * real type means a binding added to `CollectionTaskEnv` later is a compile error here
+ * rather than a silently absent member, which is the difference between a double that
+ * models the platform and one that models a moment of it.
+ */
+class StubCollectionTask extends AbstractCollectionTask<CollectionTaskEnv> {
   protected override getTaskType(): string {
     return 'stub-collection';
   }

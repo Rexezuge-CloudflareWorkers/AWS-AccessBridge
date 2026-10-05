@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { cloudflareTest, cloudflarePool } from '@cloudflare/vitest-pool-workers';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import path from 'node:path';
 
 const apiSrcPath = fileURLToPath(new URL('../../apps/api/src', import.meta.url));
 const backgroundSrcPath = fileURLToPath(new URL('../../apps/background/src', import.meta.url));
@@ -13,11 +13,11 @@ const backendServicesSrcPath = fileURLToPath(new URL('../../packages/backend-ser
 const providerClientsSrcPath = fileURLToPath(new URL('../../packages/provider-clients/src', import.meta.url));
 const sharedSrcPath = fileURLToPath(new URL('../../packages/shared/src', import.meta.url));
 
-const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
+const migrationsDir = path.resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
 const migrationFiles = readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
-  .sort();
-const migrationEntries = migrationFiles.map((f) => ({ name: f, sql: readFileSync(resolve(migrationsDir, f), 'utf-8') }));
+  .toSorted((left, right) => left.localeCompare(right));
+const migrationEntries = migrationFiles.map((f) => ({ name: f, sql: readFileSync(path.resolve(migrationsDir, f), 'utf8') }));
 // Both forms are injected: the per-file list so a test can apply a named range
 // (the 0032 upgrade test seeds between migrations), and the flattened string
 // kept for harnesses/tests that only want the whole bundle.

@@ -46,13 +46,31 @@ function createDurableObjectState(): DurableObjectState {
   } as unknown as DurableObjectState;
 }
 
-function createEnv(): Env {
+/**
+ * A deliberately minimal environment.
+ *
+ * The worker's entry point is typed `CloudflareEnv`, which the generator pins to the
+ * template's exact values — `POLICY_AUD` is the literal
+ * `"you-cloudflare-zero-trust-application-aud"`, not `string`. So a test env built to
+ * exercise routing or auth can never satisfy it field-for-field, and every
+ * `worker.fetch(request, createEnv())` reported `Argument of type 'Env' is not
+ * assignable to parameter of type 'CloudflareEnv'` — twelve errors in this file that
+ * were all one missing cast in one factory.
+ *
+ * The cast is here rather than at the call sites for the reason it usually is: it is
+ * one known boundary, and a reader can establish once that these tests are about the
+ * worker's behaviour rather than about configuration completeness.
+ */
+function createEnv(): CloudflareEnv {
+  // The two storage doubles are markers rather than working objects, and each one is a
+  // cast that does not typecheck: `{ mock: true }` and `D1Database` do not overlap, so
+  // every use was reported twice — once for the cast and once for the env it produced.
   return {
-    AccessBridgeDB: { mock: true } as D1Database,
-    AccessBridgeKV: { mock: true } as KVNamespace,
+    AccessBridgeDB: { mock: true } as unknown as D1Database,
+    AccessBridgeKV: { mock: true } as unknown as KVNamespace,
     CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn() } as unknown as SecretsStoreSecret,
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn() } as unknown as SecretsStoreSecret,
-  } as Env;
+  } as unknown as CloudflareEnv;
 }
 
 function createRunRequest(): Request {
@@ -60,7 +78,7 @@ function createRunRequest(): Request {
     method: 'POST',
     body: JSON.stringify({
       cron: '*/10 * * * *',
-      scheduledTime: 123456,
+      scheduledTime: 123_456,
     }),
   });
 }
@@ -75,7 +93,10 @@ describe('CronTasksWorker', () => {
   });
 
   it('runs phase 1 before phase 2 tasks', async () => {
-    const env: Env = createEnv();
+    // No `Env` annotation: `createEnv()` returns `CloudflareEnv`, and re-narrowing it
+    // to the hand-written global `Env` reintroduced exactly the mismatch this factory
+    // exists to avoid — the worker entry point wants `CloudflareEnv`.
+    const env = createEnv();
     const worker: CronTasksWorker = new CronTasksWorker(createDurableObjectState(), env);
 
     const response: Response = await worker.fetch(createRunRequest());
@@ -92,7 +113,7 @@ describe('CronTasksWorker', () => {
 
     const scheduledEvent: ScheduledController = taskSpies.credentialCacheRefresh.mock.calls[0][0];
     expect(scheduledEvent.cron).toBe('*/10 * * * *');
-    expect(scheduledEvent.scheduledTime).toBe(123456);
+    expect(scheduledEvent.scheduledTime).toBe(123_456);
     expect(taskSpies.credentialCacheRefresh.mock.calls[0][1]).toBe(env);
   });
 
@@ -122,7 +143,7 @@ describe('CronTasksWorker', () => {
     const worker: CronTasksWorker = new CronTasksWorker(createDurableObjectState(), createEnv());
 
     const notFoundResponse: Response = await worker.fetch(new Request('https://cron-tasks.internal/missing', { method: 'POST' }));
-    const methodResponse: Response = await worker.fetch(new Request('https://cron-tasks.internal/run', { method: 'GET' }));
+    const methodResponse: Response = await worker.fetch(new Request('https://cron-tasks.internal/run'));
 
     expect(notFoundResponse.status).toBe(404);
     expect(methodResponse.status).toBe(405);

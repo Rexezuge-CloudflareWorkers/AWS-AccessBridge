@@ -13,17 +13,28 @@ interface RecordedHeader {
  * explicit `Cache-Control` an intermediary or the browser back/forward cache can
  * replay any of it after the request that produced it.
  */
-function createApp(): { app: { fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> }; headers: RecordedHeader[] } {
+/**
+ * The middleware double, and the headers it recorded.
+ *
+ * `fetch` resolves **`void`**, not a `Response`. `noStore` is a header-setting
+ * middleware: it records a header and awaits `next()`, and there is no response here to
+ * return. The declared `Promise<Response>` was fiction, which is why the implementation
+ * was reported as an error on its own return statement. Nothing reads a response from
+ * this double — the assertion is on `headers` — so the honest signature is the real one.
+ */
+function createApp(): { app: { fetch: (request: Request, env: unknown, ctx: unknown) => Promise<void> }; headers: RecordedHeader[] } {
   const headers: RecordedHeader[] = [];
   const app = {
-    fetch: async (request: Request, env: unknown, ctx: unknown): Promise<Response> => {
+    fetch: async (request: Request, env: unknown, ctx: unknown): Promise<void> => {
       const noStore = MiddlewareHandlers.noStore();
       return noStore(
         {
           req: { url: request.url, header: (name: string) => request.headers.get(name) ?? undefined },
           env,
           executionCtx: ctx,
-          header: (name: string, value: string) => headers.push({ name, value }),
+          header: (name: string, value: string) => {
+          headers.push({ name, value });
+        },
         } as never,
         async () => undefined,
       );
@@ -32,8 +43,17 @@ function createApp(): { app: { fetch: (request: Request, env: unknown, ctx: unkn
   return { app, headers };
 }
 
-function createExecutionContext(): unknown {
-  return { waitUntil: vi.fn(), passThroughOnException: vi.fn() };
+/**
+ * `ExecutionContext`, not `unknown`.
+ *
+ * Declared `unknown`, which is assignable to nothing — so it only typechecked while the
+ * surrounding call sites were themselves mistyped. Correcting the env cast on those
+ * exposed it here: `unknown` is not an `ExecutionContext`. The two members below are the
+ * ones the Worker runtime actually attaches, and the cast is where a test double earns
+ * it.
+ */
+function createExecutionContext(): ExecutionContext {
+  return { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as unknown as ExecutionContext;
 }
 
 function createRouteDb(): unknown {
@@ -63,7 +83,13 @@ describe('MiddlewareHandlers.noStore', () => {
 
   it('sets the headers after the route has produced a response', async () => {
     const order: string[] = [];
-    await MiddlewareHandlers.noStore()({ header: () => order.push('header') } as never, async () => {
+    await MiddlewareHandlers.noStore()(
+      {
+        header: () => {
+          order.push('header');
+        },
+      } as never,
+      async () => {
       order.push('next');
     });
     expect(order).toEqual(['next', 'header', 'header']);
@@ -75,7 +101,11 @@ describe('MiddlewareHandlers.noStore', () => {
     // the auth handlers would never run on that path.
     const headers: RecordedHeader[] = [];
     await MiddlewareHandlers.noStore()(
-      { header: (name: string, value: string) => headers.push({ name, value }) } as never,
+      {
+        header: (name: string, value: string) => {
+          headers.push({ name, value });
+        },
+      } as never,
       async () => undefined,
     );
     expect(headers.map((entry) => entry.name)).toEqual(['Cache-Control', 'Pragma']);
@@ -93,7 +123,7 @@ describe('AccessBridgeWorker cache headers', () => {
         headers: { Authorization: 'Bearer test-token' },
         body: JSON.stringify({ principalArn: 'arn:aws:iam::123456789012:role/Dev' }),
       }),
-      { AccessBridgeDB: createRouteDb(), DEV_AUTH_EMAIL: 'dev@example.com' } as unknown as Env,
+      { AccessBridgeDB: createRouteDb(), DEV_AUTH_EMAIL: 'dev@example.com' } as unknown as CloudflareEnv,
       createExecutionContext(),
     );
     expect(response.headers.get('Cache-Control')).toBe('no-store, max-age=0');
@@ -104,7 +134,7 @@ describe('AccessBridgeWorker cache headers', () => {
     const worker = new AccessBridgeWorker();
     const response: Response = await worker.fetch(
       new Request('https://worker.example.com/user/me', { headers: { Authorization: 'Bearer test-token' } }),
-      { AccessBridgeDB: createRouteDb(), DEV_AUTH_EMAIL: 'dev@example.com' } as unknown as Env,
+      { AccessBridgeDB: createRouteDb(), DEV_AUTH_EMAIL: 'dev@example.com' } as unknown as CloudflareEnv,
       createExecutionContext(),
     );
     expect(response.headers.get('Cache-Control')).toBe('no-store, max-age=0');

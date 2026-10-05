@@ -2,20 +2,38 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRequestScope, getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import type { ServiceEnv } from '@aws-access-bridge/backend-services/composition/ServiceEnv';
+import type { Token } from '@aws-access-bridge/backend-runtime/di';
+import { serviceEnv } from '../helpers/service-env';
 
-function scopeEnv() {
-  return {
-    AccessBridgeDB: {},
-    AccessBridgeKV: {},
-    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
-    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
-  } as never;
+/**
+ * A `ServiceEnv`, not `never`.
+ *
+ * This returned its literal `as never`, which is assignable to everything and
+ * therefore type-checks nothing — and it made the *return type* `never` too, so the
+ * three `{ ...scopeEnv() }` spreads below were reported as "spread types may only be
+ * created from object types" rather than at the `as never` that caused them. The
+ * bindings the composition root reads are supplied for real; the database comes from
+ * the shared helper rather than being an empty object.
+ */
+function scopeEnv(): ServiceEnv {
+  return serviceEnv({
+    AccessBridgeKV: {} as KVNamespace,
+    CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') } as unknown as SecretsStoreSecret,
+    CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') } as unknown as SecretsStoreSecret,
+  });
 }
 
 describe('createRequestScope', () => {
   it('resolves every domain service from one composition root', () => {
     const scope = createRequestScope(scopeEnv());
-    for (const token of [
+    // Typed as `Token<unknown>[]` rather than left to inference. `get<T>(token: Token<T>)`
+    // is generic, but `Token<T>` is `(string | symbol) & { readonly __type?: T }` — the
+    // value lives in an *optional* property, so inference over a union of seventeen
+    // differently-typed tokens collapses to the first member and every other one is
+    // reported as not assignable. Widening at the declaration says what the loop means:
+    // "every token in the registry", which is the claim being tested.
+    const registry: Token<unknown>[] = [
       Tokens.CredentialChainService,
       Tokens.CredentialStoreService,
       Tokens.AssumeRoleService,
@@ -33,7 +51,8 @@ describe('createRequestScope', () => {
       Tokens.AuditService,
       Tokens.TokenService,
       Tokens.AccessAuthService,
-    ]) {
+    ];
+    for (const token of registry) {
       expect(scope.get(token)).toBeTruthy();
     }
   });
@@ -154,7 +173,7 @@ describe('getRequestScope', () => {
     // Two "handlers" of the same request: one sees the raw env, the other a
     // session-wrapped spread copy, exactly as the middleware and routes did.
     const first = { env };
-    const second = { env: { ...env, AccessBridgeDB: { prepare: () => undefined } } };
+    const second = { env: { ...env, AccessBridgeDB: { prepare: () => undefined } as unknown as ServiceEnv['AccessBridgeDB'] } };
 
     const scope = getRequestScope(first);
     expect(getRequestScope(second)).not.toBe(scope);
@@ -175,7 +194,7 @@ describe('getRequestScope', () => {
 
   it('fetches the encryption keys once per request scope, not once per call', async () => {
     const credential = vi.fn().mockResolvedValue('k');
-    const context = { env: { ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: credential } } as never };
+    const context = { env: { ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: credential } as unknown as SecretsStoreSecret } };
     await getRequestScope(context).get(Tokens.CredentialKey)();
     await getRequestScope(context).get(Tokens.CredentialKey)();
     expect(credential).toHaveBeenCalledTimes(1);
@@ -185,7 +204,7 @@ describe('getRequestScope', () => {
     // The services hold only `env`, which is not the request's identity, so the
     // composition root passes the keys in rather than letting them look a scope up.
     const get = vi.fn().mockResolvedValue('k');
-    const scope = createRequestScope({ ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get } } as never);
+    const scope = createRequestScope({ ...scopeEnv(), CREDENTIAL_ENCRYPTION_KEY_SECRET: { get } });
     const store = scope.get(Tokens.CredentialStoreService);
     await store.createCredentialsDAO();
     await store.createCredentialsDAO();

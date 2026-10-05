@@ -26,7 +26,7 @@ describe('UserEmailDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -59,7 +59,7 @@ describe('UserEmailDAO', () => {
     it("refuses to re-point an address another account already holds", async () => {
       // The core safety property. Silently re-pointing would let one account
       // authenticate as another the moment the address was claimed.
-      vi.mocked(mockStmt.first).mockResolvedValue(existing({ user_id: 'usr_other' }) as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(existing({ user_id: 'usr_other' }));
       const dao = new UserEmailDAO(mockDb);
 
       await expect(dao.register({ email: 'alice@example.com', userId: 'usr_new', isVerified: true, now: 100 })).resolves.toBe('already-claimed');
@@ -71,7 +71,7 @@ describe('UserEmailDAO', () => {
     it('re-points a revoked address, releasing it', async () => {
       // The counterpart: without this, an address a user moved away from could
       // never be claimed by anyone else.
-      vi.mocked(mockStmt.first).mockResolvedValue(existing({ is_verified: 0 }) as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(existing({ is_verified: 0 }));
       const dao = new UserEmailDAO(mockDb);
 
       await expect(dao.register({ email: 'alice@example.com', userId: 'usr_new', isVerified: true, now: 200 })).resolves.toBe('claimed');
@@ -105,7 +105,7 @@ describe('UserEmailDAO', () => {
   describe('get', () => {
     it('returns the stored row', async () => {
       const row = existing();
-      vi.mocked(mockStmt.first).mockResolvedValue(row as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(row);
       const dao = new UserEmailDAO(mockDb);
 
       await expect(dao.get('alice@example.com')).resolves.toEqual(row);
@@ -113,7 +113,7 @@ describe('UserEmailDAO', () => {
     });
 
     it('returns null when no row matches', async () => {
-      vi.mocked(mockStmt.first).mockResolvedValue(null as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(null);
       await expect(new UserEmailDAO(mockDb).get('nobody@example.com')).resolves.toBeNull();
     });
 
@@ -121,7 +121,7 @@ describe('UserEmailDAO', () => {
       // Deliberate: the registry stores normalized addresses, and a pre-0032
       // mixed-case account has no registry row to collide with. Normalizing here
       // would make a case-variant probe match a row it should not.
-      vi.mocked(mockStmt.first).mockResolvedValue(null as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(null);
       await new UserEmailDAO(mockDb).get('Alice@Example.com');
 
       expect(mockStmt.bind).toHaveBeenCalledWith('Alice@Example.com');

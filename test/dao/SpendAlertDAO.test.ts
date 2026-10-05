@@ -12,7 +12,7 @@ describe('SpendAlertDAO', () => {
       first: vi.fn(),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),

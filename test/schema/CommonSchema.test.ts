@@ -35,7 +35,7 @@ describe('shared schema branches', () => {
   });
 
   it('rejects blank strings and bad enums', () => {
-    expect(nonEmptyStringSchema('name').safeParse('   ').success).toBe(false);
+    expect(nonEmptyStringSchema('name').safeParse(' '.repeat(3)).success).toBe(false);
     expect(nonEmptyStringSchema('name').safeParse('ok').success).toBe(true);
     expect(CollectionTypeSchema.safeParse('bogus').success).toBe(false);
     expect(BooleanQuerySchema.safeParse('maybe').success).toBe(false);

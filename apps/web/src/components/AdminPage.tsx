@@ -26,9 +26,9 @@ export default function AdminPage({ activeTab: activeTabProp, onTabChange }: Adm
   const { message, showMessage, dismiss } = useToast();
 
   const tabGroups = [
-    { header: t('admin.setupHeader', 'Setup'), tabs: [{ id: 'wizard', label: t('admin.wizardTab', 'Setup Wizard') }] },
+    { header: t('admin.setupHeader', 'SETUP'), tabs: [{ id: 'wizard', label: t('admin.wizardTab', 'Setup Wizard') }] },
     {
-      header: t('admin.configurationHeader', 'Configuration'),
+      header: t('admin.configurationHeader', 'CONFIGURATION'),
       tabs: [
         { id: 'credentials', label: t('admin.credentialsTab', 'Credentials') },
         { id: 'accounts', label: t('admin.nicknamesTab', 'Account Nicknames') },
@@ -36,21 +36,21 @@ export default function AdminPage({ activeTab: activeTabProp, onTabChange }: Adm
       ],
     },
     {
-      header: t('admin.accessHeader', 'Access'),
+      header: t('admin.accessHeader', 'ACCESS'),
       tabs: [
         { id: 'access', label: t('admin.accessTab', 'User Access') },
         { id: 'teams', label: t('admin.teamsTab', 'Teams') },
       ],
     },
     {
-      header: t('admin.monitoringHeader', 'Monitoring'),
+      header: t('admin.monitoringHeader', 'MONITORING'),
       tabs: [
         { id: 'spendalerts', label: t('admin.spendAlertsTab', 'Spend Alerts') },
         { id: 'datacollection', label: t('admin.dataCollectionTab', 'Data Collection') },
       ],
     },
     {
-      header: t('admin.systemHeader', 'System'),
+      header: t('admin.systemHeader', 'SYSTEM'),
       tabs: [
         { id: 'auditlogs', label: t('admin.auditLogsTab', 'Audit Logs') },
         { id: 'maintenance', label: t('admin.maintenanceTab', 'Maintenance') },

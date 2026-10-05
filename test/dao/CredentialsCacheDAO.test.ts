@@ -133,7 +133,9 @@ describe('CredentialsCacheDAO', () => {
   });
 });
 
-/** Build a ciphertext with a caller-chosen IV, as pre-fix code did. */
+/**
+Build a ciphertext with a caller-chosen IV, as pre-fix code did.
+*/
 async function encryptWithIv(data: string, keyBase64: string, ivBase64: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, ['encrypt']);
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: Uint8Array.from(atob(ivBase64), (c) => c.codePointAt(0) ?? 0) }, key, new TextEncoder().encode(data));

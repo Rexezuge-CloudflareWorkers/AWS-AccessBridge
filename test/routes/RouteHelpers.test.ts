@@ -5,13 +5,15 @@ describe('route-helpers', () => {
   it('withUnconstrainedD1Session wraps databases exposing withSession', () => {
     const session = { scoped: true };
     const withSession = vi.fn().mockReturnValue(session);
-    const out = withUnconstrainedD1Session({ AccessBridgeDB: { withSession }, other: 1 });
+    const out = withUnconstrainedD1Session({ AccessBridgeDB: { withSession } as unknown as D1Database, other: 1 });
     expect(withSession).toHaveBeenCalledOnce();
     expect(out.AccessBridgeDB).toBe(session);
   });
 
   it('withUnconstrainedD1Session passes through envs without sessions', () => {
-    const env = { AccessBridgeDB: {} };
+    // Deliberately not a D1 database: this case is the binding that exposes no
+    // `withSession`, which the implementation passes through rather than throwing on.
+    const env = { AccessBridgeDB: {} as D1Database };
     expect(withUnconstrainedD1Session(env).AccessBridgeDB).toBe(env.AccessBridgeDB);
   });
 

@@ -37,11 +37,11 @@ describe('TimestampUtil', () => {
 
   describe('addDays', () => {
     it('adds days to a timestamp', () => {
-      expect(TimestampUtil.addDays(1000, 1)).toBe(1000 + 86400);
+      expect(TimestampUtil.addDays(1000, 1)).toBe(1000 + 86_400);
     });
 
     it('adds multiple days', () => {
-      expect(TimestampUtil.addDays(0, 7)).toBe(7 * 86400);
+      expect(TimestampUtil.addDays(0, 7)).toBe(7 * 86_400);
     });
   });
 
@@ -57,7 +57,7 @@ describe('TimestampUtil', () => {
 
   describe('subtractDays', () => {
     it('subtracts days from a timestamp', () => {
-      expect(TimestampUtil.subtractDays(100000, 1)).toBe(100000 - 86400);
+      expect(TimestampUtil.subtractDays(100_000, 1)).toBe(100_000 - 86_400);
     });
   });
 

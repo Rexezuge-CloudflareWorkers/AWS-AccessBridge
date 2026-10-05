@@ -47,7 +47,7 @@ describe('BaseAwsCollector failure signalling', () => {
   });
 
   it('throws for the JSON-protocol collectors too', async () => {
-    for (const [collector, status] of [
+    for (const [collector] of [
       [new LambdaCollector(factoryReturning(new Response('nope', { status: 403 })).clientFactory as never), 403],
       [new RdsCollector(factoryReturning(new Response('nope', { status: 400 })).clientFactory as never), 400],
       [new DynamoDbCollector(factoryReturning(new Response('nope', { status: 403 })).clientFactory as never), 403],

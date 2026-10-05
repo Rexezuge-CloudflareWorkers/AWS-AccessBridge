@@ -67,7 +67,7 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
         <p style={{ color: '#d1d5db', marginBottom: '24px' }}>
           {t(
             'admin.collectionHint',
-            'Enable background cost and/or resource inventory collection for a credential. The credential must have appropriate IAM permissions (ce:GetCostAndUsage for cost, ec2/s3/lambda/rds describe/list for resources).',
+            'Enable background cost and/or resource inventory collection for a credential. The credential must have the required AWS permissions.',
           )}
         </p>
         <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} onSubmit={(e) => e.preventDefault()}>

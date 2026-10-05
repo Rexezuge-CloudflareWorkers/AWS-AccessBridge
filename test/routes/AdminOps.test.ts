@@ -58,7 +58,7 @@ describe('spend alert routes', () => {
       body: { awsAccountId: '123456789012', thresholdAmount: 100, periodType: 'monthly' },
       env: adminEnv(),
     });
-    await new CreateSpendAlertRoute({} as never).handle(c as never);
+    await new CreateSpendAlertRoute({} as never).handle(c);
     expect(SpendAlertDAO.prototype.createAlert).toHaveBeenCalledWith('123456789012', 100, 'monthly', 'user@example.com');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -70,7 +70,7 @@ describe('spend alert routes', () => {
       body: { alertId: 'a1' },
       env: adminEnv(),
     });
-    await new DeleteSpendAlertRoute({} as never).handle(c as never);
+    await new DeleteSpendAlertRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });
@@ -87,7 +87,7 @@ describe('collection config routes', () => {
       body: { principalArn: 'arn:aws:iam::123456789012:role/Dev', collectionTypes: ['cost', 'resource'] },
       env: adminEnv(),
     });
-    await new EnableDataCollectionRoute({} as never).handle(c as never);
+    await new EnableDataCollectionRoute({} as never).handle(c);
     expect(DataCollectionConfigDAO.prototype.create).toHaveBeenCalledTimes(2);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -99,7 +99,7 @@ describe('collection config routes', () => {
       body: { principalArn: 'arn:aws:iam::123456789012:role/Dev', collectionType: 'cost' },
       env: adminEnv(),
     });
-    await new DisableDataCollectionRoute({} as never).handle(c as never);
+    await new DisableDataCollectionRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });
@@ -118,7 +118,7 @@ describe('maintenance routes', () => {
     vi.mocked(ResourceInventoryDAO.prototype.deleteOrphaned).mockResolvedValue(6);
     vi.mocked(AwsAccountsDAO.prototype.deleteOrphaned).mockResolvedValue(7);
     const c = createRouteContext({ method: 'POST', body: {}, env: adminEnv() });
-    await new CleanupOrphanedDataRoute({} as never).handle(c as never);
+    await new CleanupOrphanedDataRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ totalDeleted: 28 }));
   });
 
@@ -142,7 +142,7 @@ describe('maintenance routes', () => {
       url: 'https://example.com/user/admin/maintenance/task-runs?taskType=cost-data-collection&limit=10',
       env: adminEnv(),
     });
-    await new ListTaskRunsRoute({} as never).handle(c as never);
+    await new ListTaskRunsRoute({} as never).handle(c);
     expect(BackgroundTaskRunDAO.prototype.listRuns).toHaveBeenCalledWith({
       taskType: 'cost-data-collection',
       status: undefined,

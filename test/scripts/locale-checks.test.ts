@@ -11,7 +11,9 @@ import {
   type FlatBundle,
 } from '../../scripts/i18n/locale-checks';
 
-/** A two-locale bundle shaped like the real ones, so the fixtures stay short. */
+/**
+A two-locale bundle shaped like the real ones, so the fixtures stay short.
+*/
 const bundle = (entries: Record<string, unknown>): FlatBundle => flatten(entries);
 
 const base = bundle({ nav: { app: 'Bridge', save: 'Save {{name}}' }, common: { cancel: 'Cancel' } });

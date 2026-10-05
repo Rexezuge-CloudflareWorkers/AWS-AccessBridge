@@ -13,7 +13,7 @@ describe('CredentialCacheConfigDAO', () => {
       first: vi.fn(),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -58,8 +58,8 @@ describe('CredentialCacheConfigDAO', () => {
   describe('updateLastCachedTime', () => {
     it('updates cache timestamp for a principal ARN', async () => {
       const dao = new CredentialCacheConfigDAO(mockDb);
-      await dao.updateLastCachedTime('arn:aws:iam::123456789012:role/MyRole', 1700000000);
-      expect(mockStmt.bind).toHaveBeenCalledWith(1700000000, 'arn:aws:iam::123456789012:role/MyRole');
+      await dao.updateLastCachedTime('arn:aws:iam::123456789012:role/MyRole', 1_700_000_000);
+      expect(mockStmt.bind).toHaveBeenCalledWith(1_700_000_000, 'arn:aws:iam::123456789012:role/MyRole');
     });
 
     it('throws DatabaseError on failure', async () => {
@@ -75,14 +75,14 @@ describe('CredentialCacheConfigDAO', () => {
         results: [{ principal_arn: 'arn:aws:iam::111111111111:role/Role1' }, { principal_arn: 'arn:aws:iam::222222222222:role/Role2' }],
       } as unknown as D1Result);
       const dao = new CredentialCacheConfigDAO(mockDb);
-      const result = await dao.getPrincipalArnsNeedingUpdate(10, 1700000000);
+      const result = await dao.getPrincipalArnsNeedingUpdate(10, 1_700_000_000);
       expect(result).toEqual(['arn:aws:iam::111111111111:role/Role1', 'arn:aws:iam::222222222222:role/Role2']);
-      expect(mockStmt.bind).toHaveBeenCalledWith(1700000000, 10);
+      expect(mockStmt.bind).toHaveBeenCalledWith(1_700_000_000, 10);
     });
 
     it('returns empty array when nothing needs update', async () => {
       const dao = new CredentialCacheConfigDAO(mockDb);
-      const result = await dao.getPrincipalArnsNeedingUpdate(10, 1700000000);
+      const result = await dao.getPrincipalArnsNeedingUpdate(10, 1_700_000_000);
       expect(result).toEqual([]);
     });
   });

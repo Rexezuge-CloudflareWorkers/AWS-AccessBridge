@@ -91,10 +91,7 @@ describe('AssumeRoleRoute', () => {
     vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
     vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
     vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
-      if (arn === pathed) {
-        return { principalArn: pathed, assumedBy: 'arn:aws:iam::123456789012:user/base' };
-      }
-      return { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
+      return arn === pathed ? { principalArn: pathed, assumedBy: 'arn:aws:iam::123456789012:user/base' } : { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
     });
     vi.mocked(UserMetadataDAO.prototype.getOrCreateFederationUsername).mockResolvedValue('federated-user');
     vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockResolvedValue(undefined);
@@ -129,7 +126,7 @@ describe('GenerateConsoleUrlRoute', () => {
       body: { accessKeyId: 'AKIA', secretAccessKey: 's', destinationRegion: 'eu-west-1' },
       env: secretsEnv(),
     });
-    await new GenerateConsoleUrlRoute({} as never).handle(c as never);
+    await new GenerateConsoleUrlRoute({} as never).handle(c);
     expect(ConsoleService.prototype.getSigninToken).toHaveBeenCalledWith('AKIA', 's', undefined);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining('signin.aws.amazon.com') }));
   });

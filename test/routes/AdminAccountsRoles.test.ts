@@ -46,21 +46,21 @@ describe('admin nickname routes', () => {
       body: { awsAccountId: '123456789012', nickname: 'prod' },
       env: adminEnv(),
     });
-    await new SetAccountNicknameRoute({} as never).handle(c as never);
+    await new SetAccountNicknameRoute({} as never).handle(c);
     expect(AwsAccountsDAO.prototype.setAccountNickname).toHaveBeenCalledWith('123456789012', 'prod');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, nickname: 'prod' }));
   });
 
   it('PUT /user/admin/account/nickname rejects malformed ids', async () => {
     const c = createRouteContext({ method: 'PUT', body: { awsAccountId: 'abc', nickname: 'x' }, env: adminEnv() });
-    await new SetAccountNicknameRoute({} as never).handle(c as never);
+    await new SetAccountNicknameRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 
   it('DELETE /user/admin/account/nickname removes nicknames', async () => {
     vi.mocked(AwsAccountsDAO.prototype.removeAccountNickname).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'DELETE', body: { awsAccountId: '123456789012' }, env: adminEnv() });
-    await new RemoveAccountNicknameRoute({} as never).handle(c as never);
+    await new RemoveAccountNicknameRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });
@@ -108,7 +108,7 @@ describe('admin role config routes', () => {
       body: { awsAccountId: '123456789012', roleName: 'Dev', destinationPath: '/ec2/home' },
       env: adminEnv(),
     });
-    await new SetRoleConfigRoute({} as never).handle(c as never);
+    await new SetRoleConfigRoute({} as never).handle(c);
     expect(RoleConfigsDAO.prototype.setRoleConfig).toHaveBeenCalledWith('123456789012', 'Dev', '/ec2/home', undefined, undefined);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -120,7 +120,7 @@ describe('admin role config routes', () => {
       body: { awsAccountId: '123456789012', roleName: 'Dev' },
       env: adminEnv(),
     });
-    await new DeleteRoleConfigRoute({} as never).handle(c as never);
+    await new DeleteRoleConfigRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });

@@ -62,7 +62,7 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
       <p style={{ color: '#d1d5db', marginBottom: '24px' }}>
         {t(
           'admin.roleConfigHint',
-          'Configure custom destination paths, regions, and session durations for AWS Console access when users assume specific roles.',
+          'Configure custom destination paths, regions, and session durations for AWS Console access.',
         )}
       </p>
       <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} onSubmit={(e) => e.preventDefault()}>

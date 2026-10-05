@@ -13,7 +13,7 @@ describe('RoleConfigsDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn(),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -30,7 +30,7 @@ describe('RoleConfigsDAO', () => {
         role_name: 'Admin',
         destination_path: '/s3',
         destination_region: 'us-west-2',
-        role_session_duration_seconds: 14400,
+        role_session_duration_seconds: 14_400,
       });
       const dao = new RoleConfigsDAO(mockDb);
       const result = await dao.getRoleConfig('123456789012', 'Admin');
@@ -39,7 +39,7 @@ describe('RoleConfigsDAO', () => {
         roleName: 'Admin',
         destinationPath: '/s3',
         destinationRegion: 'us-west-2',
-        roleSessionDurationSeconds: 14400,
+        roleSessionDurationSeconds: 14_400,
       });
     });
 
@@ -72,9 +72,9 @@ describe('RoleConfigsDAO', () => {
   describe('setRoleConfig', () => {
     it('upserts role config with all fields', async () => {
       const dao = new RoleConfigsDAO(mockDb);
-      await dao.setRoleConfig('123456789012', 'Admin', '/s3', 'us-west-2', 14400);
+      await dao.setRoleConfig('123456789012', 'Admin', '/s3', 'us-west-2', 14_400);
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR REPLACE'));
-      expect(mockStmt.bind).toHaveBeenCalledWith('123456789012', 'Admin', '/s3', 'us-west-2', 14400);
+      expect(mockStmt.bind).toHaveBeenCalledWith('123456789012', 'Admin', '/s3', 'us-west-2', 14_400);
     });
 
     it('stores null for missing optional fields', async () => {

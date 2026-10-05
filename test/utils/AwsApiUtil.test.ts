@@ -122,7 +122,7 @@ describe('CostExplorerService.getCostAndUsage', () => {
         },
       ],
     });
-    mockFetch.mockResolvedValue({ ok: true, status: 200, text: async () => body } as Response);
+    mockFetch.mockResolvedValue({ ok: true, status: 200, text: async () => body });
     const results = await new CostExplorerService().getCostAndUsage(KEYS, '2025-01-01', '2025-01-02');
     expect(results).toHaveLength(1);
     expect(results[0]?.totalCost).toBe(1.5);
@@ -130,7 +130,7 @@ describe('CostExplorerService.getCostAndUsage', () => {
   });
 
   it('throws InternalServerError when Cost Explorer rejects', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'nope' } as Response);
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'nope' });
     await expect(new CostExplorerService().getCostAndUsage(KEYS, '2025-01-01', '2025-01-02')).rejects.toThrow(InternalServerError);
   });
 });

@@ -172,7 +172,7 @@ describe('useAuth', () => {
   const user = { email: 'user@example.com', isSuperAdmin: false, demoMode: false };
 
   function jsonResponse(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+    return Response.json(body, { status, headers: { 'Content-Type': 'application/json' } });
   }
 
   afterEach(() => {

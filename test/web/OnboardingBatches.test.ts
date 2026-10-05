@@ -18,7 +18,9 @@ const mocked = vi.mocked(adminService);
 describe('settleAll', () => {
   it('runs every item and reports no failures', async () => {
     const seen: number[] = [];
-    expect(await settleAll([1, 2, 3], async (n) => void seen.push(n))).toBe(0);
+    expect(await settleAll([1, 2, 3], async (n) => {
+        seen.push(n);
+      })).toBe(0);
     expect(seen).toEqual([1, 2, 3]);
   });
 
@@ -139,7 +141,7 @@ describe('grantSelectedRoles', () => {
   it('drops a blank address entry', async () => {
     // The route falls back to the authenticated admin only when the field is
     // absent, so a blank string would be treated as a real invalid address.
-    const result = await grantSelectedRoles(['a@example.com', '', '   '], new Set(['Dev']), '123456789012');
+    const result = await grantSelectedRoles(['a@example.com', '', ' '.repeat(3)], new Set(['Dev']), '123456789012');
 
     expect(result.attempted).toBe(1);
     for (const [email] of mocked.grantAccess.mock.calls) {

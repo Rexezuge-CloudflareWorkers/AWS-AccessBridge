@@ -13,7 +13,7 @@ describe('UserFavoriteAccountsDAO', () => {
       first: vi.fn(),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -83,7 +83,7 @@ describe('UserFavoriteAccountsDAO', () => {
       vi.mocked(mockStmt.all).mockResolvedValue({ results: [] } as unknown as D1Result);
       const dao = new UserFavoriteAccountsDAO(mockDb);
       await dao.getByUserId('usr_abc', 'user@test.com');
-      const sql = vi.mocked(mockDb.prepare).mock.calls[0]?.[0] as string;
+      const sql = vi.mocked(mockDb.prepare).mock.calls[0]?.[0];
       expect(sql).toContain('ufa.user_id = ? OR (ufa.user_id IS NULL AND ufa.user_email = ?)');
       expect(mockStmt.bind).toHaveBeenCalledWith('usr_abc', 'user@test.com');
     });

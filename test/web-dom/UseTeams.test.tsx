@@ -22,7 +22,9 @@ const mocked = vi.mocked(teamsService);
 const TEAM_A: Team = { teamId: 'team-a', teamName: 'Alpha', createdBy: 'u', createdAt: 1 };
 const TEAM_B: Team = { teamId: 'team-b', teamName: 'Beta', createdBy: 'u', createdAt: 2 };
 
-/** A promise plus its resolvers, so a test can decide resolution order. */
+/**
+A promise plus its resolvers, so a test can decide resolution order.
+*/
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void } {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -150,7 +152,7 @@ describe('useTeams', () => {
     await act(async () => {
       slowA.reject(new Error('stale team A failure'));
     });
-    expect(onError.mock.calls.length).toBe(before);
+    expect(onError.mock.calls).toHaveLength(before);
     expect(result.current.membersLoading).toBe(false);
   });
 

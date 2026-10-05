@@ -79,7 +79,7 @@ describe('BackgroundTaskRunDAO', () => {
           created_at: 100,
         },
       ],
-    } as unknown as D1Result);
+    });
     const dao = new BackgroundTaskRunDAO(mockDb);
     const runs = await dao.listRuns({ taskType: 'audit-log-cleanup', limit: 10 });
     expect(runs).toHaveLength(1);
@@ -89,14 +89,14 @@ describe('BackgroundTaskRunDAO', () => {
   });
 
   it('deleteOlderThanBatch returns the deleted count', async () => {
-    vi.mocked(mockStmt.run).mockResolvedValue({ success: true, meta: { changes: 500 } } as unknown as D1Result);
+    vi.mocked(mockStmt.run).mockResolvedValue({ success: true, meta: { changes: 500 } });
     const dao = new BackgroundTaskRunDAO(mockDb);
     await expect(dao.deleteOlderThanBatch(100, 500)).resolves.toBe(500);
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('LIMIT ?'));
   });
 
   it('throws DatabaseError when writes fail', async () => {
-    vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'D1 down' } as unknown as D1Result);
+    vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'D1 down' });
     const dao = new BackgroundTaskRunDAO(mockDb);
     await expect(dao.startRun({ taskType: 'x' })).rejects.toThrow('Failed to start background task run');
   });

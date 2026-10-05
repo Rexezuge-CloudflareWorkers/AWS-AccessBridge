@@ -44,7 +44,7 @@ function flatKeys(value: unknown, prefix: string, out: string[]): void {
 function leafKeys(value: unknown): string[] {
   const out: string[] = [];
   flatKeys(value, '', out);
-  return out.sort();
+  return out.toSorted((left, right) => left.localeCompare(right));
 }
 
 function leafValues(value: unknown): Array<{ key: string; value: string }> {
@@ -125,8 +125,8 @@ describe('web normalizeLanguage parity', () => {
 
 describe('web locale catalogs', () => {
   it('ships exactly the twelve supported locales', () => {
-    expect(Object.keys(LOCALE_CATALOGS).sort()).toEqual(
-      ['de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'zh-CN', 'zh-TW'].sort(),
+    expect(Object.keys(LOCALE_CATALOGS).toSorted((left, right) => left.localeCompare(right))).toEqual(
+      ['de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'zh-CN', 'zh-TW'].toSorted((left, right) => left.localeCompare(right)),
     );
   });
 
@@ -159,13 +159,13 @@ describe('web locale catalogs', () => {
   });
 
   it('keeps placeholder variables in sync with English', () => {
-    const placeholderPattern = /\{\{[^}]+\}\}/g;
+    const placeholderPattern = /\{\{[^{}]+\}\}/g;
     const english = new Map(leafValues(LOCALE_CATALOGS['en']).map((e) => [e.key, e.value]));
     for (const [locale, catalog] of Object.entries(LOCALE_CATALOGS)) {
       if (locale === 'en') continue;
       for (const { key, value } of leafValues(catalog)) {
-        const expected = [...(english.get(key) ?? '').matchAll(placeholderPattern)].map((m) => m[0]).sort();
-        const actual = [...value.matchAll(placeholderPattern)].map((m) => m[0]).sort();
+        const expected = (english.get(key) ?? '').matchAll(placeholderPattern).map((m) => m[0]).toArray().toSorted((left, right) => left.localeCompare(right));
+        const actual = value.matchAll(placeholderPattern).map((m) => m[0]).toArray().toSorted((left, right) => left.localeCompare(right));
         expect(actual, `${locale}.${key}`).toEqual(expected);
       }
     }

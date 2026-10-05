@@ -12,7 +12,7 @@ interface RouteContextOptions {
 function createRouteContext<TEnv extends IEnv>(options?: RouteContextOptions): ActivityContext<TEnv> {
   const { body = {}, url = 'https://example.com/user/test', method = 'GET', email = 'user@example.com', env = {} } = options ?? {};
   const raw =
-    method === 'GET' || method === 'HEAD' ? new Request(url, { method }) : new Request(url, { method, body: JSON.stringify(body) });
+    new Request(url, method === 'GET' || method === 'HEAD' ? { method } : { method, body: JSON.stringify(body) });
   return {
     req: {
       json: async () => body,

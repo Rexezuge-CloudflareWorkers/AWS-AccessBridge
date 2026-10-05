@@ -17,7 +17,7 @@ describe('AssumableRolesDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),

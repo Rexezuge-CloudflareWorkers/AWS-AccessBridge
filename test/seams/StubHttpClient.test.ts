@@ -33,7 +33,8 @@ describe('StubHttpClient', () => {
 
   it('supports the legacy Response-handler constructor', async () => {
     const stub = new StubHttpClient(() => new Response('legacy'));
-    await expect((await stub.fetch('https://example.com/l')).text()).resolves.toBe('legacy');
+    const response = await stub.fetch('https://example.com/l');
+    await expect(response.text()).resolves.toBe('legacy');
   });
 });
 

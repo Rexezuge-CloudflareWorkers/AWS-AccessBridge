@@ -12,8 +12,8 @@ import { Container } from '@aws-access-bridge/backend-runtime/di';
 describe('Container', () => {
   it('resolves bound values', () => {
     const scope = new Container();
-    scope.bindValue('num' as never, 41);
-    expect(scope.get('num' as never)).toBe(41);
+    scope.bindValue('num', 41);
+    expect(scope.get('num')).toBe(41);
   });
 
   it('memoizes factory singletons per scope', () => {
@@ -22,9 +22,9 @@ describe('Container', () => {
     // one request.
     const scope = new Container();
     let calls = 0;
-    scope.bind('svc' as never, () => ({ id: ++calls }));
-    const first = scope.get<{ id: number }>('svc' as never);
-    const second = scope.get<{ id: number }>('svc' as never);
+    scope.bind('svc', () => ({ id: ++calls }));
+    const first = scope.get<{ id: number }>('svc');
+    const second = scope.get<{ id: number }>('svc');
     expect(first).toBe(second);
     expect(first.id).toBe(1);
   });
@@ -34,8 +34,8 @@ describe('Container', () => {
     // and the encryption-key chains would outlive the request they belong to.
     let calls = 0;
     const factory = (): { id: number } => ({ id: ++calls });
-    const first = new Container().bind('svc' as never, factory).get<{ id: number }>('svc' as never);
-    const second = new Container().bind('svc' as never, factory).get<{ id: number }>('svc' as never);
+    const first = new Container().bind('svc', factory).get<{ id: number }>('svc');
+    const second = new Container().bind('svc', factory).get<{ id: number }>('svc');
     expect(first).not.toBe(second);
     expect(first.id).toBe(1);
     expect(second.id).toBe(2);
@@ -45,16 +45,16 @@ describe('Container', () => {
     // The message is the only diagnostic an operator gets from a missing
     // binding, so it must name which one.
     const scope = new Container();
-    expect(() => scope.get('missing' as never)).toThrow('DI container has no binding for token');
-    expect(() => scope.get('missing' as never)).toThrow('missing');
+    expect(() => scope.get('missing')).toThrow('DI container has no binding for token');
+    expect(() => scope.get('missing')).toThrow('missing');
   });
 
   it('prefers a bound value over a factory for the same token', () => {
     const scope = new Container();
     let calls = 0;
-    scope.bind('svc' as never, () => ({ id: ++calls }));
-    scope.bindValue('svc' as never, { id: 99 });
-    expect(scope.get<{ id: number }>('svc' as never).id).toBe(99);
+    scope.bind('svc', () => ({ id: ++calls }));
+    scope.bindValue('svc', { id: 99 });
+    expect(scope.get<{ id: number }>('svc').id).toBe(99);
   });
 
   it('returns false-ish for a token bound to undefined via bindValue', () => {
@@ -62,7 +62,7 @@ describe('Container', () => {
     // nothing"; the singleton map holds it, so `get` must not fall through to
     // the factory path.
     const scope = new Container();
-    scope.bindValue('nothing' as never, undefined);
-    expect(scope.get('nothing' as never)).toBeUndefined();
+    scope.bindValue('nothing', undefined);
+    expect(scope.get('nothing')).toBeUndefined();
   });
 });

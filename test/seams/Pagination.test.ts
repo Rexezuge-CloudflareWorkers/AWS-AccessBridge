@@ -57,6 +57,6 @@ describe('Pagination.offset', () => {
 
   it('falls back to 0 for unparseable input', () => {
     expect(Pagination.offset('abc')).toBe(0);
-    expect(Pagination.offset(Number.NaN)).toBe(0);
+    expect(Pagination.offset(NaN)).toBe(0);
   });
 });

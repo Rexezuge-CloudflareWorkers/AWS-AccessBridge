@@ -124,7 +124,7 @@ describe('AccessAuthService.verifyAccessJwt configuration guards', () => {
   });
 
   it('rejects a blank POLICY_AUD', async () => {
-    await expect(AccessAuthService.verifyAccessJwt(withToken(), 'https://t', '   ')).rejects.toThrow(/Missing required JWT verification configuration/);
+    await expect(AccessAuthService.verifyAccessJwt(withToken(), 'https://t', ' '.repeat(3))).rejects.toThrow(/Missing required JWT verification configuration/);
   });
 
   it('reports a verification failure as unauthorized, not internal', async () => {

@@ -46,7 +46,7 @@ describe('evaluateConfig', () => {
   });
 
   it('ignores whitespace-only secrets', () => {
-    const config = evaluateConfig({ ...CLOUDFLARE, BACKUP_ENCRYPTION_KEY: '   ', ...S3 });
+    const config = evaluateConfig({ ...CLOUDFLARE, BACKUP_ENCRYPTION_KEY: ' '.repeat(3), ...S3 });
 
     expect(config.encryption).toBe(false);
     expect(config.errors).toHaveLength(1);

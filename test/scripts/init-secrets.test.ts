@@ -19,7 +19,9 @@ const SECRET_LIST_OUTPUT = [
   '└────────────────────────────────┴──────────────────────────────────┴─────────┴─────────┴─────────┴───────────────────────┴───────────────────────┘',
 ].join('\n');
 
-/** A store holding only the `-2` variant, to pin down exact-name matching. */
+/**
+A store holding only the `-2` variant, to pin down exact-name matching.
+*/
 const PREFIX_ONLY_OUTPUT = [
   '┌────────────────────────────────┬──────────────────────────────────┬─────────┬─────────┬─────────┬───────────────────────┬───────────────────────┐',
   '│ Name                           │ ID                               │ Comment │ Scopes  │ Status  │ Created               │ Modified              │',
