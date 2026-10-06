@@ -13,10 +13,16 @@ import { createBucketWithObject, createDbInstance } from './helpers/seed';
  * real response can. RDS does the same with `<DBInstanceIdentifier>`,
  * `<DBInstanceStatus>` and `<Engine>`.
  *
- * S3, RDS and EC2 are seeded to a non-empty state. Lambda is asserted at the
- * parse level instead: seeding it means a real container launch
- * (`CreateFunction`) or emulator-wide mock flags whose defaults would then have
- * to be pinned, and neither buys parser coverage the seeded ones do not give.
+ * S3 and RDS are seeded to a non-empty state. EC2 and Lambda are asserted at the
+ * parse level instead: seeding them means a real container launch
+ * (`RunInstances`/`CreateFunction`) or emulator-wide mock flags whose defaults
+ * would then have to be pinned, and neither buys parser coverage the seeded ones
+ * do not give.
+ *
+ * The RDS seed is a metadata write — the emulator runs with
+ * `FLOCI_SERVICES_RDS_MOCK=true` (see `helpers/floci.ts`), so the instance exists
+ * as a record with no backing engine. The tags this test exists to check are read
+ * back the same way regardless.
  *
  * **`DynamoDbCollector` is absent, and that is a finding rather than an
  * oversight.** Its `X-Amz-Target: DynamoDB_20120810.ListTables` is not

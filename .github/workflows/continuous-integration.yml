@@ -172,9 +172,7 @@ jobs:
   #
   # `test/floci/**` is excluded from the root Vitest projects, so `pnpm test` and
   # `pnpm run checks` stay container-free and this job is the only thing that
-  # needs the emulator. No Docker socket is mounted on purpose: every operation
-  # the suite exercises is in-process in Floci, including `CreateDBInstance`,
-  # which reaches `available` as metadata with no reachable daemon.
+  # needs the emulator.
   floci-smoke:
     name: Floci Smoke Tests
     runs-on: ubuntu-latest
@@ -187,16 +185,38 @@ jobs:
 
     services:
       floci:
-        image: floci/floci:latest
+        # Pinned, not `latest`. This emulator is a floating dependency whose
+        # releases change behaviour under us — 2.2.0 shipped the morning this was
+        # last red — and a job that breaks because a tag moved is a job nobody
+        # trusts. Bump deliberately, and read the release notes for anything
+        # under services the suite exercises.
+        image: floci/floci:2.2.0
         ports:
           - 4566:4566
-        # No `options:` — deliberately no health-check override. `latest` is the
+        # RDS in metadata-only mode: instances and clusters are created as
+        # records with no backing container and no auth proxy.
+        #
+        # This is what the suite needs, and it is also *much* cheaper than the
+        # alternative. No Docker socket is mounted here on purpose, and the
+        # no-daemon path is not free: `CreateDBInstance` reaches for Docker
+        # before it gives up, and since 2.2.0 every Docker call is retried
+        # inside the emulator (six attempts, 500ms exponential backoff capped
+        # at 8s, any `IOException` counted as transient — a missing socket is
+        # exactly that). One seeded create therefore spent ~30s of retry
+        # backoff reaching the same metadata record this flag returns
+        # immediately, which is what timed the RDS collector test out at both
+        # 30s and 60s. A real engine would mean a `postgres:16-alpine` pull and a
+        # container start on every run to learn nothing the parser does not
+        # already learn from the metadata response.
+        env:
+          FLOCI_SERVICES_RDS_MOCK: 'true'
+        # No `options:` — deliberately no health-check override. The tag is the
         # *native* image, built on `registry.access.redhat.com/ubi9-micro`: no
         # shell, no `curl`, no `wget`. Two failed runs established this the hard
         # way, and the failure mode is invisible from the outside: a
         # `--health-cmd` naming a missing binary makes Docker mark the container
         # unhealthy on the first probe, and GitHub reports only "Failed to
-        # initialize container floci/floci:latest", which reads like a broken
+        # initialize container floci/floci:2.2.0", which reads like a broken
         # image rather than a broken health command.
         #
         # Overriding is not merely unnecessary but unsafe. Docker runs a
@@ -223,10 +243,9 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
 
-      # Floci is a moving tag, so a red run here right after an upstream release
-      # is worth re-running once against a pinned tag before treating it as a
-      # regression in our parsers. `max_attempts: 2` covers the ordinary case of
-      # a slow first boot.
+      # The image is pinned, so a red run is our regression until proven
+      # otherwise — `max_attempts: 2` exists only to absorb a slow first boot,
+      # not to paper over a flaky assertion.
       - name: Run Floci Smoke Tests
         uses: ./.github/actions/retry-step
         with:
