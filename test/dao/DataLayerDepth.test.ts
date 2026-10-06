@@ -30,7 +30,7 @@ describe('CostDataDAO depth', () => {
         { aws_account_id: '1', period_start: '2025-01-01', period_end: '2025-01-02', total_cost: 2, currency: 'USD', service_breakdown: '{"EC2":2}', collected_at: 1 },
         { aws_account_id: '1', period_start: '2025-01-03', period_end: '2025-01-04', total_cost: 0, currency: 'USD', service_breakdown: null, collected_at: 2 },
       ],
-    } as never);
+    });
     const rows = await dao.getCostDataByAccount('1', '2025-01-01', '2025-01-04');
     expect(rows).toHaveLength(2);
     expect(rows[0].serviceBreakdown).toEqual({ EC2: 2 });
@@ -47,7 +47,7 @@ describe('CostDataDAO depth', () => {
 
   it('queries multi-account sets', async () => {
     const { db, stmt } = mockDb();
-    vi.mocked(stmt.all).mockResolvedValue({ results: [] } as never);
+    vi.mocked(stmt.all).mockResolvedValue({ results: [] });
     const dao = new CostDataDAO(db);
     await expect(dao.getCostDataForAccounts(['1', '2'], 'a', 'b')).resolves.toEqual([]);
     await expect(dao.getLatestCostSummary(['1'])).resolves.toEqual([]);
@@ -67,7 +67,7 @@ describe('SpendAlertDAO depth', () => {
 
     vi.mocked(stmt.all).mockResolvedValue({
       results: [{ alert_id: 'a', aws_account_id: '1', threshold_amount: 100, currency: 'USD', period_type: 'monthly', created_by: 'x', created_at: 1, enabled: 0 }],
-    } as never);
+    });
     const alerts = await dao.getAlertsByAccount('1');
     expect(alerts[0].enabled).toBe(false);
     await dao.deleteAlert('a');
@@ -76,7 +76,7 @@ describe('SpendAlertDAO depth', () => {
 
   it('lists all alerts', async () => {
     const { db, stmt } = mockDb();
-    vi.mocked(stmt.all).mockResolvedValue({ results: [] } as never);
+    vi.mocked(stmt.all).mockResolvedValue({ results: [] });
     await expect(new SpendAlertDAO(db).getAllAlerts()).resolves.toEqual([]);
   });
 });
@@ -91,10 +91,10 @@ describe('ResourceInventoryDAO depth', () => {
     await dao.deleteStaleResources('1', 'ec2', 5);
     expect(stmt.run).toHaveBeenCalledTimes(2);
 
-    vi.mocked(stmt.first).mockResolvedValue({ total: 1 } as never);
+    vi.mocked(stmt.first).mockResolvedValue({ total: 1 });
     vi.mocked(stmt.all).mockResolvedValue({
       results: [{ aws_account_id: '1', region: 'r', resource_type: 'ec2', resource_id: 'i-1', resource_name: null, state: null, metadata: null, collected_at: 1 }],
-    } as never);
+    });
     const result = await dao.searchResources(['1'], 'web', 'ec2', 10, 0);
     expect(result.total).toBe(1);
     expect(result.items[0]).toMatchObject({ resourceName: '', metadata: {} });
@@ -107,7 +107,7 @@ describe('ResourceInventoryDAO depth', () => {
     await expect(dao.getResourceCounts([])).resolves.toEqual({});
     vi.mocked(stmt.all).mockResolvedValue({
       results: [{ aws_account_id: '1', resource_type: 'ec2', count: 3 }],
-    } as never);
+    });
     await expect(dao.getResourceCounts(['1'])).resolves.toEqual({ '1': { ec2: 3 } });
   });
 });
@@ -120,9 +120,9 @@ describe('TeamAccountsDAO + DataCollectionConfigDAO depth', () => {
     const dao = new TeamAccountsDAO(db);
     await dao.addAccountToTeam('t', '123456789012');
     await dao.removeAccountFromTeam('t', '123456789012');
-    vi.mocked(stmt.all).mockResolvedValue({ results: [{ aws_account_id: '123456789012' }] } as never);
+    vi.mocked(stmt.all).mockResolvedValue({ results: [{ aws_account_id: '123456789012' }] });
     await expect(dao.getAccountsByTeam('t')).resolves.toEqual(['123456789012']);
-    vi.mocked(stmt.first).mockResolvedValue({ '1': 1 } as never);
+    vi.mocked(stmt.first).mockResolvedValue({ '1': 1 });
     await expect(dao.isAccountInTeam('t', '123456789012')).resolves.toBe(true);
     vi.mocked(stmt.first).mockResolvedValue(null);
     await expect(dao.isAccountInTeam('t', '9')).resolves.toBe(false);
@@ -133,7 +133,7 @@ describe('TeamAccountsDAO + DataCollectionConfigDAO depth', () => {
     const dao = new DataCollectionConfigDAO(db);
     await dao.create('arn', 'cost');
     await dao.delete('arn', 'cost');
-    vi.mocked(stmt.all).mockResolvedValue({ results: [{ principal_arn: 'arn' }] } as never);
+    vi.mocked(stmt.all).mockResolvedValue({ results: [{ principal_arn: 'arn' }] });
     await expect(dao.getPrincipalArnsNeedingCollection('cost', 3, 1)).resolves.toEqual(['arn']);
     await dao.updateLastCollectedTime('arn', 'cost');
     expect(stmt.run).toHaveBeenCalled();

@@ -7,7 +7,6 @@ import { TestCredentialChainRoute } from '@/endpoints/user/admin/credentials/tes
 import { GrantAccessRoute } from '@/endpoints/user/admin/access/POST';
 import { RevokeAccessRoute } from '@/endpoints/user/admin/access/DELETE';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
-import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO';
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
 import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
@@ -84,7 +83,7 @@ describe('admin credentials routes', () => {
       body: { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
       env: adminEnv(),
     });
-    await new ValidateCredentialsRoute({} as never).handle(c as never);
+    await new ValidateCredentialsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ valid: true, accountId: '123456789012' }));
   });
 
@@ -121,7 +120,7 @@ describe('admin access routes', () => {
       body: { awsAccountId: '123456789012', roleName: 'Dev', userEmail: 'dev@example.com' },
       env: adminEnv(),
     });
-    await new GrantAccessRoute({} as never).handle(c as never);
+    await new GrantAccessRoute({} as never).handle(c);
     expect(AssumableRolesDAO.prototype.grantUserAccessToRole).toHaveBeenCalledWith(
       { userId: null, anchorEmail: 'dev@example.com' },
       '123456789012',
@@ -136,7 +135,7 @@ describe('admin access routes', () => {
       body: { awsAccountId: 'abc', roleName: 'Dev' },
       env: adminEnv(),
     });
-    await new GrantAccessRoute({} as never).handle(c as never);
+    await new GrantAccessRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 
@@ -147,7 +146,7 @@ describe('admin access routes', () => {
       body: { awsAccountId: '123456789012', roleName: 'Dev' },
       env: adminEnv(),
     });
-    await new RevokeAccessRoute({} as never).handle(c as never);
+    await new RevokeAccessRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });

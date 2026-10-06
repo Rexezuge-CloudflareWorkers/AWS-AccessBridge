@@ -17,7 +17,9 @@ import { createBucketWithObject } from './helpers/seed';
  * emulator's pricing model being correct.
  */
 
-/** Window covering the current month, in the `YYYY-MM-DD` shape the API takes. */
+/**
+Window covering the current month, in the `YYYY-MM-DD` shape the API takes.
+*/
 function currentMonth(): { start: string; end: string } {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));

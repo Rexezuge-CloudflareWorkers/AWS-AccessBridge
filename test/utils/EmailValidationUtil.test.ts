@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { AccessAuthService } from '@aws-access-bridge/backend-services/auth';
 import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
+import { serviceEnv } from '../helpers/service-env';
 
 describe('AccessAuthService', () => {
   describe('verifyAccessJwt', () => {
@@ -60,19 +61,19 @@ describe('AccessAuthService', () => {
 
   describe('getAuthenticatedUserEmail', () => {
     it('uses the demo user when demo mode is enabled', async () => {
-      const service = new AccessAuthService({ DEMO_MODE: 'true' });
+      const service = new AccessAuthService(serviceEnv({ DEMO_MODE: 'true' }));
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).resolves.toBe(
         'demo@example.com',
       );
     });
 
     it('uses the dev bypass email when configured', async () => {
-      const service = new AccessAuthService({ DEV_AUTH_EMAIL: 'dev@example.com' });
+      const service = new AccessAuthService(serviceEnv({ DEV_AUTH_EMAIL: 'dev@example.com' }));
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).resolves.toBe('dev@example.com');
     });
 
     it('uses the platform-verified identity when JWT vars are unset (Worker-level Access)', async () => {
-      const service = new AccessAuthService({});
+      const service = new AccessAuthService(serviceEnv());
       const accessCtx = { access: { getIdentity: async () => ({ email: 'platform@example.com' }) } };
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).resolves.toBe(
         'platform@example.com',
@@ -80,7 +81,7 @@ describe('AccessAuthService', () => {
     });
 
     it('rejects when JWT vars are unset and the platform identity has no email', async () => {
-      const service = new AccessAuthService({});
+      const service = new AccessAuthService(serviceEnv());
       const accessCtx = { access: { getIdentity: async () => null } };
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).rejects.toThrow(
         'No Cloudflare Access JWT token provided in request headers.',
@@ -88,14 +89,14 @@ describe('AccessAuthService', () => {
     });
 
     it('rejects when JWT vars are unset and no platform identity is available', async () => {
-      const service = new AccessAuthService({});
+      const service = new AccessAuthService(serviceEnv());
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'))).rejects.toThrow(
         'No Cloudflare Access JWT token provided in request headers.',
       );
     });
 
     it('prefers JWT verification over the platform identity when JWT vars are set', async () => {
-      const service = new AccessAuthService({ TEAM_DOMAIN: 'https://team.example.com', POLICY_AUD: 'aud' });
+      const service = new AccessAuthService(serviceEnv({ TEAM_DOMAIN: 'https://team.example.com', POLICY_AUD: 'aud' }));
       const accessCtx = { access: { getIdentity: async () => ({ email: 'platform@example.com' }) } };
       await expect(service.getAuthenticatedUserEmail(new Request('https://worker.example.com/user/test'), accessCtx)).rejects.toThrow(
         'No Cloudflare Access JWT token provided in request headers.',

@@ -9,9 +9,18 @@
  *
  * Guards two failure modes:
  *   1. No `d1_databases` entry at all — nothing to export.
- *   2. A placeholder `database_id` — `prepare-wrangler-config.ts` auto-provisions
- *      a missing D1 database, and a database it just created holds no user data.
- *      Uploading that empty dump would be a false sense of safety.
+ *   2. A database that was **created by the provisioning step in this same run** — it
+ *      holds no user data, and uploading that empty dump would be a false sense of
+ *      safety.
+ *
+ * The second guard reads `PROVISIONED_RESOURCES`, which the previous step emits, and it
+ * has to. This used to re-read the placeholder `database_id` out of `wrangler.jsonc`,
+ * which is **unreachable**: the same job runs `prepare-wrangler-config.ts` first, and
+ * `provisionWranglerResources` patches the placeholder away before the reader runs, so
+ * no `database_id` can still equal it. The guard could not fire for the one case it was
+ * written for, and a check that cannot fail is indistinguishable from the absence of
+ * data. `resolveD1Target` still rejects a placeholder as a second line of defence — it
+ * just is not the one doing the work.
  *
  * Emits the export target as the `target` step output.
  */
@@ -37,6 +46,18 @@ try {
   target = resolveD1Target(config);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
+}
+
+// Emitted by the provisioning step. A `d1:` entry means this run created the
+// database, so there is nothing in it to back up.
+const provisioned = (process.env['PROVISIONED_RESOURCES'] ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+if (provisioned.some((entry) => entry.startsWith('d1:'))) {
+  fail(
+    `${target.target} was created by the provisioning step in this same run, so it holds no data. Refusing to upload an empty dump as a backup. Provision it with a deploy first.`,
+  );
 }
 
 console.log(`D1 binding: ${target.binding}`);

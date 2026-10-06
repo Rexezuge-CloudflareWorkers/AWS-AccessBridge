@@ -13,7 +13,7 @@ describe('UserMetadataDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -112,7 +112,7 @@ describe('UserMetadataDAO', () => {
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email)'));
       // `COALESCE` so a concurrent writer's value is never overwritten.
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('SET federation_username = COALESCE(federation_username, ?)'));
-      const updateBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call as unknown[])[1] === 'user@example.com' && /^[0-9A-F]{32}$/.test(String((call as unknown[])[0]))) as unknown as [string, string];
+      const updateBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call)[1] === 'user@example.com' && /^[0-9A-F]{32}$/.test(String((call)[0]))) as unknown as [string, string];
       // The generated candidate is uppercase hex without dashes (32 chars).
       expect(updateBind[0]).toMatch(/^[0-9A-F]{32}$/);
     });
@@ -128,7 +128,7 @@ describe('UserMetadataDAO', () => {
       const dao = new UserMetadataDAO(mockDb);
       await dao.getOrCreateFederationUsername('new@example.com');
 
-      const order = vi.mocked(mockDb.prepare).mock.calls.map(([sql]) => String(sql));
+      const order = vi.mocked(mockDb.prepare).mock.calls.map(([sql]) => sql);
       const provisionIndex = order.findIndex((sql) => sql.includes('id, current_email'));
       const updateIndex = order.findIndex((sql) => sql.includes('COALESCE(federation_username'));
       expect(provisionIndex).toBeGreaterThanOrEqual(0);

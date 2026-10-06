@@ -64,7 +64,13 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
 
+      # `created` is what this step emits, and it is what makes the empty-database
+      # guard work: provisioning auto-creates a missing D1 database, and a database
+      # created moments ago holds no user data. Re-reading the placeholder id out of
+      # wrangler.jsonc instead would be checking an artefact this step has already
+      # rewritten, so the guard could never fire.
       - name: Prepare Wrangler Configuration
+        id: provision
         uses: ./.github/actions/retry-step
         with:
           command: pnpm exec tsx scripts/deploy/prepare-wrangler-config.ts
@@ -81,6 +87,7 @@ jobs:
       - name: Resolve D1 Database
         id: db
         env:
+          PROVISIONED_RESOURCES: ${{ steps.provision.outputs.created }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec tsx scripts/backup/resolve-d1-target.ts

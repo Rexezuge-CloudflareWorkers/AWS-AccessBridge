@@ -69,9 +69,9 @@ describe('Model Types', () => {
         accessKeyId: 'AKID',
         secretAccessKey: 'SECRET',
         sessionToken: 'TOKEN',
-        expiresAt: 1700000000,
+        expiresAt: 1_700_000_000,
       };
-      expect(cache.expiresAt).toBe(1700000000);
+      expect(cache.expiresAt).toBe(1_700_000_000);
     });
   });
 
@@ -109,8 +109,8 @@ describe('Model Types', () => {
         userEmail: 'user@test.com',
         accessToken: 'secret-token',
         name: 'My Token',
-        createdAt: 1700000000,
-        expiresAt: 1800000000,
+        createdAt: 1_700_000_000,
+        expiresAt: 1_800_000_000,
       };
       expect(token.accessToken).toBe('secret-token');
     });
@@ -129,12 +129,24 @@ describe('Model Types', () => {
 
   describe('UserMetadata', () => {
     it('has all required fields', () => {
+      // **All four, and each asserted.** This test existed to pin the required set, and
+      // `preferredLanguage` was added to `UserMetadata` without it following — the
+      // literal still compiled because the field had not been required yet when it was
+      // written, and by the time it was required this test was the one place that
+      // should have said so. It also asserted only `isSuperAdmin`, so it would not have
+      // noticed a *missing* value on any of the others.
       const meta: UserMetadata = {
         userEmail: 'user@test.com',
         isSuperAdmin: true,
         federationUsername: 'ABCDEF123456',
+        preferredLanguage: 'en',
       };
-      expect(meta.isSuperAdmin).toBe(true);
+      expect(meta).toEqual({
+        userEmail: 'user@test.com',
+        isSuperAdmin: true,
+        federationUsername: 'ABCDEF123456',
+        preferredLanguage: 'en',
+      });
     });
 
     it('internal model uses snake_case with optional fields', () => {
@@ -151,10 +163,10 @@ describe('Model Types', () => {
         roleName: 'Admin',
         destinationPath: '/s3',
         destinationRegion: 'us-west-2',
-        roleSessionDurationSeconds: 14400,
+        roleSessionDurationSeconds: 14_400,
       };
       expect(config.destinationPath).toBe('/s3');
-      expect(config.roleSessionDurationSeconds).toBe(14400);
+      expect(config.roleSessionDurationSeconds).toBe(14_400);
     });
 
     it('internal model uses snake_case', () => {

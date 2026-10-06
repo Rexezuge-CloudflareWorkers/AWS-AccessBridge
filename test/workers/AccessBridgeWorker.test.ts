@@ -24,11 +24,26 @@ function createRouteDb(): unknown {
   };
 }
 
-function createEnv(overrides: Partial<TestEnv> = {}): Env {
+/**
+ * A deliberately minimal environment.
+ *
+ * The worker's entry point is typed `CloudflareEnv`, which the generator pins to the
+ * template's exact values — `POLICY_AUD` is the literal
+ * `"you-cloudflare-zero-trust-application-aud"`, not `string`. So a test env built to
+ * exercise routing or auth can never satisfy it field-for-field, and every
+ * `worker.fetch(request, createEnv())` reported `Argument of type 'Env' is not
+ * assignable to parameter of type 'CloudflareEnv'` — twelve errors in this file that
+ * were all one missing cast in one factory.
+ *
+ * The cast is here rather than at the call sites for the reason it usually is: it is
+ * one known boundary, and a reader can establish once that these tests are about the
+ * worker's behaviour rather than about configuration completeness.
+ */
+function createEnv(overrides: Partial<TestEnv> = {}): CloudflareEnv {
   return {
     AccessBridgeDB: createRouteDb(),
     ...overrides,
-  } as unknown as Env;
+  } as unknown as CloudflareEnv;
 }
 
 describe('AccessBridgeWorker', () => {
@@ -210,7 +225,7 @@ describe('AccessBridgeWorker', () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('application/json');
-      const body = (await response.json()) as { email: string; isSuperAdmin: boolean; demoMode: boolean };
+      const body: { demoMode?: unknown; email?: unknown } = await response.json();
       expect(body.demoMode).toBe(true);
       expect(typeof body.email).toBe('string');
     });

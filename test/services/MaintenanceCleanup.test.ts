@@ -28,7 +28,9 @@ const TABLES = {
   awsAccounts: AwsAccountsDAO,
 } as const;
 
-/** Give each table a distinct count so a mis-wired total is visible. */
+/**
+Give each table a distinct count so a mis-wired total is visible.
+*/
 function distinctCountsPerTable(): void {
   for (const [index, dao] of Object.values(TABLES).entries()) {
     vi.mocked(dao.prototype.deleteOrphaned).mockResolvedValue(index + 1);
@@ -85,7 +87,7 @@ describe('MaintenanceService.cleanupOrphanedData', () => {
 
     const result = await new MaintenanceService(ENV).cleanupOrphanedData();
 
-    expect(result.failures.map((failure) => failure.table).toSorted()).toEqual(['costData', 'spendAlerts']);
+    expect(result.failures.map((failure) => failure.table).toSorted((left, right) => left.localeCompare(right))).toEqual(['costData', 'spendAlerts']);
     expect(result.totalDeleted).toBe(5);
   });
 

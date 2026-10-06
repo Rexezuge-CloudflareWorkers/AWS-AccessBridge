@@ -53,27 +53,27 @@ describe('user language routes', () => {
     vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(false);
     vi.mocked(UserMetadataDAO.prototype.getPreferredLanguage).mockResolvedValue('de_DE');
     const c = createRouteContext({ url: 'https://example.com/user/me' });
-    await new GetCurrentUserRoute({} as never).handle(c as never);
+    await new GetCurrentUserRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ preferredLanguage: 'de' }));
   });
 
   it('PUT /user/me normalizes underscore tags', async () => {
     const c = createRouteContext({ method: 'PUT', body: { preferredLanguage: 'de_DE' }, url: 'https://example.com/user/me' });
-    await new UpdateCurrentUserRoute({} as never).handle(c as never);
+    await new UpdateCurrentUserRoute({} as never).handle(c);
     expect(UserMetadataDAO.prototype.updatePreferredLanguage).toHaveBeenCalledWith('user@example.com', 'de');
     expect(c.json).toHaveBeenCalledWith({ success: true, preferredLanguage: 'de' });
   });
 
   it('PUT /user/me clears the preference on null', async () => {
     const c = createRouteContext({ method: 'PUT', body: { preferredLanguage: null }, url: 'https://example.com/user/me' });
-    await new UpdateCurrentUserRoute({} as never).handle(c as never);
+    await new UpdateCurrentUserRoute({} as never).handle(c);
     expect(UserMetadataDAO.prototype.updatePreferredLanguage).toHaveBeenCalledWith('user@example.com', null);
     expect(c.json).toHaveBeenCalledWith({ success: true, preferredLanguage: null });
   });
 
   it('PUT /user/me rejects unsupported languages with 400', async () => {
     const c = createRouteContext({ method: 'PUT', body: { preferredLanguage: 'xx' }, url: 'https://example.com/user/me' });
-    await new UpdateCurrentUserRoute({} as never).handle(c as never);
+    await new UpdateCurrentUserRoute({} as never).handle(c);
     expect(UserMetadataDAO.prototype.updatePreferredLanguage).not.toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });

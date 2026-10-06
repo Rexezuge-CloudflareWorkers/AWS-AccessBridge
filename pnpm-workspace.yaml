@@ -1,6 +1,16 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  # The test suite is a workspace project so `pnpm -r typecheck` and `pnpm run lint`
+  # actually reach it. It sat outside the workspace while holding ~1.2 MB of test code,
+  # so a type error in a test surfaced only when that test happened to run, and eslint
+  # ignored `test/**` outright — 125 of 134 files there were never linted once.
+  #
+  # Being in the workspace is also what lets it resolve dependencies at all: pnpm's
+  # layout is strict, so `hono` lives in `apps/api/node_modules` and an unhooked
+  # `test/` could not import it — 4 tests' worth of "cannot find module" that said
+  # nothing about the code under test.
+  - 'test'
 allowBuilds:
   esbuild: true
   sharp: true

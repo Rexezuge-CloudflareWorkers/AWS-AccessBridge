@@ -71,7 +71,7 @@ describe('TeamsDAO', () => {
   });
 
   it('surfaces a failed statement in the delete batch', async () => {
-    vi.mocked(mockDb.batch).mockResolvedValue([{ success: true }, { success: false, error: 'constraint' }, { success: true }] as unknown as D1Result[]);
+    vi.mocked(mockDb.batch).mockResolvedValue([{ success: true }, { success: false, error: 'constraint' }, { success: true }] as unknown);
     const dao = new TeamsDAO(mockDb);
     await expect(dao.deleteTeam('t1')).rejects.toThrow(DatabaseError);
   });

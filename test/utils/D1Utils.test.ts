@@ -79,7 +79,12 @@ describe('createD1SessionEnv', () => {
     // back needs the session to still be writable.
     const session = { fake: true };
     const db = { withSession: vi.fn().mockReturnValue(session) };
-    const scoped = createD1SessionEnv({ AccessBridgeDB: db, other: 1 } as never);
+    // The cast is on `db`, not on the env. `createD1SessionEnv` is generic in the env
+    // and returns that same type, so casting the argument to `never` made the *return*
+    // type `never` — and reading `.AccessBridgeDB` off it is the error this replaced.
+    // The double is not a real `D1Database` because it is only asked for
+    // `withSession`, which is the single member the implementation reads.
+    const scoped = createD1SessionEnv({ AccessBridgeDB: db as unknown as D1Database, other: 1 });
     expect(scoped.AccessBridgeDB).toBe(session);
     expect(db.withSession).toHaveBeenCalledWith('first-unconstrained');
     // Every other binding is carried through.

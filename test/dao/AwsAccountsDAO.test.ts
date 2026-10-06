@@ -13,7 +13,7 @@ describe('AwsAccountsDAO', () => {
       first: vi.fn(),
       all: vi.fn(),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),

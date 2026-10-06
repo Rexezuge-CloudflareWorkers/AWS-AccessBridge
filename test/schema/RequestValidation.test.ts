@@ -24,7 +24,7 @@ describe('Request input schemas', () => {
   });
 
   it('rejects invalid query data', async () => {
-    const request = new Request('https://access-bridge.example.com/user/resources?limit=not-a-number', { method: 'GET' });
+    const request = new Request('https://access-bridge.example.com/user/resources?limit=not-a-number');
 
     await expect(validateRequestInput(request, {})).rejects.toBeInstanceOf(BadRequestError);
   });
@@ -48,12 +48,12 @@ describe('Request input schemas', () => {
       validateRequestInput(request, {
         awsAccountId: '123456789012',
         roleName: 'Admin',
-        roleSessionDurationSeconds: 14400,
+        roleSessionDurationSeconds: 14_400,
       }),
     ).resolves.toEqual({
       awsAccountId: '123456789012',
       roleName: 'Admin',
-      roleSessionDurationSeconds: 14400,
+      roleSessionDurationSeconds: 14_400,
     });
   });
 

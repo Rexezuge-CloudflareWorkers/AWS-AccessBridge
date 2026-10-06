@@ -291,6 +291,67 @@ importers:
         specifier: ^6.0.0
         version: 6.0.3
 
+  test:
+    dependencies:
+      '@aws-access-bridge/backend-data':
+        specifier: workspace:*
+        version: link:../packages/backend-data
+      '@aws-access-bridge/backend-errors':
+        specifier: workspace:*
+        version: link:../packages/backend-errors
+      '@aws-access-bridge/backend-runtime':
+        specifier: workspace:*
+        version: link:../packages/backend-runtime
+      '@aws-access-bridge/backend-services':
+        specifier: workspace:*
+        version: link:../packages/backend-services
+      '@aws-access-bridge/background':
+        specifier: workspace:*
+        version: link:../apps/background
+      '@aws-access-bridge/provider-clients':
+        specifier: workspace:*
+        version: link:../packages/provider-clients
+      '@aws-access-bridge/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
+      '@cloudflare/vitest-pool-workers':
+        specifier: 0.22.0
+        version: 0.22.0(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10)
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.2)(vitest@4.1.10)
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      hono:
+        specifier: ^4.13.12
+        version: 4.13.12
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.4
+        version: 26.6.4
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.3.0(@types/react@19.3.0)
+      jsdom:
+        specifier: ^30.1.1
+        version: 30.1.1
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 8.3.2
+        version: 8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@26.6.4)(@vitest/coverage-v8@4.1.10)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
 packages:
 
   '@adobe/css-tools@4.5.0':

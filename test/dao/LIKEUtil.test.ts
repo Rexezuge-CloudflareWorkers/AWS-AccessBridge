@@ -5,18 +5,18 @@ import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/Assumable
 
 describe('LIKEUtil', () => {
   it('neutralises the percent wildcard', () => {
-    expect(LIKEUtil.contains('%')).toBe('%\\%%');
+    expect(LIKEUtil.contains('%')).toBe(String.raw`%\%%`);
   });
 
   it('neutralises the single-character wildcard', () => {
-    expect(LIKEUtil.contains('_')).toBe('%\\_%');
+    expect(LIKEUtil.contains('_')).toBe(String.raw`%\_%`);
   });
 
   it('neutralises the escape character itself, so an escaped wildcard stays literal', () => {
-    expect(LIKEUtil.contains('\\')).toBe('%\\\\%');
+    expect(LIKEUtil.contains('\\')).toBe(String.raw`%\\%`);
     // Without escaping the backslash, `\%` would consume the escape and leave a
     // bare `%`, silently turning the escape back into a wildcard.
-    expect(LIKEUtil.escape('\\%')).toBe('\\\\\\%');
+    expect(LIKEUtil.escape(String.raw`\%`)).toBe(String.raw`\\\%`);
   });
 
   it('wraps an ordinary term unchanged', () => {
@@ -24,11 +24,11 @@ describe('LIKEUtil', () => {
   });
 
   it('emits the ESCAPE clause the escaped patterns require', () => {
-    expect(LIKEUtil.escapeClause).toBe("ESCAPE '\\'");
+    expect(LIKEUtil.escapeClause).toBe(String.raw`ESCAPE '\'`);
   });
 
   it('escapes only the metacharacters', () => {
-    expect(LIKEUtil.escape("it's a 50% _test_")).toBe("it's a 50\\% \\_test\\_");
+    expect(LIKEUtil.escape("it's a 50% _test_")).toBe(String.raw`it's a 50\% \_test\_`);
   });
 });
 
@@ -55,17 +55,17 @@ describe('search DAOs bind an escaped LIKE pattern', () => {
     const { db, bindings } = capturingDb();
     await new ResourceInventoryDAO(db).searchResources(['123456789012'], '100%');
     const bound = bindings().flat();
-    expect(bound).toContain('%100\\%%');
-    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => String(sql)).join('\n');
-    expect(sql).toContain("ESCAPE '\\'");
+    expect(bound).toContain(String.raw`%100\%%`);
+    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => sql).join('\n');
+    expect(sql).toContain(String.raw`ESCAPE '\'`);
   });
 
   it('AssumableRolesDAO escapes the search term and declares ESCAPE', async () => {
     const { db, bindings } = capturingDb();
     await new AssumableRolesDAO(db).searchAccountsByQuery({ userId: 'usr_1', anchorEmail: 'user@example.com' }, 'a_b');
     const bound = bindings().flat();
-    expect(bound).toContain('%a\\_b%');
-    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => String(sql)).join('\n');
-    expect(sql).toContain("ESCAPE '\\'");
+    expect(bound).toContain(String.raw`%a\_b%`);
+    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => sql).join('\n');
+    expect(sql).toContain(String.raw`ESCAPE '\'`);
   });
 });

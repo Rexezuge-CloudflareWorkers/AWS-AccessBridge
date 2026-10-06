@@ -144,7 +144,7 @@ describe('0032 user identity upgrade on a populated database', () => {
   let after: Record<string, number>;
 
   beforeAll(async () => {
-    db = env.AccessBridgeDB as unknown as Db;
+    db = env.AccessBridgeDB;
     expect(migrationFileNames()).toContain(LAST_PRE_IDENTITY_MIGRATION);
     expect(migrationFileNames()).toContain(IDENTITY_MIGRATION);
 
@@ -162,7 +162,8 @@ describe('0032 user identity upgrade on a populated database', () => {
     after = await snapshotCounts(db);
     // `audit_logs` is excluded from GUARDED_TABLES, so record it here while the
     // database still holds only the seeded rows.
-    after['audit_logs'] = ((await db.prepare('SELECT COUNT(*) AS c FROM audit_logs').first<{ c: number }>())?.c) ?? 0;
+    const auditCount = await db.prepare('SELECT COUNT(*) AS c FROM audit_logs').first<{ c: number }>();
+    after['audit_logs'] = auditCount?.c ?? 0;
     before['audit_logs'] = 2;
   });
 
@@ -242,7 +243,8 @@ describe('0032 user identity upgrade on a populated database', () => {
       .bind(AMBIGUOUS_UPPER, AMBIGUOUS_LOWER)
       .all<{ user_email: string; current_email: string | null }>();
     expect(rows.results).toHaveLength(2);
-    for (const row of rows.results ?? []) {
+    const allRows = rows.results ?? [];
+    for (const row of allRows) {
       expect(row.current_email).toBeNull();
     }
     // Neither is in the registry, so neither can authenticate yet, and the
@@ -270,12 +272,13 @@ describe('0032 user identity upgrade on a populated database', () => {
     }>();
     // Alice + Bob only. The two stragglers are deliberately absent.
     expect(registry.results).toHaveLength(2);
-    for (const row of registry.results ?? []) {
+    const registryRows = registry.results ?? [];
+    for (const row of registryRows) {
       expect(row.email).toBe(row.email.toLowerCase());
       expect(row.is_verified).toBe(1);
       expect(row.user_id).toMatch(/^usr_/);
     }
-    expect(registry.results?.map((r) => r.email).sort()).toEqual([ALICE, BOB.toLowerCase()].sort());
+    expect(registry.results?.map((r) => r.email).toSorted((left, right) => left.localeCompare(right))).toEqual([ALICE, BOB.toLowerCase()].toSorted((left, right) => left.localeCompare(right)));
   });
 
   it('backfills user_id on access-control rows, resolving the exact anchor', async () => {
@@ -419,14 +422,14 @@ describe('0032 user identity upgrade on a populated database', () => {
       `INSERT INTO user_emails (email, user_id, is_verified, created_at) VALUES (?, ?, 1, ?)
        ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id, is_verified = excluded.is_verified`,
       'alice@new.test',
-      aliceId as string,
+      aliceId,
       now,
     );
-    await run(db, `UPDATE user_metadata SET current_email = ? WHERE id = ?`, 'alice@new.test', aliceId as string);
-    await run(db, `UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?`, aliceId as string, 'alice@new.test');
+    await run(db, `UPDATE user_metadata SET current_email = ? WHERE id = ?`, 'alice@new.test', aliceId);
+    await run(db, `UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?`, aliceId, 'alice@new.test');
 
     // The anchor is untouched, so the FK targets still resolve...
-    const anchor = await db.prepare('SELECT user_email FROM user_metadata WHERE id = ?').bind(aliceId as string).first<{
+    const anchor = await db.prepare('SELECT user_email FROM user_metadata WHERE id = ?').bind(aliceId).first<{
       user_email: string;
     }>();
     expect(anchor?.user_email).toBe(ALICE);
@@ -434,13 +437,13 @@ describe('0032 user identity upgrade on a populated database', () => {
     // ...and the id-keyed reads all still return Alice's rows.
     const byId = await db
       .prepare('SELECT COUNT(*) AS c FROM assumable_roles WHERE user_id = ?')
-      .bind(aliceId as string)
+      .bind(aliceId)
       .first<{ c: number }>();
     expect(byId?.c).toBe(1);
 
     const tokensById = await db
       .prepare('SELECT COUNT(*) AS c FROM user_access_tokens WHERE user_id = ?')
-      .bind(aliceId as string)
+      .bind(aliceId)
       .first<{ c: number }>();
     expect(tokensById?.c).toBe(1);
 

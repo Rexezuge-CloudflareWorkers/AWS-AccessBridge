@@ -77,8 +77,12 @@ describe('Credential encryption against real D1', () => {
     const arn = 'arn:aws:iam::123456789012:role/Tampered';
     const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredential(arn, 'AKIATAMPEREDKEY00000', 'tamperSecretValue');
+    // Hoisted out of the `.bind(...)` argument list: reaching into an `await` expression
+    // inline is legal and unreadable, and here it also hid that the value is a whole
+    // object rather than the ciphertext string.
+    const tampered = await encryptData('attackerValue', MASTER_KEY);
     await env.AccessBridgeDB.prepare('UPDATE credentials SET encrypted_secret_access_key = ? WHERE principal_arn = ?')
-      .bind((await encryptData('attackerValue', MASTER_KEY)).encrypted, arn)
+      .bind(tampered.encrypted, arn)
       .run();
 
     // The GCM tag check must fail: decrypting with the stored per-field IV
@@ -112,7 +116,9 @@ describe('Per-feature credential keys', () => {
   const featureKey = 'ZmVhdHVyZS1rZXktZm9yLWNyZWRlbnRpYWxzLTAwMDA=';
   const legacyArn = 'arn:aws:iam::123456789012:role/NeedsRekey';
 
-  /** Write a row under the legacy master key, as a pre-split deployment would. */
+  /**
+  Write a row under the legacy master key, as a pre-split deployment would.
+  */
   async function seedLegacyRow(): Promise<void> {
     const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, [
       'encrypt',

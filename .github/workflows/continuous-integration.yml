@@ -250,6 +250,41 @@ jobs:
       - name: Build Web App
         run: pnpm --filter @aws-access-bridge/web build
 
+  # Verifies the shell the API worker *serves*, which is a different artifact from
+  # `apps/web/dist/` — it is embedded into `apps/api/src/generated/spa-shell.ts` by the
+  # Vite plugin, and both are gitignored. A stale-but-present shell is a deploy that
+  # serves yesterday's operator UI.
+  #
+  # Its own job, and it builds first rather than depending on `build-web`, so the
+  # failure says "the served shell is wrong" instead of arriving inside a build log.
+  # That costs a second Vite build per run; the alternative — verifying inside
+  # `build-web` — is free and is the trade being made here.
+  #
+  # The build is a **precondition**, not a convenience: a fresh checkout has neither
+  # `apps/web/dist/` nor `apps/api/src/generated/`, and `postinstall` writes a
+  # deliberately minimal stub so `tsc` can resolve `SPA_HTML` before anyone has built.
+  # Verifying without building cannot pass, and fails with precisely the message the
+  # check exists to give.
+  spa-shell:
+    name: Verify SPA Shell
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      - name: Build Web App
+        run: pnpm --filter @aws-access-bridge/web build
+
+      - name: Verify The SPA Shell
+        uses: ./.github/actions/retry-step
+        with:
+          command: pnpm run verify:spa-shell
+          max_attempts: '2'
+
   dependabot-auto-merge:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.state == 'open' && !github.event.repository.fork }}
     name: Auto-Merge Dependabot PR
@@ -263,6 +298,7 @@ jobs:
       - integration-tests
       - floci-smoke
       - build-web
+      - spa-shell
     permissions:
       contents: write
       pull-requests: write
@@ -294,6 +330,7 @@ jobs:
       - integration-tests
       - floci-smoke
       - build-web
+      - spa-shell
     permissions:
       contents: write
     runs-on: ubuntu-latest

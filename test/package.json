@@ -1,0 +1,34 @@
+{
+  "name": "@aws-access-bridge/test",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "//": "A workspace project so `pnpm -r typecheck` and `pnpm run lint` reach this directory, and so pnpm links the bare specifiers its files import \u2014 pnpm's layout is strict, so an unhooked `test/` cannot resolve `hono` at all. The tsconfig maps the workspace path aliases; only bare specifiers are listed here, and each is pinned to the same range a sibling package declares so the store holds one copy. An exact pin where the product uses a caret would typecheck the tests against a *different* hono than the one the worker imports, which is the failure mode this whole change is about.",
+  "scripts": {
+    "//typecheck": "The 4 GB floor is a measurement, not a precaution. Under pnpm's default heap this project is killed by V8 at ~482 MB while checking 134 files that import most of the workspace, and tsc emits no `error TS` line when it dies \u2014 so the failure is indistinguishable from a clean run to anything grepping the output. `test/tsconfig.json` is the only project that pulls in every package at once.",
+    "typecheck": "NODE_OPTIONS=--max-old-space-size=4096 tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-access-bridge/backend-data": "workspace:*",
+    "@aws-access-bridge/backend-errors": "workspace:*",
+    "@aws-access-bridge/backend-runtime": "workspace:*",
+    "@aws-access-bridge/backend-services": "workspace:*",
+    "@aws-access-bridge/background": "workspace:*",
+    "@aws-access-bridge/provider-clients": "workspace:*",
+    "@aws-access-bridge/shared": "workspace:*",
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "hono": "^4.13.12",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "jsdom": "^30.1.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.2",
+    "vitest": "4.1.10"
+  }
+}

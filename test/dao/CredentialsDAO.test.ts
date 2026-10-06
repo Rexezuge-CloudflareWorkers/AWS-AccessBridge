@@ -26,7 +26,7 @@ describe('CredentialsDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn(),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -91,7 +91,7 @@ describe('CredentialsDAO', () => {
         salt_secret_access_key: ivB,
         salt_session_token: ivC,
       };
-      vi.mocked(mockStmt.first).mockResolvedValue(row as never);
+      vi.mocked(mockStmt.first).mockResolvedValue(row);
       await expect(dao.getCredentialByPrincipalArn(row.principal_arn)).resolves.toMatchObject({
         accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
         secretAccessKey: 'wJalrXUtnFEMI/K7MDENG',
@@ -118,7 +118,7 @@ describe('CredentialsDAO', () => {
         encrypted_secret_access_key: legacy[1].encrypted,
         encrypted_session_token: undefined,
         salt: sharedIv,
-      } as never);
+      });
 
       const dao = new CredentialsDAO(mockDb, [key], 3);
       const result = await dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Legacy');
@@ -136,7 +136,7 @@ describe('CredentialsDAO', () => {
         // A stale row whose per-field IV is set must not fall back to `salt`.
         salt: wrongIv,
         salt_secret_access_key: correct.iv,
-      } as never);
+      });
 
       const dao = new CredentialsDAO(mockDb, [key], 3);
       await expect(dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Upgraded')).resolves.toMatchObject({

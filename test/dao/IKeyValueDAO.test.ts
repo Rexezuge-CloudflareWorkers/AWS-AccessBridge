@@ -26,6 +26,11 @@ class ExposedKeyValueDAO extends IKeyValueDAO {
   }
 }
 
+/**
+ * `get` narrowed to the single shape this file exercises.
+ */
+type KvGet = (key: string, type?: string) => Promise<unknown>;
+
 function createMockKV(): KVNamespace {
   return {
     get: vi.fn().mockResolvedValue(null),
@@ -33,7 +38,7 @@ function createMockKV(): KVNamespace {
     delete: vi.fn().mockResolvedValue(undefined),
     list: vi.fn(),
     getWithMetadata: vi.fn(),
-  } as unknown as KVNamespace;
+  };
 }
 
 describe('IKeyValueDAO', () => {
@@ -58,11 +63,17 @@ describe('IKeyValueDAO', () => {
 
     it('returns the stored value, and null when absent', async () => {
       const kv = createMockKV();
-      vi.mocked(kv.get).mockResolvedValue({ data: 'value' });
+      // `KVNamespace.get` carries eleven overloads, and `vi.mocked` types the mock from
+      // the **last** one — `get(key: Array<Key>, type: 'text')`, returning a `Map`. So
+      // `mockResolvedValue` demanded a `Map` for a call that resolves one value. The
+      // overload the DAO actually calls is the `'json'` one; erasing the set to it is
+      // what the double means, and doing it here keeps the assertion about the value
+      // rather than about TypeScript's overload resolution order.
+      vi.mocked(kv.get as KvGet).mockResolvedValue({ data: 'value' });
       const dao = new ExposedKeyValueDAO(kv, 'CC');
       await expect(dao.read('key')).resolves.toEqual({ data: 'value' });
 
-      vi.mocked(kv.get).mockResolvedValue(null);
+      vi.mocked(kv.get as KvGet).mockResolvedValue(null);
       await expect(dao.read('missing')).resolves.toBeNull();
     });
   });

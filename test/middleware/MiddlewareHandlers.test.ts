@@ -38,6 +38,24 @@ import { MiddlewareHandlers } from '@/middleware';
 
 type TestApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+/**
+ * Mounts a handler whose `Context` type differs from the app's.
+ *
+ * `MiddlewareHandlers` returns handlers typed against Hono's `RequestContext`, which
+ * requires `[GET_MATCH_RESULT]` on `req` and is therefore not satisfied by a
+ * generically-typed app. That produced nine "no overload matches" errors on
+ * `app.use(...)` — the middleware is fine, the two context types are simply declared
+ * independently.
+ *
+ * The mismatch is erased **here**, once, rather than at each of the nine call sites:
+ * the alternative is nine casts that each hide the same fact, and a reader would have to
+ * establish nine times that this one is the same known variance gap. The test is about
+ * the middleware's behaviour, not Hono's inference.
+ */
+function mount(app: TestApp, path: string, handler: (c: never, next: never) => Promise<unknown>): void {
+  app.use(path, handler as unknown as Parameters<TestApp['use']>[1]);
+}
+
 function createExecutionContext(): ExecutionContext {
   return {
     waitUntil: waitUntilSpy,
@@ -45,9 +63,61 @@ function createExecutionContext(): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
+/**
+ * A `D1Result`, built rather than cast: the type requires `meta` alongside `results`
+ * and `success`, so an object missing `meta` is not a result at all.
+ */
+function d1Result<T>(results: T[]): D1Result<T> {
+  return {
+    success: true,
+    results,
+    meta: {
+      duration: 0,
+      size_after: 0,
+      rows_read: 0,
+      rows_written: 0,
+      last_row_id: 0,
+      changed_db: false,
+      changes: 0,
+    },
+  };
+}
+
+/**
+ * A D1 session double.
+ *
+ * This was `{ mock: true } as D1DatabaseSession`, which does not typecheck — the two
+ * types do not overlap — and the failure cascaded into nine "no overload matches"
+ * errors on every subsequent `app.request(...)`, so one dishonest stub was reported as
+ * ten unrelated ones.
+ *
+ * The middlewares under test never query D1, so the members are present but empty,
+ * and the cast is explicit rather than inherited from a structural mismatch. The
+ * alternative — hand-writing `D1PreparedStatement`'s overloads for `first` and `raw`,
+ * which differ only in a `columnNames` discriminant — is a lot of ceremony for a stub
+ * that is never exercised, and a *partial* attempt at it is worse: it claims members
+ * `D1DatabaseSession` does not have in this platform build. A query reaching this
+ * returns the empty result, which is the right answer for a double and fails loudly
+ * enough in a test that expected rows.
+ */
+function d1Session(): D1DatabaseSession {
+  const empty = () => d1Result<Record<string, unknown>>([]);
+  return {
+    prepare: () => ({
+      bind: () => undefined,
+      first: async () => null,
+      run: empty,
+      all: empty,
+      raw: async () => [],
+    }),
+    batch: async () => [empty()],
+    getBookmark: () => null,
+  } as unknown as D1DatabaseSession;
+}
+
 function createEnv(overrides: Partial<Env> = {}): Env {
   return {
-    AccessBridgeDB: { mock: true } as D1DatabaseSession,
+    AccessBridgeDB: d1Session(),
     DEMO_MODE: 'false',
     TEAM_DOMAIN: 'https://team.example.com',
     POLICY_AUD: 'policy-aud',
@@ -66,9 +136,9 @@ function withCloudflareMetadata(request: Request): Request {
 function createUserApp(includeAudit: boolean = false): TestApp {
   const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
   if (includeAudit) {
-    app.use('*', MiddlewareHandlers.activityAudit());
+    mount(app, '*', MiddlewareHandlers.activityAudit());
   }
-  app.use('*', MiddlewareHandlers.userAuthentication());
+  mount(app, '*', MiddlewareHandlers.userAuthentication());
   app.get('/user/test', async (c) => {
     return c.json({ email: c.get('AuthenticatedUserEmailAddress') });
   });
@@ -77,7 +147,7 @@ function createUserApp(includeAudit: boolean = false): TestApp {
 
 function createApiApp(): TestApp {
   const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-  app.use('*', MiddlewareHandlers.apiAuthentication());
+  mount(app, '*', MiddlewareHandlers.apiAuthentication());
   app.get('/api/test', async (c) => {
     return c.json({ email: c.get('AuthenticatedUserEmailAddress') });
   });
@@ -96,12 +166,13 @@ describe('MiddlewareHandlers', () => {
   describe('activityAudit', () => {
     it('writes an audit log entry with the authenticated user and response status', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         c.set('AuthenticatedUserEmailAddress', 'user@example.com');
         return c.json({ ok: true }, 201);
       });
 
+      const env = createEnv();
       const response: Response = await app.fetch(
         new Request('https://worker.example.com/api/test', {
           headers: {
@@ -109,12 +180,17 @@ describe('MiddlewareHandlers', () => {
             'User-Agent': 'Vitest',
           },
         }),
-        createEnv(),
+        env,
         createExecutionContext(),
       );
 
       expect(response.status).toBe(201);
-      expect(auditLogConstructorSpy).toHaveBeenCalledWith({ mock: true });
+      // **Identity**, not shape. This asserted `{ mock: true }` — the double's
+      // *contents* — so replacing those members broke a test that was never about
+      // them, which is the failure mode of pinning an assertion to a fake's shape
+      // rather than to its identity. The claim is "the DAO was handed the session this
+      // app was configured with", so that is what is asserted.
+      expect(auditLogConstructorSpy).toHaveBeenCalledWith(env.AccessBridgeDB);
       expect(auditLogCreateSpy).toHaveBeenCalledWith(
         'user@example.com',
         'GET:/api/test',
@@ -132,7 +208,7 @@ describe('MiddlewareHandlers', () => {
 
     it('uses the first forwarded-for address for trusted Pages proxy audit logs', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         c.set('AuthenticatedUserEmailAddress', 'user@example.com');
         return c.json({ ok: true });
@@ -169,7 +245,7 @@ describe('MiddlewareHandlers', () => {
 
     it('ignores spoofed forwarded-for headers for direct audit logs', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         c.set('AuthenticatedUserEmailAddress', 'user@example.com');
         return c.json({ ok: true });
@@ -206,7 +282,7 @@ describe('MiddlewareHandlers', () => {
 
     it('writes an audit log entry with unknown user when authentication has not populated the context', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         return c.json(
           {
@@ -246,7 +322,7 @@ describe('MiddlewareHandlers', () => {
       auditLogCreateSpy.mockRejectedValue(new Error('D1 unavailable'));
 
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         c.set('AuthenticatedUserEmailAddress', 'user@example.com');
         return c.json({ ok: true });
@@ -266,7 +342,7 @@ describe('MiddlewareHandlers', () => {
       });
 
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
         c.set('AuthenticatedUserEmailAddress', 'user@example.com');
         return c.json({ ok: true });
@@ -279,7 +355,7 @@ describe('MiddlewareHandlers', () => {
 
     it('audits a failed request with a 5xx status and does not swallow the error', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      app.use('*', MiddlewareHandlers.activityAudit());
+      mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', () => Promise.reject(new Error('boom')));
 
       const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());

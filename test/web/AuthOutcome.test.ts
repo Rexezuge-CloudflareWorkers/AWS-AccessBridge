@@ -4,7 +4,7 @@ import { ApiError } from '@aws-access-bridge/web/lib/api';
 import { loadCurrentUser } from '@aws-access-bridge/web/services/authService';
 
 function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  return Response.json(body, { status, headers: { 'Content-Type': 'application/json' } });
 }
 
 /**
@@ -46,7 +46,16 @@ describe('classifyAuthFailure', () => {
     // `fetch` rejects with a TypeError, but a stubbed or future transport could
     // reject with anything. The gate must still classify, never crash.
     expect(classifyAuthFailure('boom')).toEqual({ kind: 'load-failed', reason: 'Failed to load your profile.' });
-    expect(classifyAuthFailure(new Error(''))).toEqual({ kind: 'load-failed', reason: 'Failed to load your profile.' });
+    // An Error whose `message` is **empty** -- the case that must fall back rather than
+    // surface a blank reason. Built by assignment rather than written as `new Error('')`
+    // or `new Error()`, both of which are rejected by `unicorn/error-message`: that rule
+    // is right that an empty message is usually a mistake, and here it is the subject,
+    // so the intent is written out instead of suppressed. Passing a real message instead
+    // produced the same expected value while no longer covering this path, which is what
+    // made it look correct.
+    const emptyMessage = new Error('placeholder');
+    emptyMessage.message = '';
+    expect(classifyAuthFailure(emptyMessage)).toEqual({ kind: 'load-failed', reason: 'Failed to load your profile.' });
   });
 
   it('always yields a reason on the load-failed path', () => {

@@ -20,23 +20,29 @@
  * `tsx` rather than `node` because of the extensionless relative import, as every
  * other script that imports a sibling module does.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BASE_LOCALE,
   checkBaseLocale,
   checkBundle,
+  checkCallSite,
   checkTagListsAgree,
   checkTags,
+  checkUnusedKeys,
+  dynamicKeyFinding,
   flatten,
+  hasDynamicCall,
   readDeclaredTags,
+  translationCalls,
   type Finding,
 } from './locale-checks';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCALES_DIR = path.join(ROOT, 'apps', 'web', 'src', 'locales');
-const WEB_I18N = path.join(ROOT, 'apps', 'web', 'src', 'i18n.ts');
+const WEB_SRC = path.join(ROOT, 'apps', 'web', 'src');
+const WEB_I18N = path.join(WEB_SRC, 'i18n.ts');
 const SHARED_LOCALE_UTIL = path.join(ROOT, 'packages', 'shared', 'src', 'utils', 'LocaleUtil.ts');
 
 /**
@@ -152,8 +158,66 @@ for (const [label, file] of [
 
 failures.push(...checkTagListsAgree(declared.SUPPORTED_LANGUAGES ?? [], declared.SUPPORTED_LOCALES ?? []));
 
+// --- Call sites against the base bundle ---
+//
+// Everything above compares bundles to each other, so a key missing from *all*
+// of them passes. This reads the application instead, which is the only thing
+// that can tell a key nobody has from a key nobody wants.
+function sourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      if (entry === 'locales' || entry === 'generated') continue;
+      out.push(...sourceFiles(full));
+    } else if (/\.tsx?$/.test(entry)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+const usedKeys = new Set<string>();
+const dynamicSites = new Set<string>();
+let defaultsCompared = 0;
+
+for (const file of sourceFiles(WEB_SRC)) {
+  const source = readFileSync(file, 'utf8');
+  const where = path.relative(ROOT, file);
+
+  for (const call of translationCalls(source)) {
+    usedKeys.add(call.key);
+    if (call.inlineDefault !== null) defaultsCompared += 1;
+    failures.push(...checkCallSite(where, call, base));
+  }
+
+  // A key assembled at runtime cannot be verified, so it is named rather than
+  // passed over — the script should not report coverage it does not have.
+  if (hasDynamicCall(source)) {
+    dynamicSites.add(where);
+  }
+}
+
+const unused = checkUnusedKeys(base, usedKeys);
+failures.push(...unused);
+for (const where of dynamicSites) {
+  failures.push(dynamicKeyFinding(where));
+}
+
+console.log(
+  `call sites: referenced=${usedKeys.size} unused=${unused.length} dynamic=${dynamicSites.size} defaults_compared=${defaultsCompared} [${dynamicSites.size === 0 ? 'OK' : 'UNVERIFIED'}]`,
+);
+
 for (const finding of failures) {
+  // Advisory findings describe a limit of this script or untidiness in the
+  // bundle, not a defect that should block a merge.
+  if (finding.advisory) {
+    console.warn(`WARN: ${finding.subject} ${finding.detail}`);
+    continue;
+  }
   console.error(`FAIL: ${finding.subject} ${finding.detail}`);
 }
-console.log(failures.length === 0 ? 'ALL OK' : 'FAILURES PRESENT');
-process.exit(failures.length === 0 ? 0 : 1);
+
+const fatal = failures.filter((finding) => !finding.advisory);
+console.log(fatal.length === 0 ? 'ALL OK' : `FAILURES PRESENT (${fatal.length})`);
+process.exit(fatal.length === 0 ? 0 : 1);

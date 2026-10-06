@@ -1,7 +1,27 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals", "vite/client"],
+    // `ESNext`, matching `scripts/tsconfig.json` rather than the repo default
+    // `ES2022`. `scripts/` uses `Map.prototype.filter`/`map` (the iterator helpers,
+    // ES2025) and `Array#toSorted` (ES2023), and `test/scripts/*.test.ts` imports
+    // those modules — so `tsc` checks an imported file under the *importing* project's
+    // lib, and a test reaching `scripts/i18n/locale-checks.ts` was reporting
+    // `Property 'filter' does not exist on type 'MapIterator'` for code that is
+    // correct on its own.
+    //
+    // Picking ES2023 here was not enough: it satisfies `toSorted` and not the
+    // iterator helpers, which is the same error by a different route.
+    "target": "ES2022",
+    "lib": ["ESNext", "DOM"],
+    "types": [
+      "vitest/globals",
+      "vite/client",
+      // `cloudflare:test` — `test/integration/**` and `test/middleware/**` run under
+      // the Workers pool and import it. Without this the module does not resolve, so
+      // typechecking those files means nothing. It is an ambient declaration inside
+      // the pool's own package, which is why it is named here rather than imported.
+      "@cloudflare/vitest-pool-workers/types"
+    ],
     "paths": {
       "@/*": ["../apps/api/src/*"],
       "@aws-access-bridge/background": ["../apps/background/src"],
@@ -14,6 +34,13 @@
       "@aws-access-bridge/backend-runtime/*": ["../packages/backend-runtime/src/*"],
       "@aws-access-bridge/backend-services": ["../packages/backend-services/src"],
       "@aws-access-bridge/backend-services/*": ["../packages/backend-services/src/*"],
+      // The package's own `exports` map declares `.`, `./aws` and `./aws/*`; the
+      // aliases above have to mirror all of it or a subpath import resolves at runtime
+      // and fails to typecheck.
+      "@aws-access-bridge/provider-clients": ["../packages/provider-clients/src"],
+      "@aws-access-bridge/provider-clients/aws": ["../packages/provider-clients/src/aws/index"],
+      "@aws-access-bridge/provider-clients/*": ["../packages/provider-clients/src/*"],
+      "@aws-access-bridge/web/*": ["../apps/web/src/*"],
       "@aws-access-bridge/shared": ["../packages/shared/src"],
       "@aws-access-bridge/shared/*": ["../packages/shared/src/*"]
     }

@@ -23,14 +23,18 @@ const INDEX_HTML: string = path.join(WEB, 'index.html');
 const SVG: string = readFileSync(FAVICON, 'utf8').trim();
 const INDEX: string = readFileSync(INDEX_HTML, 'utf8');
 
-/** The `href` of the first `<link rel="icon">` in a document. */
+/**
+The `href` of the first `<link rel="icon">` in a document.
+*/
 function iconHref(html: string): string {
   const match: RegExpExecArray | null = /<link[^>]*rel=["']icon["'][^>]*href=["']([^"']*)["']/.exec(html);
   expect(match, 'no <link rel="icon" href="…"> found').not.toBeNull();
   return match?.[1] ?? '';
 }
 
-/** Decode a `data:` URI back to the text it carries. */
+/**
+Decode a `data:` URI back to the text it carries.
+*/
 function decodeDataUri(href: string): string {
   const prefix = 'data:image/svg+xml,';
   expect(href.startsWith(prefix)).toBe(true);

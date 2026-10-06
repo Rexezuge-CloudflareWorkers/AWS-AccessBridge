@@ -27,7 +27,7 @@ describe('useAccountMutations', () => {
 
   function seed(result: { current: ReturnType<typeof useAccountMutations> }, roles: Record<string, unknown>): void {
     act(() => {
-      result.current.setRolesData(roles as never);
+      result.current.setRolesData(roles);
     });
   }
 
@@ -219,7 +219,7 @@ describe('useAccountMutations', () => {
   describe('openAccessKeys', () => {
     it('stores the credentials for the modal', async () => {
       const creds = { accessKeyId: 'AK', secretAccessKey: 'SK' };
-      mocked.assumeRoleKeys.mockResolvedValue(creds as never);
+      mocked.assumeRoleKeys.mockResolvedValue(creds);
       const { result } = hook();
 
       await act(async () => {
@@ -235,7 +235,7 @@ describe('useAccountMutations', () => {
       // tick as the call, so reading it synchronously afterwards would only
       // observe the settled state.
       let release!: (value: unknown) => void;
-      mocked.assumeRoleKeys.mockReturnValue(new Promise((resolve) => (release = resolve)) as never);
+      mocked.assumeRoleKeys.mockReturnValue(new Promise((resolve) => (release = resolve)));
       const { result } = hook();
 
       let pending: Promise<void>;

@@ -76,7 +76,7 @@ describe('InternalRequestHelper', () => {
     expect(url).toBe('https://self.invalid/api/aws/assume-role');
     const headers = init.headers as Record<string, string>;
     expect(headers['x-internal-user-email']).toBe('user@example.com');
-    expect(headers['x-internal-signature']).toMatch(/^[A-Za-z0-9+/=]+$/);
+    expect(headers['x-internal-signature']).toMatch(/^[A-Z0-9+/=]+$/i);
     expect(headers['x-internal-timestamp']).toMatch(/^\d+$/);
     expect(headers['Content-Type']).toBe('application/json');
   });

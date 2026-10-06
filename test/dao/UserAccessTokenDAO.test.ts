@@ -16,7 +16,7 @@ describe('UserAccessTokenDAO', () => {
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
-    } as unknown as D1PreparedStatement;
+    };
 
     mockDb = {
       prepare: vi.fn().mockReturnValue(mockStmt),
@@ -29,7 +29,7 @@ describe('UserAccessTokenDAO', () => {
   describe('create', () => {
     it('inserts a new access token', async () => {
       const dao = new UserAccessTokenDAO(mockDb);
-      await dao.create('token-id', 'user@test.com', 'token-value', 'My Token', 1800000000, 'usr_abc');
+      await dao.create('token-id', 'user@test.com', 'token-value', 'My Token', 1_800_000_000, 'usr_abc');
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO user_access_tokens'));
       // The anchor goes in the FK'd column; the id is what survives a change.
       expect(mockStmt.bind).toHaveBeenCalledWith(
@@ -38,7 +38,7 @@ describe('UserAccessTokenDAO', () => {
         'token-value',
         'My Token',
         expect.any(Number),
-        1800000000,
+        1_800_000_000,
         'usr_abc',
       );
     });
@@ -57,10 +57,10 @@ describe('UserAccessTokenDAO', () => {
         user_email: 'user@test.com',
         access_token: 'tok',
         name: 'My Token',
-        created_at: 1700000000,
-        expires_at: 1800000000,
+        created_at: 1_700_000_000,
+        expires_at: 1_800_000_000,
         user_id: 'usr_abc',
-        last_used_at: 1750000000,
+        last_used_at: 1_750_000_000,
       });
       const dao = new UserAccessTokenDAO(mockDb);
       const result = await dao.getById('tid', false);
@@ -69,9 +69,9 @@ describe('UserAccessTokenDAO', () => {
         userEmail: 'user@test.com',
         userId: 'usr_abc',
         name: 'My Token',
-        createdAt: 1700000000,
-        expiresAt: 1800000000,
-        lastUsedAt: 1750000000,
+        createdAt: 1_700_000_000,
+        expiresAt: 1_800_000_000,
+        lastUsedAt: 1_750_000_000,
       });
     });
 
@@ -89,8 +89,8 @@ describe('UserAccessTokenDAO', () => {
         user_email: 'user@test.com',
         access_token: 'tok',
         name: 'My Token',
-        created_at: 1700000000,
-        expires_at: 1800000000,
+        created_at: 1_700_000_000,
+        expires_at: 1_800_000_000,
         user_id: null,
         last_used_at: undefined,
       });
@@ -103,8 +103,8 @@ describe('UserAccessTokenDAO', () => {
         userEmail: 'user@test.com',
         userId: null,
         name: 'My Token',
-        createdAt: 1700000000,
-        expiresAt: 1800000000,
+        createdAt: 1_700_000_000,
+        expiresAt: 1_800_000_000,
         lastUsedAt: undefined,
       });
     });

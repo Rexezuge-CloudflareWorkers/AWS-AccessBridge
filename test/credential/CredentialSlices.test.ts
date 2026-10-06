@@ -47,7 +47,7 @@ describe('CredentialChainService', () => {
       accessKeyId: 'AK',
       secretAccessKey: 'SK',
       sessionToken: 'ST',
-    } as never);
+    });
     vi.mocked(StsService.prototype.assumeRole)
       .mockResolvedValueOnce({ accessKeyId: 'A1', secretAccessKey: 'S1', sessionToken: 'T1', expiration: 'e' })
       .mockResolvedValueOnce({ accessKeyId: 'A2', secretAccessKey: 'S2', sessionToken: 'T2', expiration: 'e' });
@@ -63,7 +63,7 @@ describe('CredentialChainService', () => {
       accessKeyId: 'AK',
       secretAccessKey: 'SK',
       sessionToken: 'ST',
-    } as never);
+    });
     vi.mocked(StsService.prototype.assumeRole).mockRejectedValue(new Error('denied'));
     const result = await new CredentialChainService(env()).testChain(LEAF);
     expect(result.success).toBe(false);

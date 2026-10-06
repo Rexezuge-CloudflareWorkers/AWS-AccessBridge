@@ -40,7 +40,7 @@ describe('team CRUD routes', () => {
   it('POST /user/admin/team creates teams', async () => {
     vi.mocked(TeamsDAO.prototype.createTeam).mockResolvedValue({ teamId: 't1', teamName: 'Ops', createdAt: 1, createdBy: 'u@e.c' });
     const c = createRouteContext({ method: 'POST', body: { teamName: 'Ops' }, env: adminEnv() });
-    await new CreateTeamRoute({} as never).handle(c as never);
+    await new CreateTeamRoute({} as never).handle(c);
     expect(TeamsDAO.prototype.createTeam).toHaveBeenCalledWith('Ops', 'user@example.com');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -51,7 +51,7 @@ describe('team CRUD routes', () => {
       body: { teamId: '00000000-0000-0000-0000-000000000000' },
       env: adminEnv(),
     });
-    await new DeleteTeamRoute({} as never).handle(c as never);
+    await new DeleteTeamRoute({} as never).handle(c);
     expect(TeamsDAO.prototype.deleteTeam).not.toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
@@ -59,21 +59,21 @@ describe('team CRUD routes', () => {
   it('DELETE /user/admin/team removes teams', async () => {
     vi.mocked(TeamsDAO.prototype.deleteTeam).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'DELETE', body: { teamId: 't1' }, env: adminEnv() });
-    await new DeleteTeamRoute({} as never).handle(c as never);
+    await new DeleteTeamRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
   it('GET /user/admin/teams lists teams', async () => {
     vi.mocked(TeamsDAO.prototype.listTeams).mockResolvedValue([]);
     const c = createRouteContext({ url: 'https://example.com/user/admin/teams', env: adminEnv() });
-    await new ListTeamsRoute({} as never).handle(c as never);
+    await new ListTeamsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ teams: [] }));
   });
 
   it('PUT /user/admin/team/name renames teams', async () => {
     vi.mocked(TeamsDAO.prototype.updateTeamName).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'PUT', body: { teamId: 't1', teamName: 'New' }, env: adminEnv() });
-    await new UpdateTeamNameRoute({} as never).handle(c as never);
+    await new UpdateTeamNameRoute({} as never).handle(c);
     expect(TeamsDAO.prototype.updateTeamName).toHaveBeenCalledWith('t1', 'New');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -91,7 +91,7 @@ describe('team member routes', () => {
       body: { teamId: 't1', userEmail: 'dev@example.com', role: 'member' },
       env: adminEnv(),
     });
-    await new AddTeamMemberRoute({} as never).handle(c as never);
+    await new AddTeamMemberRoute({} as never).handle(c);
     expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
       't1',
       { userId: null, anchorEmail: 'dev@example.com' },
@@ -107,7 +107,7 @@ describe('team member routes', () => {
       body: { teamId: 't1', userEmail: 'dev@example.com' },
       env: adminEnv(),
     });
-    await new RemoveTeamMemberRoute({} as never).handle(c as never);
+    await new RemoveTeamMemberRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
@@ -117,11 +117,11 @@ describe('team member routes', () => {
       url: 'https://example.com/user/admin/team/members?teamId=11111111-1111-4111-8111-111111111111',
       env: adminEnv(),
     });
-    await new ListTeamMembersRoute({} as never).handle(c as never);
+    await new ListTeamMembersRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ members: [] }));
 
     const missing = createRouteContext({ url: 'https://example.com/user/admin/team/members', env: adminEnv() });
-    await new ListTeamMembersRoute({} as never).handle(missing as never);
+    await new ListTeamMembersRoute({} as never).handle(missing);
     expect(missing.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 
@@ -132,7 +132,7 @@ describe('team member routes', () => {
       body: { teamId: 't1', userEmail: 'dev@example.com', role: 'admin' },
       env: adminEnv(),
     });
-    await new UpdateTeamMemberRoleRoute({} as never).handle(c as never);
+    await new UpdateTeamMemberRoleRoute({} as never).handle(c);
     expect(TeamMembersDAO.prototype.updateMemberRole).toHaveBeenCalledWith(
       't1',
       { userId: null, anchorEmail: 'dev@example.com' },
@@ -154,7 +154,7 @@ describe('team account routes', () => {
       body: { teamId: 't1', awsAccountId: '123456789012' },
       env: adminEnv(),
     });
-    await new AddTeamAccountRoute({} as never).handle(c as never);
+    await new AddTeamAccountRoute({} as never).handle(c);
     expect(TeamAccountsDAO.prototype.addAccountToTeam).toHaveBeenCalledWith('t1', '123456789012');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
@@ -166,7 +166,7 @@ describe('team account routes', () => {
       body: { teamId: 't1', awsAccountId: '123456789012' },
       env: adminEnv(),
     });
-    await new RemoveTeamAccountRoute({} as never).handle(c as never);
+    await new RemoveTeamAccountRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
@@ -176,7 +176,7 @@ describe('team account routes', () => {
       url: 'https://example.com/user/admin/team/accounts?teamId=11111111-1111-4111-8111-111111111111',
       env: adminEnv(),
     });
-    await new ListTeamAccountsRoute({} as never).handle(c as never);
+    await new ListTeamAccountsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ accountIds: ['123456789012'] }));
   });
 });

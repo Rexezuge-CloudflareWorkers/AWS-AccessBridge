@@ -83,7 +83,13 @@ describe('AuditEventBuilder', () => {
     ['userEmail', (): AuditEventBuilder => AuditEventBuilder.create().action('A').request('GET', '/x').status(200)],
     ['action', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').request('GET', '/x').status(200)],
     ['method', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').status(200)],
-    ['path', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').request('GET').status(200)],
+    // Deliberately omitting `path`, which is what this row is for. It is spelled as a
+    // one-argument `request(...)` rather than `request('GET', undefined)`, and the
+    // reason it needs the cast is the finding: `request` sets `method` and `path`
+    // together, so the public API **cannot** produce an event carrying a method with no
+    // path. Omitting `path` is reachable only by breaking the signature, so the case
+    // this row covers is currently only reachable by a type error.
+    ['path', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').request('GET', undefined as unknown as string).status(200)],
     ['statusCode', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').request('GET', '/x')],
   ])('refuses to build without %s', (_field, build) => {
     // A partial audit row is worse than none: it would look like a real entry

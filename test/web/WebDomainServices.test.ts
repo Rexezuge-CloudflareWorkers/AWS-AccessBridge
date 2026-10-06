@@ -6,7 +6,7 @@ import { loadCurrentUser, updatePreferredLanguage } from '@aws-access-bridge/web
 import { formatMonthLabel, formatCurrency, formatAmount, formatUnixDate, formatUnixTimestamp } from '@aws-access-bridge/web/lib/format';
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
+  return Response.json(body, { status });
 }
 
 describe('accountService', () => {
@@ -18,12 +18,24 @@ describe('accountService', () => {
   });
 
   it('lists via search when a term is present, paged otherwise', async () => {
+    // `fetch`'s first argument is `RequestInfo | URL`, so a template interpolation would
+    // stringify a `URL` through its default `toString` and a `Request` as `[object Object]`.
+    // Narrowing to the string form the assertion below actually needs says which it is.
     vi.mocked(fetch).mockImplementation((url) =>
-      Promise.resolve(jsonResponse(String(url).includes('search') ? { '1': { roles: [] } } : { totalAccounts: 0 })),
+      Promise.resolve(
+        jsonResponse(typeof url === 'string' && url.includes('search') ? { '1': { roles: [] } } : { totalAccounts: 0 }),
+      ),
     );
     await expect(listAccounts({ showHidden: false, searchTerm: 'dev', pageSize: 10, currentPage: 1 })).resolves.toMatchObject({ total: 1 });
     await expect(listAccounts({ showHidden: true, searchTerm: '', pageSize: 10, currentPage: 2 })).resolves.toMatchObject({ total: 0 });
-    const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]));
+    // Only the string form is asserted on, and a `URL`'s own `toString` is the right
+    // answer for the other branch -- but the rule cannot see that a `Request` is absent,
+    // so the narrowing is explicit rather than left to `String(...)`, which would print
+    // `[object Object]` for one and match nothing.
+    const urls = vi.mocked(fetch).mock.calls.map((call) => {
+      const first = call[0];
+      return typeof first === 'string' ? first : first instanceof URL ? first.href : '';
+    });
     expect(urls[0]).toContain('/user/assumables/search?q=dev');
     expect(urls[1]).toContain('offset=10');
   });

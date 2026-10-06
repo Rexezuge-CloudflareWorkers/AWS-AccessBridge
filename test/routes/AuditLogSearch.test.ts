@@ -34,7 +34,7 @@ describe('ListAuditLogsRoute account filter', () => {
     // every row they ever wrote.
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockResolvedValue('usr_abc');
 
-    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`) as never);
+    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));
 
     expect(AuditService.prototype.queryLogs).toHaveBeenCalledWith(
       expect.objectContaining({ userEmail: EMAIL, userId: 'usr_abc' }),
@@ -45,13 +45,13 @@ describe('ListAuditLogsRoute account filter', () => {
 
   it('keeps the address alongside the id, since it narrows the unattributed rows', async () => {
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockResolvedValue('usr_abc');
-    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`) as never);
+    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));
     const [filters] = vi.mocked(AuditService.prototype.queryLogs).mock.calls[0];
     expect(filters.userEmail).toBe(EMAIL);
   });
 
   it('does not resolve an id when no address filter was given', async () => {
-    await new ListAuditLogsRoute({} as never).handle(context() as never);
+    await new ListAuditLogsRoute({} as never).handle(context());
     expect(UserIdentityService.prototype.resolveUserId).not.toHaveBeenCalled();
     expect(vi.mocked(AuditService.prototype.queryLogs).mock.calls[0][0]).not.toHaveProperty('userId');
   });
@@ -62,7 +62,7 @@ describe('ListAuditLogsRoute account filter', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockResolvedValue(null);
 
-    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`) as never);
+    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));
 
     const [filters] = vi.mocked(AuditService.prototype.queryLogs).mock.calls[0];
     expect(filters.userEmail).toBe(EMAIL);
@@ -70,12 +70,17 @@ describe('ListAuditLogsRoute account filter', () => {
   });
 
   it('propagates nothing and still answers when the identity lookup itself fails', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // The spy is captured rather than read back off `console.warn`. `vi.spyOn` returns
+    // it, and the installed function keeps the plain overload signature — so
+    // `console.warn.mock` does not exist, and the assertion could not be written the way
+    // it was. Reading the recorded calls off the value the call returned is also the
+    // only version that still works once the install is un-restored.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockRejectedValue(new Error('d1 is busy'));
 
-    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`) as never);
+    await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));
 
-    expect(console.warn.mock.calls.flat().join(' ')).toContain('d1 is busy');
+    expect(warn.mock.calls.flat().join(' ')).toContain('d1 is busy');
     expect(AuditService.prototype.queryLogs).toHaveBeenCalledOnce();
   });
 });

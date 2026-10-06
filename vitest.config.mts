@@ -34,7 +34,18 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: ['test/**/*.test.ts'],
-          exclude: ['test/integration/**', 'test/floci/**'],
+          // `**/node_modules/**` is Vitest's own default exclusion, and naming
+          // `exclude` at all **replaces** that default rather than adding to it.
+          //
+          // That was harmless while `test/` was outside the workspace and had no
+          // `node_modules` of its own, and it stopped being harmless the moment it
+          // became a workspace project: pnpm then links `test/node_modules`, which
+          // sits under the `test/**/*.test.ts` glob, and the suite collected the
+          // dependency's own test files — `zod`, `@testing-library/jest-dom` and the
+          // rest, 3,000-odd files and ten times the real suite's runtime. Nothing
+          // announced it: the run reported failures from inside `node_modules` that
+          // belonged to no code in this repository.
+          exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
         },
       },
       {
@@ -44,7 +55,7 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           include: ['test/**/*.test.tsx'],
-          exclude: ['test/integration/**', 'test/floci/**'],
+          exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
           setupFiles: ['test/setup/dom.ts'],
         },
       },

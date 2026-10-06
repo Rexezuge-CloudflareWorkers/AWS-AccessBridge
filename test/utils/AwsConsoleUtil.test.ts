@@ -31,7 +31,7 @@ describe('ConsoleService', () => {
   describe('buildDestination', () => {
     it('builds console destinations with optional region', () => {
       const service = new ConsoleService();
-      expect(service.buildDestination(undefined, undefined)).toBe('https://console.aws.amazon.com/');
+      expect(service.buildDestination()).toBe('https://console.aws.amazon.com/');
       expect(service.buildDestination('ec2/home', 'eu-west-1')).toContain('region=eu-west-1');
     });
   });

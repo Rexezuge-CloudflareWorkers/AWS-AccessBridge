@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError, apiRequest, isUnauthorized, throwForResponse } from '@aws-access-bridge/web/lib/api';
 
 function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  return Response.json(body, { status, headers: { 'Content-Type': 'application/json' } });
 }
 
 describe('apiRequest', () => {

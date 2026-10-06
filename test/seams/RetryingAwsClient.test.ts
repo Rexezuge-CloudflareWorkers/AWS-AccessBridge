@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { RetryingAwsClient, HttpFetchError } from '@aws-access-bridge/backend-services/http/IHttpClient';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 
-/** A signed-client double that replays a scripted sequence of responses. */
+/**
+A signed-client double that replays a scripted sequence of responses.
+*/
 function scriptedClient(...responses: Array<Response | Error>) {
   const fetch = vi.fn();
   for (const response of responses) {
@@ -24,14 +26,14 @@ describe('RetryingAwsClient', () => {
 
   it('returns a successful response without retrying', async () => {
     const { fetch, signed } = scriptedClient(new Response('ok', { status: 200 }));
-    const response = await new RetryingAwsClient(signed as never, 3).fetch('https://example.com');
+    const response = await new RetryingAwsClient(signed, 3).fetch('https://example.com');
     expect(response.status).toBe(200);
     expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('retries a 429 and succeeds', async () => {
     const { fetch, signed } = scriptedClient(throttle(), new Response('ok', { status: 200 }));
-    const response = await new RetryingAwsClient(signed as never, 3).fetch('https://example.com');
+    const response = await new RetryingAwsClient(signed, 3).fetch('https://example.com');
     expect(response.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -47,7 +49,7 @@ describe('RetryingAwsClient', () => {
   it('does not retry a 4xx, which would fail identically', async () => {
     for (const status of [400, 401, 403, 404]) {
       const { fetch, signed } = scriptedClient(new Response('nope', { status }), new Response('ok', { status: 200 }));
-      const response = await new RetryingAwsClient(signed as never, 3).fetch('https://example.com');
+      const response = await new RetryingAwsClient(signed, 3).fetch('https://example.com');
       expect(response.status).toBe(status);
       expect(fetch).toHaveBeenCalledOnce();
     }
@@ -55,7 +57,7 @@ describe('RetryingAwsClient', () => {
 
   it('gives up after maxAttempts and returns the last response', async () => {
     const { fetch, signed } = scriptedClient(throttle(), throttle(), throttle());
-    const response = await new RetryingAwsClient(signed as never, 3).fetch('https://example.com');
+    const response = await new RetryingAwsClient(signed, 3).fetch('https://example.com');
     expect(response.status).toBe(429);
     expect(fetch).toHaveBeenCalledTimes(3);
   });
@@ -76,7 +78,7 @@ describe('RetryingAwsClient', () => {
     const withRetryAfter = new Response('slow down', { status: 429, headers: { 'Retry-After': '2' } });
     const { fetch, signed } = scriptedClient(withRetryAfter, new Response('ok', { status: 200 }));
 
-    const pending = new RetryingAwsClient(signed as never, 3).fetch('https://example.com');
+    const pending = new RetryingAwsClient(signed, 3).fetch('https://example.com');
     // The first retry must not fire before the requested 2s.
     await vi.advanceTimersByTimeAsync(1500);
     expect(fetch).toHaveBeenCalledOnce();
@@ -91,7 +93,7 @@ describe('RetryingAwsClient', () => {
     // is deterministic: `jitter` returns `max / 2`, turning the exponential
     // window into an observable 50ms then 100ms.
     const delays: number[] = [];
-    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) } as never, 3, 100, (max: number) =>
+    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) }, 3, 100, (max: number) =>
       Math.floor(max / 2),
     );
     const spy = vi.spyOn(globalThis, 'setTimeout');
@@ -109,7 +111,7 @@ describe('RetryingAwsClient', () => {
 
   it('keeps every jittered delay inside its exponential window', async () => {
     // The real `cryptoJitter` must never exceed the window it is given.
-    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) } as never, 3, 100);
+    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) }, 3, 100);
     const delays: number[] = [];
     const spy = vi.spyOn(globalThis, 'setTimeout');
     spy.mockImplementation(((handler: () => void, ms?: number) => {
@@ -163,7 +165,7 @@ describe('StsService retries throttled calls', () => {
       .mockResolvedValueOnce(new Response('Throttling', { status: 429 }))
       .mockResolvedValueOnce(new Response(ASSUME_XML, { status: 200 }));
 
-    const pending = new StsService((() => ({ fetch })) as never).assumeRole('arn:aws:iam::123456789012:role/Dev', {
+    const pending = new StsService((() => ({ fetch }))).assumeRole('arn:aws:iam::123456789012:role/Dev', {
       accessKeyId: 'AKIA',
       secretAccessKey: 'secret',
     }, 'session');
@@ -176,7 +178,7 @@ describe('StsService retries throttled calls', () => {
   it('surfaces a persistent AccessDenied rather than retrying it', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
     await expect(
-      new StsService((() => ({ fetch })) as never).assumeRole(
+      new StsService((() => ({ fetch }))).assumeRole(
         'arn:aws:iam::123456789012:role/Dev',
         { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
         'session',

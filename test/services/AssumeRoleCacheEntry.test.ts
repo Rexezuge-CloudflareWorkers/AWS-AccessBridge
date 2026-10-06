@@ -4,6 +4,17 @@ import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import type { CredentialChain } from '@aws-access-bridge/shared/model';
 
+/**
+ * The cache encryption key, passed as the **list** the API takes.
+ *
+ * `CredentialsCacheDAO`'s second parameter is `readonly string[]` — keys to try in
+ * preference order — and all three call sites here passed only `{}`, with `as never`
+ * suppressing the arity error. The tests still passed because each one asserts that
+ * nothing was written, so the decryption loop never ran; the constructor was simply
+ * being called with the wrong shape and nothing noticed.
+ */
+const CACHE_KEY = '0123456789abcdef0123456789abcdef';
+
 vi.mock('@aws-access-bridge/backend-services/aws/sts');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsCacheDAO');
 
@@ -16,7 +27,9 @@ function db(): never {
   return { prepare: () => chain } as never;
 }
 
-/** target -> Mid -> base. Only `Mid` is an intermediate the cache is allowed to hold. */
+/**
+target -> Mid -> base. Only `Mid` is an intermediate the cache is allowed to hold.
+*/
 const CHAIN: CredentialChain = {
   principalArns: [TARGET, MID, BASE],
   accessKeyId: 'AKIA',
@@ -46,9 +59,9 @@ describe('AssumeRoleService.assumeRoleChain cache entries', () => {
       secretAccessKey: 'shh',
       // No sessionToken, but a valid expiration.
       expiration: '2099-01-01T00:00:00Z',
-    } as never);
+    });
 
-    await service().assumeRoleChain(new CredentialsCacheDAO({} as never), CHAIN, 1, CHAIN as never, 'FEDERATED');
+    await service().assumeRoleChain(new CredentialsCacheDAO({} as unknown as KVNamespace, [CACHE_KEY]), CHAIN, 1, CHAIN, 'FEDERATED');
 
     expect(CredentialsCacheDAO.prototype.storeCachedCredential).not.toHaveBeenCalled();
   });
@@ -59,9 +72,9 @@ describe('AssumeRoleService.assumeRoleChain cache entries', () => {
       secretAccessKey: 'shh',
       sessionToken: 'tok',
       expiration: '2099-01-01T00:00:00Z',
-    } as never);
+    });
 
-    await service().assumeRoleChain(new CredentialsCacheDAO({} as never), CHAIN, 1, CHAIN as never, 'FEDERATED');
+    await service().assumeRoleChain(new CredentialsCacheDAO({} as unknown as KVNamespace, [CACHE_KEY]), CHAIN, 1, CHAIN, 'FEDERATED');
 
     expect(CredentialsCacheDAO.prototype.storeCachedCredential).toHaveBeenCalledWith(
       expect.objectContaining({ principalArn: MID, sessionToken: 'tok' }),
@@ -75,9 +88,9 @@ describe('AssumeRoleService.assumeRoleChain cache entries', () => {
       accessKeyId: 'ASIA',
       secretAccessKey: 'shh',
       sessionToken: 'tok',
-    } as never);
+    });
 
-    await service().assumeRoleChain(new CredentialsCacheDAO({} as never), CHAIN, 1, CHAIN as never, 'FEDERATED');
+    await service().assumeRoleChain(new CredentialsCacheDAO({} as unknown as KVNamespace, [CACHE_KEY]), CHAIN, 1, CHAIN, 'FEDERATED');
 
     expect(CredentialsCacheDAO.prototype.storeCachedCredential).not.toHaveBeenCalled();
   });

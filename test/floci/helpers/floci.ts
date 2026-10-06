@@ -17,14 +17,20 @@ import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { defaultAwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
 import type { AwsClientFactory, AwsClientOptions, AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
 
-/** Where the emulator is expected. Overridable so CI can move the port. */
+/**
+Where the emulator is expected. Overridable so CI can move the port.
+*/
 const FLOCI_ENDPOINT: string = process.env.FLOCI_ENDPOINT ?? 'http://127.0.0.1:4566';
 
-/** Emulator boot budget. Floci starts in milliseconds; this only absorbs pull time. */
+/**
+Emulator boot budget. Floci starts in milliseconds; this only absorbs pull time.
+*/
 const READY_TIMEOUT_MS = 60_000;
 const READY_POLL_MS = 500;
 
-/** How to start the emulator, quoted verbatim in the probe's failure message. */
+/**
+How to start the emulator, quoted verbatim in the probe's failure message.
+*/
 const START_HINT: string = 'docker run --rm -p 4566:4566 floci/floci:latest';
 
 /**
@@ -38,7 +44,9 @@ const ACCOUNT_A = '111111111111';
 const ACCOUNT_B = '222222222222';
 const SECRET = 'floci-smoke-secret';
 
-/** Throwaway credentials for one Floci account. No session token: these are the chain's leaf. */
+/**
+Throwaway credentials for one Floci account. No session token: these are the chain's leaf.
+*/
 function accountKeys(accessKeyId: string): AccessKeys {
   return { accessKeyId, secretAccessKey: SECRET };
 }

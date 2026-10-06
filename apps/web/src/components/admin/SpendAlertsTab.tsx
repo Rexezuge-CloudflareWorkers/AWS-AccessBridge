@@ -55,7 +55,7 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
         <p style={{ color: '#d1d5db', marginBottom: '24px' }}>
           {t(
             'admin.spendAlertsHint',
-            'Set up cost threshold alerts for AWS accounts. Alerts are evaluated against cost data collected by background tasks.',
+            'Set up cost threshold alerts for AWS accounts. Alerts are evaluated against cost data collected in the background.',
           )}
         </p>
         <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} onSubmit={(e) => e.preventDefault()}>

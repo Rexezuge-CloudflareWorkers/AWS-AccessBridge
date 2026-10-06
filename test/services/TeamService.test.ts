@@ -57,10 +57,19 @@ describe('TeamService', () => {
       expect(TeamsDAO.prototype.createTeam).toHaveBeenCalledWith('Platform', 'user@example.com');
     });
 
-    it.each([['', 'empty'], ['   ', 'whitespace only'], [undefined, 'absent']])('rejects a %s team name (%s)', async (name) => {
-      await expect(service().createTeam(name as string, 'user@example.com')).rejects.toThrow(BadRequestError);
-      expect(TeamsDAO.prototype.createTeam).not.toHaveBeenCalled();
-    });
+    // Annotated as a tuple array rather than left to inference. Without it `it.each`
+    // infers a *union of tuples* — `[string, string] | [undefined, string]` — and a
+    // single-parameter callback is not assignable to a union of arities, so the row
+    // values never reached the parameter at all. `name as string` below is what the
+    // `undefined` row is actually testing, so the cast moves to the table where the
+    // `undefined` is visible.
+    it.each<[string, string]>([['', 'empty'], [' '.repeat(3), 'whitespace only'], [undefined as unknown as string, 'absent']])(
+      'rejects a %s team name (%s)',
+      async (name) => {
+        await expect(service().createTeam(name, 'user@example.com')).rejects.toThrow(BadRequestError);
+        expect(TeamsDAO.prototype.createTeam).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('deleteTeam', () => {
@@ -98,7 +107,7 @@ describe('TeamService', () => {
     it.each([
       ['', 'New Name'],
       ['team-1', ''],
-      ['team-1', '   '],
+      ['team-1', ' '.repeat(3)],
     ])('rejects teamId=%p name=%p', async (teamId, name) => {
       await expect(service().updateTeamName(teamId, name)).rejects.toThrow(BadRequestError);
       expect(TeamsDAO.prototype.updateTeamName).not.toHaveBeenCalled();
@@ -119,12 +128,12 @@ describe('TeamService', () => {
     it('resolves the stable account id when the registry has a row', async () => {
       // With a registry row the write must be keyed on `user_id`, so the
       // membership survives an address change.
-      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_abc', is_verified: 1, created_at: 1 } as never);
+      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_abc', is_verified: 1, created_at: 1 });
       vi.mocked(UserMetadataDAO.prototype.getById).mockResolvedValue({
         id: 'usr_abc',
         user_email: 'user@example.com',
         current_email: 'user@example.com',
-      } as never);
+      });
       await service().addMember('team-1', 'user@example.com');
       expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', { userId: 'usr_abc', anchorEmail: 'user@example.com' }, 'member');
     });
@@ -132,8 +141,8 @@ describe('TeamService', () => {
     it('does NOT resolve a revoked address to its previous holder', async () => {
       // A revoked registry row must not fall through to the metadata lookup, or a
       // reassigned address would keep authenticating the previous account.
-      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_old', is_verified: 0, created_at: 1 } as never);
-      vi.mocked(UserMetadataDAO.prototype.getByAnchor).mockResolvedValue({ id: 'usr_old', user_email: 'user@example.com' } as never);
+      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_old', is_verified: 0, created_at: 1 });
+      vi.mocked(UserMetadataDAO.prototype.getByAnchor).mockResolvedValue({ id: 'usr_old', user_email: 'user@example.com' });
 
       await service().addMember('team-1', 'user@example.com');
 
@@ -222,11 +231,19 @@ describe('TeamService', () => {
       await expect(service().listAccounts('team-1')).resolves.toEqual(['123456789012']);
     });
 
-    it.each([
-      ['addAccount', ''],
-      ['addAccount', '123456789012'],
-      ['removeAccount', ''],
-      ['removeAccount', '123456789012'],
+    // Three columns, because the callback takes three arguments and the title has three
+    // placeholders. The table supplied **two**, so `accountId` was always `undefined`
+    // whatever the row said — which is why this read as a test of "a missing field" while
+    // only ever testing a missing *team id*, and why the parameters were implicitly `any`:
+    // the row arity and the callback arity did not agree, so neither could be checked.
+    //
+    // Each method now appears twice with the field that is missing named, which is what
+    // the title claims.
+    it.each<[string, string, string]>([
+      ['addAccount', '', '123456789012'],
+      ['addAccount', 'team-1', ''],
+      ['removeAccount', '', '123456789012'],
+      ['removeAccount', 'team-1', ''],
     ])('%s(%p, %p) rejects a missing field', async (method, teamId, accountId) => {
       const call = service()[method as 'addAccount' | 'removeAccount'].bind(service());
       await expect(call(teamId, accountId)).rejects.toThrow(BadRequestError);

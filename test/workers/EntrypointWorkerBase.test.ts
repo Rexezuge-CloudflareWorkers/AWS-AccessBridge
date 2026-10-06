@@ -53,7 +53,9 @@ describe('AbstractEntrypointWorker', () => {
         throw new Error('kaput');
       }
       protected async onScheduled(): Promise<void> {
-        /* unused */
+        /*
+        unused
+        */
       }
     }
     const response = await new BoomWorker().fetch(new Request('https://worker.example.com/'), createEnv(), createExecutionContext());

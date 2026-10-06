@@ -33,7 +33,7 @@ describe('ConsoleService.buildIssuerUrl', () => {
     expect(url.searchParams.get('role')).toBe(roleName);
     // The injected text stayed inside the `role` value instead of becoming a
     // sibling parameter.
-    expect([...url.searchParams.keys()]).toEqual(['awsAccountId', 'role']);
+    expect(url.searchParams.keys().toArray()).toEqual(['awsAccountId', 'role']);
   });
 
   it('preserves an IAM path in the role name', () => {

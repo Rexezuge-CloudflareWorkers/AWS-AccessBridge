@@ -38,7 +38,9 @@ const repoFiles: MigrationFile[] = [
  */
 const kinds = (result: { findings: { kind: string }[] }): string[] => result.findings.map((finding) => finding.kind);
 
-/** `kinds` for a `parseLock` result, which returns the findings directly. */
+/**
+`kinds` for a `parseLock` result, which returns the findings directly.
+*/
 const parseKinds = (raw: string | null): string[] => parseLock(raw).findings.map((finding) => finding.kind);
 
 describe('parseLock', () => {

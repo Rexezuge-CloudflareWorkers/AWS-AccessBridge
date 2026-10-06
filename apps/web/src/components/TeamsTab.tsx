@@ -156,8 +156,8 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
               if (!selectedTeamId) return;
               void run(
                 () => updateMemberRoleInHook(selectedTeamId, email, role),
-                t('teams.roleUpdated', 'Member role updated successfully'),
-                t('teams.roleUpdateFailed', 'Failed to update member role'),
+                t('teams.roleUpdated', 'Role updated successfully'),
+                t('teams.roleUpdateFailed', 'Failed to update role'),
               );
             }}
           />

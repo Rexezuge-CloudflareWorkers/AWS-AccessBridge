@@ -24,8 +24,7 @@ function createMockKv(stored: Record<string, string> = {}) {
   return {
     get: vi.fn(async (key: string, type?: string) => {
       const value = data.get(key) ?? null;
-      if (value !== null && type === 'json') return JSON.parse(value);
-      return value;
+      return value !== null && type === 'json' ? JSON.parse(value) : value;
     }),
     put: vi.fn(async (key: string, value: string) => {
       data.set(key, value);
@@ -54,7 +53,13 @@ describe('CredentialsCacheDAO', () => {
   });
 
   it('returns undefined for missing entries', async () => {
-    const dao = new CredentialsCacheDAO(createMockKv(), '0123456789abcdef0123456789abcdef');
+    // An **array**, like every other construction in this file. The second argument is
+    // `readonly string[]` — keys to try in preference order — and this one call passed
+    // the bare string. It passed anyway, and that is the finding: a string is iterable,
+    // so the key list silently became 32 one-character keys, and the assertion only
+    // survived because a *missing* entry never reaches the decryption loop. The test
+    // looked like it covered decryption and covered none of it.
+    const dao = new CredentialsCacheDAO(createMockKv(), ['0123456789abcdef0123456789abcdef']);
     await expect(dao.getCachedCredential('arn:missing')).resolves.toBeUndefined();
   });
 
@@ -100,6 +105,10 @@ describe('AuditLogDAO', () => {
           path: '/user/aws/assume-role',
           status_code: 200,
           detail: null,
+          // A documentation-reserved address as a *logged value*. This is the payload of
+          // an audit row being queried, not a host anything connects to, which is what
+          // the rule is guarding.
+          // eslint-disable-next-line sonarjs/no-hardcoded-ip
           ip_address: '1.2.3.4',
           user_agent: 'ua',
         },

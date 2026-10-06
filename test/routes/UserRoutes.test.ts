@@ -38,7 +38,7 @@ describe('user profile routes', () => {
     vi.mocked(UserMetadataDAO.prototype.isSuperAdmin).mockResolvedValue(false);
     vi.mocked(UserMetadataDAO.prototype.getPreferredLanguage).mockResolvedValue('de');
     const c = createRouteContext({ url: 'https://example.com/user/me' });
-    await new GetCurrentUserRoute({} as never).handle(c as never);
+    await new GetCurrentUserRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'user@example.com', isSuperAdmin: false, preferredLanguage: 'de' }),
     );
@@ -46,7 +46,7 @@ describe('user profile routes', () => {
 
   it('PUT /user/me stores the language preference', async () => {
     const c = createRouteContext({ method: 'PUT', body: { preferredLanguage: 'ja' }, url: 'https://example.com/user/me' });
-    await new UpdateCurrentUserRoute({} as never).handle(c as never);
+    await new UpdateCurrentUserRoute({} as never).handle(c);
     expect(UserMetadataDAO.prototype.updatePreferredLanguage).toHaveBeenCalledWith('user@example.com', 'ja');
     expect(c.json).toHaveBeenCalledWith({ success: true, preferredLanguage: 'ja' });
   });
@@ -63,13 +63,13 @@ describe('assumables routes', () => {
       '123456789012': { roles: ['Dev'], nickname: 'dev', favorite: false },
     });
     const c = createRouteContext({ url: 'https://example.com/user/assumables?limit=10&offset=0' });
-    await new ListAssumablesRoute({} as never).handle(c as never);
+    await new ListAssumablesRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ totalAccounts: 2 }));
   });
 
   it('GET /user/assumables/search requires a query', async () => {
     const c = createRouteContext({ url: 'https://example.com/user/assumables/search' });
-    await new SearchAccountsRoute({} as never).handle(c as never);
+    await new SearchAccountsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 
@@ -78,7 +78,7 @@ describe('assumables routes', () => {
       '123456789012': { roles: ['Dev'], nickname: 'dev', favorite: true },
     });
     const c = createRouteContext({ url: 'https://example.com/user/assumables/search?q=dev' });
-    await new SearchAccountsRoute({} as never).handle(c as never);
+    await new SearchAccountsRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ '123456789012': expect.anything() }));
   });
 
@@ -86,7 +86,7 @@ describe('assumables routes', () => {
     vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
     vi.mocked(AssumableRolesDAO.prototype.hideRole).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012', roleName: 'Dev' } });
-    await new HideRoleRoute({} as never).handle(c as never);
+    await new HideRoleRoute({} as never).handle(c);
     expect(AssumableRolesDAO.prototype.hideRole).toHaveBeenCalledWith(
       { userId: null, anchorEmail: 'user@example.com' },
       '123456789012',
@@ -99,7 +99,7 @@ describe('assumables routes', () => {
     vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
     vi.mocked(AssumableRolesDAO.prototype.unhideRole).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012', roleName: 'Dev' } });
-    await new UnhideRoleRoute({} as never).handle(c as never);
+    await new UnhideRoleRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith({ success: true });
   });
 });
@@ -113,7 +113,7 @@ describe('favorites routes', () => {
     vi.mocked(AwsAccountsDAO.prototype.ensureAccountExists).mockResolvedValue(undefined);
     vi.mocked(UserFavoriteAccountsDAO.prototype.favoriteAccount).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012' } });
-    await new FavoriteAccountRoute({} as never).handle(c as never);
+    await new FavoriteAccountRoute({} as never).handle(c);
     expect(AwsAccountsDAO.prototype.ensureAccountExists).toHaveBeenCalledWith('123456789012');
     expect(c.json).toHaveBeenCalledWith({ success: true });
   });
@@ -121,7 +121,7 @@ describe('favorites routes', () => {
   it('DELETE /user/favorites unfavorites', async () => {
     vi.mocked(UserFavoriteAccountsDAO.prototype.unfavoriteAccount).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012' } });
-    await new UnfavoriteAccountRoute({} as never).handle(c as never);
+    await new UnfavoriteAccountRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith({ success: true });
   });
 });
@@ -136,7 +136,7 @@ describe('token routes', () => {
       { tokenId: 't1', userEmail: 'user@example.com', name: 'ci', createdAt: 1, expiresAt: 2, lastUsedAt: undefined },
     ]);
     const c = createRouteContext({ url: 'https://example.com/user/tokens' });
-    await new ListTokensRoute({} as never).handle(c as never);
+    await new ListTokensRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ tokens: expect.any(Array) }));
   });
 
@@ -144,7 +144,7 @@ describe('token routes', () => {
     vi.mocked(UserAccessTokenDAO.prototype.getByUserEmail).mockResolvedValue([]);
     vi.mocked(UserAccessTokenDAO.prototype.create).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { name: 'ci', expiresInDays: 7 } });
-    await new CreateTokenRoute({} as never).handle(c as never);
+    await new CreateTokenRoute({} as never).handle(c);
     expect(UserAccessTokenDAO.prototype.create).toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ name: 'ci' }));
   });
@@ -162,18 +162,18 @@ describe('token routes', () => {
     );
     vi.mocked(UserAccessTokenDAO.prototype.countActiveByUserEmail).mockResolvedValue(5);
     const c = createRouteContext({ method: 'POST', body: { name: 'extra' } });
-    await new CreateTokenRoute({} as never).handle(c as never);
+    await new CreateTokenRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 
   it('DELETE /user/tokens removes tokens and requires an id', async () => {
     vi.mocked(UserAccessTokenDAO.prototype.delete).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'DELETE', body: { tokenId: 't1' } });
-    await new DeleteTokenRoute({} as never).handle(c as never);
+    await new DeleteTokenRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith({ success: true });
 
     const missing = createRouteContext({ method: 'DELETE', body: {} });
-    await new DeleteTokenRoute({} as never).handle(missing as never);
+    await new DeleteTokenRoute({} as never).handle(missing);
     expect(missing.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'BadRequest' }) }), 400);
   });
 });
