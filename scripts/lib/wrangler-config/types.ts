@@ -11,6 +11,13 @@ export const CONFIG_PATH = path.join(process.cwd(), 'wrangler.jsonc');
 export const TEMPLATE_PATH = path.join(process.cwd(), 'apps/api/wrangler.template.jsonc');
 
 /**
+ * The template path as written in error messages. `TEMPLATE_PATH` is absolute and
+ * rooted at whatever `cwd` a test happens to run in, which is useless to whoever
+ * reads a CI log.
+ */
+export const TEMPLATE_LABEL = 'apps/api/wrangler.template.jsonc';
+
+/**
  * The id `apps/api/wrangler.template.jsonc` carries for a D1 database that does
  * not exist yet. `provisionWranglerResources` replaces it with a real id;
  * `resolveD1Target` refuses to export while it is still in place, because a
@@ -35,6 +42,23 @@ export const DEFAULT_KV_NAMESPACE_NAMES: Record<string, string> = {
 };
 
 /**
+ * Template bindings the config is not required to carry.
+ *
+ * `AES_ENCRYPTION_KEY_SECRET` is the legacy read-only fallback, documented as
+ * droppable once every row has been rewritten (`docs/agents/runtime/AGENTS.md`),
+ * and a config that has finished migrating must not be told to add it back.
+ */
+export const OPTIONAL_TEMPLATE_KEYS: ReadonlySet<string> = new Set(['AES_ENCRYPTION_KEY_SECRET']);
+
+/**
+ * Template bindings `provisionWranglerResources` injects on its own.
+ *
+ * `ensureRequiredKvBindings` adds any of `DEFAULT_KV_NAMESPACE_NAMES` that a config
+ * omits, so requiring one here would report a gap that is about to be filled.
+ */
+export const PROVISIONED_TEMPLATE_KEYS: ReadonlySet<string> = new Set(Object.keys(DEFAULT_KV_NAMESPACE_NAMES));
+
+/**
  * `vars` is widened with `null` on purpose: jsonc-parser yields `null` for an
  * explicit `vars: null`, and the vars-patch path must be able to reject that
  * rather than treat the field as absent.
@@ -50,6 +74,14 @@ export interface WranglerConfig {
   kv_namespaces?: Array<{
     binding?: string;
     id?: string;
+  }>;
+  durable_objects?: {
+    bindings?: Array<{
+      name?: string;
+    }>;
+  };
+  services?: Array<{
+    binding?: string;
   }>;
   secrets_store_secrets?: Array<{
     binding?: string;

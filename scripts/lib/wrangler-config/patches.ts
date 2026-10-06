@@ -119,28 +119,6 @@ export function prepareConfigFile(): void {
 }
 
 /**
- * Refuses to deploy a config older than the template requires.
- *
- * A stale `wrangler.jsonc` carried over from an older deploy can omit bindings
- * the current worker needs; failing here names the fix instead of letting the
- * deploy fail later against a live environment.
- */
-export function ensureMinimumConfigVersion(): void {
-  const template = parse(readFileSync(TEMPLATE_PATH, 'utf8')) as { $minimumVersion?: unknown };
-  if (typeof template.$minimumVersion !== 'number') {
-    return;
-  }
-  const { config } = readConfig();
-  const currentVersion = (config as { $version?: unknown }).$version;
-  if (typeof currentVersion !== 'number' || currentVersion < template.$minimumVersion) {
-    throw new Error(
-      `wrangler.jsonc version (${typeof currentVersion === 'number' ? currentVersion : 'missing'}) is below minimum template version (${template.$minimumVersion}). Regenerate it from apps/api/wrangler.template.jsonc.`,
-    );
-  }
-  console.log(`Config version ${currentVersion} meets minimum ${template.$minimumVersion}.`);
-}
-
-/**
  * Merges `WRANGLER_VARS_PATCH_JSON` into `wrangler.jsonc`'s `vars` section.
  */
 export function applyVarsPatch(): void {

@@ -10,16 +10,20 @@
  */
 
 import { setOutput } from '../lib/github-actions';
-import { applyTopLevelPatch, applyVarsPatch, ensureMinimumConfigVersion, prepareConfigFile } from '../lib/wrangler-config/patches';
+import { applyTopLevelPatch, applyVarsPatch, prepareConfigFile } from '../lib/wrangler-config/patches';
 import { provisionWranglerResources } from '../lib/wrangler-config/resources';
+import { ensureConfigCoversTemplate } from '../lib/wrangler-config/template-coverage';
 
-// Order matters: the file must exist before it can be patched, the version
-// check must see the template's floor, and resources are provisioned last so
-// they see the patched values.
+// Order matters: the file must exist before it can be patched, and coverage is
+// checked after both patches so a var supplied by `WRANGLER_VARS_PATCH_JSON`
+// counts the same as one carried in the file. Resources are provisioned last so
+// they see the patched values — and after the check, so a config that cannot
+// deploy never creates a D1 database, KV namespace, or Secrets Store on the way
+// to finding out.
 prepareConfigFile();
-ensureMinimumConfigVersion();
 applyTopLevelPatch();
 applyVarsPatch();
+ensureConfigCoversTemplate();
 const created = provisionWranglerResources();
 
 // Published as a step output rather than only printed. `export-d1` in the backup
