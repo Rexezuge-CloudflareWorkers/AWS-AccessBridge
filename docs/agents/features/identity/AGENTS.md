@@ -1,6 +1,6 @@
 # User Identity
 
-Scope: the decoupled account key, the frozen email anchor, the address registry, and changing a sign-in address. Parent index: `../../../AGENTS.md`. Schema rationale: `../../../packages/backend-data/AGENTS.md`. Apply notes: `../../runtime/AGENTS.md`.
+Scope: the decoupled account key, the frozen email anchor, the address registry, and changing a sign-in address. Parent index: [`../../../../AGENTS.md`](../../../../AGENTS.md). Service code: [`../../../../packages/backend-services/AGENTS.md`](../../../../packages/backend-services/AGENTS.md). Schema rationale: [`../../../../packages/backend-data/AGENTS.md`](../../../../packages/backend-data/AGENTS.md). Apply notes: [`../../runtime/AGENTS.md`](../../runtime/AGENTS.md).
 
 ## Model
 

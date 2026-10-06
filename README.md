@@ -36,14 +36,15 @@ AWS AccessBridge is a pnpm monorepo deploying a Cloudflare Worker API, a cron Du
 
 ### Team Workspaces
 
-- Multi-tenant **teams** with admin/member roles.
-- Scope AWS accounts to specific teams so only team members see them.
+- Multi-tenant **teams** with `admin`/`member` roles recorded per member.
+- Associate AWS accounts with teams, and manage members and account membership per team.
 - Per-team admin controls for member and account membership.
+- _(Membership is recorded and displayed, not enforced: which accounts a user sees is driven by per-user role grants plus superadmin. See [`docs/agents/features/teams/AGENTS.md`](./docs/agents/features/teams/AGENTS.md).)_
 
 ### Cost & Resource Insights
 
 - **Cost dashboard** — daily/weekly/monthly spend by account, trend charts, and total-spend cards powered by AWS Cost Explorer.
-- **Spend alerts** — configurable thresholds that notify when an account crosses a dollar limit.
+- **Spend alerts** — configurable per-account thresholds, stored and managed in the admin tab. _(Thresholds are stored; no evaluator or notifier runs yet — see [`docs/agents/features/cost-analytics/AGENTS.md`](./docs/agents/features/cost-analytics/AGENTS.md).)_
 - **Resource inventory** — paginated, filterable view of EC2 instances, S3 buckets, Lambda functions, RDS databases, and DynamoDB tables across every connected account, refreshed in the background.
 - **Per-account collection toggles** — enable or disable cost/resource collection per account.
 
@@ -152,7 +153,7 @@ pnpm exec tsx scripts/deploy/init-secrets.ts
 
 This script reads `wrangler.jsonc` and creates any declared secret that does not yet exist, generating a cryptographically strong value for each. Re-running it is a no-op — it skips any secret that already exists.
 
-On the **first** run after an upgrade it does one extra thing: `aws-access-bridge-credential-encryption-key` and `aws-access-bridge-credential-cache-encryption-key` are *seeded with the value `aws-access-bridge-aes-encryption-key` already had*, rather than generated independently. That is what makes the per-feature key split non-breaking — no key material changes hands, and rows written under the old single key stay readable. Both per-feature bindings then serve as the read fallback for legacy rows, and new writes always use the surface's own key. A genuinely fresh install has no legacy key to copy, so each surface simply gets its own.
+On the **first** run after an upgrade it does one extra thing: `aws-access-bridge-credential-encryption-key` and `aws-access-bridge-credential-cache-encryption-key` are _seeded with the value `aws-access-bridge-aes-encryption-key` already had_, rather than generated independently. That is what makes the per-feature key split non-breaking — no key material changes hands, and rows written under the old single key stay readable. Both per-feature bindings then serve as the read fallback for legacy rows, and new writes always use the surface's own key. A genuinely fresh install has no legacy key to copy, so each surface simply gets its own.
 
 If you'd rather generate the secrets yourself:
 
@@ -206,11 +207,13 @@ When the vars are set they always take precedence; when unset, requests authenti
 pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
 ```
 
-You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql`. Re-running is safe.
+You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql` and `0032_user_identity.sql`. Re-running is safe.
 
 Once a migration has been applied, **do not edit it** — D1 records the filename, not the file's contents, so it would never re-apply your change and production would keep the old schema. `migrations/migrations.lock.json` records a checksum per migration and CI fails on drift. After adding a migration, run `pnpm run migrations:lock` to record it. The squashed baseline (`0030_squash.sql`) is exempt, since rewriting it is what a squash is.
 
 `0031` adds `salt_secret_access_key` and `salt_session_token` to `credentials`. Every encrypted field now gets its own AES-GCM IV instead of sharing one (nonce reuse leaks the XOR of the plaintexts and enables authentication-tag forgery). **No backfill is required**: existing rows keep their shared `salt` and are read with it, then rewritten with distinct IVs the next time a credential is stored. The same applies to the KV credential cache, whose entries simply expire.
+
+`0032` decouples the sign-in address from the account key: `user_metadata.id` (`usr_<hex>`) becomes the stable account key every user-keyed table points at, `current_email` holds the address a user signs in with today, and a `user_emails` registry maps addresses to accounts. `user_email` stays as a frozen anchor because live foreign keys still target it. It is purely additive and the code tolerates a database without it (reads fall back to address lookups), but apply it before or with the deploy that first relies on `user_id`. Accounts whose address collides case-insensitively with another's are deliberately left unresolved — find them with `SELECT user_email FROM user_metadata WHERE current_email IS NULL`.
 
 ### Step 6. Build and deploy
 
@@ -379,27 +382,28 @@ After the first account, you can repeat for additional accounts from the same Ad
 
 ## Environment Variables
 
-All of these live in `wrangler.jsonc` under `vars`. Defaults come from `packages/backend-runtime/src/config/ConfigurationDefaults.ts` and are read via `ConfigurationManager` namespaces.
+All of these live in `wrangler.jsonc` under `vars`. Defaults come from `packages/backend-runtime/src/config/ConfigurationDefaults.ts` and are read via `ConfigurationManager` namespaces. `INVENTORY_REGIONS` is the only one with no code default — an empty value means "use the built-in list", so blanking it cannot silently disable collection.
 
-| Variable                                          | Purpose                                                                                                                                                                                            | Default   |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `POLICY_AUD`                                      | Zero Trust Application Audience tag. **Optional when Worker-level Access is enabled** (platform identity is used instead); required for self-hosted or cross-account (Cloudflare for SaaS) setups. | —         |
-| `TEAM_DOMAIN`                                     | Zero Trust team domain (e.g. `https://acme.cloudflareaccess.com`). **Optional** — same conditions as `POLICY_AUD`.                                                                                 | —         |
-| `MAX_TOKENS_PER_USER`                             | How many active Personal Access Tokens a user can hold.                                                                                                                                            | `5`       |
-| `MAX_TOKEN_EXPIRY_DAYS`                           | Max expiry a user can set on a PAT.                                                                                                                                                                | `90`      |
-| `PRINCIPAL_TRUST_CHAIN_LIMIT`                     | Max depth of role assumption chain.                                                                                                                                                                | `3`       |
-| `AUDIT_LOG_RETENTION_DAYS`                        | How long to keep audit log entries.                                                                                                                                                                | `90`      |
-| `BACKGROUND_TASK_RUN_RETENTION_DAYS`              | How long to keep background task-run records.                                                                                                                                                      | `30`      |
-| `PRUNE_BATCH_SIZE`                                | Rows deleted per prune batch.                                                                                                                                                                      | `500`     |
-| `NUMBER_OF_CREDENTIALS_TO_REFRESH`                | Max cached credentials refreshed per cycle.                                                                                                                                                        | `10`      |
-| `CREDENTIAL_REFRESH_INTERVAL_MINUTES`             | Background refresh interval for stale cached credentials.                                                                                                                                          | `45`      |
-| `COST_COLLECTION_INTERVAL_HOURS`                  | Background Cost Explorer collection interval.                                                                                                                                                      | `6`       |
-| `COST_LOOKBACK_DAYS`                              | Days of cost history fetched per collection.                                                                                                                                                       | `30`      |
-| `RESOURCE_COLLECTION_INTERVAL_HOURS`              | Background resource inventory collection interval.                                                                                                                                                 | `2`       |
-| `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` | HMAC timestamp replay window for internal self-calls.                                                                                                                                              | `1000`    |
-| `DEMO_MODE`                                       | When `"true"`, all admin write operations are blocked. Safe for public demos.                                                                                                                      | `"false"` |
-| `ENVIRONMENT`                                     | Only the literal `"production"` arms the `DEV_AUTH_EMAIL` guard. Set it on every real deployment.                                                                                                 | `"development"` |
-| `DEV_AUTH_EMAIL`                                  | Local-only auth bypass. **Refused** when `ENVIRONMENT` is `"production"`.                                                                                                                        | —         |
+| Variable                                          | Purpose                                                                                                                                                                                                        | Default         |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `POLICY_AUD`                                      | Zero Trust Application Audience tag. **Optional when Worker-level Access is enabled** (platform identity is used instead); required for self-hosted or cross-account (Cloudflare for SaaS) setups.             | —               |
+| `TEAM_DOMAIN`                                     | Zero Trust team domain (e.g. `https://acme.cloudflareaccess.com`). **Optional** — same conditions as `POLICY_AUD`.                                                                                             | —               |
+| `MAX_TOKENS_PER_USER`                             | How many active Personal Access Tokens a user can hold.                                                                                                                                                        | `5`             |
+| `MAX_TOKEN_EXPIRY_DAYS`                           | Max expiry a user can set on a PAT.                                                                                                                                                                            | `90`            |
+| `PRINCIPAL_TRUST_CHAIN_LIMIT`                     | Max depth of role assumption chain.                                                                                                                                                                            | `3`             |
+| `AUDIT_LOG_RETENTION_DAYS`                        | How long to keep audit log entries.                                                                                                                                                                            | `90`            |
+| `BACKGROUND_TASK_RUN_RETENTION_DAYS`              | How long to keep background task-run records.                                                                                                                                                                  | `30`            |
+| `PRUNE_BATCH_SIZE`                                | Rows deleted per prune batch.                                                                                                                                                                                  | `500`           |
+| `NUMBER_OF_CREDENTIALS_TO_REFRESH`                | Max cached credentials refreshed per cycle.                                                                                                                                                                    | `10`            |
+| `CREDENTIAL_REFRESH_INTERVAL_MINUTES`             | Background refresh interval for stale cached credentials.                                                                                                                                                      | `45`            |
+| `COST_COLLECTION_INTERVAL_HOURS`                  | Background Cost Explorer collection interval.                                                                                                                                                                  | `6`             |
+| `COST_LOOKBACK_DAYS`                              | Days of cost history fetched per collection.                                                                                                                                                                   | `30`            |
+| `RESOURCE_COLLECTION_INTERVAL_HOURS`              | Background resource inventory collection interval.                                                                                                                                                             | `2`             |
+| `INVENTORY_REGIONS`                               | Comma-separated AWS regions the resource inventory sweeps. Empty falls back to the built-in commercial-region list. Set it to trim the list and cut collection calls per account; S3 is global and ignores it. | `""`            |
+| `INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` | HMAC timestamp replay window for internal self-calls.                                                                                                                                                          | `1000`          |
+| `DEMO_MODE`                                       | When `"true"`, all admin write operations are blocked. Safe for public demos.                                                                                                                                  | `"false"`       |
+| `ENVIRONMENT`                                     | Only the literal `"production"` arms the `DEV_AUTH_EMAIL` guard. Set it on every real deployment.                                                                                                              | `"development"` |
+| `DEV_AUTH_EMAIL`                                  | Local-only auth bypass. **Refused** when `ENVIRONMENT` is `"production"`.                                                                                                                                      | —               |
 
 ---
 
@@ -449,22 +453,27 @@ pnpm exec wrangler dev --config ./wrangler.jsonc   # Local Cloudflare Workers ru
 
 Useful scripts (see root `package.json` and `apps/web/package.json`):
 
-| Command                                          | What it does                                                                |
-| ------------------------------------------------ | --------------------------------------------------------------------------- |
-| `pnpm run checks`                                | Typecheck all workspaces + lint + migrations + locales + unit + integration |
-| `pnpm -r typecheck`                              | Type-check every workspace                                                  |
-| `pnpm run lint`                                  | ESLint autofix (`--fix --quiet`)                                            |
-| `pnpm run prettier`                              | Prettier format                                                             |
-| `pnpm run test` / `pnpm run test:coverage`       | Run the vitest suite, optionally with coverage                              |
-| `pnpm run test:integration`                      | Run the Workers integration suite                                           |
-| `pnpm --filter @aws-access-bridge/web run build` | Build the SPA with Vite (also embeds it into the API worker)                |
-| `pnpm run typegen`                               | Regenerate `worker-configuration.d.ts` from the API template                |
+| Command                                          | What it does                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `pnpm run checks`                                | The full gate: typecheck + lint + god-files + migrations + locales + SPA shell, then coverage and integration |
+| `pnpm run typecheck`                             | Type-check every workspace, plus `scripts/**` and `functions/**`                                              |
+| `pnpm run lint`                                  | ESLint autofix (`--fix --quiet`)                                                                              |
+| `pnpm run prettier`                              | Prettier format                                                                                               |
+| `pnpm run test` / `pnpm run test:coverage`       | Run the vitest suite, optionally with coverage                                                                |
+| `pnpm run check:coverage-floor`                  | Per-file coverage floors for the 23 load-bearing files                                                        |
+| `pnpm run test:integration`                      | Run the Workers integration suite                                                                             |
+| `pnpm run test:floci`                            | AWS parser smoke tests against a local emulator (needs the container)                                         |
+| `pnpm run validate:migrations`                   | Verify no applied migration has been edited                                                                   |
+| `pnpm run validate:locales`                      | Verify the 12 web locale bundles agree                                                                        |
+| `pnpm --filter @aws-access-bridge/web run build` | Build the SPA with Vite (also embeds it into the API worker)                                                  |
+| `pnpm run verify:spa-shell`                      | Check the embedded shell is a real build, not the postinstall stub                                            |
+| `pnpm run typegen`                               | Regenerate `worker-configuration.d.ts` from the API template                                                  |
 
 ---
 
 ## Documentation
 
-- **[`AGENTS.md`](./AGENTS.md)** — architecture, endpoint inventory, database layout, scheduled tasks, and everything else an LLM agent or new contributor needs to navigate the codebase.
+- **[`AGENTS.md`](./AGENTS.md)** — the agent/contributor index. Every area of the codebase has a scoped guide behind it: [`docs/agents/repo`](./docs/agents/repo/AGENTS.md) (workspace, commands, gates), [`docs/agents/runtime`](./docs/agents/runtime/AGENTS.md) (bindings, env vars, migrations, backups), [`docs/agents/testing`](./docs/agents/testing/AGENTS.md) (the suite and its thresholds), one per app ([`api`](./apps/api/AGENTS.md), [`web`](./apps/web/AGENTS.md), [`background`](./apps/background/AGENTS.md)) and package ([`backend-data`](./packages/backend-data/AGENTS.md), [`backend-services`](./packages/backend-services/AGENTS.md)), and one per feature under [`docs/agents/features/`](./docs/agents/features/) (assume-role, credential chains, cost analytics, resource inventory, teams, user identity).
 - **[Database Backup, Restore, and Time Travel](./docs/db-backup-recovery.md)** — the daily D1 backup workflow, its secrets, and how to get your data back.
 - **OpenAPI docs** — the running worker serves interactive API docs at **`/docs`**.
 

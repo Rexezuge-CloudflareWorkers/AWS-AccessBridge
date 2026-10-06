@@ -1,15 +1,68 @@
 # AWS-AccessBridge — Background Worker
 
-Scope: `apps/background/**`. Parent index: `../../AGENTS.md`.
+Scope: `apps/background/**`. Parent index: `../../AGENTS.md`. Workspace and layer rules: [`../../docs/agents/repo/AGENTS.md`](../../docs/agents/repo/AGENTS.md).
 
-- `CronTasksWorker.ts` — DO serializing cron in two phases via `scheduled/TaskRegistry.ts` (`tasksForPhase(1|2)`; add tasks there, not in the worker):
-  - Phase 1 (parallel): `CredentialCacheRefreshTask` (user-facing freshness first; pre-warms the *intermediate* hops of each due chain — `principalArns[0]` is the target role and the last entry is the base IAM user, so neither is cacheable — and bumps `last_cached_at` once per principal after the walk, so a one-hop chain with nothing to cache still leaves the batch)
-  - Phase 2 (parallel): `AuditLogCleanupTask`, `BackgroundTaskRunPruningTask`, `CostDataCollectionTask`, `ResourceInventoryCollectionTask` (prunes stale rows only for collector types that did not throw — see `BaseAwsCollector`)
-- Shared scheduled bases: `IScheduledTask` (Template Method + automatic `background_task_runs` tracking for tasks overriding `getTaskType()` and returning a `TaskRunSummary`; `createTaskRunDAO` Factory-Method seam for tests), `AbstractPruningTask` (Template Method for retention pruning: `getRetentionDays` + `pruneBatch` abstract, cutoff + batched loop in base; both cleanup tasks extend it), `AbstractCollectionTask` (Template Method for per-account collection: `collectionType`/`maxAccountsPerCollection`/`collectionIntervalHours`/`sessionName` + `collectForAccount` abstract; `CostDataCollectionTask` + `ResourceInventoryCollectionTask` extend it).
-- `scheduled/TaskRegistry.ts` — composite phase registry (`CRON_TASK_DEFINITIONS`); append a definition to add a task.
-- Tasks compose `backend-services`: `CredentialService` (chain resolution, `resolveLeafCredentials` chain walk), `StsService`, `CostExplorerService`, `CollectorRegistry` (resource fan-out over all registered collectors), `ConfigurationManager` (`credential`/`costs`/`resource`/`audit`/`processing` namespaces — no `parseInt(env.X || DEFAULT)` inline).
-- Retention/batch tunables live in `ConfigurationDefaults.ts` and are read via `ConfigurationManager` (`AUDIT_LOG_RETENTION_DAYS`, `BACKGROUND_TASK_RUN_RETENTION_DAYS`, `COST_COLLECTION_INTERVAL_HOURS`, `COST_LOOKBACK_DAYS`, `RESOURCE_COLLECTION_INTERVAL_HOURS`, `NUMBER_OF_CREDENTIALS_TO_REFRESH`, `CREDENTIAL_REFRESH_INTERVAL_MINUTES`).
+`src/index.ts` re-exports `CronTasksWorker`; `apps/api/src/index.ts` re-exports it again for the DO
+binding. There is **no** HTTP trigger for the cron pipeline — `AbstractEntrypointWorker` routes every
+request to the Hono app — so the scheduled path is reachable only from Cloudflare's
+`triggers.crons`.
 
-## Background Task Visibility
+## The two phases
 
-`GET /user/admin/maintenance/task-runs` (`BackgroundTaskRunDAO.listRuns`, optional `taskType`/`status`/`limit`) exposes cron run history. Retention: `BACKGROUND_TASK_RUN_RETENTION_DAYS` (default 30, `ConfigurationDefaults.ts`), pruned by `BackgroundTaskRunPruningTask`.
+`CronTasksWorker` serializes the cron into two phases via `scheduled/TaskRegistry.ts`. Adding a task
+means appending a definition to `CRON_TASK_DEFINITIONS`, not editing the worker.
+
+| Phase | Task                              | Job                                                                                                                   |
+| ----- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1     | `CredentialCacheRefreshTask`      | pre-assume the _intermediate_ hops of each due chain into KV; bump `last_cached_at` once per principal after the walk |
+| 2     | `AuditLogCleanupTask`             | prune `audit_log` past `AUDIT_LOG_RETENTION_DAYS`                                                                     |
+| 2     | `BackgroundTaskRunPruningTask`    | prune `background_task_runs` past `BACKGROUND_TASK_RUN_RETENTION_DAYS`                                                |
+| 2     | `CostDataCollectionTask`          | Cost Explorer, 3 accounts/invocation                                                                                  |
+| 2     | `ResourceInventoryCollectionTask` | resource sweep, 2 accounts/invocation                                                                                 |
+
+User-facing freshness first: refreshing the credential cache is what makes the next interactive
+assume-role fast, and running it before the collection tasks means those tasks hit a warm chain.
+
+## The three template bases
+
+| Base                     | Abstract members                                                                                            | Extended by                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `IScheduledTask`         | `handleScheduledTask`                                                                                       | every task; also writes `background_task_runs` for any task overriding `getTaskType()` and returning a `TaskRunSummary` |
+| `AbstractPruningTask`    | `getRetentionDays`, `pruneBatch`                                                                            | `AuditLogCleanupTask`, `BackgroundTaskRunPruningTask`                                                                   |
+| `AbstractCollectionTask` | `collectionType`, `maxAccountsPerCollection`, `collectionIntervalHours`, `sessionName`, `collectForAccount` | `CostDataCollectionTask`, `ResourceInventoryCollectionTask`                                                             |
+
+`IScheduledTask.createTaskRunDAO` is a Factory-Method seam so a test can substitute the run recorder.
+
+`AbstractCollectionTask` advances a principal's collection interval **only when `collectForAccount`
+reported data**. An account that returned nothing stays due and is retried on the next tick rather
+than silently skipped for the whole interval.
+
+## Services come from the composition root, with a fresh scope per run
+
+Every task resolves its collaborators through `createRequestScope(env).get(Tokens.X)` — never
+`new XService(env)`. The tokens actually used are `CredentialChainService` and `StsService` (phase 1),
+`CostExplorerService` (cost collection) and `CollectorRegistry` (inventory collection).
+
+**A fresh scope per run, not `getRequestScope`.** A Durable Object's `env` is stable for the object's
+lifetime, so a cached scope would pin the memoized encryption keys in `composition/encryptionKeys.ts`
+and the cron would keep using the old key after a rotation. The request-path reason for keying on
+the Hono context instead of `env` does not apply here — there is no context.
+
+Retention and batch tunables are read through `ConfigurationManager` namespaces
+(`credential`, `costs`, `resource`, `audit`, `processing`), never `parseInt(env.X || DEFAULT)`
+inline. See [`../../docs/agents/runtime/AGENTS.md`](../../docs/agents/runtime/AGENTS.md) for the
+variable table.
+
+Per-account failures are isolated: one unresolvable chain, one denied account, or one malformed AWS
+body must not abort the remaining principals or accounts in the batch. Each is caught, counted in
+`itemsFailed`, and the run still reports.
+
+## Visibility
+
+`GET /user/admin/maintenance/task-runs` exposes cron history via `BackgroundTaskRunDAO.listRuns`,
+with optional `taskType`, `status` and `limit`. `MaintenanceService.listTaskRuns` clamps the limit —
+`Pagination` lives in `backend-runtime` (Layer 1), so the clamp belongs in the Layer 3 service rather
+than in its Layer 2 DAO. Retention is `BACKGROUND_TASK_RUN_RETENTION_DAYS` (default 30), pruned by
+`BackgroundTaskRunPruningTask` in `PRUNE_BATCH_SIZE` chunks.
+
+Frontend: the `MaintenanceTab` admin tab.
