@@ -55,9 +55,23 @@ const AwsRoleNameSchema = nonEmptyStringSchema('roleName', 128);
 const AwsAccessKeyIdSchema = nonEmptyStringSchema('accessKeyId', 128);
 const AwsSecretAccessKeySchema = nonEmptyStringSchema('secretAccessKey', 512);
 const AwsSessionTokenSchema = nonEmptyStringSchema('sessionToken', 8192).optional();
-const AwsDestinationPathSchema = nonEmptyStringSchema('destinationPath', 2048)
-  .refine((value: string): boolean => !/^[a-z][a-z0-9+.-]*:\/\//i.test(value), 'destinationPath must be a console path, not a URL.')
-  .optional();
+/**
+ * A console path, not a URL.
+ *
+ * The scheme check requires only `scheme:`, not `scheme://`. Requiring the double
+ * slash let `javascript:alert(1)` through — the classic bypass of an `://` test —
+ * even though this field's whole purpose is to reject URLs. `buildDestination`
+ * currently prefixes an https origin, so the value is not directly executable
+ * today; the check is strict anyway because that safety currently rests on a
+ * string concatenation two files away, and `javascript:` costs nothing to reject.
+ *
+ * A legitimate console path never starts with a scheme — `ec2/home#Instances`,
+ * `s3/buckets/<name>`, `lambda/home#/functions/<name>` — so nothing valid is lost.
+ */
+const AwsDestinationPathSchema = nonEmptyStringSchema('destinationPath', 2048).refine(
+  (value: string): boolean => !/^[a-z][a-z0-9+.-]*:/i.test(value),
+  'destinationPath must be a console path, not a URL.',
+).optional();
 const AwsRegionSchema = z.string().regex(AWS_REGION_PATTERN, 'destinationRegion must be a valid AWS region.').optional();
 const AwsRoleSessionDurationSecondsSchema = z
   .number()
