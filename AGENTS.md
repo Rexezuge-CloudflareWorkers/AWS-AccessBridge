@@ -35,7 +35,7 @@ AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace
 
 ## Commands
 
-Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run typecheck && pnpm run lint && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration`. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
+Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run checks:fast` (typecheck, lint, god-files, migrations, locales, SPA shell) then `test:coverage`, `check:coverage-floor` and `test:integration`. `check:coverage-floor` pins per-file line/branch floors on the 23 files carrying the auth boundary, request validation, credential encryption, data integrity, the background pipeline, routing and logging — an aggregate can be met while one of those rots, which is how `MiddlewareHandlers` sat at 61.5% branch while the total looked healthy. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
 
 ```bash
 pnpm install
