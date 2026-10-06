@@ -8,21 +8,29 @@ function pagedClient(...pages: Array<Response | Error>) {
   const bodies: string[] = [];
   let index = 0;
   const fetch = vi.fn((_url: string, init?: RequestInit) => {
-    if (init?.body) {
-      bodies.push(String(init.body));
+    // Narrowed rather than `String(...)`-coerced: `RequestInit.body` is a union, and
+    // stringifying the non-string members yields a misleading `'[object Object]'`
+    // that reads like a passed assertion.
+    const body: unknown = init?.body;
+    if (typeof body === 'string') {
+      bodies.push(body);
     }
     const next = pages[index++];
-    if (next instanceof Error) {
-      return Promise.reject(next);
-    }
-    return Promise.resolve(next);
+    return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
   });
   return { bodies, clientFactory: vi.fn().mockReturnValue({ fetch }), fetch };
 }
 
+/**
+The request body recorded for the `n`th call; `''` when there was none.
+*/
+function bodyOf(bodies: string[], index: number): string {
+  return bodies[index] ?? '';
+}
+
 function page(start: string, groups: Record<string, string>, nextPageToken?: string): Response {
-  return new Response(
-    JSON.stringify({
+  return Response.json(
+    {
       ResultsByTime: [
         {
           TimePeriod: { Start: start, End: `${start}T23:59:59Z` },
@@ -32,8 +40,8 @@ function page(start: string, groups: Record<string, string>, nextPageToken?: str
           })),
         },
       ],
-      ...(nextPageToken ? { NextPageToken: nextPageToken } : {}),
-    }),
+      ...(nextPageToken && { NextPageToken: nextPageToken }),
+    },
     { status: 200, headers: { 'Content-Type': 'application/x-amz-json-1.1' } },
   );
 }
@@ -55,9 +63,9 @@ describe('CostExplorerClient pagination', () => {
 
     expect(results.map((r) => r.periodStart)).toEqual(['2025-01-01', '2025-01-02']);
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(bodies[0]).not.toContain('NextPageToken');
-    expect(bodies[1]).toContain('NextPageToken');
-    expect(bodies[1]).toContain('tok-1');
+    expect(bodyOf(bodies, 0)).not.toContain('NextPageToken');
+    expect(bodyOf(bodies, 1)).toContain('NextPageToken');
+    expect(bodyOf(bodies, 1)).toContain('tok-1');
   });
 
   it('totals every page, so a multi-page breakdown is not under-reported', async () => {

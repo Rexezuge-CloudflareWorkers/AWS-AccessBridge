@@ -18,7 +18,9 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 
-/** Line/branch percentage floors, keyed by path suffix so the check survives moves. */
+/**
+Line/branch percentage floors, keyed by path suffix so the check survives moves.
+*/
 const FLOORS = [
   // --- Authentication and the internal trust boundary -------------------------
   { branch: 60, file: 'apps/api/src/middleware/MiddlewareHandlers.ts', line: 80 },
@@ -65,7 +67,9 @@ if (!existsSync(LCOV)) {
   process.exit(1);
 }
 
-/** @returns {{line: number, branch: number, found: boolean}} */
+/**
+@returns {{line: number, branch: number, found: boolean}}
+*/
 function coverageFor(lcov, suffix) {
   const result = { branch: 100, found: false, line: 100 };
   for (const block of lcov.split('end_of_record')) {
@@ -76,17 +80,18 @@ function coverageFor(lcov, suffix) {
     let total = 0;
     let branchesCovered = 0;
     let branchesTotal = 0;
-    for (const [, ln, hits] of block.matchAll(/^DA:(\d+),(\d+)/gm)) {
+    // Index 1 is the hit count; the line number is not needed here.
+    for (const record of block.matchAll(/^DA:\d+,(\d+)/gm)) {
       total += 1;
-      if (hits !== '0') covered += 1;
+      if (record[1] !== '0') covered += 1;
     }
     for (const match of block.matchAll(/^BRDA:(\d+),(\d+),(\d+),(\d+|-)/gm)) {
       branchesTotal += 1;
       if (match[4] !== '0' && match[4] !== '-') branchesCovered += 1;
     }
     result.found = true;
-    result.line = total === 0 ? 100 : Math.floor((covered / total) * 10000) / 100;
-    result.branch = branchesTotal === 0 ? 100 : Math.floor((branchesCovered / branchesTotal) * 10000) / 100;
+    result.line = total === 0 ? 100 : Math.floor((covered / total) * 10_000) / 100;
+    result.branch = branchesTotal === 0 ? 100 : Math.floor((branchesCovered / branchesTotal) * 10_000) / 100;
   }
   return result;
 }
