@@ -4,6 +4,7 @@ import { ASSUME_ROLE_UTIL_ERROR_STS_CALL, ASSUME_ROLE_UTIL_ERROR_STS_RESPONSE_PA
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 
+import { log } from '@aws-access-bridge/shared/utils';
 interface CallerIdentity {
   arn: string;
   accountId: string;
@@ -46,7 +47,7 @@ class StsClient {
     const xmlText: string = await response.text();
 
     if (!response.ok) {
-      console.error(`STS AssumeRole failed: ${response.status} ${response.statusText}\n${xmlText}`);
+      log.error(`STS AssumeRole failed: ${response.status} ${response.statusText}\n${xmlText}`);
       throw new UnauthorizedError(ASSUME_ROLE_UTIL_ERROR_STS_CALL);
     }
 

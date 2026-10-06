@@ -3,6 +3,7 @@ import type { UserMetadataInternal } from '@aws-access-bridge/shared/model';
 import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 /**
  * A row of `user_metadata`, including the identity columns added by migration
  * 0032. `user_email` is the frozen anchor and `current_email` the mutable
@@ -51,9 +52,7 @@ class UserMetadataDAO extends BaseDAO {
         .bind(userEmail)
         .run();
     }
-    if (!result.success) {
-      throw new DatabaseError(`Failed to ensure user email exists: ${result.error}`);
-    }
+    assertD1Success(result, `ensure user email exists`);
   }
 
   /**
@@ -96,9 +95,7 @@ class UserMetadataDAO extends BaseDAO {
       .prepare('UPDATE user_metadata SET current_email = ? WHERE id = ?')
       .bind(currentEmail.toLowerCase(), userId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to set current email: ${result.error}`);
-    }
+    assertD1Success(result, `set current email`);
   }
 
   public async isSuperAdmin(userEmail: string): Promise<boolean> {
@@ -123,9 +120,7 @@ class UserMetadataDAO extends BaseDAO {
       .prepare('UPDATE user_metadata SET preferred_language = ? WHERE user_email = ?')
       .bind(preferredLanguage, userEmail)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to update preferred language: ${result.error}`);
-    }
+    assertD1Success(result, `update preferred language`);
   }
 
   public async getOrCreateFederationUsername(userEmail: string): Promise<string> {

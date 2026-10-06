@@ -1,9 +1,9 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { TeamMember, TeamMemberInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 import { ownerClause } from './AssumableRolesQueries';
 
+import { assertD1Success } from '../utils/D1Utils';
 /**
  * Who a user-keyed `team_members` statement is about.
  *
@@ -32,9 +32,7 @@ class TeamMembersDAO extends BaseDAO {
       .prepare('INSERT OR IGNORE INTO team_members (team_id, user_email, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)')
       .bind(teamId, owner.anchorEmail, owner.userId, role, joinedAt)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to add team member: ${result.error}`);
-    }
+    assertD1Success(result, `add team member`);
   }
 
   public async removeMember(teamId: string, owner: TeamMemberOwner): Promise<void> {
@@ -42,9 +40,7 @@ class TeamMembersDAO extends BaseDAO {
       .prepare(`DELETE FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`)
       .bind(teamId, owner.userId, owner.anchorEmail)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to remove team member: ${result.error}`);
-    }
+    assertD1Success(result, `remove team member`);
   }
 
   public async isTeamAdmin(teamId: string, owner: TeamMemberOwner): Promise<boolean> {
@@ -109,9 +105,7 @@ class TeamMembersDAO extends BaseDAO {
       .prepare(`UPDATE team_members SET role = ? WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`)
       .bind(newRole, teamId, owner.userId, owner.anchorEmail)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to update team member role: ${result.error}`);
-    }
+    assertD1Success(result, `update team member role`);
   }
 }
 

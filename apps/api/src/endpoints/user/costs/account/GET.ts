@@ -6,6 +6,7 @@ import type { CostData } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAccountCostResponse, GetAccountCostEnv> {
   schema = {
     tags: ['Cost'],
@@ -99,82 +100,10 @@ class GetAccountCostRoute extends IActivityAPIRoute<GetAccountCostRequest, GetAc
           },
         },
       },
-      '400': {
-        description: 'Bad request - Missing required parameter',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'BadRequestError' },
-                    Message: { type: 'string' as const, example: 'Missing required parameter: awsAccountId.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User does not have access to this account',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'ForbiddenError' },
-                    Message: { type: 'string' as const, example: 'You do not have access to this account.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while fetching cost data',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'Failed to retrieve account cost data.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Bad request - Missing required parameter'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User does not have access to this account'),
+      '500': internalServerErrorResponse('Internal server error while fetching cost data'),
     },
     security: [{ CloudflareAccess: [] }],
   };

@@ -1,7 +1,7 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 class UserFavoriteAccountsDAO extends BaseDAO {
   /**
    * Mark an account favourited.
@@ -20,9 +20,7 @@ class UserFavoriteAccountsDAO extends BaseDAO {
       )
       .bind(anchorEmail, userId, awsAccountId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to favorite account: ${result.error}`);
-    }
+    assertD1Success(result, `favorite account`);
   }
 
   public async unfavoriteAccount(userEmail: string, awsAccountId: string, userId: string | null = null): Promise<void> {
@@ -31,9 +29,7 @@ class UserFavoriteAccountsDAO extends BaseDAO {
       .prepare(`DELETE FROM user_favorite_accounts WHERE ${clause} AND aws_account_id = ?`)
       .bind(...bindings, awsAccountId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to unfavorite account: ${result.error}`);
-    }
+    assertD1Success(result, `unfavorite account`);
   }
 
   /**

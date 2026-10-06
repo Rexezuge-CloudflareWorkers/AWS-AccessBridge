@@ -1,5 +1,5 @@
 export type { AccessableAccount, AccessableAccountInternal } from './AccessableAccount';
-export type { AccessKeysResponse, AssumablesResponse } from './AccessBridge';
+export type { AccessKeysResponse } from './AccessBridge';
 export type { BackgroundTaskRun, BackgroundTaskRunInternal, BackgroundTaskRunStatus } from './BackgroundTaskRun';
 export type { AccessKeys, AccessKeysWithExpiration } from './AccessKeys';
 export type { AssumableRole, AssumableRoleInternal } from './AssumableRoles';

@@ -3,7 +3,7 @@ import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, UUIDUtil, log } from '@aws-access-bridge/shared/utils';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';
@@ -48,7 +48,7 @@ class TokenService {
         defer(stampLastUsed);
       } else {
         await stampLastUsed.catch((error: unknown) => {
-          console.error('Failed to update token last-used timestamp:', error instanceof Error ? error.message : error);
+          log.error('Failed to update token last-used timestamp', { error });
         });
       }
       if (tokenData.userId) {

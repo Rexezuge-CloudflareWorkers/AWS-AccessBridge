@@ -3,6 +3,7 @@ import type { AuditEvent } from './AuditEventBuilder';
 import type { IAuditObserver } from './AuditObserver';
 import { AuditLogObserver } from './AuditObserver';
 
+import { log } from '@aws-access-bridge/shared/utils';
 /**
  * Injectable observer registry (Otter `IntegrationObserverRegistry`
  * precedent). `AuditService` keeps its `Promise.allSettled` fan-out but
@@ -40,7 +41,7 @@ public async notifyAll(event: AuditEvent): Promise<void> {
     const results = await Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
     for (const result of results) {
       if (result.status === 'rejected') {
-        console.error('Audit observer failed to record an event:', result.reason instanceof Error ? result.reason.message : result.reason);
+        log.error('Audit observer failed to record an event:', { error: result.reason instanceof Error ? result.reason.message : result.reason });
       }
     }
   }

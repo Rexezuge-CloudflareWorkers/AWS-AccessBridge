@@ -43,7 +43,9 @@ describe('BaseAwsCollector failure signalling', () => {
   it('throws AwsCollectionError on a non-OK response instead of resolving empty', async () => {
     const { clientFactory, fetch } = factoryReturning(new Response('denied', { status: 403 }));
     await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toBeInstanceOf(AwsCollectionError);
-    expect(fetch).toHaveBeenCalledWith('https://s3.amazonaws.com/');
+    // `list-type=2` is what makes the listing paginatable; the V1 listing
+    // (the default when `list-type` is absent) cannot be continued at all.
+    expect(fetch).toHaveBeenCalledWith('https://s3.amazonaws.com/?list-type=2');
   });
 
   it('throws for the JSON-protocol collectors too', async () => {

@@ -1,6 +1,7 @@
 import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-runtime/base';
 import { tasksForPhase } from '@aws-access-bridge/background/scheduled';
 
+import { log } from '@aws-access-bridge/shared/utils';
 const CRON_TASKS_RUN_PATH: string = '/run';
 
 interface CronTasksRunRequest {
@@ -30,7 +31,7 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
       await run;
       return Response.json({ status: 'completed' });
     } catch (err: unknown) {
-      console.error('Cron task run failed:', err);
+      log.error('Cron task run failed:', { error: err });
       return Response.json({ status: 'failed' }, { status: 500 });
     } finally {
       if (this.currentRun === run) {
@@ -61,7 +62,7 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
       // is exactly what someone needs to see in a production log tail. A debug
       // line is invisible there, and the empty fallback still lets the run proceed
       // with a synthesized cron expression — so the failure has to be visible.
-      console.warn('Cron trigger body was not valid JSON; falling back to defaults:', error instanceof Error ? error.message : error);
+      log.warn('Cron trigger body was not valid JSON; falling back to defaults:', { error: error instanceof Error ? error.message : error });
       return {};
     }
   }

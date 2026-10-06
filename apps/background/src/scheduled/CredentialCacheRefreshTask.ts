@@ -1,9 +1,9 @@
 import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import type { CredentialChainService } from '@aws-access-bridge/backend-services/credential';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import type { StsService } from '@aws-access-bridge/backend-services/aws/sts';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
@@ -26,9 +26,13 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
     // A fresh scope per run, not `getRequestScope`: a Durable Object's `env` is
     // stable for the object's lifetime, so a cached scope would pin the memoized
     // encryption keys and the cron would keep using the old key after a rotation.
-    const chainService = createRequestScope(env).get(Tokens.CredentialChainService);
+    const scope = createRequestScope(env);
+    const chainService = scope.get(Tokens.CredentialChainService);
     const credentialsCacheDAO = await chainService.createCacheDAO();
-    const sts = new StsService();
+    // Resolved from the scope rather than constructed directly, so the composition
+    // root stays the single place services are built — a test can substitute the
+    // STS client through the token instead of the global being unreachable.
+    const sts = scope.get(Tokens.StsService);
     const principalArns: string[] = await credentialCacheConfigDAO.getPrincipalArnsNeedingUpdate(refreshBatchSize, cutoffTime);
     let refreshedCount: number = 0;
     let failedCount: number = 0;
@@ -41,7 +45,7 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
         refreshedCount += refreshedForPrincipal;
       } catch (error: unknown) {
         failedCount += 1;
-        console.error(`[CredentialCacheRefreshTask] Failed to refresh ${principalArn}:`, error);
+        log.error(`[CredentialCacheRefreshTask] Failed to refresh ${principalArn}:`, { error: error });
       }
     }
     return {

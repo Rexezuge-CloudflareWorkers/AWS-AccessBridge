@@ -5,4 +5,4 @@ export interface AccessKeysResponse {
   expiration: string;
 }
 
-export type AssumablesResponse = Record<string, string[]>;
+

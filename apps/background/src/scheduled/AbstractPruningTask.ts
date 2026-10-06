@@ -1,4 +1,4 @@
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
@@ -28,7 +28,7 @@ abstract class AbstractPruningTask<TEnv extends IEnv> extends IScheduledTask<TEn
       deletedInBatch = await this.pruneBatch(db, cutoff, batchSize);
       totalDeleted += deletedInBatch;
     }
-    console.log(`[${this.constructor.name}] Pruned ${totalDeleted} rows older than ${retentionDays} days`);
+    log.info(`[${this.constructor.name}] Pruned ${totalDeleted} rows older than ${retentionDays} days`);
     return { itemsProcessed: totalDeleted, itemsFailed: 0, summary: `Pruned ${totalDeleted} rows older than ${retentionDays} days` };
   }
 }

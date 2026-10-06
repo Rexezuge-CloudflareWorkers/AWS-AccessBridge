@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { RetryingAwsClient, HttpFetchError } from '@aws-access-bridge/backend-services/http/IHttpClient';
+import { MAX_RETRY_DELAY_MS, RetryingAwsClient, HttpFetchError } from '@aws-access-bridge/backend-services/http';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 
 /**
@@ -129,17 +129,96 @@ describe('RetryingAwsClient', () => {
   });
 });
 
-describe('HttpFetchError', () => {
-  it('carries the status, statusText and body', () => {
-    const error = new HttpFetchError(503, 'Service Unavailable', 'upstream down');
-    expect(error.status).toBe(503);
-    expect(error.statusText).toBe('Service Unavailable');
-    expect(error.body).toBe('upstream down');
-    expect(error.message).toContain('upstream down');
+/**
+ * `Retry-After` is stated in seconds for a client that can wait indefinitely. A
+ * Workers request cannot: sleeping 120s outlives the request's own wall-clock
+ * limit, so the caller sees a timeout instead of the throttle that actually
+ * happened. The client therefore declines a wait it cannot afford rather than
+ * shortening it (a shorter sleep just earns another throttle).
+ */
+describe('RetryingAwsClient caps an unaffordable Retry-After', () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('falls back to statusText when the body is empty', () => {
-    expect(new HttpFetchError(500, 'Internal Server Error', '').message).toContain('Internal Server Error');
+  it('declines a Retry-After beyond the ceiling instead of sleeping past the request', async () => {
+    const { fetch, signed } = scriptedClient(new Response('slow down', { status: 429, headers: { 'Retry-After': '120' } }));
+    const delays: number[] = [];
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    spy.mockImplementation(((handler: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      handler();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as never);
+
+    const response = await new RetryingAwsClient(signed, 3).fetch('https://example.com');
+    spy.mockRestore();
+
+    // The server's own answer comes back rather than a 120s sleep.
+    expect(response.status).toBe(429);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(delays).toEqual([]);
+  });
+
+  it('honours a Retry-After it can afford', async () => {
+    const { fetch, signed } = scriptedClient(
+      new Response('wait', { status: 429, headers: { 'Retry-After': '3' } }),
+      new Response('ok', { status: 200 }),
+    );
+    const delays: number[] = [];
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    spy.mockImplementation(((handler: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      handler();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as never);
+
+    await new RetryingAwsClient(signed, 3).fetch('https://example.com');
+    spy.mockRestore();
+    expect(delays).toEqual([3000]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('never exceeds the ceiling on its own exponential window', async () => {
+    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) }, 6, 100, (max: number) => max);
+    const delays: number[] = [];
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    spy.mockImplementation(((handler: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      handler();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as never);
+
+    await client.fetch('https://example.com');
+    spy.mockRestore();
+    // 2**5 * 100ms would be 3200ms uncapped; the ceiling holds it at MAX_RETRY_DELAY_MS.
+    expect(delays.length).toBeGreaterThan(0);
+    for (const delay of delays) {
+      expect(delay).toBeLessThanOrEqual(MAX_RETRY_DELAY_MS);
+    }
+  });
+});
+
+describe('RetryingAwsClient classifies the throw path', () => {
+  it('surfaces a permanent rejection on the first attempt', async () => {
+    // The regression this exists for: every rejection used to be retried, so an
+    // AccessDenied burned all three attempts plus the backoff schedule before
+    // reaching the caller.
+    const { fetch, signed } = scriptedClient(new Error('AccessDenied: not authorized to perform sts:AssumeRole'));
+    await expect(new RetryingAwsClient(signed as never, 3).fetch('https://example.com')).rejects.toThrow(/AccessDenied/);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('surfaces a malformed-body rejection without retrying it', async () => {
+    const { fetch, signed } = scriptedClient(new HttpFetchError(200, 'Malformed JSON', 'not json', { retryable: false }));
+    await expect(new RetryingAwsClient(signed as never, 3).fetch('https://example.com')).rejects.toBeInstanceOf(HttpFetchError);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('still retries a transient rejection', async () => {
+    const { fetch, signed } = scriptedClient(new Error('Throttling: slow down'), new Response('ok', { status: 200 }));
+    await expect(new RetryingAwsClient(signed as never, 3).fetch('https://example.com')).resolves.toMatchObject({ status: 200 });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
 

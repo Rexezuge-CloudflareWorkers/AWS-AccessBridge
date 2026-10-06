@@ -4,6 +4,7 @@ import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backe
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type AccessAuthEnv = ServiceEnv;
 
 // Minimal structural view of the Workers runtime ExecutionContext when
@@ -36,7 +37,7 @@ class AccessAuthService {
       if (ConfigurationManager.environment.isProduction(this.env)) {
         throw new InternalServerError('DEV_AUTH_EMAIL is set in a production environment. Remove it and redeploy.');
       }
-      console.warn('Bypassing Cloudflare Access: DEV_AUTH_EMAIL is set. This is only safe outside production.');
+      log.warn('Bypassing Cloudflare Access: DEV_AUTH_EMAIL is set. This is only safe outside production.');
       return this.env.DEV_AUTH_EMAIL;
     }
     if (this.env.TEAM_DOMAIN && this.env.POLICY_AUD) {

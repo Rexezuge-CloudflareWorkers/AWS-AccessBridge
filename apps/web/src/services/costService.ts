@@ -1,4 +1,4 @@
-import { readJson, throwForResponse } from '../lib/api';
+import { apiRequest } from '../lib/api';
 
 interface CostSummary {
   accounts: Record<string, { totalCost: number; currency: string }>;
@@ -16,19 +16,11 @@ interface TrendMonth {
 }
 
 async function loadSummary(): Promise<CostSummary> {
-  const summaryRes = await fetch('/user/costs/summary');
-  if (!summaryRes.ok) {
-    await throwForResponse(summaryRes, 'Failed to load cost summary');
-  }
-  return readJson<CostSummary>(summaryRes);
+  return apiRequest<CostSummary>('/user/costs/summary');
 }
 
 async function loadTrends(months = 6): Promise<TrendMonth[]> {
-  const trendsRes = await fetch(`/user/costs/trends?months=${months}`);
-  if (!trendsRes.ok) {
-    await throwForResponse(trendsRes, 'Failed to load cost trends');
-  }
-  const trendsData = await readJson<{ months: TrendMonth[] }>(trendsRes);
+  const trendsData = await apiRequest<{ months: TrendMonth[] }>(`/user/costs/trends?months=${months}`);
   return trendsData.months || [];
 }
 

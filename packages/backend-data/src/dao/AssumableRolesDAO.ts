@@ -1,4 +1,4 @@
-import { DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { mapRowsToAssumableMap } from './AssumableRolesMapper';
 import type { AssumableRoleRow } from './AssumableRolesMapper';
@@ -6,6 +6,7 @@ import { buildListRolesQuery, buildSearchRolesQuery, hiddenFilterClause, ownerCl
 import { LIKEUtil } from '../utils/LIKEUtil';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 /**
  * Who a user-keyed `assumable_roles` statement is about.
  *
@@ -128,12 +129,6 @@ class AssumableRolesDAO extends BaseDAO {
   }
 
   /**
-   * Grants a user access to assume a specific role in an AWS account.
-   * @param userEmail The email address of the user.
-   * @param awsAccountId The AWS account ID.
-   * @param roleName The name of the role to grant access to.
-   */
-  /**
    * Grant an account access to assume a role.
    *
    * `user_email` keeps the anchor: it is the foreign key the schema cannot
@@ -150,9 +145,7 @@ class AssumableRolesDAO extends BaseDAO {
       )
       .bind(owner.anchorEmail, owner.userId, awsAccountId, roleName)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to grant user access to role: ${result.error}`);
-    }
+    assertD1Success(result, `grant user access to role`);
   }
 
   /**
@@ -169,9 +162,7 @@ class AssumableRolesDAO extends BaseDAO {
       )
       .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to revoke user access to role: ${result.error}`);
-    }
+    assertD1Success(result, `revoke user access to role`);
   }
 
   /**
@@ -189,9 +180,7 @@ class AssumableRolesDAO extends BaseDAO {
       )
       .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to hide role: ${result.error}`);
-    }
+    assertD1Success(result, `hide role`);
   }
 
   /**
@@ -209,9 +198,7 @@ class AssumableRolesDAO extends BaseDAO {
       )
       .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to unhide role: ${result.error}`);
-    }
+    assertD1Success(result, `unhide role`);
   }
 
   /**

@@ -6,6 +6,7 @@ import {
   DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
   DEFAULT_DEMO_MODE,
   DEFAULT_ENVIRONMENT,
+  DEFAULT_INVENTORY_REGIONS,
   DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
@@ -15,6 +16,7 @@ import {
   DEFAULT_RESOURCE_COLLECTION_INTERVAL_HOURS,
 } from './ConfigurationDefaults';
 import { EnvParser } from './EnvParser';
+import { DEFAULT_INVENTORY_REGIONS as COMMERCIAL_INVENTORY_REGIONS } from '../constants/InventoryRegions';
 
 class ConfigurationManager {
   // ─── Namespace groups ────────────────────────────────────────────────────────
@@ -52,6 +54,28 @@ class ConfigurationManager {
   public static readonly resource = {
     getCollectionIntervalHours: (env: unknown): number =>
       EnvParser.positiveInt(env, 'RESOURCE_COLLECTION_INTERVAL_HOURS', DEFAULT_RESOURCE_COLLECTION_INTERVAL_HOURS),
+    /**
+     * Regions the resource inventory sweeps.
+     *
+     * Normalised rather than taken raw, because the value is a comma-separated
+     * list an operator types and every one of these would otherwise be a silent
+     * misconfiguration: surrounding whitespace produces a request to a
+     * non-existent endpoint, an empty entry produces an unsigned request to the
+     * service root, and a duplicate multiplies the API calls per account. An
+     * unusable list falls back to the default rather than sweeping nothing.
+     */
+    getInventoryRegions: (env: unknown): string[] => {
+      const raw: string = EnvParser.string(env, 'INVENTORY_REGIONS', DEFAULT_INVENTORY_REGIONS);
+      const parsed: string[] = [
+        ...new Set(
+          raw
+            .split(',')
+            .map((region: string): string => region.trim().toLowerCase())
+            .filter((region: string): boolean => region.length > 0),
+        ),
+      ];
+      return parsed.length > 0 ? parsed : [...COMMERCIAL_INVENTORY_REGIONS];
+    },
   };
 
   public static readonly auth = {

@@ -1,4 +1,5 @@
 export { BaseDAO, EncryptedDAO } from './BaseDAO';
+export { DEFAULT_BATCH_SIZE } from './BatchSize';
 export { AssumableRolesDAO } from './AssumableRolesDAO';
 export type { AssumableRoleOwner } from './AssumableRolesDAO';
 export { mapRowsToAssumableMap } from './AssumableRolesMapper';

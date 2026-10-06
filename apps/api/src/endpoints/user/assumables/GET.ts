@@ -6,6 +6,7 @@ import { getRequestScope } from '@aws-access-bridge/backend-services/composition
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 
+import { internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListAssumablesResponse, ListAssumablesEnv> {
   schema = {
     tags: ['User'],
@@ -149,58 +150,8 @@ class ListAssumablesRoute extends IActivityAPIRoute<ListAssumablesRequest, ListA
           },
         },
       },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while retrieving roles',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Database error while retrieving assumable roles',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '500': internalServerErrorResponse('Internal server error while retrieving roles'),
     },
     security: [
       {

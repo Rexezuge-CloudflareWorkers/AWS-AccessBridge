@@ -1,8 +1,8 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { BackgroundTaskRun, BackgroundTaskRunInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 interface StartTaskRunInput {
   taskType: string;
 }
@@ -32,9 +32,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
       )
       .bind(runId, input.taskType, now, now)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to start background task run: ${result.error}`);
-    }
+    assertD1Success(result, `start background task run`);
     return runId;
   }
 
@@ -57,9 +55,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
         runId,
       )
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to complete background task run: ${result.error}`);
-    }
+    assertD1Success(result, `complete background task run`);
   }
 
   public async failRun(runId: string, errorMessage: string, partial?: Partial<CompleteTaskRunInput>): Promise<void> {
@@ -81,9 +77,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
         runId,
       )
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to fail background task run: ${result.error}`);
-    }
+    assertD1Success(result, `fail background task run`);
   }
 
   public async skipRun(runId: string, reason?: string): Promise<void> {
@@ -96,9 +90,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
       )
       .bind(reason ?? null, now, runId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to skip background task run: ${result.error}`);
-    }
+    assertD1Success(result, `skip background task run`);
   }
 
   public async listRuns(options?: ListTaskRunsOptions): Promise<BackgroundTaskRun[]> {
@@ -131,9 +123,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
       .prepare('DELETE FROM background_task_runs WHERE started_at < ?')
       .bind(cutoffTimestamp)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to delete old background task runs: ${result.error}`);
-    }
+    assertD1Success(result, `delete old background task runs`);
     return result.meta?.changes ?? 0;
   }
 
@@ -142,9 +132,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
       .prepare('DELETE FROM background_task_runs WHERE started_at < ? LIMIT ?')
       .bind(cutoffTimestamp, batchSize)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to delete old background task runs: ${result.error}`);
-    }
+    assertD1Success(result, `delete old background task runs`);
     return result.meta?.changes ?? 0;
   }
 

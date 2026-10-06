@@ -4,6 +4,7 @@ import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoint
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, SetRoleConfigResponse, SetRoleConfigEnv> {
   schema = {
     tags: ['Admin'],
@@ -131,122 +132,9 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
           },
         },
       },
-      '400': {
-        description: 'Invalid request parameters - missing required fields or malformed data',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'BadRequestError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Details about the invalid request parameters',
-                      example: 'Missing required fields.',
-                    },
-                  },
-                },
-              },
-            },
-            examples: {
-              'missing-fields': {
-                summary: 'Missing required fields',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'Missing required fields.',
-                  },
-                },
-              },
-              'invalid-account-id': {
-                summary: 'Invalid AWS Account ID',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'AWS Account ID must be exactly 12 digits.',
-                  },
-                },
-              },
-              'empty-role-name': {
-                summary: 'Empty role name',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'Role name cannot be empty.',
-                  },
-                },
-              },
-              'path-too-long': {
-                summary: 'Destination path too long',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'Destination path cannot exceed 512 characters.',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid Cloudflare Access authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during role configuration operation',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to set role configuration in database',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Invalid request parameters - missing required fields or malformed data'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid Cloudflare Access authentication'),
+      '500': internalServerErrorResponse('Internal server error during role configuration operation'),
     },
     security: [
       {

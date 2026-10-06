@@ -2,7 +2,7 @@ import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/sh
 import { StsClient, defaultAwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
 import type { AwsClientFactory } from '@aws-access-bridge/provider-clients/aws';
 import type { CallerIdentity } from '@aws-access-bridge/provider-clients/aws';
-import { RetryingAwsClient } from '../../http/IHttpClient';
+import { RetryingAwsClient } from '../../http/RetryingAwsClient';
 
 /**
  * Domain STS service (Layer 3). Thin orchestration over the raw

@@ -105,7 +105,8 @@ describe('MaintenanceService.cleanupOrphanedData', () => {
   it('logs each failure, since a 200 does not look like a failure in a log tail', async () => {
     vi.mocked(CostDataDAO.prototype.deleteOrphaned).mockRejectedValue(new Error('cost failed'));
     await new MaintenanceService(ENV).cleanupOrphanedData();
-    expect(console.error).toHaveBeenCalledWith('Orphan cleanup failed for costData:', expect.any(Error));
+    // A partial run answers 200, so the log line is the only place the failure shows.
+    expect(console.error).toHaveBeenCalledWith('[ERROR] Orphan cleanup failed for costData {"table":"costData"}');
   });
 
   it('sums distinct per-table counts, so a mis-wired total is visible', async () => {

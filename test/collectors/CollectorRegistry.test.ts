@@ -5,7 +5,12 @@ import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import type { IAwsResourceCollector } from '@aws-access-bridge/backend-services/aws/collectors';
 
 function stubCollector(resourceType: string): IAwsResourceCollector {
-  return { resourceType, collect: vi.fn().mockResolvedValue([]) };
+  return {
+    collect: vi.fn().mockResolvedValue([]),
+    collectAllRegions: vi.fn().mockResolvedValue({ failedRegions: [], items: [], succeededRegions: [] }),
+    isRegional: true,
+    resourceType,
+  };
 }
 
 describe('CollectorRegistry', () => {

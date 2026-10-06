@@ -1,5 +1,6 @@
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao';
 
+import { log } from '@aws-access-bridge/shared/utils';
 interface TaskRunSummary {
   itemsProcessed: number;
   itemsFailed: number;
@@ -31,7 +32,7 @@ abstract class IScheduledTask<TEnv extends IEnv> {
     if (taskType && db) {
       const dao = this.createTaskRunDAO(db);
       runId = await dao.startRun({ taskType }).catch((error: unknown) => {
-        console.warn(`[${this.constructor.name}] Failed to start task run record:`, error);
+        log.warn(`[${this.constructor.name}] Failed to start task run record:`, { error: error });
         return undefined;
       });
     }
@@ -41,15 +42,15 @@ abstract class IScheduledTask<TEnv extends IEnv> {
       if (runId && db) {
         const dao = this.createTaskRunDAO(db);
         await dao.succeedRun(runId, result ?? { itemsProcessed: 0, itemsFailed: 0 }).catch((error: unknown) => {
-          console.warn(`[${this.constructor.name}] Failed to mark task run succeeded:`, error);
+          log.warn(`[${this.constructor.name}] Failed to mark task run succeeded:`, { error: error });
         });
       }
     } catch (error: unknown) {
-      console.error(`[${this.constructor.name}] Uncaught error:`, error);
+      log.error(`[${this.constructor.name}] Uncaught error:`, { error: error });
       if (runId && db) {
         const dao = this.createTaskRunDAO(db);
         await dao.failRun(runId, String(error)).catch((recordError: unknown) => {
-          console.warn(`[${this.constructor.name}] Failed to mark task run failed:`, recordError);
+          log.warn(`[${this.constructor.name}] Failed to mark task run failed:`, { error: recordError });
         });
       }
       // Re-throw after recording. The run record is durable, but swallowing here

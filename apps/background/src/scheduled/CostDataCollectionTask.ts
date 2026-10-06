@@ -1,8 +1,9 @@
 import { CostDataDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { CostExplorerService } from '@aws-access-bridge/backend-services/aws/ce';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
+import { COST_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, CostData } from '@aws-access-bridge/shared/model';
 import { AbstractCollectionTask } from './AbstractCollectionTask';
 import type { CollectionTaskEnv } from './AbstractCollectionTask';
@@ -27,7 +28,7 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
   }
 
   protected sessionName(): string {
-    return 'AccessBridge-CostCollection';
+    return COST_COLLECTION_ROLE_SESSION_NAME;
   }
 
   protected override async collectForAccount(
@@ -37,7 +38,12 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
     env: CostDataCollectionTaskEnv,
   ): Promise<number> {
     const lookbackDays: number = ConfigurationManager.costs.getLookbackDays(env);
-    const costExplorer = new CostExplorerService();
+    // Resolved from the composition root rather than constructed directly: a fresh
+    // scope per run, because a Durable Object's `env` is stable for the object's
+    // lifetime and a cached scope would pin the memoized encryption keys after a
+    // rotation. Consistent with `AbstractCollectionTask`'s own scope usage.
+    const scope = createRequestScope(env);
+    const costExplorer = scope.get(Tokens.CostExplorerService);
     const costDataDAO = new CostDataDAO(env.AccessBridgeDB);
 
     const { startDate, endDate } = MoneyUtil.lookbackWindow(lookbackDays);
@@ -57,7 +63,7 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
       await costDataDAO.upsertCostData(costData);
     }
 
-    console.log(`Cost data collected for ${principalArn}: ${results.length} periods`);
+    log.info(`Cost data collected for ${principalArn}: ${results.length} periods`);
     // The number of periods written, not a constant: `AbstractCollectionTask` reads
     // this both to advance the collection interval (only when non-zero) and to fill
     // `background_task_runs.items_processed`, which was otherwise a meaningless 1.

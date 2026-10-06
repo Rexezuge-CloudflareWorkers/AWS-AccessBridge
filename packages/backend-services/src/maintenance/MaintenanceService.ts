@@ -1,3 +1,4 @@
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants/Pagination';
 import {
   AwsAccountsDAO,
   BackgroundTaskRunDAO,
@@ -12,6 +13,7 @@ import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type MaintenanceServiceEnv = ServiceEnv;
 
 interface OrphanCleanupCounts {
@@ -82,7 +84,7 @@ class MaintenanceService {
       // partial count would be worse than reporting none.
       deletedCounts[table] = 0;
       failures.push({ table, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
-      console.error(`Orphan cleanup failed for ${table}:`, result.reason);
+      log.error(`Orphan cleanup failed for ${table}`, { table });
     });
 
     const totalDeleted: number = Object.values(deletedCounts).reduce((sum, count) => sum + count, 0);
@@ -91,7 +93,10 @@ class MaintenanceService {
 
   public async listTaskRuns(options: { taskType?: string; status?: string; limit?: number }): Promise<BackgroundTaskRun[]> {
     const dao: BackgroundTaskRunDAO = new BackgroundTaskRunDAO(this.env.AccessBridgeDB);
-    return dao.listRuns({ taskType: options.taskType, status: options.status, limit: options.limit });
+    // Clamped in the service as well as at the route, because `Pagination` lives
+    // in `backend-runtime` (Layer 1) and the DAO is in `backend-data` (Layer 2),
+    // which must not import upward. The service is the layer that may.
+    return dao.listRuns({ taskType: options.taskType, status: options.status, limit: Pagination.limit(options?.limit) });
   }
 }export { MaintenanceService };
 export type { MaintenanceServiceEnv, OrphanCleanupCounts, OrphanCleanupResult };

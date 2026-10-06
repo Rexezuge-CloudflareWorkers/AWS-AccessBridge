@@ -30,7 +30,14 @@ export default defineConfig({
     // Every test here crosses a process boundary and `aws4fetch` retries a 5xx
     // up to ten times with backoff, so a chain walk can outrun the 5s default
     // on a cold emulator without anything being wrong.
-    testTimeout: 30_000,
+    //
+    // Raised from 30s because the RDS case has to do *two* AWS round trips in one
+    // test (`CreateDBInstance`, then `DescribeDBInstances`) on an emulator that is
+    // still warming up: the neighbouring EC2 test already measured 16.5s in CI on
+    // its single round trip. 30s left no margin, and a budget that flakes on a slow
+    // runner teaches everyone to ignore it. The cost of being generous here is a
+    // genuinely hung test takes twice as long to report.
+    testTimeout: 60_000,
     hookTimeout: 90_000,
     // Serialized on purpose. Most files seed distinct resource names into the
     // shared throwaway account and would tolerate running concurrently, but the
