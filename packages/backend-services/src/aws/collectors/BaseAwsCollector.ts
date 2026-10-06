@@ -5,6 +5,16 @@ import { defaultAwsClientFactory } from '../sts';
 import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
 
 /**
+ * Ceiling on pages walked per collector call.
+ *
+ * Not a correctness limit — every service here finishes in a handful of pages at
+ * its own page size. It exists so a service that keeps returning a token fails
+ * fast inside the request instead of running until the wall-clock limit, and the
+ * truncation is logged rather than silent.
+ */
+const MAX_COLLECTION_PAGES = 50;
+
+/**
  * Abstract Template base for AWS resource collectors (Strategy pattern).
  * Previously each of the 5 collectors repeated the
  * `clientFactory` ctor + `fetch → check → parse` shape.
@@ -59,6 +69,62 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
       this.assertOk(response, service, region);
       return response;
     }, service, region);
+  }
+
+  /**
+   * Walk every page of a paginated AWS list call and return the pages in order.
+   *
+   * **Why this cannot be skipped.** Every collector here read one page and called
+   * it a complete answer: EC2 caps `DescribeInstances` at 1000 instances, Lambda
+   * and DynamoDB at 100 items, RDS at 100. `ResourceInventoryCollectionTask`
+   * *prunes* previously collected rows for any type whose collector returned, so an
+   * account with more resources than fit on one page had its unreturned remainder
+   * deleted on every run — a first collection stored 1000 instances and each later
+   * run deleted the other 4000 before re-adding 1000. Reading a page is not the
+   * same as having read the list.
+   *
+   * `fetchPage` receives the token for the page it should fetch (`undefined` for
+   * the first) and returns that page plus the token AWS supplied for the next, if
+   * any. Each service spells this differently — EC2 and RDS use a Query parameter,
+   * Lambda a `Marker` query parameter, DynamoDB an `ExclusiveStartTableName` body
+   * field — so both halves are supplied by the caller rather than inferred here.
+   *
+   * A non-OK response still throws, so a denied region or a throttled page is a
+   * failure rather than a short list, and the caller's existing "denied is not
+   * empty" rule still holds.
+   */
+  protected async paginate<TPage>(
+    fetchPage: (token: string | undefined) => Promise<{ page: TPage; nextToken: string | undefined }>,
+    readNextToken: (page: TPage) => string | undefined,
+    service: string,
+    region: string,
+  ): Promise<TPage[]> {
+    const pages: TPage[] = [];
+    const seenTokens = new Set<string>();
+    let token: string | undefined;
+    let pageCount = 0;
+
+    for (;;) {
+      const { page, nextToken }: { page: TPage; nextToken: string | undefined } = await fetchPage(token);
+      pages.push(page);
+      pageCount += 1;
+
+      if (!nextToken) {
+        break;
+      }
+      // A service that keeps handing back tokens would otherwise loop until the
+      // request's own wall-clock limit. Stop with what was read and say so —
+      // truncating loudly beats hanging, and beats silently treating a partial
+      // read as the whole list.
+      if (pageCount >= MAX_COLLECTION_PAGES || seenTokens.has(nextToken)) {
+        console.error(`${this.resourceType} collection from ${service}.${region} stopped after ${pageCount} page(s) without exhausting its pagination; returning a partial list.`);
+        break;
+      }
+      seenTokens.add(nextToken);
+      token = nextToken;
+    }
+
+    return pages;
   }
 
   private async send(url: string, service: string, region: string, accessKeys: AccessKeys, init?: RequestInit): Promise<Response> {

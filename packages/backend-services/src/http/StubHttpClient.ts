@@ -71,7 +71,7 @@ class StubHttpClient implements IHttpClient {
   }
 
   private static toResponse(value: unknown): Promise<Response> {
-    return value instanceof Response ? Promise.resolve(value) : Response.json(value);
+    return Promise.resolve(value instanceof Response ? value : Response.json(value));
   }
 
   private static async readJson(response: Response): Promise<unknown> {
