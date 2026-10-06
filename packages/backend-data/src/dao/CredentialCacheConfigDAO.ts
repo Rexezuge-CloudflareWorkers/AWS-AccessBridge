@@ -1,8 +1,8 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { toSafeBatchSize } from './BatchSize';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 class CredentialCacheConfigDAO extends BaseDAO {
   /**
    * Idempotently register a principal for scheduled cache refresh.
@@ -16,9 +16,7 @@ class CredentialCacheConfigDAO extends BaseDAO {
       .prepare('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)')
       .bind(principalArn)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to create cache config: ${result.error}`);
-    }
+    assertD1Success(result, `create cache config`);
   }
 
   public async delete(principalArn: string): Promise<void> {
@@ -26,9 +24,7 @@ class CredentialCacheConfigDAO extends BaseDAO {
       .prepare('DELETE FROM credential_cache_config WHERE principal_arn = ?')
       .bind(principalArn)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to delete cache config: ${result.error}`);
-    }
+    assertD1Success(result, `delete cache config`);
   }
 
   public async updateLastCachedTime(
@@ -39,9 +35,7 @@ class CredentialCacheConfigDAO extends BaseDAO {
       .prepare('UPDATE credential_cache_config SET last_cached_at = ? WHERE principal_arn = ?')
       .bind(timestamp, principalArn)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to update cache config: ${result.error}`);
-    }
+    assertD1Success(result, `update cache config`);
   }
 
   /**

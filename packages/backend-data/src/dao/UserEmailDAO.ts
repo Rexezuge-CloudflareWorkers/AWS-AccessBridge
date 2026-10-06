@@ -1,6 +1,6 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 /**
  * One known address for an account.
  *
@@ -37,9 +37,7 @@ class UserEmailDAO extends BaseDAO {
       )
       .bind(email, input.userId, input.isVerified ? 1 : 0, input.now)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to register user email: ${result.error}`);
-    }
+    assertD1Success(result, `register user email`);
     return 'claimed';
   }
 
@@ -71,9 +69,7 @@ class UserEmailDAO extends BaseDAO {
       .prepare('UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?')
       .bind(userId, exceptEmail.toLowerCase())
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to revoke verified user emails: ${result.error}`);
-    }
+    assertD1Success(result, `revoke verified user emails`);
   }
 }
 

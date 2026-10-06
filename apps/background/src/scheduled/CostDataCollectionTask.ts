@@ -3,6 +3,7 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
+import { COST_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, CostData } from '@aws-access-bridge/shared/model';
 import { AbstractCollectionTask } from './AbstractCollectionTask';
 import type { CollectionTaskEnv } from './AbstractCollectionTask';
@@ -27,7 +28,7 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
   }
 
   protected sessionName(): string {
-    return 'AccessBridge-CostCollection';
+    return COST_COLLECTION_ROLE_SESSION_NAME;
   }
 
   protected override async collectForAccount(

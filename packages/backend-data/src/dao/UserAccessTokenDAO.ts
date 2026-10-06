@@ -1,10 +1,10 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenInternal } from '@aws-access-bridge/shared/model';
 import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 class UserAccessTokenDAO extends BaseDAO {
   public async create(
     tokenId: string,
@@ -21,9 +21,7 @@ class UserAccessTokenDAO extends BaseDAO {
       )
       .bind(tokenId, userEmail, token, name, createdAt, expiresAt, userId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to create access token: ${result.error}`);
-    }
+    assertD1Success(result, `create access token`);
   }
 
   public async getById(tokenId: string, activeOnly: boolean): Promise<UserAccessTokenMetadata | undefined> {
@@ -165,9 +163,7 @@ class UserAccessTokenDAO extends BaseDAO {
       .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE token_id = ?')
       .bind(lastUsedAt, tokenId)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to update last used: ${result.error}`);
-    }
+    assertD1Success(result, `update last used`);
   }
 
   public async updateLastUsedByToken(token: string): Promise<void> {
@@ -176,9 +172,7 @@ class UserAccessTokenDAO extends BaseDAO {
       .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE access_token = ?')
       .bind(lastUsedAt, token)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to update last used: ${result.error}`);
-    }
+    assertD1Success(result, `update last used`);
   }
 
   /**
@@ -202,9 +196,7 @@ class UserAccessTokenDAO extends BaseDAO {
       .prepare(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`)
       .bind(...bindings)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to delete access token: ${result.error}`);
-    }
+    assertD1Success(result, `delete access token`);
   }
 }
 

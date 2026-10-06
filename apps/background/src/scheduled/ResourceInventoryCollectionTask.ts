@@ -3,6 +3,7 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import type { ResourceDiscoveryItem } from '@aws-access-bridge/backend-services/aws/collectors';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { RESOURCE_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 import { AbstractCollectionTask } from './AbstractCollectionTask';
 import type { CollectionTaskEnv } from './AbstractCollectionTask';
@@ -27,7 +28,7 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
   }
 
   protected sessionName(): string {
-    return 'AccessBridge-ResourceCollection';
+    return RESOURCE_COLLECTION_ROLE_SESSION_NAME;
   }
 
   protected override async collectForAccount(

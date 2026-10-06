@@ -1,9 +1,10 @@
-import { DatabaseError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { Credential, CredentialChain, CredentialInternal } from '@aws-access-bridge/shared/model';
 import { decryptDataField, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { EncryptedDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 /**
  * Pick the IV to decrypt a credential field with.
  *
@@ -120,9 +121,7 @@ class CredentialsDAO extends EncryptedDAO {
         encryptedSessionToken?.iv || null,
       )
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to store credential: ${result.error}`);
-    }
+    assertD1Success(result, `store credential`);
   }
 
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
@@ -133,16 +132,12 @@ class CredentialsDAO extends EncryptedDAO {
       )
       .bind(principalArn, assumedBy)
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to store credential relationship: ${result.error}`);
-    }
+    assertD1Success(result, `store credential relationship`);
   }
 
   public async removeCredential(principalArn: string): Promise<void> {
     const result: D1Result = await this.database.prepare(`DELETE FROM credentials WHERE principal_arn = ?`).bind(principalArn).run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to remove credential: ${result.error}`);
-    }
+    assertD1Success(result, `remove credential`);
   }
 }
 

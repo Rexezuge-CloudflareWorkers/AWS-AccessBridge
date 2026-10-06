@@ -1,8 +1,8 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import type { AuditLog, AuditLogInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 
+import { assertD1Success } from '../utils/D1Utils';
 class AuditLogDAO extends BaseDAO {
   public async create(
     userEmail: string,
@@ -37,9 +37,7 @@ class AuditLogDAO extends BaseDAO {
         userAgent || null,
       )
       .run();
-    if (!result.success) {
-      throw new DatabaseError(`Failed to create audit log: ${result.error}`);
-    }
+    assertD1Success(result, `create audit log`);
   }
 
   public async query(filters: AuditLogQueryFilters, limit: number, offset: number): Promise<{ logs: AuditLog[]; total: number }> {

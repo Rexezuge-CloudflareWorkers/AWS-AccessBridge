@@ -3,6 +3,7 @@ import { AwsAccountsDAO, RoleConfigsDAO } from '@aws-access-bridge/backend-data/
 import type { AccessKeys, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared/utils/aws';
+import { ROLE_DISCOVERY_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import { CredentialChainService } from '../credential';
 import { IamService, type DiscoveredRole } from '../aws/iam';
 import { StsService } from '../aws/sts';
@@ -104,7 +105,7 @@ class AccountService {
 
     for (let i = credentialChain.principalArns.length - 2; i >= 0; i--) {
       const roleArn: string = credentialChain.principalArns[i];
-      credential = await this.sts.assumeRole(roleArn, credential, 'AccessBridge-RoleDiscovery');
+      credential = await this.sts.assumeRole(roleArn, credential, ROLE_DISCOVERY_ROLE_SESSION_NAME);
     }
 
     const roles = await this.iam.listRoles(credential);

@@ -3,6 +3,7 @@ import { CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-
 
 import type { AccessKeys, Credential, CredentialCache, CredentialChain } from '@aws-access-bridge/shared/model';
 import { BadRequestError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { CHAIN_TEST_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import { StsService } from '../aws/sts';
 import { ChainTestWalker, LeafCredentialsWalker } from './CredentialChainWalker';
 import type { ServiceEnv } from '../composition/ServiceEnv';
@@ -124,7 +125,7 @@ class CredentialChainService {
 
   public async testChain(
     principalArn: string,
-    sessionName = 'AccessBridge-ChainTest',
+    sessionName = CHAIN_TEST_ROLE_SESSION_NAME,
   ): Promise<{ success: boolean; chain: Array<{ arn: string; status: string }> }> {
     if (!principalArn) {
       throw new BadRequestError('Missing required field: principalArn.');
