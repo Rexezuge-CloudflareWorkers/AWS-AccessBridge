@@ -1,104 +1,75 @@
-# AGENTS.md
+# AWS-AccessBridge — Index
 
-Guidance for agents working in AWS-AccessBridge. `CLAUDE.md` is a symbolic link to this file. This is the global index — follow the links to scoped sub-guides before working in an area.
+**AWS-AccessBridge** is a self-hosted AWS multi-account access portal on Cloudflare Workers: a
+Hono + Chanfana API, a cron Durable Object, and a Vite React SPA in one pnpm workspace. Engineers
+sign in with Cloudflare Zero Trust, see which AWS roles they may assume across connected accounts,
+assume them (multi-hop), mint temporary Console URLs, and watch spend and inventory. IAM
+credentials live encrypted in D1; the cron pre-assumes hot chains into KV so the interactive path
+never waits on a cold assume-role.
 
-## Overview
+This file is an index and the commit policy. Everything else has a home, and each home has a
+reader: the split is by **who needs the answer**, not by directory.
 
-AWS-AccessBridge is a Cloudflare Worker API + Vite React SPA in a pnpm workspace (`@aws-access-bridge/monorepo`, `packageManager: pnpm@11.2.2`).
+## Guides
 
-- **Core**: Cloudflare Zero Trust on `/user/*` (JWT `cf-access-jwt-assertion` verified against `POLICY_AUD`/`TEAM_DOMAIN`, with platform `ctx.access` fallback when vars are unset); programmatic access under `/api/*` via Bearer PATs or HMAC-signed internal self-calls; users assume AWS roles across accounts and mint temporary Console URLs. See `apps/api/AGENTS.md`.
-- **Credentials**: encrypted IAM credentials with multi-hop assumption chains (up to `PRINCIPAL_TRUST_CHAIN_LIMIT`), KV credential caching. See `docs/agents/features/credential-chains/AGENTS.md`.
-- **Identity**: the sign-in email is decoupled from the account key. `user_metadata.id` (`usr_<hex>`) is the stable identity; `user_email` is a frozen anchor that existing foreign keys still target; `user_emails` is the address registry; every user-keyed table carries `user_id`. Applied by `migrations/0032_user_identity.sql` (purely additive — see `packages/backend-data/AGENTS.md` for why the anchor is frozen) with `UserIdentityService` + `scripts/ops/change-email.ts` for address changes.
-- **Analytics**: Cost Explorer collection with spend alerts; EC2/S3/Lambda/RDS/DynamoDB inventory. See `docs/agents/features/cost-analytics/AGENTS.md` and `docs/agents/features/resource-inventory/AGENTS.md`.
-- **Teams**: multi-tenant team workspaces scoping AWS accounts. See `docs/agents/features/teams/AGENTS.md`.
-- **Assume-role flows**: browser + programmatic + federate fan-out. See `docs/agents/features/assume-role/AGENTS.md`.
-- **Governance**: every `/user/*` + `/api/*` call is audit-logged with configurable retention; orphan cleanup + background task-run visibility (`GET /user/admin/maintenance/task-runs`). See `apps/api/AGENTS.md` and `apps/background/AGENTS.md`.
-- **Onboarding**: 6-step admin Setup Wizard (Account → Credentials → Chain → Roles → Users → Summary) with credential validation, chain testing, and IAM role discovery. See `apps/web/AGENTS.md`.
-- **Background**: cron Durable Object `CronTasksWorker` on `*/10 * * * *` — phase 1 credential-cache refresh, phase 2 audit prune + task prune + cost/resource collection. See `apps/background/AGENTS.md` and `docs/agents/runtime/AGENTS.md`.
-- **i18n**: 12 web locales + backend `preferredLanguage` (`GET|PUT /user/me`) > `localStorage` > `navigator` > `en`; Title Case, no ALL-CAPS. See `apps/web/AGENTS.md`.
-- **Web entry**: canonical `/user/` (Zero Trust login trigger), pages under `/user/app/*` (never collide with `/user/*` JSON), legacy `/costs|/resources|/admin/*` redirects; the Worker always serves the SPA (unconditional catch-all). See `apps/web/AGENTS.md` and `apps/api/AGENTS.md`.
-- **DI**: per-request composition root (`composition/Tokens` + `createRequestScope`, resolved via `getRequestScope(env).get(Tokens.X)`). This is the only way services are constructed; the legacy `*Factory.create(env)` classes have been removed. `ServiceEnv` (`composition/ServiceEnv.ts`) is the single source of truth for what a service may read, which is what makes the root type-safe without casts. See `packages/backend-services/AGENTS.md`.
+### Cross-cutting
 
-## Cloudflare Documentation
+| Area                                                               | Guide                                                            |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Working in this repository: workspace, layers, commands, gates, CI | [`docs/agents/repo/AGENTS.md`](docs/agents/repo/AGENTS.md)       |
+| Bindings, secrets, env vars, migrations, backups                   | [`docs/agents/runtime/AGENTS.md`](docs/agents/runtime/AGENTS.md) |
+| The suite, the thresholds, the doubles, the emulator tier          | [`docs/agents/testing/AGENTS.md`](docs/agents/testing/AGENTS.md) |
 
-**STOP.** APIs, limits, and behavior change frequently. Before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, Workers AI, or Agents SDK task, retrieve current official docs.
+### By area
 
-- Workers: https://developers.cloudflare.com/workers/
-- Cloudflare MCP: https://docs.mcp.cloudflare.com/mcp
-- Node.js compat: https://developers.cloudflare.com/workers/runtime-apis/nodejs/
-- Worker errors: https://developers.cloudflare.com/workers/observability/errors/
-- Limits: retrieve each product's `/platform/limits/` page (e.g. `/workers/platform/limits/`)
-- Product refs: `/workers/`, `/kv/`, `/r2/`, `/d1/`, `/durable-objects/`, `/queues/`, `/vectorize/`, `/workers-ai/`, `/agents/`
-- Error 1102 = CPU/memory exceeded; see `/workers/platform/limits/`.
-- Durable Objects: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
-- Worker-level Access (`ctx.access.getIdentity()`, no JWT parsing): https://developers.cloudflare.com/workers/configuration/cloudflare-access/ — this is the `POLICY_AUD`/`TEAM_DOMAIN`-less fallback in `AccessAuthService`.
+| Area                                            | Guide                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| API worker: auth, routes, the error envelope    | [`apps/api/AGENTS.md`](apps/api/AGENTS.md)                                   |
+| Background worker: cron phases, task visibility | [`apps/background/AGENTS.md`](apps/background/AGENTS.md)                     |
+| Operator SPA: i18n, UI text conventions         | [`apps/web/AGENTS.md`](apps/web/AGENTS.md)                                   |
+| D1, the DAOs, KV, encryption, write discipline  | [`packages/backend-data/AGENTS.md`](packages/backend-data/AGENTS.md)         |
+| Services, the composition root, the DI contract | [`packages/backend-services/AGENTS.md`](packages/backend-services/AGENTS.md) |
 
-## Commands
+### By feature
 
-Plain `pnpm` is canonical. No `source ~/.customrc`, no `volta run` prefix. `pnpm run checks` is the full gate: `pnpm run checks:fast` (typecheck, lint, god-files, migrations, locales, SPA shell) then `test:coverage`, `check:coverage-floor` and `test:integration`. `check:coverage-floor` pins per-file line/branch floors on the 23 files carrying the auth boundary, request validation, credential encryption, data integrity, the background pipeline, routing and logging — an aggregate can be met while one of those rots, which is how `MiddlewareHandlers` sat at 61.5% branch while the total looked healthy. `typecheck` runs `pnpm -r typecheck` across the workspace plus `typecheck:scripts` for `scripts/**`. The `lint` script sets `NODE_OPTIONS=--max-old-space-size=6144` itself, because type-aware ESLint exhausts the default heap on this repo — prefix any _manual_ `eslint`/`vitest` invocation with the same flag rather than raising the script's limit.
+| Area                                                        | Guide                                                                                                    |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Assume-role flows: browser, programmatic, federate          | [`docs/agents/features/assume-role/AGENTS.md`](docs/agents/features/assume-role/AGENTS.md)               |
+| Credential chains: encrypted storage, hops, KV cache        | [`docs/agents/features/credential-chains/AGENTS.md`](docs/agents/features/credential-chains/AGENTS.md)   |
+| Cost Explorer collection and spend alerts                   | [`docs/agents/features/cost-analytics/AGENTS.md`](docs/agents/features/cost-analytics/AGENTS.md)         |
+| Resource inventory: regions, pagination, pruning            | [`docs/agents/features/resource-inventory/AGENTS.md`](docs/agents/features/resource-inventory/AGENTS.md) |
+| Team workspaces                                             | [`docs/agents/features/teams/AGENTS.md`](docs/agents/features/teams/AGENTS.md)                           |
+| User identity: account key, frozen anchor, address registry | [`docs/agents/features/identity/AGENTS.md`](docs/agents/features/identity/AGENTS.md)                     |
 
-```bash
-pnpm install
-pnpm run checks   # shorthand for: pnpm run typecheck && pnpm run lint && pnpm run validate:migrations && pnpm run validate:locales && pnpm run test:coverage && pnpm run test:integration
-pnpm --filter @aws-access-bridge/web run build   # only web has a build script
-pnpm --filter @aws-access-bridge/web run dev     # vite dev server
-pnpm run typegen   # after changing wrangler bindings (also runs via postinstall)
-# No committed wrangler.jsonc — materialize it first from apps/api/wrangler.template.jsonc
-# (scripts/deploy/prepare-wrangler-config.ts, also run by CI), then from the repo root:
-pnpm exec wrangler dev --config ./wrangler.jsonc
-pnpm exec wrangler deploy --config ./wrangler.jsonc
-```
+### Also
 
-## Import Direction
+| Area                                              | Guide                                                      |
+| ------------------------------------------------- | ---------------------------------------------------------- |
+| Deploying, onboarding, IAM setup, troubleshooting | [`README.md`](README.md)                                   |
+| The nightly D1 backup and how to restore it       | [`docs/db-backup-recovery.md`](docs/db-backup-recovery.md) |
+| `scripts/**` layout and the entrypoint convention | [`scripts/README.md`](scripts/README.md)                   |
 
-```
-Layer 0: shared, backend-errors          — zero @aws-access-bridge/* deps
-Layer 1: backend-runtime (+ di/)         → layer 0 only (lint additionally tolerates provider-clients; don't rely on it)
-Layer 2: backend-data, provider-clients  → layer 0 only (lint additionally tolerates backend-data → provider-clients; don't rely on it)
-Layer 3: backend-services (+ composition/) → layers 0–2 (not apps)
-(no Layer 4 by design)
-Layer 5: apps/background                 → layers 0–3 via backend-services (no direct provider-clients dep)
-         apps/api                        → layers 0–3 + background (NOT aws4fetch/provider-clients directly; endpoints/** also NOT backend-data/dao except type-only)
-```
+## The invariants
 
-Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs` (Layer 5 blocks `apps/api → aws4fetch` and `apps/api → provider-clients`; route AWS SDK usage through `@aws-access-bridge/backend-services`. `apps/api/src/endpoints/**` additionally blocks `backend-data/dao` value imports).
+The rules this repository learned the hard way, each written once in the guide whose reader needs
+it. A guide that grows a rule nobody can act on is a rule nobody reads — so where a rule spans two
+areas, the guide that owns the _code_ keeps it and the other links.
 
-## Index
+Two shapes recur among them. **A claim nothing measures is not an invariant**: a comment, a
+default, a typed constant beside the code it bounds, and a double that shares the code's
+assumptions have each carried a defect through a green suite here. And **an empty answer is not an
+answer** — every place this code once turned "we were denied" or "the request failed" into `[]`,
+`null`, or `0`, a caller downstream read it as "there is nothing here" and deleted real data.
 
-| Area                                            | Guide                                               |
-| ----------------------------------------------- | --------------------------------------------------- |
-| API worker, auth, routes                        | `apps/api/AGENTS.md`                                |
-| Background worker, cron phases, task visibility | `apps/background/AGENTS.md`                         |
-| Web SPA, frontend i18n, UI text conventions     | `apps/web/AGENTS.md`                                |
-| D1/DAO layer, KV cache, retention pruning       | `packages/backend-data/AGENTS.md`                   |
-| Business logic, service domain map              | `packages/backend-services/AGENTS.md`               |
-| Bindings, wrangler, env vars                    | `docs/agents/runtime/AGENTS.md`                     |
-| Tests, thresholds, mock patterns                | `docs/agents/testing/AGENTS.md`                     |
-| Assume-role flows                               | `docs/agents/features/assume-role/AGENTS.md`        |
-| Credential chains                               | `docs/agents/features/credential-chains/AGENTS.md`  |
-| Cost analytics + spend alerts                   | `docs/agents/features/cost-analytics/AGENTS.md`     |
-| Resource inventory                              | `docs/agents/features/resource-inventory/AGENTS.md` |
-| Team workspaces                                 | `docs/agents/features/teams/AGENTS.md`              |
-| User identity (account key vs email)            | `docs/agents/features/identity/AGENTS.md`           |
+## Keeping these current
 
-## File Size Guard
-
-`scripts/check-god-files.mjs` fails above 400 LOC and warns above 300, run by `pnpm run check:god-files` (wired into `checks`, plus its own CI job). Excludes tooling, tests, generated output, and migrations. A file past a few hundred lines stops being readable as a unit — this repo's own history has a 219-line god-class and a 495-line React component, both split by hand.
-
-## Keeping AGENTS.md Current
-
-Update the scoped sub-guide (not this index) as part of any change that adds, removes, or renames:
-
-- Routes → `apps/api/AGENTS.md`
-- Cron tasks/phases → `apps/background/AGENTS.md`
-- Web UI, locales, text conventions → `apps/web/AGENTS.md`
-- DAOs, KV cache, pruning → `packages/backend-data/AGENTS.md`
-- Services → `packages/backend-services/AGENTS.md` (+ feature file if cross-cutting)
-- User identity (account key, frozen email anchor, address registry, email change) → `docs/agents/features/identity/AGENTS.md`
-- Env vars, bindings → `docs/agents/runtime/AGENTS.md`
-- Tests, thresholds, mocks → `docs/agents/testing/AGENTS.md`
-- Top-level features → `docs/agents/features/*/AGENTS.md` + one-line Overview touch-up here
-- `shared`, `backend-errors`, `backend-runtime`, `provider-clients` (no scoped guide) → document the change in the closest consumer guide (`backend-services` for domain use, `runtime` for bindings/env, `testing` for mocks) instead of this index
+Update the guide whose reader needs the change, in the same change — never this index. Routes →
+`apps/api`. Cron tasks → `apps/background`. UI, locales, text conventions → `apps/web`. DAOs, KV,
+encryption → `packages/backend-data`. Services and the composition root → `packages/backend-services`.
+Env vars and bindings → `docs/agents/runtime`. Tests and thresholds → `docs/agents/testing`.
+Commands, layers, gates → `docs/agents/repo`. A top-level feature gets a
+`docs/agents/features/*/AGENTS.md`. `shared`, `backend-errors`, `backend-runtime` and
+`provider-clients` have no scoped guide; document their use in the closest consumer's guide.
 
 ## Commit Policy
 
