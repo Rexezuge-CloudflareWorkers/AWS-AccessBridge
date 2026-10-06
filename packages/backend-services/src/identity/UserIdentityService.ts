@@ -1,6 +1,7 @@
 import { UserEmailDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { isMissingSchemaError } from '@aws-access-bridge/backend-data/utils';
+import { isD1ErrorRetryable } from '@aws-access-bridge/backend-data/utils/D1ErrorClassifier';
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { AddressRegistryService } from './AddressRegistryService';
 
@@ -118,9 +119,11 @@ class UserIdentityService {
       };
     } catch (error) {
       if (isMissingSchemaError(error)) return null;
-      throw error instanceof DatabaseError
-        ? error
-        : new DatabaseError(`Failed to resolve account: ${error instanceof Error ? error.message : String(error)}`);
+      // Already classified by the DAO layer, so it passes through with its
+      // `retryable` flag intact. A raw `Error` is classified here rather than
+      // wrapped blind: a busy or throttled database is retryable, and dropping the
+      // verdict means the retry policy treats it as permanent.
+      throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve account: ${error instanceof Error ? error.message : String(error)}`, isD1ErrorRetryable(error instanceof Error ? error.message : String(error)));
     }
   }
 
