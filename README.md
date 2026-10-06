@@ -267,7 +267,7 @@ The repo ships a `Continuous Deployment` workflow at `.github/workflows/continuo
    The workflow writes this out to `wrangler.jsonc` at the start of each run (since `wrangler.jsonc` itself is gitignored).
 
 6. **Push to `main`**. Once CI passes, the `Continuous Deployment` workflow kicks off automatically and will:
-   - Prepare the Wrangler config via `scripts/deploy/prepare-wrangler-config.ts` (fills `000…` placeholder IDs, applies `WRANGLER_PATCH_JSON` / `WRANGLER_VARS_PATCH_JSON`, provisions missing D1/KV/Secrets Store resources)
+   - Prepare the Wrangler config via `scripts/deploy/prepare-wrangler-config.ts` (applies `WRANGLER_PATCH_JSON` / `WRANGLER_VARS_PATCH_JSON`, checks the config carries every binding and var the template declares, fills `000…` placeholder IDs, provisions missing D1/KV/Secrets Store resources)
    - Initialize any missing secrets via `scripts/deploy/init-secrets.ts`
    - Apply pending D1 migrations to your remote database (`AccessBridgeDB` binding)
    - Build the Vite SPA (`pnpm --filter @aws-access-bridge/web build`)
@@ -278,7 +278,9 @@ A second job, `deploy-pages`, builds the SPA and deploys it to Cloudflare Pages 
 
 ### Keeping `WRANGLER_JSONC` up to date
 
-The template evolves (new bindings, new vars). If CI reports a version error, update your `WRANGLER_JSONC` GitHub variable to match the latest `apps/api/wrangler.template.jsonc`. (The `$version`/`$minimumVersion` staleness check fires whenever the template declares a `$minimumVersion`, which it does — bump both together when a deploy needs a binding or var an older config would not carry.)
+The template evolves (new bindings, new vars), so a `WRANGLER_JSONC` variable copied from an older one can fall behind. `prepare-wrangler-config.ts` compares your config against `apps/api/wrangler.template.jsonc` and refuses to deploy one that omits any binding or var the template declares, naming every gap it found. If CI reports a coverage error, diff your variable against the template and resync — or supply the missing vars through `WRANGLER_VARS_PATCH_JSON` instead of replacing the whole file.
+
+Two bindings are deliberately excluded from that comparison. KV namespaces are injected automatically when missing (`ensureRequiredKvBindings`), so requiring one would reject a config that is about to be completed. `AES_ENCRYPTION_KEY_SECRET` is the legacy read-only encryption fallback and is documented as droppable once every row has been rewritten, so requiring it would block that migration.
 
 ## Continuous Deployment Variables
 
@@ -424,7 +426,7 @@ open https://<your-worker-url>/docs
 
 - **"Unauthorized" on every request** — if you use a self-hosted Access application or a cross-account setup (Cloudflare for SaaS), make sure `POLICY_AUD` and `TEAM_DOMAIN` are set and match the owning account's Zero Trust application. If you rely on Worker-level Access instead, make sure it is enabled on the worker — with the vars unset, requests authenticate via the platform identity.
 - **Admin tab is missing** — you haven't been promoted to superadmin yet. See Step 7 of the manual guide.
-- **CI fails with "version below minimum"** — your `WRANGLER_JSONC` GitHub variable is stale. Diff it against `apps/api/wrangler.template.jsonc` and resync. The guard fires whenever the template declares `$minimumVersion`, which it does.
+- **CI fails with "is missing bindings and vars that … requires"** — your `WRANGLER_JSONC` GitHub variable predates a binding or var the template now declares. The error lists every missing key; diff it against `apps/api/wrangler.template.jsonc` and resync, or add the missing vars to `WRANGLER_VARS_PATCH_JSON`.
 - **`wrangler deploy` OOMs in CI** — the workflow hides stray `open-next.config.ts` / `next.config.ts` files before deploying so wrangler doesn't delegate to the OpenNext Next.js build (the repo currently ships neither file, so this is defensive).
 - **Credentials cached forever after rotating an IAM key** — the cron trigger fires every 10 minutes, but cached credentials are only refreshed once stale per `CREDENTIAL_REFRESH_INTERVAL_MINUTES` (default 45), so a rotation takes up to that long to take effect. To force a cycle locally, run `pnpm exec wrangler dev --test-scheduled` and hit `/__scheduled`. There is no production trigger: the scheduled pipeline runs only from Cloudflare's `triggers.crons`.
 
