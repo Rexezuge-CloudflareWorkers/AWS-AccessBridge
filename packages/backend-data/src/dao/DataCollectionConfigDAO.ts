@@ -1,4 +1,5 @@
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { toSafeBatchSize } from './BatchSize';
 import { BaseDAO } from './BaseDAO';
 
 class DataCollectionConfigDAO extends BaseDAO {
@@ -31,12 +32,18 @@ class DataCollectionConfigDAO extends BaseDAO {
     return result.meta?.changes ?? 0;
   }
 
+  /**
+   * @param limit A *batch* size, not a page size — see the note on
+   *   `CredentialCacheConfigDAO.getPrincipalArnsNeedingUpdate`. Only guarded
+   *   against a non-positive or non-integer value, which `LIMIT ?` rejects.
+   */
   public async getPrincipalArnsNeedingCollection(collectionType: string, limit: number, olderThan: number): Promise<string[]> {
+    const batchSize: number = toSafeBatchSize(limit);
     const results = await this.database
       .prepare(
         'SELECT principal_arn FROM data_collection_config WHERE collection_type = ? AND enabled = 1 AND last_collected_at < ? ORDER BY last_collected_at ASC LIMIT ?',
       )
-      .bind(collectionType, olderThan, limit)
+      .bind(collectionType, olderThan, batchSize)
       .all<{ principal_arn: string }>();
 
     return (results.results || []).map((row) => row.principal_arn);

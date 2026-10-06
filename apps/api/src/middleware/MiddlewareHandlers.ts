@@ -12,6 +12,7 @@ import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-err
 import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
 
 import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
+import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuard';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
@@ -39,7 +40,11 @@ function exceptionBody(error: IServiceError): { Exception: { Type: string; Messa
 }
 
 async function validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
-  await HMACHandler.validateInternalRequest(c, next);
+  // A KV-backed guard would need to be resolved from the request scope, but that
+  // scope is not available on `*` — `hmacValidation` runs before any auth
+  // middleware. Constructed from the raw binding instead, and only for the
+  // internal surface.
+  await HMACHandler.validateInternalRequest(c, next, undefined, new ReplayGuard(c.env.AccessBridgeKV));
 }
 
 function hasInternalHeadersFor(headers: Headers): boolean {
@@ -227,8 +232,7 @@ class MiddlewareHandlers {
     return apiAuthenticationHandler;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private static withErrorTranslation<T extends any[], R>(fn: (...args: T) => Promise<R>): (...args: T) => Promise<R> {
+  private static withErrorTranslation<T extends unknown[], R>(fn: (...args: T) => Promise<R>): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {
       try {
         return await fn(...args);

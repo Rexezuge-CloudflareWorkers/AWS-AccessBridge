@@ -1,6 +1,6 @@
 import { buildPrincipalArn } from '@aws-access-bridge/shared';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
-import { readJson, throwForResponse } from '../lib/api';
+import { apiRequest } from '../lib/api';
 
 type RoleMap = Record<string, { roles: string[]; hiddenRoles?: string[]; nickname?: string; favorite: boolean }>;
 
@@ -33,11 +33,7 @@ async function listAccounts(options: ListAccountsOptions): Promise<AccountsResul
     url = `/user/assumables?${params.toString()}`;
   }
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    await throwForResponse(res, 'Failed to load accounts');
-  }
-  const data = await readJson<RoleMap & { totalAccounts?: number }>(res);
+  const data = await apiRequest<RoleMap & { totalAccounts?: number }>(url);
   if (searchTerm.trim()) {
     return { roles: data, total: Object.keys(data).length };
   }
@@ -46,37 +42,24 @@ async function listAccounts(options: ListAccountsOptions): Promise<AccountsResul
 }
 
 async function setFavorite(accountId: string, isFavorite: boolean): Promise<void> {
-  const response = await fetch('/user/favorites', {
+  await apiRequest<void>('/user/favorites', {
     method: isFavorite ? 'DELETE' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ awsAccountId: accountId }),
+    body: { awsAccountId: accountId },
   });
-  if (!response.ok) {
-    await throwForResponse(response, `Failed to ${isFavorite ? 'unfavorite' : 'favorite'} account`);
-  }
 }
 
 async function setRoleHidden(accountId: string, role: string, hide: boolean): Promise<void> {
-  const response = await fetch('/user/assumable/hidden', {
+  await apiRequest<void>('/user/assumable/hidden', {
     method: hide ? 'POST' : 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ awsAccountId: accountId, roleName: role }),
+    body: { awsAccountId: accountId, roleName: role },
   });
-  if (!response.ok) {
-    await throwForResponse(response, `Failed to ${hide ? 'hide' : 'unhide'} role`);
-  }
 }
 
 async function assumeRoleKeys(accountId: string, role: string): Promise<AccessKeysResponse> {
-  const assumeRes = await fetch('/user/aws/assume-role', {
+  return apiRequest<AccessKeysResponse>('/user/aws/assume-role', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ principalArn: buildPrincipalArn(accountId, role) }),
+    body: { principalArn: buildPrincipalArn(accountId, role) },
   });
-  if (!assumeRes.ok) {
-    await throwForResponse(assumeRes, 'Assume role failed');
-  }
-  return readJson<AccessKeysResponse>(assumeRes);
 }
 
 /**

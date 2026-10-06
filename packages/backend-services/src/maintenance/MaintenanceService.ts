@@ -1,3 +1,4 @@
+import { Pagination } from '@aws-access-bridge/backend-runtime/constants/Pagination';
 import {
   AwsAccountsDAO,
   BackgroundTaskRunDAO,
@@ -91,7 +92,10 @@ class MaintenanceService {
 
   public async listTaskRuns(options: { taskType?: string; status?: string; limit?: number }): Promise<BackgroundTaskRun[]> {
     const dao: BackgroundTaskRunDAO = new BackgroundTaskRunDAO(this.env.AccessBridgeDB);
-    return dao.listRuns({ taskType: options.taskType, status: options.status, limit: options.limit });
+    // Clamped in the service as well as at the route, because `Pagination` lives
+    // in `backend-runtime` (Layer 1) and the DAO is in `backend-data` (Layer 2),
+    // which must not import upward. The service is the layer that may.
+    return dao.listRuns({ taskType: options.taskType, status: options.status, limit: Pagination.limit(options?.limit) });
   }
 }export { MaintenanceService };
 export type { MaintenanceServiceEnv, OrphanCleanupCounts, OrphanCleanupResult };

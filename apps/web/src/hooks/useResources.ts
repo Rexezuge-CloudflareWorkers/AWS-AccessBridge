@@ -31,7 +31,7 @@ function useResources() {
   useEffect(() => {
     loadSummary()
       .then((data) => {
-        if (data) setSummary(data);
+        setSummary(data);
       })
       .catch((err: unknown) => {
         // The summary is supplementary — the table below still works — so this

@@ -1,4 +1,4 @@
-import { readJson, throwForResponse } from '../lib/api';
+import { apiRequest } from '../lib/api';
 
 interface ResourceItem {
   awsAccountId: string;
@@ -61,9 +61,11 @@ function getConsoleDestination(resource: ResourceItem): ConsoleDestination | nul
   }
 }
 
-async function loadSummary(): Promise<ResourceSummary | null> {
-  const res = await fetch('/user/resources/summary');
-  return res.ok ? readJson<ResourceSummary>(res) : null;
+async function loadSummary(): Promise<ResourceSummary> {
+  // Thrown, not swallowed into `null`. A server error is not "this account has no
+  // resources", and returning null made the two indistinguishable — the
+  // inventory rendered an empty state while the failure was never surfaced.
+  return apiRequest<ResourceSummary>('/user/resources/summary');
 }
 
 async function listResources(options: ListResourcesOptions): Promise<ResourcesResult> {
@@ -74,11 +76,7 @@ async function listResources(options: ListResourcesOptions): Promise<ResourcesRe
   params.set('limit', pageSize.toString());
   params.set('offset', (page * pageSize).toString());
 
-  const res = await fetch(`/user/resources?${params.toString()}`);
-  if (!res.ok) {
-    await throwForResponse(res, 'Failed to load resources');
-  }
-  return readJson<ResourcesResult>(res);
+  return apiRequest<ResourcesResult>(`/user/resources?${params.toString()}`);
 }
 
 export type { ResourceItem, ResourceSummary, ResourcesResult, ListResourcesOptions, ConsoleDestination };

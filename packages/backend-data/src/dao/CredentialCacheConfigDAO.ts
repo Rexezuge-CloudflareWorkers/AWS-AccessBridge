@@ -1,5 +1,6 @@
 import { DatabaseError } from '@aws-access-bridge/backend-errors';
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { toSafeBatchSize } from './BatchSize';
 import { BaseDAO } from './BaseDAO';
 
 class CredentialCacheConfigDAO extends BaseDAO {
@@ -43,10 +44,17 @@ class CredentialCacheConfigDAO extends BaseDAO {
     }
   }
 
+  /**
+   * @param limit A *batch* size, not a page size: the caller walks one batch per
+   *   cron tick, so clamping it to `Pagination.MAX_LIMIT` would silently change
+   *   how much work a tick does. Clamped to a positive integer only, because an
+   *   unbounded or non-numeric `LIMIT ?` is rejected by the database.
+   */
   public async getPrincipalArnsNeedingUpdate(limit: number, olderThanTimestamp: number): Promise<string[]> {
+    const batchSize: number = toSafeBatchSize(limit);
     const results: D1Result<GetPrincipalsNeedingUpdateInternal> = await this.database
       .prepare('SELECT principal_arn FROM credential_cache_config WHERE last_cached_at < ? ORDER BY last_cached_at ASC LIMIT ?')
-      .bind(olderThanTimestamp, limit)
+      .bind(olderThanTimestamp, batchSize)
       .all<GetPrincipalsNeedingUpdateInternal>();
     return results.results.map((r) => r.principal_arn);
   }
