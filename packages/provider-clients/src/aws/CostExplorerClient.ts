@@ -4,6 +4,7 @@ import { InternalServerError } from '@aws-access-bridge/backend-errors';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { defaultAwsClientFactory } from './AwsSignedFetcher';
 
+import { log } from '@aws-access-bridge/shared/utils';
 interface CostExplorerResult {
   accountId: string;
   periodStart: string;
@@ -79,7 +80,7 @@ class CostExplorerClient {
       // would otherwise re-fetch the same page until the request's wall-clock
       // limit. Truncating loudly is better than hanging.
       if (seenTokens.has(token)) {
-        console.error('Cost Explorer repeated a NextPageToken; returning a partial cost breakdown.');
+        log.error('Cost Explorer repeated a NextPageToken; returning a partial cost breakdown.');
         break;
       }
       seenTokens.add(token);
@@ -164,7 +165,7 @@ class CostExplorerClient {
     const responseText: string = await response.text();
 
     if (!response.ok) {
-      console.error(`Cost Explorer API failed: ${response.status}\n${responseText}`);
+      log.error(`Cost Explorer API failed: ${response.status}\n${responseText}`);
       throw new InternalServerError(`Cost Explorer API failed: ${response.status}`);
     }
 

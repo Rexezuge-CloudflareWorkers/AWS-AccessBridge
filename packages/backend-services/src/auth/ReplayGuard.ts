@@ -1,3 +1,5 @@
+import { log } from '@aws-access-bridge/shared/utils';
+
 /**
  * Single-use enforcement for HMAC-signed internal requests.
  *
@@ -67,7 +69,9 @@ class ReplayGuard {
       await this.kv.put(key, '1', { expirationTtl: this.ttlSeconds });
       return true;
     } catch (error: unknown) {
-      console.error('HMAC replay guard failed open; relying on the timestamp window:', error instanceof Error ? error.message : error);
+      // The message only, never the error's stack: a KV error can quote the key,
+      // which is the HMAC signature.
+      log.error('HMAC replay guard failed open; relying on the timestamp window', { error });
       return true;
     }
   }

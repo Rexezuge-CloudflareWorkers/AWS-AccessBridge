@@ -1,7 +1,7 @@
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
 
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
@@ -76,11 +76,11 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
         if (collected > 0) {
           await configDAO.updateLastCollectedTime(principalArn, this.collectionType());
         } else {
-          console.warn(`[${this.collectionType()}] ${principalArn} reported no data; leaving its collection interval unadvanced.`);
+          log.warn(`[${this.collectionType()}] ${principalArn} reported no data; leaving its collection interval unadvanced.`);
         }
       } catch (error: unknown) {
         failedAccounts += 1;
-        console.error(`Failed to collect ${this.collectionType()} data for ${principalArn}:`, error);
+        log.error(`Failed to collect ${this.collectionType()} data for ${principalArn}:`, { error: error });
       }
     }
     return {

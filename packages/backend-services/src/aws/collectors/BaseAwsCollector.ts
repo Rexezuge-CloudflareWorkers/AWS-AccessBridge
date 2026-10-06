@@ -4,6 +4,7 @@ import type { AwsClientFactory, AwsSignedClient } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import type { CollectorSweepResult, IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
 
+import { log } from '@aws-access-bridge/shared/utils';
 /**
  * Region recorded for a global service's resources, so they are distinguishable
  * from a regional resource in `us-east-1`.
@@ -190,7 +191,7 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
       // truncating loudly beats hanging, and beats silently treating a partial
       // read as the whole list.
       if (pageCount >= MAX_COLLECTION_PAGES || seenTokens.has(nextToken)) {
-        console.error(`${this.resourceType} collection from ${service}.${region} stopped after ${pageCount} page(s) without exhausting its pagination; returning a partial list.`);
+        log.error(`${this.resourceType} collection from ${service}.${region} stopped after ${pageCount} page(s) without exhausting its pagination; returning a partial list.`);
         break;
       }
       seenTokens.add(nextToken);
@@ -231,7 +232,7 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
     }
 
     const message: string = `${this.resourceType} collection failed: ${service}.${region} returned HTTP ${response.status}`;
-    console.error(message);
+    log.error(message);
     throw new AwsCollectionError(message, response.status, this.resourceType);
   }
 

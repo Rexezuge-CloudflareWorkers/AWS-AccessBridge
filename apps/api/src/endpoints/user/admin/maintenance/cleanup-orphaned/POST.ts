@@ -6,6 +6,7 @@ import { getRequestScope } from '@aws-access-bridge/backend-services/composition
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 import { forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import { log } from '@aws-access-bridge/shared/utils';
 class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
   CleanupOrphanedDataRequest,
   CleanupOrphanedDataResponse,
@@ -91,7 +92,7 @@ class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
     // tell the administrator nothing happened, when six of the seven tables were in
     // fact cleaned — the next run would retry the whole thing either way.
     if (result.failures.length > 0) {
-      console.warn(`Orphan cleanup completed with ${result.failures.length} failed table(s):`, result.failures);
+      log.warn(`Orphan cleanup completed with ${result.failures.length} failed table(s)`, { failedTables: result.failures });
     }
     return { deletedCounts: result.deletedCounts, totalDeleted: result.totalDeleted, failures: result.failures };
   }

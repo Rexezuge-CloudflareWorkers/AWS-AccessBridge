@@ -3,7 +3,7 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import type { CredentialChainService } from '@aws-access-bridge/backend-services/credential';
 import type { StsService } from '@aws-access-bridge/backend-services/aws/sts';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';
@@ -45,7 +45,7 @@ class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTa
         refreshedCount += refreshedForPrincipal;
       } catch (error: unknown) {
         failedCount += 1;
-        console.error(`[CredentialCacheRefreshTask] Failed to refresh ${principalArn}:`, error);
+        log.error(`[CredentialCacheRefreshTask] Failed to refresh ${principalArn}:`, { error: error });
       }
     }
     return {

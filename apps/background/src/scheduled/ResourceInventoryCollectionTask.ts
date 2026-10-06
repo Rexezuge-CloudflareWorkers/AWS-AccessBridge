@@ -2,7 +2,7 @@ import { ResourceInventoryDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 import type { ResourceDiscoveryItem } from '@aws-access-bridge/backend-services/aws/collectors';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { RESOURCE_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, ResourceInventoryItem } from '@aws-access-bridge/shared/model';
 import { AbstractCollectionTask } from './AbstractCollectionTask';
@@ -72,14 +72,12 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
           collectedTypes.add(collector.resourceType);
         } else {
           incompleteTypes.push(collector.resourceType);
-          console.warn(
-            `${collector.resourceType} collection incomplete for ${principalArn}: ${sweep.succeededRegions.length}/${expectedRegionCount} region(s) read; ` +
-              `leaving its previously recorded resources untouched. Failures: ${sweep.failedRegions.map((failure) => `${failure.region} (${failure.reason})`).join('; ')}`,
-          );
+          log.warn(`${collector.resourceType} collection incomplete for ${principalArn}: ${sweep.succeededRegions.length}/${expectedRegionCount} region(s) read; ` +
+              `leaving its previously recorded resources untouched. Failures: ${sweep.failedRegions.map((failure) => `${failure.region} (${failure.reason})`).join('; ')}`);
         }
       } catch (error: unknown) {
         incompleteTypes.push(collector.resourceType);
-        console.warn(`${collector.resourceType} collection failed; its previously recorded resources are left untouched:`, error);
+        log.warn(`${collector.resourceType} collection failed; its previously recorded resources are left untouched:`, { error: error });
       }
     }
 
@@ -102,11 +100,9 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
       await resourceDAO.deleteStaleResources(accountId, resourceType, collectedAt);
     }
 
-    console.log(
-      `Resource inventory collected for ${principalArn}: ${allItems.length} resources across ${collectedTypes.size}/${collectors.size} type(s) ` +
+    log.info(`Resource inventory collected for ${principalArn}: ${allItems.length} resources across ${collectedTypes.size}/${collectors.size} type(s) ` +
         `over ${regions.length} configured region(s)` +
-        (incompleteTypes.length > 0 ? `; incomplete: ${incompleteTypes.join(', ')}` : ''),
-    );
+        (incompleteTypes.length > 0 ? `; incomplete: ${incompleteTypes.join(', ')}` : ''));
     return allItems.length;
   }
 }

@@ -5,6 +5,7 @@ import { DefaultInternalServerError, DatabaseError, InternalServerError, IServic
 import { validateRequestInput } from '@/schema';
 import { getQueryParam, getRequestBaseUrl, isDemoModeEnv, withUnconstrainedD1Session } from './route-helpers';
 
+import { log } from '@aws-access-bridge/shared/utils';
 abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IResponse, TEnv extends IEnv> extends OpenAPIRoute {
   async handle(c: ActivityContext<TEnv>) {
     try {
@@ -85,7 +86,7 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
 
   protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {
     if (error instanceof IServiceError && error.getErrorCode() < 500) {
-      console.warn(`Responding with ${error.getErrorType()}:`, error.stack);
+      log.warn(`Responding with ${error.getErrorType()}:`, { error: error.stack });
       return this.exceptionResponse(c, error, error.getErrorCode());
     }
     if (error instanceof DatabaseError) {
@@ -93,12 +94,12 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       // column names, constraint names, statement offsets), so they are logged
       // rather than returned. Callers get the same generic 500 as any other
       // server-side fault.
-      console.error('Caught database error during execution:', error);
+      log.error('Caught database error during execution:', { error: error });
     }
     if (!(error instanceof IServiceError) || error instanceof InternalServerError) {
-      console.error('Caught service error during execution:', error);
+      log.error('Caught service error during execution:', { error: error });
     }
-    console.warn('Responding with DefaultInternalServerError:', DefaultInternalServerError);
+    log.warn('Responding with DefaultInternalServerError:', { error: DefaultInternalServerError });
     return this.exceptionResponse(c, DefaultInternalServerError, DefaultInternalServerError.getErrorCode());
   }
 

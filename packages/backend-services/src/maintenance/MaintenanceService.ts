@@ -13,6 +13,7 @@ import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type MaintenanceServiceEnv = ServiceEnv;
 
 interface OrphanCleanupCounts {
@@ -83,7 +84,7 @@ class MaintenanceService {
       // partial count would be worse than reporting none.
       deletedCounts[table] = 0;
       failures.push({ table, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
-      console.error(`Orphan cleanup failed for ${table}:`, result.reason);
+      log.error(`Orphan cleanup failed for ${table}`, { table });
     });
 
     const totalDeleted: number = Object.values(deletedCounts).reduce((sum, count) => sum + count, 0);

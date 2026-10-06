@@ -5,6 +5,7 @@ import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import { EncryptedDAO } from './BaseDAO';
 
 import { assertD1Success } from '../utils/D1Utils';
+import { log } from '@aws-access-bridge/shared/utils';
 /**
  * Pick the IV to decrypt a credential field with.
  *
@@ -75,7 +76,7 @@ class CredentialsDAO extends EncryptedDAO {
 
     if (!credential.accessKeyId || !credential.secretAccessKey) {
       if (depth >= this.principalTrustChainLimit) {
-        console.error('Principal chain exceeds the maximum allowed depth:', this.principalTrustChainLimit);
+        log.error('Principal chain exceeds the maximum allowed depth', { limit: this.principalTrustChainLimit });
       }
       throw new InternalServerError('Principal chain is not valid. Contact system administrator.');
     }

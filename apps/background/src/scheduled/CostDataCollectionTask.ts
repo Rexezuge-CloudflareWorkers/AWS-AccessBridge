@@ -1,7 +1,7 @@
 import { CostDataDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import { COST_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, CostData } from '@aws-access-bridge/shared/model';
@@ -63,7 +63,7 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
       await costDataDAO.upsertCostData(costData);
     }
 
-    console.log(`Cost data collected for ${principalArn}: ${results.length} periods`);
+    log.info(`Cost data collected for ${principalArn}: ${results.length} periods`);
     // The number of periods written, not a constant: `AbstractCollectionTask` reads
     // this both to advance the collection interval (only when non-zero) and to fill
     // `background_task_runs.items_processed`, which was otherwise a meaningless 1.

@@ -56,6 +56,7 @@ import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
   Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
@@ -248,11 +249,11 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
         .fetch(cronTasksRequest)
         .then(async (response: Response): Promise<void> => {
           if (!response.ok && response.status !== 202) {
-            console.error('CronTasksWorker returned an error response:', response.status, await response.text());
+            log.error('CronTasksWorker returned an error response', { body: await response.text(), status: response.status });
           }
         })
         .catch((err: unknown): void => {
-          console.error('Failed to invoke CronTasksWorker:', err);
+          log.error('Failed to invoke CronTasksWorker:', { error: err });
         }),
     );
     return Promise.resolve();

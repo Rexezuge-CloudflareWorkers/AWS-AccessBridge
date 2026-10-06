@@ -10,6 +10,7 @@ import type { ServiceEnv } from '../composition/ServiceEnv';
 import { resolveCredentialKeys } from '../composition/encryptionKeys';
 import type { CredentialKeyProvider } from '../composition/encryptionKeys';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type CredentialChainServiceEnv = ServiceEnv;
 
 /**
@@ -105,7 +106,7 @@ class CredentialChainService {
       throw new ForbiddenError('For security reasons, long-term credentials are not retrievable.');
     }
     if (depth >= limit) {
-      console.error('Principal chain exceeds the maximum allowed depth:', limit);
+      log.error('Principal chain exceeds the maximum allowed depth', { limit });
     }
     throw new InternalServerError('Principal chain is not valid. Contact system administrator.');
   }

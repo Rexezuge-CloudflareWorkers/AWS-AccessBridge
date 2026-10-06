@@ -16,6 +16,7 @@ import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuar
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { log } from '@aws-access-bridge/shared/utils';
 type RequestContext = Context<{
   Bindings: Env;
   // `AuthenticatedUserEmailAddress` is the address the request authenticated as.
@@ -89,7 +90,7 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
     const deferred = (work: Promise<unknown>): void => {
       c.executionCtx.waitUntil(
         work.catch((error: unknown): void => {
-          console.error('Failed to update token last-used timestamp:', error instanceof Error ? error.message : error);
+          log.error('Failed to update token last-used timestamp:', { error: error instanceof Error ? error.message : error });
         }),
       );
     };
@@ -121,11 +122,11 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
       // rather than reach the catch below. Attach the handler to the promise.
       c.executionCtx.waitUntil(
         auditService.record(event).catch((auditError: unknown): void => {
-          console.error('Failed to write audit log:', auditError);
+          log.error('Failed to write audit log:', { error: auditError });
         }),
       );
     } catch (error: unknown) {
-      console.error('Failed to build audit log event:', error);
+      log.error('Failed to build audit log event:', { error: error });
     }
   }
 }
@@ -148,7 +149,7 @@ async function publishAccountId(c: RequestContext, userEmail: string): Promise<v
       c.set('AuthenticatedUserId', userId);
     }
   } catch (error: unknown) {
-    console.warn('Could not resolve authenticated user id:', error instanceof Error ? error.message : error);
+    log.warn('Could not resolve authenticated user id:', { error: error instanceof Error ? error.message : error });
   }
 }
 
