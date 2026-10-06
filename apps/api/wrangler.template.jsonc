@@ -114,6 +114,12 @@
     "PRINCIPAL_TRUST_CHAIN_LIMIT": "3",
     "AUDIT_LOG_RETENTION_DAYS": "90",
     "DEMO_MODE": "false",
+    // Comma-separated AWS regions the resource inventory sweeps. Empty means the
+    // built-in commercial-region list in
+    // `backend-runtime/src/constants/InventoryRegions.ts` — which is also the
+    // fallback, so blanking this cannot silently sweep nothing. Set it to trim the
+    // list and cut collection API calls per account. S3 is global and ignores it.
+    "INVENTORY_REGIONS": "",
     // Only the literal "production" arms the DEV_AUTH_EMAIL guard. Set this on
     // every real deployment.
     "ENVIRONMENT": "production",

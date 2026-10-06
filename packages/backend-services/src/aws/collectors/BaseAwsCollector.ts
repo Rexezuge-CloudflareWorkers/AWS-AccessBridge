@@ -2,7 +2,13 @@ import { AwsCollectionError } from '@aws-access-bridge/backend-errors';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import type { AwsClientFactory, AwsSignedClient } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
-import type { IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
+import type { CollectorSweepResult, IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
+
+/**
+ * Region recorded for a global service's resources, so they are distinguishable
+ * from a regional resource in `us-east-1`.
+ */
+const GLOBAL_REGION = 'global';
 
 /**
  * Ceiling on pages walked per collector call.
@@ -39,6 +45,73 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
   public collect(accessKeys: AccessKeys, region = 'us-east-1'): Promise<ResourceDiscoveryItem[]> {
     return this.collectWithRegion(accessKeys, region);
   }
+
+  /**
+   * Whether this collector is region-scoped. Overridden to `false` by a global
+   * service.
+   */
+  public abstract readonly isRegional: boolean;
+
+  /**
+   * Sweep every configured region, isolating per-region failures.
+   *
+   * **This is what makes the inventory multi-region.** `BaseAwsCollector.collect`
+   * took an optional region that defaulted to `us-east-1` and had exactly one
+   * caller which passed none — so EC2, Lambda, RDS and DynamoDB inventory covered
+   * `us-east-1` and nothing else, while the API and UI both filter by region and
+   * presented the result as a complete inventory.
+   *
+   * Failures are collected rather than thrown: a role denied in one region still
+   * has the other 26, and discarding those would make a single `AccessDenied`
+   * erase a real inventory. `succeededRegions` is what a caller prunes on, and it
+   * is only complete when nothing failed.
+   *
+   * Regions are swept concurrently rather than in sequence. A sequential sweep
+   * would multiply collection wall-clock time by the region count — 27 signed
+   * round trips per resource type, serially, inside a cron-driven Durable Object
+   * request that is also walking a credential chain and hitting a 10-minute tick.
+   */
+  public async collectAllRegions(accessKeys: AccessKeys, regions: readonly string[]): Promise<CollectorSweepResult> {
+    if (!this.isRegional) {
+      // A global service answers the same wherever it is asked. Swept once, and
+      // recorded against a single region so the caller's "all configured regions
+      // succeeded" test still holds.
+      const region: string = this.globalRegion;
+      const items: ResourceDiscoveryItem[] = await this.collect(accessKeys, region);
+      return { failedRegions: [], items, succeededRegions: [region] };
+    }
+
+    const settled: Array<{ items: ResourceDiscoveryItem[]; region: string; reason?: string }> = await Promise.all(
+      regions.map(
+        async (region: string): Promise<{ items: ResourceDiscoveryItem[]; region: string; reason?: string }> => {
+          try {
+            return { items: await this.collect(accessKeys, region), region };
+          } catch (error: unknown) {
+            return { items: [], reason: error instanceof Error ? error.message : String(error), region };
+          }
+        },
+      ),
+    );
+
+    const result: CollectorSweepResult = { failedRegions: [], items: [], succeededRegions: [] };
+    for (const entry of settled) {
+      if (entry.reason === undefined) {
+        result.succeededRegions.push(entry.region);
+        result.items.push(...entry.items);
+      } else {
+        result.failedRegions.push({ reason: entry.reason, region: entry.region });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * The region a global service is recorded under.
+   *
+   * `global` rather than a real region, so a global resource cannot be confused
+   * with a regional one that happens to sit in `us-east-1`.
+   */
+  protected readonly globalRegion: string = GLOBAL_REGION;
 
   /**
   Signed request, returning the response body as text. Throws on non-OK.

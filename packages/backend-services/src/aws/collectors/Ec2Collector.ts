@@ -8,6 +8,7 @@ const API_VERSION = '2016-11-15';
 
 class Ec2Collector extends BaseAwsCollector {
   public override readonly resourceType = 'ec2';
+  public override readonly isRegional = true;
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     // `DescribeInstances` returns at most 1000 instances per call, so the list is

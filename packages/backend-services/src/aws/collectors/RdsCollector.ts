@@ -8,6 +8,7 @@ const API_VERSION = '2014-10-31';
 
 class RdsCollector extends BaseAwsCollector {
   public override readonly resourceType = 'rds';
+  public override readonly isRegional = true;
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     // RDS pages at 100 instances via the Query-protocol `Marker`. Following it is

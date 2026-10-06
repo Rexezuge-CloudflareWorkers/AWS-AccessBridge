@@ -12,6 +12,7 @@ interface DynamoDbListTablesResponse {
 
 class DynamoDbCollector extends BaseAwsCollector {
   public override readonly resourceType = 'dynamodb';
+  public override readonly isRegional = true;
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     // DynamoDB pages at 100 tables and resumes with `ExclusiveStartTableName` in

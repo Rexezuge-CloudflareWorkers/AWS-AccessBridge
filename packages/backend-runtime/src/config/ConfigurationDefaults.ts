@@ -10,6 +10,11 @@ export const DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS: string = '
 export const DEFAULT_COST_COLLECTION_INTERVAL_HOURS: string = '6';
 export const DEFAULT_COST_LOOKBACK_DAYS: string = '30';
 export const DEFAULT_RESOURCE_COLLECTION_INTERVAL_HOURS: string = '2';
+/**
+ * Comma-separated. Empty means "fall back to `DEFAULT_INVENTORY_REGIONS`", so a
+ * blank var cannot silently disable collection entirely.
+ */
+export const DEFAULT_INVENTORY_REGIONS: string = '';
 export const DEFAULT_PRUNE_BATCH_SIZE: string = '500';
 /**
  * Anything other than the literal `production` — unset included. The value only

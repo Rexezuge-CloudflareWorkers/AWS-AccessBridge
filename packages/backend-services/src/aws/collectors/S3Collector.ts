@@ -6,6 +6,12 @@ import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
 
 class S3Collector extends BaseAwsCollector {
   public override readonly resourceType = 's3';
+  /**
+   * Buckets are global: `ListBuckets` is answered by one endpoint regardless of
+   * region, so sweeping the configured list would issue N identical requests per
+   * account. Swept once and recorded under `global`.
+   */
+  public override readonly isRegional = false;
 
   protected override async collectWithRegion(accessKeys: AccessKeys, _region: string): Promise<ResourceDiscoveryItem[]> {
     // S3 is a global service: the request goes to the global endpoint and

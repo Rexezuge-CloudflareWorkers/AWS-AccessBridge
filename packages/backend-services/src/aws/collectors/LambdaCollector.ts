@@ -20,6 +20,7 @@ interface LambdaListResponse {
 
 class LambdaCollector extends BaseAwsCollector {
   public override readonly resourceType = 'lambda';
+  public override readonly isRegional = true;
 
   protected override async collectWithRegion(accessKeys: AccessKeys, region: string): Promise<ResourceDiscoveryItem[]> {
     // Lambda pages via the `Marker` query parameter, echoed back as `NextMarker`.

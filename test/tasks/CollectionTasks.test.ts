@@ -23,11 +23,19 @@ vi.mock('@aws-access-bridge/backend-services/aws/sts');
 vi.mock('@aws-access-bridge/backend-services/aws/ce');
 
 const { stubCollectors } = vi.hoisted(() => {
-  const makeCollector = (resourceType: string) => ({ resourceType, collect: vi.fn().mockResolvedValue([]) });
+  // Mirrors `IAwsResourceCollector`: a sweep is what the task now calls, so a
+  // collector double has to answer it.
+  const makeCollector = (resourceType: string, isRegional = true) => ({
+    resourceType,
+    isRegional,
+    collect: vi.fn().mockResolvedValue([]),
+    collectAllRegions: vi.fn().mockResolvedValue({ failedRegions: [], items: [], succeededRegions: ['us-east-1'] }),
+  });
   return {
     stubCollectors: new Map([
       ['ec2', makeCollector('ec2')],
-      ['s3', makeCollector('s3')],
+      // S3 is global, so its sweep reports exactly one region.
+      ['s3', makeCollector('s3', false)],
       ['lambda', makeCollector('lambda')],
       ['rds', makeCollector('rds')],
       ['dynamodb', makeCollector('dynamodb')],
@@ -42,9 +50,53 @@ vi.mock('@aws-access-bridge/backend-services/aws/collectors', () => ({
   },
 }));
 
+/**
+ * The tasks resolve their collaborators through the composition root, so this
+ * substitutes the seam rather than the module the collaborators came from.
+ *
+ * Previously the tasks constructed `StsService`/`CostExplorerService` and read the
+ * static `CollectorRegistry` directly, which meant the DI tokens for all three
+ * existed but nothing resolved them — and no test could inject through one.
+ */
+vi.mock('@aws-access-bridge/backend-services/composition', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@aws-access-bridge/backend-services/composition')>();
+  const { Tokens } = actual;
+  // The auto-mocked collaborators, so `StsService.prototype.assumeRole` — which the
+  // tests configure directly — is what the resolved token actually delegates to.
+  const stsModule = await import('@aws-access-bridge/backend-services/aws/sts');
+  const ceModule = await import('@aws-access-bridge/backend-services/aws/ce');
+
+  return {
+    ...actual,
+    createRequestScope: (env: unknown) => {
+      // Everything not overridden below comes from the real composition root, so
+      // the credential chain these tasks depend on still resolves normally.
+      const real = actual.createRequestScope(env as never);
+      return {
+        get: (token: symbol): unknown => {
+          if (token === Tokens.CollectorRegistry) {
+            return { get: (type: string) => stubCollectors.get(type), getAll: () => stubCollectors };
+          }
+          if (token === Tokens.StsService) {
+            return { assumeRole: (...args: unknown[]) => (stsModule.StsService.prototype.assumeRole as (...a: unknown[]) => unknown)(...args) };
+          }
+          return token === Tokens.CostExplorerService ? { getCostAndUsage: (...args: unknown[]) => (ceModule.CostExplorerService.prototype.getCostAndUsage as (...a: unknown[]) => unknown)(...args) } : real.get(token);
+        },
+      };
+    },
+  };
+});
+
 function createEvent(): ScheduledController {
   return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => undefined };
 }
+
+/**
+ * Two regions rather than the ~27-region production default, so a sweep double
+ * has to name exactly the regions it claims to have read — which is the property
+ * the pruning rule turns on.
+ */
+const INVENTORY_REGIONS = ['us-east-1', 'eu-west-1'];
 
 function taskEnv() {
   return {
@@ -52,6 +104,7 @@ function taskEnv() {
     AccessBridgeKV: {},
     CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    INVENTORY_REGIONS: INVENTORY_REGIONS.join(','),
   } as unknown as Env;
 }
 
@@ -176,8 +229,14 @@ describe('ResourceInventoryCollectionTask', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const collector of stubCollectors.values()) {
-      vi.mocked(collector.collect).mockResolvedValue([]);
+      // Every region read, no items. The default for a sweep the test is not
+      // specifically exercising.
+      vi.mocked(collector.collectAllRegions).mockResolvedValue({ failedRegions: [], items: [], succeededRegions: [...INVENTORY_REGIONS] });
     }
+    // S3 is global: one request regardless of the region list, recorded under
+    // `global`. Reporting the full list here would make the task see more regions
+    // read than it asked for and withhold the prune.
+    vi.mocked(stubCollectors.get('s3')!.collectAllRegions).mockResolvedValue({ failedRegions: [], items: [], succeededRegions: ['global'] });
   });
 
   it('collects resources and cleans stale rows', async () => {
@@ -186,9 +245,11 @@ describe('ResourceInventoryCollectionTask', () => {
     ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
-    vi.mocked(stubCollectors.get('ec2')!.collect).mockResolvedValue([
-      { resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} },
-    ]);
+    vi.mocked(stubCollectors.get('ec2')!.collectAllRegions).mockResolvedValue({
+      failedRegions: [],
+      items: [{ resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} }],
+      succeededRegions: [...INVENTORY_REGIONS],
+    });
     vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
     vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
@@ -211,10 +272,18 @@ describe('ResourceInventoryCollectionTask', () => {
     vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
-    vi.mocked(stubCollectors.get('ec2')!.collect).mockResolvedValue([
-      { resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} },
-    ]);
-    vi.mocked(stubCollectors.get('s3')!.collect).mockRejectedValue(new Error('AccessDenied: s3:ListAllMyBuckets'));
+    vi.mocked(stubCollectors.get('ec2')!.collectAllRegions).mockResolvedValue({
+      failedRegions: [],
+      items: [{ resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', region: 'us-east-1', metadata: {} }],
+      succeededRegions: [...INVENTORY_REGIONS],
+    });
+    // A region the role cannot read. The sweep reports it so the task declines to
+    // prune, rather than pruning down to whatever the readable regions held.
+    vi.mocked(stubCollectors.get('s3')!.collectAllRegions).mockResolvedValue({
+      failedRegions: [{ region: 'eu-west-1', reason: 'AccessDenied: s3:ListAllMyBuckets' }],
+      items: [],
+      succeededRegions: ['us-east-1'],
+    });
     vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
     vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
@@ -234,7 +303,7 @@ describe('ResourceInventoryCollectionTask', () => {
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     for (const collector of stubCollectors.values()) {
-      vi.mocked(collector.collect).mockRejectedValue(new Error('AWS unavailable'));
+      vi.mocked(collector.collectAllRegions).mockRejectedValue(new Error('AWS unavailable'));
     }
     vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
     vi.mocked(ResourceInventoryDAO.prototype.deleteStaleResources).mockResolvedValue(undefined);
