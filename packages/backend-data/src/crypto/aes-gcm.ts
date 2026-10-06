@@ -1,7 +1,4 @@
 /**
-NIST SP 800-38D recommends a 96-bit GCM IV; longer values are hashed down.
-*/
-/**
  * AES-GCM helpers for credential encryption.
  *
  * NIST SP 800-38D recommends a 96-bit GCM IV; longer values are hashed down.
@@ -87,24 +84,6 @@ export async function decryptDataWithKeys(encryptedBase64: string | undefined, i
 }
 
 /**
- * Decrypt, returning `undefined` instead of throwing when the payload cannot be
- * authenticated. AES-GCM's tag check is the only integrity signal we have, so
- * any tampering, key rotation, or legacy/garbled ciphertext surfaces here.
- *
- * Intended for read paths that can recover by re-fetching (e.g. the credential
- * cache, whose entries are keyed by a refreshable principal ARN). Do not use
- * for durable data, where a failure must be loud.
- */
-/**
- * As `decryptDataWithKeys`, but `undefined` instead of a throw when no key
- * authenticates. AES-GCM's tag check is the only integrity signal we have, so
- * any tampering, key rotation, or legacy/garbled ciphertext surfaces here.
- *
- * Intended for read paths that can recover by re-fetching (e.g. the credential
- * cache, whose entries are keyed by a refreshable principal ARN). Do not use
- * for durable data, where a failure must be loud.
- */
-/**
  * Decrypt one optional column: absent → `undefined`, present but no key
  * authenticates → throw.
  *
@@ -118,6 +97,18 @@ export async function decryptDataField(encryptedBase64: string | undefined, ivBa
   return !encryptedBase64 || !ivBase64 ? undefined : decryptDataWithKeys(encryptedBase64, ivBase64, keys);
 }
 
+/**
+ * As `decryptDataWithKeys`, but `undefined` instead of a throw when no key
+ * authenticates. AES-GCM's tag check is the only integrity signal we have, so
+ * any tampering, key rotation, or legacy/garbled ciphertext surfaces here.
+ *
+ * Intended for read paths that can recover by re-fetching (e.g. the credential
+ * cache, whose entries are keyed by a refreshable principal ARN). Do not use
+ * for durable data, where a failure must be loud.
+ *
+ * This block was previously duplicated above `decryptDataField`, where it
+ * documented a function it does not describe.
+ */
 export async function decryptDataTolerant(
   encryptedBase64: string | undefined,
   ivBase64: string | undefined,

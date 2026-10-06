@@ -29,17 +29,6 @@ import { LIKEUtil } from '../utils/LIKEUtil';
  * the ambiguous mixed-case accounts 0032 leaves unresolved — visible instead of
  * silently dropping them. Without the `IS NULL` guard the address arm would
  * double-count a row the id arm already matched.
- */
-/**
- * The owner predicate for a user-keyed query.
- *
- * `id OR (id IS NULL AND address)` is deliberate on both arms. The id arm matches
- * every row the backfill attributed, regardless of which address was current at
- * write time, so a grant survives an address change. The `id IS NULL` arm keeps
- * rows the backfill could not attribute — an unknown or deleted actor, or one of
- * the ambiguous mixed-case accounts 0032 leaves unresolved — visible instead of
- * silently dropping them. Without the `IS NULL` guard the address arm would
- * double-count a row the id arm already matched.
  *
  * This is the single definition of that predicate. `TeamMembersDAO`,
  * `UserFavoriteAccountsDAO`, and `UserAccessTokenDAO` all used to carry their own

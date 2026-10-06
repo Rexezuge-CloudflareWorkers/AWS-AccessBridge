@@ -129,12 +129,6 @@ class AssumableRolesDAO extends BaseDAO {
   }
 
   /**
-   * Grants a user access to assume a specific role in an AWS account.
-   * @param userEmail The email address of the user.
-   * @param awsAccountId The AWS account ID.
-   * @param roleName The name of the role to grant access to.
-   */
-  /**
    * Grant an account access to assume a role.
    *
    * `user_email` keeps the anchor: it is the foreign key the schema cannot
