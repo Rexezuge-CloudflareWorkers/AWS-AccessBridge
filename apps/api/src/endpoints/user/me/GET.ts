@@ -4,6 +4,7 @@ import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IAc
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCurrentUserResponse, GetCurrentUserEnv> {
   schema = {
     tags: ['User'],
@@ -64,58 +65,8 @@ class GetCurrentUserRoute extends IActivityAPIRoute<GetCurrentUserRequest, GetCu
           },
         },
       },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication headers',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while retrieving user information',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to extract user information from headers',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication headers'),
+      '500': internalServerErrorResponse('Internal server error while retrieving user information'),
     },
     security: [
       {

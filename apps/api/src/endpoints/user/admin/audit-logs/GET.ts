@@ -7,6 +7,7 @@ import { getRequestScope } from '@aws-access-bridge/backend-services/composition
 import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, ListAuditLogsResponse, ListAuditLogsEnv> {
   schema = {
     tags: ['Admin'],
@@ -124,63 +125,9 @@ class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, Li
           },
         },
       },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User is not a superadmin',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'User is not a super admin.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while querying audit logs',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'Failed to query audit logs.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '500': internalServerErrorResponse('Internal server error while querying audit logs'),
     },
     security: [{ CloudflareAccess: [] }],
   };

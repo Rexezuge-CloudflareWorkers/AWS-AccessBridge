@@ -5,6 +5,7 @@ import { BadRequestError } from '@aws-access-bridge/backend-errors';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, notFoundResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleResponse, AssumeRoleEnv> {
   schema = {
     tags: ['AWS'],
@@ -98,136 +99,11 @@ class AssumeRoleRoute extends IActivityAPIRoute<AssumeRoleRequest, AssumeRoleRes
           },
         },
       },
-      '400': {
-        description: 'Invalid request - malformed ARN or missing required fields',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'BadRequestError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Details about the invalid request',
-                      example: 'Missing required fields.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing authentication or invalid user',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User does not have permission to assume this role',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'ForbiddenError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Permission denial details',
-                      example: 'User does not have permission to assume role: arn:aws:iam::123456789012:role/RestrictedRole',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '404': {
-        description: 'Role not found or not configured in credential chain',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'NotFoundError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Role or credential chain not found',
-                      example: 'Credential chain not found for principal ARN',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during role assumption',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to assume role due to AWS API error',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Invalid request - malformed ARN or missing required fields'),
+      '401': unauthorizedResponse('Unauthorized - Missing authentication or invalid user'),
+      '403': forbiddenResponse('Forbidden - User does not have permission to assume this role'),
+      '404': notFoundResponse('Role not found or not configured in credential chain'),
+      '500': internalServerErrorResponse('Internal server error during role assumption'),
     },
     // Registered on both surfaces: /user/aws/* (Cloudflare Access JWT)
     // and /api/aws/* (Bearer PAT or HMAC-signed internal calls).

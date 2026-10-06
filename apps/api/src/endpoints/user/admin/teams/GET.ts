@@ -6,6 +6,7 @@ import { DEFAULT_TEAM_ID } from '@aws-access-bridge/shared/constants';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -57,63 +58,9 @@ class ListTeamsRoute extends IAdminActivityAPIRoute<IRequest, ListTeamsResponse,
           },
         },
       },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User is not a superadmin',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'User is not a super admin.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while listing teams',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'Failed to list teams.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '500': internalServerErrorResponse('Internal server error while listing teams'),
     },
     security: [{ CloudflareAccess: [] }],
   };

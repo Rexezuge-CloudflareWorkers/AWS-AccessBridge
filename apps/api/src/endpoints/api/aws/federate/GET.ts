@@ -11,6 +11,7 @@ import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse, FederateEnv> {
   schema = {
     tags: ['AWS'],
@@ -75,110 +76,10 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
           },
         },
       },
-      '400': {
-        description: 'Missing required query parameters',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'BadRequestError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Details about the missing or invalid parameters',
-                      example: 'Missing required query parameters.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid Cloudflare Access authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User not authorized to assume the specified role',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'ForbiddenError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authorization error details',
-                      example: 'User not authorized to assume role: arn:aws:iam::123456789012:role/DeveloperRole',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during role assumption or URL generation',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to assume AWS role',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Missing required query parameters'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid Cloudflare Access authentication'),
+      '403': forbiddenResponse('Forbidden - User not authorized to assume the specified role'),
+      '500': internalServerErrorResponse('Internal server error during role assumption or URL generation'),
     },
     // Registered on both surfaces: /user/aws/* (Cloudflare Access JWT)
     // and /api/aws/* (Bearer PAT or HMAC-signed internal calls).

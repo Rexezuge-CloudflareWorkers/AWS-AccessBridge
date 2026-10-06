@@ -4,6 +4,7 @@ import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IAc
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleResponse, UnhideRoleEnv> {
   schema = {
     tags: ['User'],
@@ -55,110 +56,10 @@ class UnhideRoleRoute extends IActivityAPIRoute<UnhideRoleRequest, UnhideRoleRes
           },
         },
       },
-      '400': {
-        description: 'Bad request - Invalid input parameters',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'ValidationError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Validation error details',
-                      example: 'Invalid AWS Account ID format',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User does not have access to this role',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authorization error details',
-                      example: "user@example.com is not authorized to assume role 'ReadOnlyRole' in AWS account 123456789012.",
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while unhiding role',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Database error while updating role visibility',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Bad request - Invalid input parameters'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User does not have access to this role'),
+      '500': internalServerErrorResponse('Internal server error while unhiding role'),
     },
     security: [{ CloudflareAccess: [] }],
   };

@@ -5,6 +5,7 @@ import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityA
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertRequest, DeleteSpendAlertResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -57,82 +58,10 @@ class DeleteSpendAlertRoute extends IAdminActivityAPIRoute<DeleteSpendAlertReque
           },
         },
       },
-      '400': {
-        description: 'Bad request - Missing required field',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'BadRequestError' },
-                    Message: { type: 'string' as const, example: 'Missing required field: alertId.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User is not a superadmin',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'User is not a super admin.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while deleting spend alert',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'Failed to delete spend alert.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Bad request - Missing required field'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '500': internalServerErrorResponse('Internal server error while deleting spend alert'),
     },
     security: [{ CloudflareAccess: [] }],
   };

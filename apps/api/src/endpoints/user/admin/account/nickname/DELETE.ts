@@ -4,6 +4,7 @@ import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoint
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
   RemoveAccountNicknameRequest,
   RemoveAccountNicknameResponse,
@@ -71,84 +72,9 @@ class RemoveAccountNicknameRoute extends IAdminActivityAPIRoute<
           },
         },
       },
-      '400': {
-        description: 'Invalid request parameters - missing required fields or malformed account ID',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'BadRequestError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Details about the invalid request parameters',
-                      example: 'Missing required fields.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid Cloudflare Access authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during nickname removal',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to remove account nickname from database',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Invalid request parameters - missing required fields or malformed account ID'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid Cloudflare Access authentication'),
+      '500': internalServerErrorResponse('Internal server error during nickname removal'),
     },
     security: [
       {

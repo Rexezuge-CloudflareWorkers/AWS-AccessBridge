@@ -4,6 +4,7 @@ import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IAc
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryRequest, GetResourceSummaryResponse, IEnv> {
   schema = {
     tags: ['Resources'],
@@ -54,44 +55,8 @@ class GetResourceSummaryRoute extends IActivityAPIRoute<GetResourceSummaryReques
           },
         },
       },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error while fetching resource summary',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'Failed to retrieve resource summary.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '500': internalServerErrorResponse('Internal server error while fetching resource summary'),
     },
     security: [{ CloudflareAccess: [] }],
   };

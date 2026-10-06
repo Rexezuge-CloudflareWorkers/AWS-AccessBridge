@@ -4,6 +4,7 @@ import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoint
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesRequest, ListAccountRolesResponse, ListAccountRolesEnv> {
   schema = {
     tags: ['Admin'],
@@ -70,85 +71,10 @@ class ListAccountRolesRoute extends IAdminActivityAPIRoute<ListAccountRolesReque
           },
         },
       },
-      '400': {
-        description: 'Bad request - Missing field or insufficient IAM permissions',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'BadRequestError' },
-                    Message: {
-                      type: 'string' as const,
-                      example: 'The assumed role does not have iam:ListRoles permission. You can still manually enter role names.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'No Cloudflare Access JWT token provided in request headers.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '403': {
-        description: 'Forbidden - User is not a superadmin',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'UnauthorizedError' },
-                    Message: { type: 'string' as const, example: 'User is not a super admin.' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during IAM ListRoles call',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: { type: 'string' as const, example: 'InternalServerError' },
-                    Message: { type: 'string' as const, example: 'IAM ListRoles failed: 500' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Bad request - Missing field or insufficient IAM permissions'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '500': internalServerErrorResponse('Internal server error during IAM ListRoles call'),
     },
     security: [{ CloudflareAccess: [] }],
   };

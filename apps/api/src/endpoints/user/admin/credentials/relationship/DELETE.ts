@@ -4,6 +4,7 @@ import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoint
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
+import { badRequestResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
   RemoveCredentialRelationshipRequest,
   RemoveCredentialRelationshipResponse,
@@ -83,104 +84,9 @@ class RemoveCredentialRelationshipRoute extends IAdminActivityAPIRoute<
           },
         },
       },
-      '400': {
-        description: 'Invalid request parameters - missing required fields or malformed ARN',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'BadRequestError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Details about the invalid request parameters',
-                      example: 'Missing required fields.',
-                    },
-                  },
-                },
-              },
-            },
-            examples: {
-              'missing-principal-arn': {
-                summary: 'Missing principal ARN',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'Missing required fields.',
-                  },
-                },
-              },
-              'invalid-principal-arn': {
-                summary: 'Invalid principal ARN format',
-                value: {
-                  Exception: {
-                    Type: 'BadRequestError',
-                    Message: 'Invalid principal ARN format.',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '401': {
-        description: 'Unauthorized - Missing or invalid Cloudflare Access authentication',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'UnauthorizedError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Authentication error details',
-                      example: 'No Cloudflare Access JWT token provided in request headers.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '500': {
-        description: 'Internal server error during credential relationship removal',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object' as const,
-              properties: {
-                Exception: {
-                  type: 'object' as const,
-                  properties: {
-                    Type: {
-                      type: 'string' as const,
-                      example: 'InternalServerError',
-                    },
-                    Message: {
-                      type: 'string' as const,
-                      description: 'Error description',
-                      example: 'Failed to remove credential relationship from database',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      '400': badRequestResponse('Invalid request parameters - missing required fields or malformed ARN'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid Cloudflare Access authentication'),
+      '500': internalServerErrorResponse('Internal server error during credential relationship removal'),
     },
     security: [
       {
