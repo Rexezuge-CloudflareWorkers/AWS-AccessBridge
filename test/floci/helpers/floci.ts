@@ -23,6 +23,22 @@ Where the emulator is expected. Overridable so CI can move the port.
 const FLOCI_ENDPOINT: string = process.env.FLOCI_ENDPOINT ?? 'http://127.0.0.1:4566';
 
 /**
+Ceiling on one emulator round trip, applied by the factory below.
+
+Every test here crosses a process boundary, and Node's `fetch` carries no timeout
+of its own — a request the emulator never answers waits until Vitest's own budget
+expires, which reports as `Test timed out in 30000ms` and names neither the
+service nor the action. That is a bad way to learn that one emulator call went
+wrong, so the deadline lives here: a hung call fails naming the service that hung,
+and the test around it still has budget left to say what it was doing.
+
+Not a slowness allowance. Floci answers these calls in milliseconds, so anything
+past a few seconds is a wedged call rather than a slow one, and the seeds in
+`seed.ts` assert on the calls they make regardless.
+*/
+const REQUEST_TIMEOUT_MS = 20_000;
+
+/**
 Emulator boot budget. Floci starts in milliseconds; this only absorbs pull time.
 */
 const READY_TIMEOUT_MS = 60_000;
@@ -30,8 +46,15 @@ const READY_POLL_MS = 500;
 
 /**
 How to start the emulator, quoted verbatim in the probe's failure message.
+
+Carries the two settings CI's service container also passes, and the tag CI pins,
+so a developer's emulator is the one the suite was written against.
+`FLOCI_SERVICES_RDS_MOCK` is not optional here: without it a seeded
+`CreateDBInstance` reaches for Docker before falling back to metadata, and with
+no socket mounted that retry path costs tens of seconds per call inside the
+emulator (see `seed.ts`).
 */
-const START_HINT: string = 'docker run --rm -p 4566:4566 floci/floci:latest';
+const START_HINT: string = 'docker run --rm -p 4566:4566 -e FLOCI_SERVICES_RDS_MOCK=true floci/floci:2.2.0';
 
 /**
  * Floci treats a 12-character access key id as an account id and scopes IAM per
@@ -63,15 +86,39 @@ function accountKeys(accessKeyId: string): AccessKeys {
  * The rewrite happens **before** signing, so the signature covers the emulator's
  * host, and `options.service` is untouched — Floci routes on the credential scope
  * in the `Authorization` header, exactly as LocalStack does.
+ *
+ * Every call also gets `REQUEST_TIMEOUT_MS`. This is the only place a wedged
+ * emulator call can be named, and the service name is the one piece of context
+ * that makes the failure readable: without it, a hang surfaces as a bare Vitest
+ * timeout that points at whichever test happened to be running.
  */
 function flociClientFactory(endpoint: string = FLOCI_ENDPOINT): AwsClientFactory {
   const base: URL = new URL(endpoint);
   return (options: AwsClientOptions): AwsSignedClient => {
     const signed: AwsSignedClient = defaultAwsClientFactory(options);
     return {
-      fetch: (url: string, init?: RequestInit): Promise<Response> => {
+      fetch: async (url: string, init?: RequestInit): Promise<Response> => {
         const target: URL = new URL(url);
-        return signed.fetch(`${base.origin}${target.pathname}${target.search}`, init);
+        const deadline: AbortSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+        // `AbortSignal.any` rather than `init.signal` alone: a caller-supplied
+        // signal must still win, and it must not have to know about ours. Both
+        // compose, so whichever fires first aborts the request.
+        const signal: AbortSignal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+        try {
+          return await signed.fetch(`${base.origin}${target.pathname}${target.search}`, { ...init, signal });
+        } catch (error: unknown) {
+          // Only *our* deadline is reported this way: a caller that aborted
+          // deliberately keeps its own error, which is the one it can act on.
+          if (deadline.aborted && !(init?.signal?.aborted ?? false)) {
+            throw new Error(
+              `${options.service} call to the emulator (${target.pathname}) did not answer within ` +
+                `${REQUEST_TIMEOUT_MS}ms. Either the emulator is wedged, or it is not answering from the ` +
+                `metadata-only RDS path this suite expects: ${START_HINT}`,
+              { cause: error },
+            );
+          }
+          throw error;
+        }
       },
     };
   };

@@ -47,6 +47,42 @@ async function expectSeeded(response: Response, action: string): Promise<void> {
 }
 
 /**
+ * Above this, a seeded `CreateDBInstance` is not taking the metadata-only path
+ * this suite asks the emulator for.
+ *
+ * With `FLOCI_SERVICES_RDS_MOCK` the create is a record write that answers in
+ * milliseconds. Without it the emulator still *reaches for Docker first*, and
+ * since Floci 2.2.0 a Docker call is retried inside the emulator — six attempts,
+ * 500ms exponential backoff capped at 8s, with any `IOException` (a missing
+ * socket is exactly that) counted as transient. A socket-less run therefore paid
+ * tens of seconds of retry backoff per create to arrive at the same record, which
+ * is what timed the RDS collector test out at 30s and again at 60s.
+ *
+ * The per-request deadline in `floci.ts` catches that at 20s and names the
+ * setting; this catches it sooner, while the test still has budget left to report
+ * anything. Deliberately far above the milliseconds a record write takes, so a
+ * merely slow emulator does not trip it.
+ */
+const SLOW_SEED_MS = 10_000;
+
+/**
+ * Fail a seed that took implausibly long instead of letting it eat the test
+ * budget. The message has to be actionable on its own: whoever reads the red CI
+ * log is not holding this file.
+ */
+function expectFastSeed(action: string, elapsedMs: number): void {
+  if (elapsedMs <= SLOW_SEED_MS) {
+    return;
+  }
+  throw new Error(
+    `Seeding ${action} took ${elapsedMs}ms, so the emulator is not answering from its metadata-only RDS ` +
+      `path. Start it with FLOCI_SERVICES_RDS_MOCK=true (see helpers/floci.ts for the exact command): ` +
+      `without that setting the create reaches for Docker before falling back, and Floci 2.2.0+ retries ` +
+      `every Docker call internally, so a run with no Docker socket pays tens of seconds per seed.`,
+  );
+}
+
+/**
  * A single S3 object, sized so Cost Explorer reports a non-zero amount.
  *
  * Not incidental. Floci prices S3 as `TimedStorage-Standard` x GB-month over
@@ -92,11 +128,11 @@ async function createBucketWithObject(bucket: string, keys: AccessKeys = account
 /**
  * `rds:CreateDBInstance`.
  *
- * Floci keeps the instance as metadata and reaches `available` even with no
- * reachable Docker daemon, which is why this suite needs no socket mount: the
- * collector under test only ever reads `DescribeDBInstances`. Reaching a real
- * engine would need `-v /var/run/docker.sock` and would add a container start to
- * every CI run to learn nothing this parser does not already learn here.
+ * `FLOCI_SERVICES_RDS_MOCK` is what keeps this cheap, and it is set on the CI
+ * service container and in `START_HINT`. The collector under test only ever reads
+ * `DescribeDBInstances`, so a backing engine would buy nothing: reaching one
+ * needs `-v /var/run/docker.sock` plus a `postgres:16-alpine` pull and a container
+ * start on every run, to learn what the metadata response already says.
  */
 async function createDbInstance(identifier: string, keys: AccessKeys = accountKeys(ACCOUNT_A)): Promise<void> {
   const params: URLSearchParams = new URLSearchParams({
@@ -110,7 +146,10 @@ async function createDbInstance(identifier: string, keys: AccessKeys = accountKe
     AllocatedStorage: '20',
   });
   const request = awsQueryRequest('https://rds.us-east-1.amazonaws.com/', params);
-  await expectSeeded(await flociFetch('rds', request.url, request.init, keys), `rds:CreateDBInstance ${identifier}`);
+  const startedAt: number = Date.now();
+  const response: Response = await flociFetch('rds', request.url, request.init, keys);
+  expectFastSeed(`rds:CreateDBInstance ${identifier}`, Date.now() - startedAt);
+  await expectSeeded(response, `rds:CreateDBInstance ${identifier}`);
 }
 
 export { createBucketWithObject, createDbInstance, createRole };

@@ -27,17 +27,20 @@ export default defineConfig({
     include: ['test/floci/**/*.test.ts'],
     // One readiness probe for the run, not one per file: see global-setup.ts.
     globalSetup: ['test/floci/global-setup.ts'],
-    // Every test here crosses a process boundary and `aws4fetch` retries a 5xx
-    // up to ten times with backoff, so a chain walk can outrun the 5s default
-    // on a cold emulator without anything being wrong.
+    // Every test here crosses a process boundary, so the 5s default is not the
+    // question. 30s is, and it is generous: once the emulator answered `S3` in
+    // 227ms, EC2 in 7ms and Lambda in 3ms in the same run. It was raised to 60s
+    // in the belief that the RDS case was waiting on a warming emulator — that
+    // was wrong, and the same test then failed at 60s too. The cost it really was
+    // paying was emulator-side: without `FLOCI_SERVICES_RDS_MOCK` the seeded
+    // `CreateDBInstance` reaches for Docker before falling back to metadata, and
+    // Floci 2.2.0 retries every Docker call internally (see `helpers/seed.ts`),
+    // so the seed cost tens of seconds no matter what this number was.
     //
-    // Raised from 30s because the RDS case has to do *two* AWS round trips in one
-    // test (`CreateDBInstance`, then `DescribeDBInstances`) on an emulator that is
-    // still warming up: the neighbouring EC2 test already measured 16.5s in CI on
-    // its single round trip. 30s left no margin, and a budget that flakes on a slow
-    // runner teaches everyone to ignore it. The cost of being generous here is a
-    // genuinely hung test takes twice as long to report.
-    testTimeout: 60_000,
+    // A wedged emulator call is now bounded per request by `REQUEST_TIMEOUT_MS`
+    // in `helpers/floci.ts`, which fails naming the service that hung — a far
+    // better report than this budget expiring anonymously.
+    testTimeout: 30_000,
     hookTimeout: 90_000,
     // Serialized on purpose. Most files seed distinct resource names into the
     // shared throwaway account and would tolerate running concurrently, but the
