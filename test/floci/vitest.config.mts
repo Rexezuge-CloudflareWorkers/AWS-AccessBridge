@@ -37,9 +37,12 @@ export default defineConfig({
     // Floci 2.2.0 retries every Docker call internally (see `helpers/seed.ts`),
     // so the seed cost tens of seconds no matter what this number was.
     //
-    // A wedged emulator call is now bounded per request by `REQUEST_TIMEOUT_MS`
-    // in `helpers/floci.ts`, which fails naming the service that hung — a far
-    // better report than this budget expiring anonymously.
+    // A wedged emulator call is now bounded per round trip (headers plus body)
+    // by `REQUEST_TIMEOUT_MS` in `helpers/floci.ts`, which fails naming the
+    // service that hung — a far better report than this budget expiring
+    // anonymously. The body shares the fetch's deadline rather than starting a
+    // second one, and the readiness probe in `global-setup.ts` warms every
+    // collector path so the first test does not pay cold-start init here.
     testTimeout: 30_000,
     hookTimeout: 90_000,
     // Serialized on purpose. Most files seed distinct resource names into the

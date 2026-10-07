@@ -58,10 +58,13 @@ async function expectSeeded(response: Response, action: string): Promise<void> {
  * tens of seconds of retry backoff per create to arrive at the same record, which
  * is what timed the RDS collector test out at 30s and again at 60s.
  *
- * The per-request deadline in `floci.ts` catches that at 20s and names the
- * setting; this catches it sooner, while the test still has budget left to report
- * anything. Deliberately far above the milliseconds a record write takes, so a
- * merely slow emulator does not trip it.
+ * The per-request deadline in `floci.ts` bounds the whole round trip (headers
+ * plus body) and names the setting; this catches a slow-but-answered seed
+ * sooner, while the test still has budget left to report anything. The elapsed
+ * time covers the fetch and the body read together, since a stalled body would
+ * otherwise escape the measurement and eat the test budget anonymously.
+ * Deliberately far above the milliseconds a record write takes, so a merely
+ * slow emulator does not trip it.
  */
 const SLOW_SEED_MS = 10_000;
 
@@ -148,8 +151,8 @@ async function createDbInstance(identifier: string, keys: AccessKeys = accountKe
   const request = awsQueryRequest('https://rds.us-east-1.amazonaws.com/', params);
   const startedAt: number = Date.now();
   const response: Response = await flociFetch('rds', request.url, request.init, keys);
-  expectFastSeed(`rds:CreateDBInstance ${identifier}`, Date.now() - startedAt);
   await expectSeeded(response, `rds:CreateDBInstance ${identifier}`);
+  expectFastSeed(`rds:CreateDBInstance ${identifier}`, Date.now() - startedAt);
 }
 
 export { createBucketWithObject, createDbInstance, createRole };
