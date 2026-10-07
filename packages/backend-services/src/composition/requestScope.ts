@@ -57,13 +57,12 @@ function requireCredentialCacheKv(env: RequestScopeEnvShape): KVNamespace {
 function createRequestScope(env: RequestScopeEnvShape): Container {
   const scope = new Container();
 
-  // Per-feature encryption keys. Each resolves to the ordered chain for its
-  // surface (own key first, legacy master key as a read fallback) and is
-  // memoized, so resolving one key never fetches another and a failing binding
+  // Per-feature encryption keys. Each resolves to the key chain for its surface
+  // and is memoized, so resolving one key never fetches another and a failing binding
   // is not retried per lookup.
   const keys = createEncryptionKeys(env);
-  const credentialKey = memoize(() => keyChain(keys.credentialKey, keys.legacyMasterKey));
-  const credentialCacheKey = memoize(() => keyChain(keys.credentialCacheKey, keys.legacyMasterKey));
+  const credentialKey = memoize(() => keyChain(keys.credentialKey));
+  const credentialCacheKey = memoize(() => keyChain(keys.credentialCacheKey));
   scope.bindValue(Tokens.CredentialKey, credentialKey);
   scope.bindValue(Tokens.CredentialCacheKey, credentialCacheKey);
   scope.bindValue(Tokens.CollectorRegistry, InjectableCollectorRegistry.withDefaults());

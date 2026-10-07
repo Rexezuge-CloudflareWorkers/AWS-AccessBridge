@@ -16,11 +16,11 @@ principal may assume that one_, a grant says _this user may assume that role_.
 
 Per encrypted surface the key chain is resolved by
 `backend-services/composition/encryptionKeys.ts` and **injected** into the services, which is what
-makes the per-feature key split non-breaking. `CREDENTIAL_ENCRYPTION_KEY_SECRET` covers the D1
-table; `CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET` covers the KV namespace;
-`AES_ENCRYPTION_KEY_SECRET` is the legacy single key, kept as a read-only fallback so rows written
-before the split stay decryptable. Writes always use the surface's own key, so a row upgrades itself
-the next time it is stored.
+keeps a service from building a second scope. `CREDENTIAL_ENCRYPTION_KEY_SECRET` covers the D1
+table; `CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET` covers the KV namespace. Each chain holds that one
+key; the legacy single `AES_ENCRYPTION_KEY_SECRET` and its read fallback were removed once every row
+was rewritten. The DAOs still accept a longer chain, so a future rotation can append the outgoing
+key.
 
 `AwsAccountsDAO` holds account nicknames; `RoleConfigsDAO` holds the per-role session duration and
 Console destination path/region.

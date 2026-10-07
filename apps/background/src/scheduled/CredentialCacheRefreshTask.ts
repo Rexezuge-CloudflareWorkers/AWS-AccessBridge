@@ -104,7 +104,8 @@ interface CredentialCacheRefreshTaskEnv extends IEnv {
   NUMBER_OF_CREDENTIALS_TO_REFRESH?: string;
   AccessBridgeDB: D1Database;
   AccessBridgeKV: KVNamespace;
-  AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }
 
 export { CredentialCacheRefreshTask };

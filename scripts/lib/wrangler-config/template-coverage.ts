@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parse } from 'jsonc-parser';
 import { readConfig } from './patches';
-import { OPTIONAL_TEMPLATE_KEYS, PROVISIONED_TEMPLATE_KEYS, TEMPLATE_LABEL, TEMPLATE_PATH, type WranglerConfig } from './types';
+import { PROVISIONED_TEMPLATE_KEYS, TEMPLATE_LABEL, TEMPLATE_PATH, type WranglerConfig } from './types';
 
 /**
  * One template requirement the materialized config failed to meet.
@@ -27,13 +27,11 @@ function readTemplate(): WranglerConfig {
 /**
  * Whether the worker needs this key present at all.
  *
- * The two exclusions are separate concerns: an optional key is one a deployment
- * may legitimately drop, and a provisioned one is one `provisionWranglerResources`
- * injects moments later, so demanding it would fail a config that is about to be
- * completed anyway.
+ * A provisioned key is one `provisionWranglerResources` injects moments later, so
+ * demanding it would fail a config that is about to be completed anyway.
  */
 function isRequiredKey(key: string): boolean {
-  return !OPTIONAL_TEMPLATE_KEYS.has(key) && !PROVISIONED_TEMPLATE_KEYS.has(key);
+  return !PROVISIONED_TEMPLATE_KEYS.has(key);
 }
 
 /**

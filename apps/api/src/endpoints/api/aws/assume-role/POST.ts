@@ -142,7 +142,8 @@ interface AssumeRoleResponse extends IResponse {
 interface AssumeRoleEnv extends IEnv {
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeKV: KVNamespace;
-  AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }
 
 export { AssumeRoleRoute };

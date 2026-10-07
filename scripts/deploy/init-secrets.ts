@@ -29,30 +29,11 @@ interface WranglerConfig {
  * Generates a value for each secret this script knows how to create. Anything
  * else must be supplied out of band, so an unrecognised name fails instead of
  * silently provisioning an unusable value.
- *
- * `aws-access-bridge-aes-encryption-key` is the *legacy* single key, kept as a
- * read-only fallback so rows written before the per-feature split stay readable.
- * `SECRET_COPIES` seeds the two per-feature bindings from it on first run, which
- * is what makes the split a rename plus a copy: no key material changes hands and
- * no row becomes unreadable.
  */
 const SECRET_GENERATORS: Readonly<Record<string, () => Promise<string>>> = {
-  'aws-access-bridge-aes-encryption-key': generateAESGCMKey,
   'aws-access-bridge-credential-encryption-key': generateAESGCMKey,
   'aws-access-bridge-credential-cache-encryption-key': generateAESGCMKey,
   'aws-access-bridge-internal-request-hmac-secret': generateHMACSecret,
-};
-
-/**
- * Per-feature secrets seeded with an existing secret's value on first run.
- *
- * A fresh deployment has no legacy key to copy from, so those secrets are simply
- * generated independently — each surface gets its own key from day one, and there
- * is nothing to fall back from.
- */
-const SECRET_COPIES: Readonly<Record<string, { from: string }>> = {
-  'aws-access-bridge-credential-encryption-key': { from: 'aws-access-bridge-aes-encryption-key' },
-  'aws-access-bridge-credential-cache-encryption-key': { from: 'aws-access-bridge-aes-encryption-key' },
 };
 
 /**
@@ -105,25 +86,6 @@ function parseWranglerConfig(): WranglerConfig {
 }
 
 /**
- * Reads back an existing secret's value, for seeding a per-feature key from the
- * legacy master key.
- *
- * Returns `undefined` when the value cannot be read, which is deliberately
- * distinct from "absent": the caller then generates a fresh key for that surface,
- * which is correct for a deployment that never had a legacy key, but which would
- * silently orphan existing rows if the read merely failed. So a read failure on a
- * store that *does* contain the source is treated as fatal by the caller.
- */
-function getSecretValue(storeId: string, secretName: string): string | undefined {
-  try {
-    return wrangler(['secrets-store', 'secret', 'get', storeId, '--name', secretName, '--remote']).trim();
-  } catch (error: unknown) {
-    console.warn(`Unable to read ${secretName} from store ${storeId}:`, error instanceof Error ? error.message : 'unknown error');
-    return undefined;
-  }
-}
-
-/**
  * Lists the secret names present in a Secrets Store.
  *
  * Returns `undefined` when the listing itself failed, which is deliberately
@@ -145,8 +107,8 @@ function listSecretNames(storeId: string): Set<string> | undefined {
   }
 
   // The name is the first column, taken exactly: a substring match would let
-  // `aws-access-bridge-aes-encryption-key-2` satisfy a search for
-  // `aws-access-bridge-aes-encryption-key`.
+  // `aws-access-bridge-credential-encryption-key-2` satisfy a search for
+  // `aws-access-bridge-credential-encryption-key`.
   const names: Set<string> = new Set();
   for (const row of parseWranglerTableRows(output)) {
     const name = row[0];
@@ -190,7 +152,7 @@ function generateHMACSecret(): Promise<string> {
 function createSecret(storeId: string, secretName: string, secretValue: string): void {
   console.log(`Creating secret: ${secretName}`);
   // The value is passed on stdin, not as a shell argument. Interpolating it
-  // into a command string would expose the AES master key in the process table
+  // into a command string would expose the secret value in the process table
   // and in any process-argv logging on the runner.
   wrangler(['secrets-store', 'secret', 'create', storeId, '--name', secretName, '--scopes', 'workers', '--remote'], secretValue);
 }
@@ -199,18 +161,12 @@ async function main(): Promise<void> {
   console.log('Initializing Cloudflare secrets...');
   const config: WranglerConfig = parseWranglerConfig();
   const listedByStore: Map<string, Set<string> | undefined> = new Map();
-  // Values created in this run, so a secret declared later can be seeded from
-  // one declared earlier without a second round-trip to the API.
-  const valuesByName: Map<string, string> = new Map();
 
   const declaredSecrets: Array<{ binding: string; store_id: string; secret_name: string }> = config.secrets_store_secrets ?? [];
   if (declaredSecrets.length === 0) {
     throw new Error('wrangler.jsonc declares no secrets_store_secrets entries, so there is nothing to initialize.');
   }
 
-  // Declaration order matters: a per-feature key must be seeded from the legacy
-  // master key, so the source has to be created (or found) first. The template
-  // lists it first for exactly this reason.
   for (const secret of declaredSecrets) {
     if (!listedByStore.has(secret.store_id)) {
       listedByStore.set(secret.store_id, listSecretNames(secret.store_id));
@@ -228,21 +184,6 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const copyFrom: string | undefined = SECRET_COPIES[secret.secret_name]?.from;
-    if (copyFrom !== undefined) {
-      const source: string | undefined = valuesByName.get(copyFrom) ?? getSecretValue(secret.store_id, copyFrom);
-      if (source) {
-        console.log(`Seeding ${secret.secret_name} from the existing ${copyFrom}`);
-        createSecret(secret.store_id, secret.secret_name, source);
-        valuesByName.set(secret.secret_name, source);
-        existing.add(secret.secret_name);
-        continue;
-      }
-      // No source: a fresh deployment. Each surface gets its own key from day one
-      // and there is nothing to fall back from.
-      console.log(`No ${copyFrom} to seed from; generating an independent key for ${secret.secret_name}`);
-    }
-
     const generate = SECRET_GENERATORS[secret.secret_name];
     if (!generate) {
       throw new Error(`Unknown secret: ${secret.secret_name}`);
@@ -250,7 +191,6 @@ async function main(): Promise<void> {
     const secretValue: string = await generate();
     console.log(`Generated value for ${secret.secret_name}`);
     createSecret(secret.store_id, secret.secret_name, secretValue);
-    valuesByName.set(secret.secret_name, secretValue);
     existing.add(secret.secret_name);
   }
   console.log('Secret initialization complete');

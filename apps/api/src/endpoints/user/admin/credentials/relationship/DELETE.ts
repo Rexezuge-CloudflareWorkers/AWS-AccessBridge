@@ -120,7 +120,8 @@ interface RemoveCredentialRelationshipResponse extends IResponse {
 
 interface RemoveCredentialRelationshipEnv extends IAdminEnv {
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
-  AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
 }
 
 export { RemoveCredentialRelationshipRoute };

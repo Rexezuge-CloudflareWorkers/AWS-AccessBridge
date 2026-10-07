@@ -78,45 +78,33 @@ describe('createRequestScope', () => {
     expect(scope.get(Tokens.CollectorRegistry).getAll().size).toBe(5);
   });
 
-  /**
-   * Each surface's own key first, then the legacy master key so rows written
-   * before the split still decrypt. `CREDENTIAL_ENCRYPTION_KEY_SECRET` is seeded
-   * with the current master-key value at deploy time, which is what makes this a
-   * rename plus a copy rather than a re-encryption.
-   */
-  it('orders the key chain own-key-first with the legacy master key as fallback', async () => {
+  it('resolves each surface to a single-key chain holding its own key', async () => {
     const scope = createRequestScope({
       AccessBridgeDB: {},
       CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('new-key') },
       CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('cache-key') },
-      AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('legacy-key') },
     } as never);
-    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['new-key', 'legacy-key']);
-    await expect(scope.get(Tokens.CredentialCacheKey)()).resolves.toEqual(['cache-key', 'legacy-key']);
+    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['new-key']);
+    await expect(scope.get(Tokens.CredentialCacheKey)()).resolves.toEqual(['cache-key']);
   });
 
-  it('deduplicates when the feature key and the legacy master key are the same value', async () => {
-    // The usual state right after deploying the split: seeding the new binding
-    // with the current master key means every decrypt would otherwise pay for a
-    // second, guaranteed-to-fail attempt.
-    const scope = createRequestScope(scopeEnv());
-    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['master-key']);
+  it('ignores a leftover AES_ENCRYPTION_KEY_SECRET binding', async () => {
+    // The legacy master key is gone: a deployment that still carries the binding
+    // must not see it in a chain.
+    const legacy = vi.fn().mockResolvedValue('legacy-key');
+    const scope = createRequestScope({
+      AccessBridgeDB: {},
+      CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('new-key') },
+      AES_ENCRYPTION_KEY_SECRET: { get: legacy },
+    } as never);
+    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['new-key']);
+    expect(legacy).not.toHaveBeenCalled();
   });
 
   it('falls back to the raw var when no Secrets Store binding is present', async () => {
     // Local dev and the integration harness, where no Secrets Store is provisioned.
     const scope = createRequestScope({ AccessBridgeDB: {}, CREDENTIAL_ENCRYPTION_KEY: 'raw-key' } as never);
     await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['raw-key']);
-  });
-
-  it('resolves to a single key once the legacy master key is dropped', async () => {
-    // The exit from the migration: requiring the legacy key would make it a one-way
-    // door, so an absent one degrades to a one-element chain rather than throwing.
-    const scope = createRequestScope({
-      AccessBridgeDB: {},
-      CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('only-key') },
-    } as never);
-    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['only-key']);
   });
 
   it('fails loudly when an encryption key is neither bound nor set as a var', async () => {

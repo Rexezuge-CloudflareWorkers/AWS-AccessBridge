@@ -14,8 +14,8 @@ const SECRET_LIST_OUTPUT = [
   '┌────────────────────────────────┬──────────────────────────────────┬─────────┬─────────┬─────────┬───────────────────────┬───────────────────────┐',
   '│ Name                           │ ID                               │ Comment │ Scopes  │ Status  │ Created               │ Modified              │',
   '├────────────────────────────────┼──────────────────────────────────┼─────────┼─────────┼─────────┼───────────────────────┼───────────────────────┤',
-  '│ aws-access-bridge-aes-encryption-key   │ 0f1e2d3c4b5a69788796a5b4c3d2e1f0 │         │ workers │ active  │ 9/29/2026, 1:00:00 AM │ 9/29/2026, 1:00:00 AM │',
-  '│ aws-access-bridge-aes-encryption-key-2 │ 1a2b3c4d5e6f708192a3b4c5d6e7f809 │         │ workers │ active  │ 9/29/2026, 1:05:00 AM │ 9/29/2026, 1:05:00 AM │',
+  '│ aws-access-bridge-credential-encryption-key   │ 0f1e2d3c4b5a69788796a5b4c3d2e1f0 │         │ workers │ active  │ 9/29/2026, 1:00:00 AM │ 9/29/2026, 1:00:00 AM │',
+  '│ aws-access-bridge-credential-encryption-key-2 │ 1a2b3c4d5e6f708192a3b4c5d6e7f809 │         │ workers │ active  │ 9/29/2026, 1:05:00 AM │ 9/29/2026, 1:05:00 AM │',
   '└────────────────────────────────┴──────────────────────────────────┴─────────┴─────────┴─────────┴───────────────────────┴───────────────────────┘',
 ].join('\n');
 
@@ -26,7 +26,7 @@ const PREFIX_ONLY_OUTPUT = [
   '┌────────────────────────────────┬──────────────────────────────────┬─────────┬─────────┬─────────┬───────────────────────┬───────────────────────┐',
   '│ Name                           │ ID                               │ Comment │ Scopes  │ Status  │ Created               │ Modified              │',
   '├────────────────────────────────┼──────────────────────────────────┼─────────┼─────────┼─────────┼───────────────────────┼───────────────────────┤',
-  '│ aws-access-bridge-aes-encryption-key-2 │ 1a2b3c4d5e6f708192a3b4c5d6e7f809 │         │ workers │ active  │ 9/29/2026, 1:05:00 AM │ 9/29/2026, 1:05:00 AM │',
+  '│ aws-access-bridge-credential-encryption-key-2 │ 1a2b3c4d5e6f708192a3b4c5d6e7f809 │         │ workers │ active  │ 9/29/2026, 1:05:00 AM │ 9/29/2026, 1:05:00 AM │',
   '└────────────────────────────────┴──────────────────────────────────┴─────────┴─────────┴─────────┴───────────────────────┴───────────────────────┘',
 ].join('\n');
 
@@ -34,7 +34,7 @@ describe('parseWranglerTableRows', () => {
   it('reads the secret name out of the first column', () => {
     const names = parseWranglerTableRows(SECRET_LIST_OUTPUT).map((row) => row[0]);
 
-    expect(names).toEqual(['aws-access-bridge-aes-encryption-key', 'aws-access-bridge-aes-encryption-key-2']);
+    expect(names).toEqual(['aws-access-bridge-credential-encryption-key', 'aws-access-bridge-credential-encryption-key-2']);
   });
 
   it('ignores the header, the frame, and the log line', () => {
@@ -53,13 +53,13 @@ describe('parseWranglerTableRows', () => {
 
   it('does not let a longer name satisfy a shorter one', () => {
     // The bug this replaced: `output.includes(secretName)` found
-    // `aws-access-bridge-aes-encryption-key` inside
-    // `aws-access-bridge-aes-encryption-key-2`, so the script skipped creating a
+    // `aws-access-bridge-credential-encryption-key` inside
+    // `aws-access-bridge-credential-encryption-key-2`, so the script skipped creating a
     // secret the store had never held.
     const names = parseWranglerTableRows(PREFIX_ONLY_OUTPUT).map((row) => row[0]);
 
-    expect(names).toEqual(['aws-access-bridge-aes-encryption-key-2']);
-    expect(names).not.toContain('aws-access-bridge-aes-encryption-key');
+    expect(names).toEqual(['aws-access-bridge-credential-encryption-key-2']);
+    expect(names).not.toContain('aws-access-bridge-credential-encryption-key');
   });
 
   it('returns no rows for output with no table', () => {

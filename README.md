@@ -153,7 +153,7 @@ pnpm exec tsx scripts/deploy/init-secrets.ts
 
 This script reads `wrangler.jsonc` and creates any declared secret that does not yet exist, generating a cryptographically strong value for each. Re-running it is a no-op — it skips any secret that already exists.
 
-On the **first** run after an upgrade it does one extra thing: `aws-access-bridge-credential-encryption-key` and `aws-access-bridge-credential-cache-encryption-key` are _seeded with the value `aws-access-bridge-aes-encryption-key` already had_, rather than generated independently. That is what makes the per-feature key split non-breaking — no key material changes hands, and rows written under the old single key stay readable. Both per-feature bindings then serve as the read fallback for legacy rows, and new writes always use the surface's own key. A genuinely fresh install has no legacy key to copy, so each surface simply gets its own.
+Each encrypted surface gets its own independently generated key (`aws-access-bridge-credential-encryption-key` and `aws-access-bridge-credential-cache-encryption-key`). The former single `aws-access-bridge-aes-encryption-key` is no longer read, created, or required; if your Secrets Store still holds it, you can delete it after deploying.
 
 If you'd rather generate the secrets yourself:
 
@@ -283,7 +283,7 @@ A second job, `deploy-pages`, builds the SPA and deploys it to Cloudflare Pages 
 
 The template evolves (new bindings, new vars), so a `WRANGLER_JSONC` variable copied from an older one can fall behind. `prepare-wrangler-config.ts` compares your config against `apps/api/wrangler.template.jsonc` and refuses to deploy one that omits any binding or var the template declares, naming every gap it found. If CI reports a coverage error, diff your variable against the template and resync — or supply the missing vars through `WRANGLER_VARS_PATCH_JSON` instead of replacing the whole file.
 
-Two bindings are deliberately excluded from that comparison. KV namespaces are injected automatically when missing (`ensureRequiredKvBindings`), so requiring one would reject a config that is about to be completed. `AES_ENCRYPTION_KEY_SECRET` is the legacy read-only encryption fallback and is documented as droppable once every row has been rewritten, so requiring it would block that migration.
+KV namespaces are deliberately excluded from that comparison: they are injected automatically when missing (`ensureRequiredKvBindings`), so requiring one would reject a config that is about to be completed.
 
 ## Continuous Deployment Variables
 
