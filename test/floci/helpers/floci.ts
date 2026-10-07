@@ -32,6 +32,13 @@ service nor the action. That is a bad way to learn that one emulator call went
 wrong, so the deadline lives here: a hung call fails naming the service that hung,
 and the test around it still has budget left to say what it was doing.
 
+The deadline covers headers **and** the body. `fetch()` resolving only means the
+headers arrived — a stalled XML/JSON body in `response.text()`/`response.json()`
+would otherwise bypass the abort and still surface as the bare Vitest timeout.
+The wrapped body readers share the fetch's deadline, so one round trip costs at
+most this much in total rather than this much for headers plus this much again
+for the body.
+
 Not a slowness allowance. Floci answers these calls in milliseconds, so anything
 past a few seconds is a wedged call rather than a slow one, and the seeds in
 `seed.ts` assert on the calls they make regardless.
@@ -75,6 +82,73 @@ function accountKeys(accessKeyId: string): AccessKeys {
 }
 
 /**
+ * The named failure a wedged emulator call becomes. Built in one place so the
+ * fetch abort and the body-read race report the same actionable text.
+ */
+function timeoutError(service: string, pathname: string, cause?: unknown): Error {
+  return new Error(
+    `${service} call to the emulator (${pathname}) did not answer within ` +
+      `${REQUEST_TIMEOUT_MS}ms. Either the emulator is wedged, or it is not answering from the ` +
+      `metadata-only RDS path this suite expects: ${START_HINT}`,
+    { cause },
+  );
+}
+
+/**
+ * Read a response body under what is left of the round-trip deadline.
+ *
+ * The fetch resolving only proves the headers arrived. A body that then
+ * dribbles would outlive the abort unnoticed and resurface as the bare
+ * `Test timed out` the deadline exists to replace, so the body readers share
+ * what is left of the same budget instead of starting a second one a stacked
+ * deadline could double.
+ *
+ * Module-level rather than nested in the factory: the timeout race already
+ * nests three functions deep, and nesting it inside the fetch as well trips
+ * the nested-functions limit.
+ */
+async function readBodyWithDeadline<T>(
+  read: () => Promise<T>,
+  service: string,
+  pathname: string,
+  startedAt: number,
+  deadline: AbortSignal,
+  callerAborted: () => boolean,
+): Promise<T> {
+  const remainingMs: number = REQUEST_TIMEOUT_MS - (Date.now() - startedAt);
+  if (remainingMs <= 0) {
+    if (!callerAborted()) {
+      throw timeoutError(service, pathname);
+    }
+    return read();
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const onTimeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        if (!callerAborted()) {
+          reject(timeoutError(service, pathname));
+        }
+      }, remainingMs);
+      (timer as unknown as { unref?: () => void }).unref?.();
+    });
+    return await Promise.race([read(), onTimeout]);
+  } catch (error: unknown) {
+    if (deadline.aborted && !callerAborted()) {
+      if (error instanceof Error && error.message.includes('did not answer within')) {
+        throw error;
+      }
+      throw timeoutError(service, pathname, error);
+    }
+    throw error;
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/**
  * Point a client factory at the emulator.
  *
  * Only the origin is swapped. Path and query survive verbatim, which is what
@@ -87,10 +161,11 @@ function accountKeys(accessKeyId: string): AccessKeys {
  * host, and `options.service` is untouched — Floci routes on the credential scope
  * in the `Authorization` header, exactly as LocalStack does.
  *
- * Every call also gets `REQUEST_TIMEOUT_MS`. This is the only place a wedged
- * emulator call can be named, and the service name is the one piece of context
- * that makes the failure readable: without it, a hang surfaces as a bare Vitest
- * timeout that points at whichever test happened to be running.
+ * Every call also gets `REQUEST_TIMEOUT_MS`, covering the fetch **and** the body
+ * read as one budget. This is the only place a wedged emulator call can be
+ * named, and the service name is the one piece of context that makes the failure
+ * readable: without it, a hang surfaces as a bare Vitest timeout that points at
+ * whichever test happened to be running.
  */
 function flociClientFactory(endpoint: string = FLOCI_ENDPOINT): AwsClientFactory {
   const base: URL = new URL(endpoint);
@@ -99,26 +174,37 @@ function flociClientFactory(endpoint: string = FLOCI_ENDPOINT): AwsClientFactory
     return {
       fetch: async (url: string, init?: RequestInit): Promise<Response> => {
         const target: URL = new URL(url);
+        const startedAt: number = Date.now();
         const deadline: AbortSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
         // `AbortSignal.any` rather than `init.signal` alone: a caller-supplied
         // signal must still win, and it must not have to know about ours. Both
         // compose, so whichever fires first aborts the request.
         const signal: AbortSignal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+        const callerAborted = (): boolean => init?.signal?.aborted ?? false;
+        let response: Response;
         try {
-          return await signed.fetch(`${base.origin}${target.pathname}${target.search}`, { ...init, signal });
+          response = await signed.fetch(`${base.origin}${target.pathname}${target.search}`, { ...init, signal });
         } catch (error: unknown) {
           // Only *our* deadline is reported this way: a caller that aborted
           // deliberately keeps its own error, which is the one it can act on.
-          if (deadline.aborted && !(init?.signal?.aborted ?? false)) {
-            throw new Error(
-              `${options.service} call to the emulator (${target.pathname}) did not answer within ` +
-                `${REQUEST_TIMEOUT_MS}ms. Either the emulator is wedged, or it is not answering from the ` +
-                `metadata-only RDS path this suite expects: ${START_HINT}`,
-              { cause: error },
-            );
+          if (deadline.aborted && !callerAborted()) {
+            throw timeoutError(options.service, target.pathname, error);
           }
           throw error;
         }
+        // The body readers share what is left of the fetch's deadline — see
+        // `readBodyWithDeadline` — so one round trip costs at most one budget.
+        const withBodyDeadline = <T>(read: () => Promise<T>): Promise<T> =>
+          readBodyWithDeadline(read, options.service, target.pathname, startedAt, deadline, callerAborted);
+        const originalText: () => Promise<string> = response.text.bind(response);
+        const originalJson: () => Promise<unknown> = response.json.bind(response);
+        const originalArrayBuffer: () => Promise<ArrayBuffer> = response.arrayBuffer.bind(response);
+        const originalBlob: () => Promise<Blob> = response.blob.bind(response);
+        response.text = (): Promise<string> => withBodyDeadline(originalText);
+        response.json = (): Promise<unknown> => withBodyDeadline(originalJson);
+        response.arrayBuffer = (): Promise<ArrayBuffer> => withBodyDeadline(originalArrayBuffer);
+        response.blob = (): Promise<Blob> => withBodyDeadline(originalBlob);
+        return response;
       },
     };
   };
