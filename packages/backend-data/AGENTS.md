@@ -5,8 +5,8 @@ Scope: `packages/backend-data/**`. Parent index: `../../AGENTS.md`. Layer 2: may
 ## The DAO inventory
 
 All D1 access goes through a DAO extending `BaseDAO` (`ctor(database: D1Queryable)`, `withRetry()`,
-`deleteOrphanedRows()`). `EncryptedDAO` adds `encryptionKeys` — an ordered chain, own key first,
-legacy fallback after — for encrypted rows. Never redeclare `database`; it is `protected readonly` on
+`deleteOrphanedRows()`). `EncryptedDAO` adds `encryptionKeys` — an ordered chain, own key first — for
+encrypted rows. Deployed chains hold a single key; the list shape is kept for rotation. Never redeclare `database`; it is `protected readonly` on
 the base.
 
 | DAO                                               | Holds                                                      | Notes                                                                                    |
@@ -95,7 +95,7 @@ it leaks the XOR of the plaintexts and enables tag forgery. `encryptData` theref
 argument.
 
 Decryption takes a _chain_, not one key: `decryptDataWithKeys` / `decryptDataField` walk it in
-preference order, which is what makes the per-feature key split non-breaking — a wrong key fails
+preference order, which is what lets a rotation append the outgoing key — a wrong key fails
 GCM's tag check rather than returning garbage, so trying the next one is safe. `decryptDataField`
 answers `undefined` for an absent column (a relationship-only `credentials` row legitimately has
 none) but throws when an envelope is present and unreadable; `decryptDataTolerant` answers

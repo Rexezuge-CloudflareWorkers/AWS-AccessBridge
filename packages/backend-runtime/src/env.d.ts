@@ -11,7 +11,6 @@ declare global {
     // `ServiceEnv`, and absent from the fourth place with nothing reporting it.
     CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
-    AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
     INTERNAL_REQUEST_HMAC_SECRET: SecretsStoreSecret;
     CRON_TASKS: DurableObjectNamespace;
     SELF: Fetcher;

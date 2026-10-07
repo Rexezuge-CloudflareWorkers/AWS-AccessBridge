@@ -71,7 +71,8 @@ describe('ensureConfigCoversTemplate', () => {
     d1_databases: [{ binding: 'AccessBridgeDB', database_id: 'x' }],
     kv_namespaces: [{ binding: 'AccessBridgeKV', id: 'y' }],
     secrets_store_secrets: [
-      { binding: 'AES_ENCRYPTION_KEY_SECRET', store_id: 'z' },
+      { binding: 'CREDENTIAL_ENCRYPTION_KEY_SECRET', store_id: 'z' },
+      { binding: 'CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET', store_id: 'z' },
       { binding: 'INTERNAL_REQUEST_HMAC_SECRET', store_id: 'z' },
     ],
     durable_objects: { bindings: [{ name: 'CRON_TASKS', class_name: 'CronTasksWorker' }] },
@@ -192,18 +193,6 @@ describe('ensureConfigCoversTemplate', () => {
     // absence is a production auth bypass rather than a config nit.
     writeWith((config) => ({ ...config, vars: { DEMO_MODE: 'false' } }));
     await expect(run()).rejects.toThrow(/vars: ENVIRONMENT[\s\S]*WRANGLER_VARS_PATCH_JSON/);
-  });
-
-  it('does not require the optional AES fallback binding', async () => {
-    // `docs/agents/runtime/AGENTS.md` documents this binding as droppable once
-    // every row has been rewritten; requiring it would block that migration.
-    writeWith((config) => {
-      config.secrets_store_secrets = (config.secrets_store_secrets ?? []).filter(
-        (secret) => secret.binding !== 'AES_ENCRYPTION_KEY_SECRET',
-      );
-      return config;
-    });
-    await expect(run()).resolves.toBeUndefined();
   });
 
   it('does not require a KV binding, because provisioning injects it', async () => {

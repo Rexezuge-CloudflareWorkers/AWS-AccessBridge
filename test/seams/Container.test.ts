@@ -18,7 +18,7 @@ describe('Container', () => {
 
   it('memoizes factory singletons per scope', () => {
     // The memoization is the point of the container: it is what stops a secret
-    // fetch (`AES_ENCRYPTION_KEY_SECRET.get()`) happening two or three times in
+    // fetch (`CREDENTIAL_ENCRYPTION_KEY_SECRET.get()`) happening two or three times in
     // one request.
     const scope = new Container();
     let calls = 0;

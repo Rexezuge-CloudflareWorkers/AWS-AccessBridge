@@ -37,8 +37,8 @@ class StubTask extends IScheduledTask<{ AccessBridgeDB: D1Database }> {
  * it.
  *
  * The stub used to declare `{ AccessBridgeDB: D1Database } & Record<string, unknown>`,
- * which satisfies the index signature and the database but is missing two members the
- * constraint requires — `AES_ENCRYPTION_KEY_SECRET` and `AccessBridgeKV`. Naming the
+ * which satisfies the index signature and the database but is missing members the
+ * constraint requires — the two `CREDENTIAL_*_ENCRYPTION_KEY_SECRET` bindings and `AccessBridgeKV`. Naming the
  * real type means a binding added to `CollectionTaskEnv` later is a compile error here
  * rather than a silently absent member, which is the difference between a double that
  * models the platform and one that models a moment of it.

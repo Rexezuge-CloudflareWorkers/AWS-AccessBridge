@@ -15,7 +15,7 @@ type Token<T = unknown> = (string | symbol) & { readonly __type?: T };
  *
  * Previously N scattered `*Factory.create(env)` call sites constructed
  * services inline per request with no memoization (notably
- * `AES_ENCRYPTION_KEY_SECRET.get()`); this container memoizes singletons
+ * an encryption-key secret `.get()`); this container memoizes singletons
  * per scope so keys are fetched once per request.
  */
 class Container {

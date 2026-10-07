@@ -92,15 +92,6 @@
       "secret_name": "aws-access-bridge-credential-cache-encryption-key",
     },
     {
-      // Legacy single key for both surfaces; a read-only fallback so rows written
-      // before the split stay readable. Seed this with the value the two bindings
-      // above held before the split, then remove it once every row has been
-      // rewritten. See packages/backend-services/src/composition/encryptionKeys.ts
-      "binding": "AES_ENCRYPTION_KEY_SECRET",
-      "store_id": "00000000000000000000000000000000",
-      "secret_name": "aws-access-bridge-aes-encryption-key",
-    },
-    {
       "binding": "INTERNAL_REQUEST_HMAC_SECRET",
       "store_id": "00000000000000000000000000000000",
       "secret_name": "aws-access-bridge-internal-request-hmac-secret",

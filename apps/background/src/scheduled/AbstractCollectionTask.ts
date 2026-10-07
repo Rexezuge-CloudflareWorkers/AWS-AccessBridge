@@ -11,7 +11,8 @@ import { Tokens } from '@aws-access-bridge/backend-services/composition';
 interface CollectionTaskEnv extends IEnv {
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
   AccessBridgeDB: D1Database;
-  AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
   AccessBridgeKV: KVNamespace;
   [key: string]: unknown;
 }

@@ -22,8 +22,7 @@ interface ServiceEnv {
   AccessBridgeDB: D1Queryable;
   AccessBridgeKV?: KVNamespace;
 
-  // Encryption keys, one per encrypted surface. See `encryptionKeys.ts` for the
-  // preference-ordered chain and the legacy fallback.
+  // Encryption keys, one per encrypted surface. See `encryptionKeys.ts`.
   /**
   Long-term IAM access keys in the `credentials` D1 table.
   */
@@ -32,18 +31,12 @@ interface ServiceEnv {
   Temporary STS credentials in the `credentials_cache` KV namespace.
   */
   CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
-  /**
-   * Legacy single key for both surfaces. Read-only fallback, so rows written
-   * before the split stay readable; remove once every row has been rewritten.
-   */
-  AES_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
 
   // Raw key vars for local dev and tests, where no Secrets Store is provisioned.
   // Never set these in production — `encryptionKeys.ts` only falls back to them
   // when the Secrets Store binding is absent, not when it is broken.
   CREDENTIAL_ENCRYPTION_KEY?: string;
   CREDENTIAL_CACHE_ENCRYPTION_KEY?: string;
-  AES_ENCRYPTION_KEY?: string;
 
   // Credential chains
   PRINCIPAL_TRUST_CHAIN_LIMIT?: string;

@@ -104,9 +104,12 @@ describe('Credential encryption against real D1', () => {
 /**
  * The per-feature key split, against real D1.
  *
- * A row written under the legacy master key must stay readable once the DAO is
- * given the feature key first, and it must be rewritten onto the feature key the
- * next time it is stored — the same self-healing shape migration 0031 uses for IVs.
+ * The DAO still takes a key chain, so a future rotation can append the outgoing
+ * key as a read fallback. A row written under an older key must stay readable
+ * while that key sits later in the chain, and it must be rewritten onto the
+ * current key the next time it is stored — the same self-healing shape migration
+ * 0031 uses for IVs. The former single master key is no longer part of any
+ * deployed chain; `MASTER_KEY` here just plays the role of the outgoing key.
  */
 describe('Per-feature credential keys', () => {
   beforeAll(async () => {
@@ -117,7 +120,7 @@ describe('Per-feature credential keys', () => {
   const legacyArn = 'arn:aws:iam::123456789012:role/NeedsRekey';
 
   /**
-  Write a row under the legacy master key, as a pre-split deployment would.
+  Write a row under an older key, as a deployment mid-rotation would.
   */
   async function seedLegacyRow(): Promise<void> {
     const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, [
@@ -139,9 +142,9 @@ describe('Per-feature credential keys', () => {
       .run();
   }
 
-  it('reads a legacy-key row through the chain, feature key first', async () => {
+  it('reads a row under an older key through the chain, current key first', async () => {
     await seedLegacyRow();
-    // The feature key is first and cannot decrypt this row; the chain falls back.
+    // The current key is first and cannot decrypt this row; the chain falls back.
     const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
     await expect(dao.getCredentialByPrincipalArn(legacyArn)).resolves.toMatchObject({
       accessKeyId: 'AKIALEGACYACCESSKEY00',
@@ -156,12 +159,12 @@ describe('Per-feature credential keys', () => {
     await expect(dao.getCredentialByPrincipalArn(legacyArn)).rejects.toThrow(/No key in the chain/);
   });
 
-  it('rewrites a legacy row onto the feature key on its next store', async () => {
+  it('rewrites an older-key row onto the current key on its next store', async () => {
     await seedLegacyRow();
     const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
     await dao.storeCredential(legacyArn, 'AKIAREKEYEDACCESSKEY', 'rekeyedSecretValue');
 
-    // Readable with the feature key alone — the legacy fallback is no longer needed.
+    // Readable with the current key alone — the fallback is no longer needed.
     const featureOnly = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey], 3);
     await expect(featureOnly.getCredentialByPrincipalArn(legacyArn)).resolves.toMatchObject({
       accessKeyId: 'AKIAREKEYEDACCESSKEY',

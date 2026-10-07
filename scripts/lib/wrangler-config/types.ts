@@ -42,15 +42,6 @@ export const DEFAULT_KV_NAMESPACE_NAMES: Record<string, string> = {
 };
 
 /**
- * Template bindings the config is not required to carry.
- *
- * `AES_ENCRYPTION_KEY_SECRET` is the legacy read-only fallback, documented as
- * droppable once every row has been rewritten (`docs/agents/runtime/AGENTS.md`),
- * and a config that has finished migrating must not be told to add it back.
- */
-export const OPTIONAL_TEMPLATE_KEYS: ReadonlySet<string> = new Set(['AES_ENCRYPTION_KEY_SECRET']);
-
-/**
  * Template bindings `provisionWranglerResources` injects on its own.
  *
  * `ensureRequiredKvBindings` adds any of `DEFAULT_KV_NAMESPACE_NAMES` that a config
