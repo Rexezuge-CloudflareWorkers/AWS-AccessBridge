@@ -70,29 +70,3 @@ Env vars and bindings → `docs/agents/runtime`. Tests and thresholds → `docs/
 Commands, layers, gates → `docs/agents/repo`. A top-level feature gets a
 `docs/agents/features/*/AGENTS.md`. `shared`, `backend-errors`, `backend-runtime` and
 `provider-clients` have no scoped guide; document their use in the closest consumer's guide.
-
-## Commit Policy
-
-Always commit changes after completing work unless explicitly told not to.
-
-## Git Commit Messages
-
-Format: `<TYPE>[optional scope]: <description>`
-
-- Type in UPPERCASE: `FIX`, `FEAT`, `DOCS`, `STYLE`, `REFACTOR`, `TEST`, `BUILD`, `CHORE`, `CI`, `PERF`.
-- Scope in lowercase: `FEAT(runtime): Add Scheduled Job State`.
-- Description: Title Case words — `DOCS: Latest Agents Context Reflection`.
-- When committing from `main`, first create a branch: `type/description` or `type/scope/description` in kebab-case (e.g. `feat/bootstrap/bootstrap-jqanywhere-v0.1-framework`).
-- Always include a Markdown body separated from the subject by a blank line.
-- Breaking changes: `!` after type/scope, or `BREAKING CHANGE: <description>` footer.
-- AI-assisted commits must include attribution footers: `Assisted-by: OpenCode` and `Model-ID: <providerID/modelID>` with the full ID (e.g. `opencode/muse-spark-1.3-contributor-free`).
-
-```text
-<TYPE>[optional scope]: <description>
-
-[Markdown body]
-
-[optional footers]
-Assisted-by: OpenCode
-Model-ID: <providerID/modelID>
-```
