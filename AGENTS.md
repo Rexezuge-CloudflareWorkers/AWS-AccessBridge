@@ -85,6 +85,7 @@ Format: `<TYPE>[optional scope]: <description>`
 - When committing from `main`, first create a branch: `type/description` or `type/scope/description` in kebab-case (e.g. `feat/bootstrap/bootstrap-jqanywhere-v0.1-framework`).
 - Always include a Markdown body separated from the subject by a blank line.
 - Breaking changes: `!` after type/scope, or `BREAKING CHANGE: <description>` footer.
+- AI-assisted commits must include attribution footers: `Assisted-by: OpenCode` and `Model-ID: <providerID/modelID>` with the full ID (e.g. `opencode/muse-spark-1.3-contributor-free`).
 
 ```text
 <TYPE>[optional scope]: <description>
@@ -92,4 +93,6 @@ Format: `<TYPE>[optional scope]: <description>`
 [Markdown body]
 
 [optional footers]
+Assisted-by: OpenCode
+Model-ID: <providerID/modelID>
 ```
