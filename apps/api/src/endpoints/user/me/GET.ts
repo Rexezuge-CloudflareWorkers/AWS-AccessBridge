@@ -105,4 +105,3 @@ interface GetCurrentUserResponse extends IResponse {
 type GetCurrentUserEnv = IEnv;
 
 export { GetCurrentUserRoute };
-export type { GetCurrentUserRequest, GetCurrentUserResponse };

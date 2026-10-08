@@ -12,4 +12,4 @@ interface AssumableAccountsResponse {
   totalAccounts: number;
 }
 
-export type { AssumableAccount, AssumableAccountsMap, AssumableAccountsResponse };
+export type { AssumableAccountsMap, AssumableAccountsResponse };

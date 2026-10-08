@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TeamService } from '@aws-access-bridge/backend-services/team/TeamService';
-import { TeamAccountsDAO, TeamMembersDAO, TeamsDAO } from '@aws-access-bridge/backend-data/dao';
+import { AwsAccountsDAO, TeamAccountsDAO, TeamMembersDAO, TeamsDAO } from '@aws-access-bridge/backend-data/dao';
 import { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, NotFoundError } from '@aws-access-bridge/backend-errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/TeamsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamMembersDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamAccountsDAO');
+vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 // Migration 0032: resolution consults the address registry first, so an unstubbed
 // one must read as "no registry row" and fall through to the anchor. A registry
 // *hit* then hydrates through `UserMetadataDAO`, so both are needed for the
@@ -63,13 +64,14 @@ describe('TeamService', () => {
     // values never reached the parameter at all. `name as string` below is what the
     // `undefined` row is actually testing, so the cast moves to the table where the
     // `undefined` is visible.
-    it.each<[string, string]>([['', 'empty'], [' '.repeat(3), 'whitespace only'], [undefined as unknown as string, 'absent']])(
-      'rejects a %s team name (%s)',
-      async (name) => {
-        await expect(service().createTeam(name, 'user@example.com')).rejects.toThrow(BadRequestError);
-        expect(TeamsDAO.prototype.createTeam).not.toHaveBeenCalled();
-      },
-    );
+    it.each<[string, string]>([
+      ['', 'empty'],
+      [' '.repeat(3), 'whitespace only'],
+      [undefined as unknown as string, 'absent'],
+    ])('rejects a %s team name (%s)', async (name) => {
+      await expect(service().createTeam(name, 'user@example.com')).rejects.toThrow(BadRequestError);
+      expect(TeamsDAO.prototype.createTeam).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteTeam', () => {
@@ -117,44 +119,74 @@ describe('TeamService', () => {
   describe('addMember', () => {
     it('adds a member with the default role', async () => {
       await service().addMember('team-1', 'user@example.com');
-      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', { userId: null, anchorEmail: 'user@example.com' }, 'member');
+      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+        'team-1',
+        { userId: null, anchorEmail: 'user@example.com' },
+        'member',
+      );
     });
 
     it('honours an explicit role', async () => {
       await service().addMember('team-1', 'user@example.com', 'admin');
-      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', expect.objectContaining({ anchorEmail: 'user@example.com' }), 'admin');
+      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+        'team-1',
+        expect.objectContaining({ anchorEmail: 'user@example.com' }),
+        'admin',
+      );
     });
 
     it('resolves the stable account id when the registry has a row', async () => {
       // With a registry row the write must be keyed on `user_id`, so the
       // membership survives an address change.
-      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_abc', is_verified: 1, created_at: 1 });
+      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({
+        email: 'user@example.com',
+        user_id: 'usr_abc',
+        is_verified: 1,
+        created_at: 1,
+      });
       vi.mocked(UserMetadataDAO.prototype.getById).mockResolvedValue({
         id: 'usr_abc',
         user_email: 'user@example.com',
         current_email: 'user@example.com',
       });
       await service().addMember('team-1', 'user@example.com');
-      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', { userId: 'usr_abc', anchorEmail: 'user@example.com' }, 'member');
+      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+        'team-1',
+        { userId: 'usr_abc', anchorEmail: 'user@example.com' },
+        'member',
+      );
     });
 
     it('does NOT resolve a revoked address to its previous holder', async () => {
       // A revoked registry row must not fall through to the metadata lookup, or a
       // reassigned address would keep authenticating the previous account.
-      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({ email: 'user@example.com', user_id: 'usr_old', is_verified: 0, created_at: 1 });
+      vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue({
+        email: 'user@example.com',
+        user_id: 'usr_old',
+        is_verified: 0,
+        created_at: 1,
+      });
       vi.mocked(UserMetadataDAO.prototype.getByAnchor).mockResolvedValue({ id: 'usr_old', user_email: 'user@example.com' });
 
       await service().addMember('team-1', 'user@example.com');
 
       // Falls back to the address arm of the owner predicate rather than `usr_old`.
-      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', { userId: null, anchorEmail: 'user@example.com' }, 'member');
+      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+        'team-1',
+        { userId: null, anchorEmail: 'user@example.com' },
+        'member',
+      );
     });
 
     it('falls back to a null id for an unresolvable address', async () => {
       // An unknown actor reads as "no account" rather than erroring — a 404 here
       // would turn the address space into an account-enumeration oracle.
       await service().addMember('team-1', 'stranger@example.com');
-      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('team-1', { userId: null, anchorEmail: 'stranger@example.com' }, 'member');
+      expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
+        'team-1',
+        { userId: null, anchorEmail: 'stranger@example.com' },
+        'member',
+      );
     });
 
     it.each([
@@ -217,8 +249,17 @@ describe('TeamService', () => {
 
   describe('account membership', () => {
     it('adds an account to a team', async () => {
+      vi.mocked(AwsAccountsDAO.prototype.accountExists).mockResolvedValue(true);
       await service().addAccount('team-1', '123456789012');
       expect(TeamAccountsDAO.prototype.addAccountToTeam).toHaveBeenCalledWith('team-1', '123456789012');
+    });
+
+    it('refuses an account the deployment has never connected', async () => {
+      // Adding the account as a side effect of a typo is the failure this
+      // guards: `ensureAccountExists` would silently connect it.
+      vi.mocked(AwsAccountsDAO.prototype.accountExists).mockResolvedValue(false);
+      await expect(service().addAccount('team-1', '123456789012')).rejects.toThrow(NotFoundError);
+      expect(TeamAccountsDAO.prototype.addAccountToTeam).not.toHaveBeenCalled();
     });
 
     it('removes an account from a team', async () => {

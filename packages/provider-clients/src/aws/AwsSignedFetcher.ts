@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
+import { DEFAULT_AWS_FETCH_TIMEOUT_MS, fetchWithTimeout } from './FetchTimeout';
 
 interface AwsClientOptions {
   service: string;
@@ -13,15 +14,43 @@ interface AwsSignedClient {
 
 type AwsClientFactory = (options: AwsClientOptions) => AwsSignedClient;
 
-function defaultAwsClientFactory(options: AwsClientOptions): AwsSignedClient {
-  return new AwsClient({
-    service: options.service,
-    region: options.region,
-    accessKeyId: options.keys.accessKeyId,
-    secretAccessKey: options.keys.secretAccessKey,
-    sessionToken: options.keys.sessionToken,
-  });
+/**
+ * A signed client whose every call runs under a deadline.
+ *
+ * The timeout lives here, around the signed `fetch`, rather than at each call
+ * site: there are five collectors and three clients, and a deadline that has to
+ * be remembered per caller is one a new caller forgets.
+ */
+class TimeoutAwsClient implements AwsSignedClient {
+  constructor(
+    private readonly inner: AwsSignedClient,
+    private readonly timeoutMs: number,
+  ) {}
+
+  public fetch(url: string, init?: RequestInit): Promise<Response> {
+    return fetchWithTimeout((guarded: RequestInit) => this.inner.fetch(url, guarded), init, new URL(url).host, this.timeoutMs);
+  }
 }
+
+/**
+ * Build a factory whose clients time out after `timeoutMs`. The default factory
+ * uses `DEFAULT_AWS_FETCH_TIMEOUT_MS`; tests inject a short one.
+ */
+function createAwsClientFactory(timeoutMs: number = DEFAULT_AWS_FETCH_TIMEOUT_MS): AwsClientFactory {
+  return (options: AwsClientOptions): AwsSignedClient =>
+    new TimeoutAwsClient(
+      new AwsClient({
+        service: options.service,
+        region: options.region,
+        accessKeyId: options.keys.accessKeyId,
+        secretAccessKey: options.keys.secretAccessKey,
+        sessionToken: options.keys.sessionToken,
+      }),
+      timeoutMs,
+    );
+}
+
+const defaultAwsClientFactory: AwsClientFactory = createAwsClientFactory();
 
 /**
  * Extracts the first `<Tag>value</Tag>` occurrence from an AWS XML response.
@@ -59,5 +88,5 @@ function awsQueryRequest(url: string, params: URLSearchParams): { url: string; i
   };
 }
 
-export { AWS_QUERY_FORM_CONTENT_TYPE, awsQueryRequest, defaultAwsClientFactory, parseXmlTag };
+export { awsQueryRequest, createAwsClientFactory, defaultAwsClientFactory, parseXmlTag, TimeoutAwsClient };
 export type { AwsClientFactory, AwsClientOptions, AwsSignedClient };

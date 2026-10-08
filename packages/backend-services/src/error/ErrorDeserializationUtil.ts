@@ -1,6 +1,9 @@
 import {
   BadRequestError,
+  BadGatewayError,
+  ConflictError,
   ForbiddenError,
+  NotFoundError,
   InternalServerError,
   UnauthorizedError,
   IServiceError,
@@ -24,8 +27,17 @@ class ErrorDeserializationUtil {
         case 'Forbidden': {
           return new ForbiddenError(errorMessage);
         }
+        case 'NotFound': {
+          return new NotFoundError(errorMessage);
+        }
+        case 'Conflict': {
+          return new ConflictError(errorMessage);
+        }
         case 'DatabaseError': {
           return new DatabaseError(errorMessage);
+        }
+        case 'BadGateway': {
+          return new BadGatewayError(errorMessage);
         }
         default: {
           return new InternalServerError(errorMessage);

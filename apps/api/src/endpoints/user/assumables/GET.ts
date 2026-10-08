@@ -1,4 +1,3 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
 import type { AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
@@ -181,4 +180,3 @@ type ListAssumablesResponse = AssumableAccountsResponse;
 type ListAssumablesEnv = IEnv;
 
 export { ListAssumablesRoute };
-export type { ListAssumablesRequest, ListAssumablesResponse };

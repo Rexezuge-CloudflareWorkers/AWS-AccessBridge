@@ -33,16 +33,25 @@ repointed without losing rows, so `0032` is purely additive.
 `UserIdentityService` (`packages/backend-services/src/identity/`), one memoized
 instance per request scope:
 
-1. `user_emails` exact match. A row that is `is_verified = 0` **does not
-   resolve** — otherwise a reassigned company address would inherit the previous
-   holder's account.
+1. `user_emails`, looked up with the address **lowercased**. A row that is
+   `is_verified = 0` **does not resolve** — otherwise a reassigned company
+   address would inherit the previous holder's account.
 2. `user_metadata.current_email`.
-3. The frozen anchor — the pre-0032 floor, where the address _is_ the identity.
+3. The frozen anchor — the pre-0032 floor, where the address _is_ the identity —
+   and only when the row's `current_email` is `NULL` or equal to the address
+   presented.
 
-Addresses are matched **exactly**; the migration never lowercases at resolution
-time, so a straggler with no registry row cannot be steered into another
-account's. Case-insensitivity is enforced where it matters instead — when an
-address is claimed.
+Two rules there are load-bearing. The registry lookup lowercases because
+registry rows are _stored_ lowercased: an exact-match lookup meant a mixed-case
+address (`Alice@x.com`) missed the registry, fell through to the anchor arm, and
+an account that had since moved to `bob@x.com` still resolved for it — a revoked
+address keeping its access. And `findByAnchor` rejects a row whose
+`current_email` differs, because "the anchor" is a floor for accounts that have
+never moved, not a permanent alias for one that has.
+
+Addresses are otherwise matched **exactly**, so a straggler with no registry row
+cannot be steered into another account's. Case-insensitivity is enforced where it
+matters instead — when an address is claimed.
 
 Services take the caller's sign-in address and resolve internally, so routes,
 the OpenAPI document and the web client are unaffected. Every write targets the

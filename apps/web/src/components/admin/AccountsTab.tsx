@@ -7,6 +7,7 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
 
 export default function AccountsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function AccountsTab({ showMessage }: { showMessage: ShowMessage 
       showMessage('success', t('admin.nicknameSet', 'Account nickname set successfully'));
       setNicknameForm({ awsAccountId: '', nickname: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.nicknameSetFailed', 'Failed to set nickname'));
+      showMessage('error', toErrorMessage(err, t('admin.nicknameSetFailed', 'Failed to set nickname')));
     }
   };
 
@@ -38,7 +39,7 @@ export default function AccountsTab({ showMessage }: { showMessage: ShowMessage 
       showMessage('success', t('admin.nicknameRemoved', 'Account nickname removed successfully'));
       setNicknameForm({ awsAccountId: '', nickname: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.nicknameRemoveFailed', 'Failed to remove nickname'));
+      showMessage('error', toErrorMessage(err, t('admin.nicknameRemoveFailed', 'Failed to remove nickname')));
     }
   };
 

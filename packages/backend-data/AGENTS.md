@@ -19,7 +19,7 @@ the base.
 | `UserMetadataDAO`                                 | the account row: anchor, `id`, `current_email`, superadmin | `newId()`, `ensureUserEmailExists()`                                                     |
 | `UserEmailDAO`                                    | the `user_emails` address registry                         | `is_verified = 1` may authenticate                                                       |
 | `UserFavoriteAccountsDAO`                         | favourites                                                 | delegates its owner clause                                                               |
-| `UserAccessTokenDAO`                              | PATs                                                       | FK target is the **anchor**, `ON DELETE CASCADE`                                         |
+| `UserAccessTokenDAO`                              | PATs                                                       | FK target is the **anchor**, `ON DELETE CASCADE`; stores `token_hash`, never the token   |
 | `AuditLogDAO`                                     | the audit trail                                            | `deleteOlderThanBatch()`, `query()`                                                      |
 | `BackgroundTaskRunDAO`                            | cron run history                                           | `deleteOlderThanBatch()`                                                                 |
 | `CostDataDAO`                                     | collected spend, keyed `(account, period_start)`           | `INSERT OR REPLACE`                                                                      |
@@ -49,6 +49,19 @@ rather than wrapped.
 `isMissingSchemaError` recognises a missing table or column **only**. It exists so a partially
 migrated database still authenticates; widening it would swallow a constraint violation or a
 timeout, which is a far worse failure to explain.
+
+## A PAT is stored as a digest, and the lookup is an indexed match
+
+`user_access_tokens.token_hash` holds the SHA-256 hex of the token; `TokenService` hashes on the way
+in and on every authentication read (`getByTokenHash`), and `updateLastUsedByTokenHash` stamps the
+same column. Nothing under `packages/` or `apps/` should ever see a plaintext PAT again — the value
+exists only in the `POST /user/tokens` response. Migration `0034` dropped the plaintext column and
+its rows rather than upgrading them, because SQLite cannot hash a row retroactively and a stale
+plaintext column is exactly the leak the migration exists to close.
+
+The token is 244 random bits from two UUIDs, so one SHA-256 round is the right primitive: there is
+no dictionary to search and no salt to keep. The unique index on `token_hash` is what makes
+authentication an equality match rather than the unindexed table scan it used to be.
 
 ## The 0032 owner predicate has one definition
 
@@ -130,8 +143,10 @@ rather than its DAO.
 
 - Failed writes throw `DatabaseError` on `!result.success`; its `retryable` flag drives the
   `executeD1WithRetry` backoff.
-- Batch deletes expose `deleteOlderThanBatch(cutoff, batchSize): Promise<number>` (D1
-  `DELETE … LIMIT ?`, `meta.changes ?? 0`) for `AbstractPruningTask`.
+- Batch deletes expose `deleteOlderThanBatch(cutoff, batchSize): Promise<number>` (`meta.changes ?? 0`)
+  for `AbstractPruningTask`. They select the keys first (`WHERE rowid IN (SELECT rowid … LIMIT ?)`)
+  rather than using `DELETE … LIMIT ?`, which SQLite only accepts under
+  `SQLITE_ENABLE_UPDATE_DELETE_LIMIT` — a compile-time choice D1 does not promise.
 - Models come from `@aws-access-bridge/shared/model` as dual camelCase/snake_case `Type` /
   `TypeInternal` pairs.
 - Routes must not import DAOs. ESLint enforces this under `apps/api/src/endpoints/**`, type-only

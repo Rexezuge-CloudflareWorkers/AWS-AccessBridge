@@ -2,7 +2,8 @@
 
 import { useTranslation } from 'react-i18next';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
-import { getBtnPrimary, getBtnSuccess, getInputStyle, wizardStyles } from './wizardStyles';
+import WizardInput from './WizardInput';
+import { getBtnPrimary, getBtnSuccess, wizardStyles } from './wizardStyles';
 import { isAwsAccountId } from '@aws-access-bridge/shared';
 
 /**
@@ -17,24 +18,18 @@ export default function AccountStep({ wizard }: { wizard: OnboardingWizard }) {
         <p className="text-sm" style={{ color: '#9ca3af' }}>
           {t('onboarding.accountStepHint', 'Enter the 12-digit AWS Account ID and an optional nickname.')}
         </p>
-        <input
+        <WizardInput
           type="text"
           placeholder={t('admin.accountIdPlaceholder', 'AWS Account ID (12 digits)')}
           value={wizard.awsAccountId}
           onChange={(e) => wizard.setAwsAccountId(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'accountId')}
-          onFocus={() => wizard.setFocusedInput('accountId')}
-          onBlur={() => wizard.setFocusedInput(null)}
           pattern="[0-9]{12}"
         />
-        <input
+        <WizardInput
           type="text"
           placeholder={t('onboarding.nicknamePlaceholder', 'Nickname (optional)')}
           value={wizard.nickname}
           onChange={(e) => wizard.setNickname(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'nickname')}
-          onFocus={() => wizard.setFocusedInput('nickname')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
         {wizard.accountSaved && (
           <p className="text-sm" style={{ color: '#4ade80' }}>
@@ -44,17 +39,17 @@ export default function AccountStep({ wizard }: { wizard: OnboardingWizard }) {
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <button
             onClick={wizard.handleSaveAccount}
-            disabled={wizard.isLoading || !isAwsAccountId(wizard.awsAccountId)}
+            disabled={wizard.isSavingAccount || !isAwsAccountId(wizard.awsAccountId)}
             className="font-medium"
-            style={getBtnPrimary(wizardStyles, wizard.isLoading || !isAwsAccountId(wizard.awsAccountId))}
+            style={getBtnPrimary(wizardStyles, wizard.isSavingAccount || !isAwsAccountId(wizard.awsAccountId))}
           >
-            {wizard.isLoading ? t('onboarding.saving', 'Saving...') : t('onboarding.saveAccount', 'Save Account')}
+            {wizard.isSavingAccount ? t('onboarding.saving', 'Saving...') : t('onboarding.saveAccount', 'Save Account')}
           </button>
           <button
-            onClick={() => wizard.setStep(1)}
-            disabled={!wizard.accountSaved}
+            onClick={wizard.goNext}
+            disabled={!wizard.canAdvance}
             className="font-medium"
-            style={getBtnSuccess(wizardStyles, !wizard.accountSaved)}
+            style={getBtnSuccess(wizardStyles, !wizard.canAdvance)}
           >
             {t('onboarding.next', 'Next')}
           </button>

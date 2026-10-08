@@ -31,9 +31,7 @@ class LambdaCollector extends BaseAwsCollector {
         const query: string = token ? `?Marker=${encodeURIComponent(token)}` : '';
         const page: LambdaListResponse = await this.fetchJson<LambdaListResponse>(
           `https://lambda.${region}.amazonaws.com/${API_DATE}/functions${query}`,
-          'lambda',
-          region,
-          accessKeys,
+          { accessKeys, region, service: 'lambda' },
         );
         return { page, nextToken: page.NextMarker };
       },

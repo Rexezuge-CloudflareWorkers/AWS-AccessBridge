@@ -9,14 +9,17 @@ interface UserAccessTokenMetadata {
 }
 
 interface UserAccessToken extends UserAccessTokenMetadata {
-  accessToken: string;
+  /**
+  The plaintext token. Returned exactly once at creation; never stored.
+  */
+  token: string;
 }
 
 interface UserAccessTokenInternal {
   token_id: string;
   user_email: string;
   user_id?: string | null;
-  access_token: string;
+  token_hash: string;
   name: string;
   created_at: number;
   expires_at: number;

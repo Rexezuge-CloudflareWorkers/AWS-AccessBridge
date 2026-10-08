@@ -47,8 +47,23 @@ chain are excluded and why a half-populated entry is worse than none.
 `last_cached_at` once per principal **after** the walk, so a one-hop chain with nothing to cache
 still leaves the batch rather than looping on it forever.
 
+**Only a principal that sits in a chain is registered.** `credential_cache_config` gets a row from
+`storeCredentialRelationship` — the role whose `assumed_by` points somewhere — and not from
+`storeCredential`. A base IAM principal's chain has length 1, and `getCredentialChain` answers a
+length-1 chain with `ForbiddenError` ("long-term credentials are not retrievable"), so registering
+those meant the batch consisted entirely of rows that could only ever fail, each occupying the front
+of `ORDER BY last_cached_at`. A length-1 chain arriving here anyway is skipped quietly rather than
+counted as a failure.
+
+`last_cached_at` is stamped on **failure** as well as success, for the same reason: a row that
+always throws would otherwise sort first forever and starve every principal behind it. The error is
+still logged and counted in `itemsFailed` — the stamp is about scheduling, not about pretending.
+
 Each principal is isolated in its own `try`: one unresolvable chain — a credentials row deleted out
 from under a stale `credential_cache_config` entry — must not abort the remaining principals.
+
+Regression test: `test/integration/api/CredentialPrewarm.int.test.ts` (real D1 and KV, stubbed
+STS).
 
 Because the cron only refreshes once stale, rotating an IAM key takes up to
 `CREDENTIAL_REFRESH_INTERVAL_MINUTES` to take effect. Locally, drive a cycle with

@@ -20,9 +20,26 @@ app.use('/user/*', noStore())        // registered BEFORE the auth handlers
 app.use('/api/*',  noStore())
 app.use('/user/*', activityAudit())
 app.use('/api/*',  activityAudit())
+app.use('/user/*', csrfProtection())  // state-changing requests only
+app.use('/api/*',  rateLimit())       // per CF-Connecting-IP, fail-open if unbound
 app.use('/user/*', userAuthentication())
 app.use('/api/*',  apiAuthentication())
 ```
+
+The three pre-authentication guards — `noStore`, `csrfProtection`, `rateLimit` — live in
+`RequestGuards.ts`; they answer from the request's own headers and `env` alone and never resolve a
+service from the request scope, which is what `MiddlewareHandlers` is for. Splitting them is what
+keeps that file under the god-file limit.
+
+`csrfProtection` rejects a `POST`/`PUT`/`PATCH`/`DELETE` on `/user/*` when `Sec-Fetch-Site` is present
+and is not `same-origin`/`none`, or when a body-bearing write is not `application/json`. A missing
+`Sec-Fetch-Site` is allowed: curl and server-to-server clients do not send it, and `/api/*` is not
+covered because programmatic clients have no browser to have sent it.
+
+`rateLimit` calls the platform's Rate Limiting binding on `CF-Connecting-IP` — the one header
+Cloudflare sets that a client cannot forge, where `X-Forwarded-For` would let a caller rotate
+buckets. It answers 429 with the standard envelope, and **fails open** when the binding is absent:
+local development and any deployment that has not bound a namespace must keep working.
 
 `noStore` awaits `next()` and sets the header afterwards, so it must **wrap** rather than sit behind
 the auth handlers — one of those returns its JSON directly without calling `next()`, and the header
@@ -111,7 +128,7 @@ message embeds raw D1/SQLite text, is logged and answered with the generic
 
 `@aws-access-bridge/shared/schema/exceptionResponses` holds status-keyed builders
 (`badRequestResponse`, `unauthorizedResponse`, `forbiddenResponse`, `notFoundResponse`,
-`conflictResponse`, `internalServerErrorResponse`) for the `{Exception: {Type, Message}}` shape. Use
+`internalServerErrorResponse`) for the `{Exception: {Type, Message}}` shape. Use
 them rather than inlining a schema; 147 openapi error blocks were collapsed into them.
 
 Two properties are load-bearing and asserted:
@@ -173,12 +190,16 @@ on the auth path — a write-side blip must not turn a valid PAT into a 500.
 `AuthenticatedUserEmailAddress` is the address the request authenticated as;
 `AuthenticatedUserId` is the stable account key it resolves to, published best-effort by
 `MiddlewareHandlers.publishAccountId`. A failure there logs and continues, because the address alone
-is still a complete identity. Both are read through `IActivityAPIRoute.getAuthenticatedUserEmailAddress`
-/ `getAuthenticatedUserId`; routes and the OpenAPI surface stay address-based by design, since the
-services resolve the account internally.
+is still a complete identity. Routes read the address through `IActivityAPIRoute.getAuthenticatedUserEmailAddress`;
+the account key is consumed only by the middleware (the audit event), and routes and the OpenAPI surface stay
+address-based by design, since the services resolve the account internally.
 
 Every `/user/*` and `/api/*` call is audited by `activityAudit()`, which builds the event through
-`AuditService` and writes it in `waitUntil` with its own `.catch` — a rejected audit write must not
+`AuditService` and writes it in `waitUntil` with its own `.catch` — except a **401 with no
+authenticated principal**, which writes nothing. Recording each unauthenticated request meant an
+attacker with no credentials could fill `audit_logs` with rows carrying an attacker-controlled path
+and user-agent, which is a write-amplification target. A genuine 401 after a successful handshake
+still keeps its entry. — a rejected audit write must not
 become an unhandled rejection. The event carries the account id alongside the address, best-effort and
 absent on a database without migration 0032, so an entry stays findable after an address change.
 

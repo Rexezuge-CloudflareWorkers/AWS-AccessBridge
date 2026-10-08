@@ -158,7 +158,9 @@ describe('0032 user identity upgrade on a populated database', () => {
     expect(preUser?.id).toBeUndefined();
     expect(preUser?.current_email).toBeUndefined();
 
-    await applyMigrations(db, { from: IDENTITY_MIGRATION });
+    // 0032 alone: a later migration (0034) deliberately deletes every stored
+    // token to force re-issue, which is outside what this upgrade asserts.
+    await applyMigrations(db, { from: IDENTITY_MIGRATION, to: IDENTITY_MIGRATION });
     after = await snapshotCounts(db);
     // `audit_logs` is excluded from GUARDED_TABLES, so record it here while the
     // database still holds only the seeded rows.
@@ -278,7 +280,9 @@ describe('0032 user identity upgrade on a populated database', () => {
       expect(row.is_verified).toBe(1);
       expect(row.user_id).toMatch(/^usr_/);
     }
-    expect(registry.results?.map((r) => r.email).toSorted((left, right) => left.localeCompare(right))).toEqual([ALICE, BOB.toLowerCase()].toSorted((left, right) => left.localeCompare(right)));
+    expect(registry.results?.map((r) => r.email).toSorted((left, right) => left.localeCompare(right))).toEqual(
+      [ALICE, BOB.toLowerCase()].toSorted((left, right) => left.localeCompare(right)),
+    );
   });
 
   it('backfills user_id on access-control rows, resolving the exact anchor', async () => {
@@ -435,10 +439,7 @@ describe('0032 user identity upgrade on a populated database', () => {
     expect(anchor?.user_email).toBe(ALICE);
 
     // ...and the id-keyed reads all still return Alice's rows.
-    const byId = await db
-      .prepare('SELECT COUNT(*) AS c FROM assumable_roles WHERE user_id = ?')
-      .bind(aliceId)
-      .first<{ c: number }>();
+    const byId = await db.prepare('SELECT COUNT(*) AS c FROM assumable_roles WHERE user_id = ?').bind(aliceId).first<{ c: number }>();
     expect(byId?.c).toBe(1);
 
     const tokensById = await db

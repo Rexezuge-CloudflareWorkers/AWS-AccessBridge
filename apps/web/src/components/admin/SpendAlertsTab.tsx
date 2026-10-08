@@ -7,6 +7,8 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle, inputStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
+import { parsePositiveNumber } from '../../lib/numbers';
 
 export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -23,16 +25,24 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
   const handleCreateAlert = async () => {
     if (!isCreateValid) return;
 
+    // `Number('abc')` is NaN and serialises as `null`; a negative value is
+    // rejected by the route with a wire-format message. Neither is sent.
+    const thresholdAmount = parsePositiveNumber(createForm.thresholdAmount);
+    if (thresholdAmount === null) {
+      showMessage('error', t('admin.thresholdInvalid', 'Threshold Amount must be a number greater than zero.'));
+      return;
+    }
+
     try {
       const created = await createSpendAlert({
         awsAccountId: createForm.awsAccountId,
-        thresholdAmount: Number(createForm.thresholdAmount),
+        thresholdAmount,
         periodType: createForm.periodType,
       });
       showMessage('success', t('admin.alertCreatedWithId', 'Spend alert created (ID: {{id}})', { id: created.id || 'unknown' }));
       setCreateForm({ awsAccountId: '', thresholdAmount: '', periodType: 'monthly' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.alertCreateFailed', 'Failed to create spend alert'));
+      showMessage('error', toErrorMessage(err, t('admin.alertCreateFailed', 'Failed to create spend alert')));
     }
   };
 
@@ -44,7 +54,7 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
       showMessage('success', t('admin.alertDeleted', 'Spend alert deleted'));
       setDeleteAlertId('');
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.alertDeleteFailed', 'Failed to delete spend alert'));
+      showMessage('error', toErrorMessage(err, t('admin.alertDeleteFailed', 'Failed to delete spend alert')));
     }
   };
 

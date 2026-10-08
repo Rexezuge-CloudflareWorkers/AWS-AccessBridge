@@ -1,10 +1,14 @@
 import { Container } from '@aws-access-bridge/backend-runtime/di';
 import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createEncryptionKeys, keyChain } from './encryptionKeys';
+import { ReplayGuard } from '../auth/ReplayGuard';
+import { InternalRequestHelper } from '../aws/InternalRequestHelper';
 import { AccessService } from '../access/AccessService';
 import { AccountService } from '../account/AccountService';
 import { AssumeRoleService } from '../aws/assume-role/AssumeRoleService';
 import { ConsoleService } from '../aws/console/ConsoleService';
+import { FederationService } from '../aws/federate/FederationService';
 import { CostExplorerService } from '../aws/ce/CostExplorerService';
 import { IamService } from '../aws/iam/IamService';
 import { StsService } from '../aws/sts/StsService';
@@ -67,10 +71,17 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
   scope.bindValue(Tokens.CredentialCacheKey, credentialCacheKey);
   scope.bindValue(Tokens.CollectorRegistry, InjectableCollectorRegistry.withDefaults());
 
+  // One identity service per scope: its memo is the per-request address→account
+  // cache, and injecting it everywhere keeps fifteen private instances from
+  // re-resolving the same address within a single request.
+  const identity = new UserIdentityService(env);
+  scope.bindValue(Tokens.UserIdentityService, identity);
+
   scope.bind(Tokens.StsService, () => new StsService());
   scope.bind(Tokens.IamService, () => new IamService());
   scope.bind(Tokens.CostExplorerService, () => new CostExplorerService());
   scope.bind(Tokens.ConsoleService, () => new ConsoleService());
+  scope.bind(Tokens.FederationService, () => new FederationService(scope.get(Tokens.AssumeRoleService), scope.get(Tokens.ConsoleService)));
   // The key providers are injected rather than looked up: these services hold only
   // `env`, which is not the request's identity, so a lookup inside one would build
   // a second scope and fetch the secrets again.
@@ -78,22 +89,38 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
     credentials: await credentialKey(),
     cache: await credentialCacheKey(),
   });
-  scope.bind(Tokens.CredentialChainService, () => new CredentialChainService(env, undefined, keyProvider));
+  const chainService = new CredentialChainService(env, undefined, keyProvider);
+  scope.bind(Tokens.CredentialChainService, () => chainService);
   scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env, undefined, () => credentialKey()));
-  scope.bind(Tokens.AssumeRoleService, () => new AssumeRoleService({ ...env, AccessBridgeKV: requireCredentialCacheKv(env) }));
-  scope.bind(Tokens.CostService, () => new CostService(env));
-  scope.bind(Tokens.ResourceService, () => new ResourceService(env));
-  scope.bind(Tokens.TeamService, () => new TeamService(env));
-  scope.bind(Tokens.UserService, () => new UserService(env));
-  scope.bind(Tokens.AccessService, () => new AccessService(env));
-  scope.bind(Tokens.AccountService, () => new AccountService(env));
+  scope.bind(
+    Tokens.AssumeRoleService,
+    () => new AssumeRoleService({ ...env, AccessBridgeKV: requireCredentialCacheKv(env) }, undefined, chainService, identity),
+  );
+  scope.bind(Tokens.CostService, () => new CostService(env, identity));
+  scope.bind(Tokens.ResourceService, () => new ResourceService(env, identity));
+  scope.bind(Tokens.TeamService, () => new TeamService(env, identity));
+  scope.bind(Tokens.UserService, () => new UserService(env, identity));
+  scope.bind(Tokens.AccessService, () => new AccessService(env, identity));
+  scope.bind(Tokens.AccountService, () => new AccountService(env, undefined, undefined, chainService));
   scope.bind(Tokens.MaintenanceService, () => new MaintenanceService(env));
   scope.bind(Tokens.AuditService, () => new AuditService(env));
-  scope.bind(Tokens.TokenService, () => new TokenService(env));
+  scope.bind(Tokens.TokenService, () => new TokenService(env, identity));
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env));
-  // One instance per request scope, which is what makes the address -> account
-  // memo in `UserIdentityService` a per-request cache rather than a leak.
-  scope.bind(Tokens.UserIdentityService, () => new UserIdentityService(env));
+
+  // The replay-seen-set and the self-call signing helper come from the same
+  // root as the services: the ttl outlives the handler's request window, so a
+  // signature cannot age out while its request is still acceptable.
+  const replayTtlSeconds: number = Math.max(300, (ConfigurationManager.internal.getRequestTimeWindowMs(env) / 1000) * 2);
+  scope.bind(Tokens.ReplayGuard, () => new ReplayGuard(env.AccessBridgeKV, replayTtlSeconds));
+  scope.bindValue(
+    Tokens.InternalRequestHelper,
+    memoize(async (): Promise<InternalRequestHelper> => {
+      if (!env.SELF || !env.INTERNAL_REQUEST_HMAC_SECRET) {
+        throw new InternalServerError('SELF binding and INTERNAL_REQUEST_HMAC_SECRET are required for internal self-calls.');
+      }
+      return new InternalRequestHelper(env.SELF, await env.INTERNAL_REQUEST_HMAC_SECRET.get());
+    }),
+  );
 
   return scope;
 }

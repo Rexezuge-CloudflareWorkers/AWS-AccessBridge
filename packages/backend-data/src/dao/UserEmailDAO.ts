@@ -26,19 +26,30 @@ class UserEmailDAO extends BaseDAO {
    * another. The `'already-claimed'` return is the check — callers reject on it.
    * An unverified (revoked) row is re-pointed, which releases the address.
    */
-  public async register(input: { email: string; userId: string; isVerified: boolean; now: number }): Promise<'claimed' | 'already-claimed'> {
+  public async register(input: {
+    email: string;
+    userId: string;
+    isVerified: boolean;
+    now: number;
+  }): Promise<'claimed' | 'already-claimed'> {
     const email: string = input.email.toLowerCase();
     const existing: UserEmailRow | null = await this.get(email);
     if (existing && existing.is_verified === 1) return 'already-claimed';
+    // Conditional update: the DO UPDATE may only re-point an UNVERIFIED row.
+    // Without `WHERE is_verified = 0`, two concurrent claims — claim and
+    // revoke — could re-point a verified address at a new account, because
+    // the `existing` read above and this write are not one statement. The
+    // `meta.changes` check turns "lost the race" into `'already-claimed'`.
     const result: D1Result = await this.database
       .prepare(
         `INSERT INTO user_emails (email, user_id, is_verified, created_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id, is_verified = excluded.is_verified`,
+         ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id, is_verified = excluded.is_verified
+         WHERE user_emails.is_verified = 0`,
       )
       .bind(email, input.userId, input.isVerified ? 1 : 0, input.now)
       .run();
     assertD1Success(result, `register user email`);
-    return 'claimed';
+    return (result.meta?.changes ?? 0) === 0 ? 'already-claimed' : 'claimed';
   }
 
   /**

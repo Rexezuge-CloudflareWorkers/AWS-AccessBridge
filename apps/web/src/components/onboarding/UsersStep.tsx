@@ -1,14 +1,17 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { WIZARD_STEP, validEmails } from '../../lib/onboardingWizard';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
-import { getBtnSuccess, getInputStyle, wizardStyles } from './wizardStyles';
+import WizardInput from './WizardInput';
+import { getBtnSuccess, wizardStyles } from './wizardStyles';
 
 /**
  * Step 5: user assignment (extracted from `OnboardingWizard.tsx` god file).
  */
 export default function UsersStep({ wizard }: { wizard: OnboardingWizard }) {
   const { t } = useTranslation();
+  const grantDisabled = wizard.isGranting || validEmails(wizard.userEmails).length === 0 || wizard.selectedRoles.size === 0;
   return (
     <div style={wizardStyles.card}>
       <div style={wizardStyles.cardInner}>
@@ -18,7 +21,7 @@ export default function UsersStep({ wizard }: { wizard: OnboardingWizard }) {
         </p>
         {wizard.userEmails.map((email, i) => (
           <div key={i} style={{ display: 'flex', gap: '8px' }}>
-            <input
+            <WizardInput
               type="email"
               placeholder={t('admin.emailPlaceholder', 'user@example.com')}
               value={email}
@@ -27,9 +30,6 @@ export default function UsersStep({ wizard }: { wizard: OnboardingWizard }) {
                 next[i] = e.target.value;
                 wizard.setUserEmails(next);
               }}
-              style={getInputStyle(wizard.focusedInput, wizardStyles, `email-${i}`)}
-              onFocus={() => wizard.setFocusedInput(`email-${i}`)}
-              onBlur={() => wizard.setFocusedInput(null)}
             />
             {wizard.userEmails.length > 1 && (
               <button
@@ -66,19 +66,16 @@ export default function UsersStep({ wizard }: { wizard: OnboardingWizard }) {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={wizard.handleGrantAccess}
-            disabled={wizard.isLoading || wizard.userEmails.every((e) => !e.trim()) || wizard.selectedRoles.size === 0}
+            disabled={grantDisabled}
             className="font-medium"
-            style={getBtnSuccess(
-              wizardStyles,
-              wizard.isLoading || wizard.userEmails.every((e) => !e.trim()) || wizard.selectedRoles.size === 0,
-            )}
+            style={getBtnSuccess(wizardStyles, grantDisabled)}
           >
-            {wizard.isLoading ? t('onboarding.granting', 'Granting...') : t('onboarding.grantAccess', 'Grant Access')}
+            {wizard.isGranting ? t('onboarding.granting', 'Granting...') : t('onboarding.grantAccess', 'Grant Access')}
           </button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
           <button
-            onClick={() => wizard.setStep(3)}
+            onClick={() => wizard.setStep(WIZARD_STEP.ROLES)}
             className="font-medium"
             style={wizardStyles.btnSecondary}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
@@ -86,7 +83,7 @@ export default function UsersStep({ wizard }: { wizard: OnboardingWizard }) {
           >
             {t('onboarding.back', 'Back')}
           </button>
-          <button onClick={() => wizard.setStep(5)} className="font-medium" style={wizardStyles.btnSuccess}>
+          <button onClick={() => wizard.setStep(WIZARD_STEP.SUMMARY)} className="font-medium" style={wizardStyles.btnSuccess}>
             {t('onboarding.next', 'Next')}
           </button>
         </div>

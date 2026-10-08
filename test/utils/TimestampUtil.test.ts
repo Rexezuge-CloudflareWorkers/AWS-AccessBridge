@@ -25,16 +25,6 @@ describe('TimestampUtil', () => {
     });
   });
 
-  describe('addMinutes', () => {
-    it('adds minutes to a timestamp', () => {
-      expect(TimestampUtil.addMinutes(1000, 5)).toBe(1000 + 5 * 60);
-    });
-
-    it('adds zero minutes', () => {
-      expect(TimestampUtil.addMinutes(1000, 0)).toBe(1000);
-    });
-  });
-
   describe('addDays', () => {
     it('adds days to a timestamp', () => {
       expect(TimestampUtil.addDays(1000, 1)).toBe(1000 + 86_400);
@@ -52,12 +42,6 @@ describe('TimestampUtil', () => {
 
     it('subtracts zero minutes', () => {
       expect(TimestampUtil.subtractMinutes(1000, 0)).toBe(1000);
-    });
-  });
-
-  describe('subtractDays', () => {
-    it('subtracts days from a timestamp', () => {
-      expect(TimestampUtil.subtractDays(100_000, 1)).toBe(100_000 - 86_400);
     });
   });
 

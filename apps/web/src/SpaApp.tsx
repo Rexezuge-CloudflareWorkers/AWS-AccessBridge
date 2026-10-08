@@ -12,6 +12,12 @@ import { useAuth } from './hooks/useAuth';
 import { useRouter, type View } from './hooks/useRouter';
 import { useSpaLanguage } from './hooks/useSpaLanguage';
 import { useToast } from './hooks/useToast';
+import { pageRange, totalPages } from './lib/pagination';
+import { readStoredInt } from './lib/storage';
+
+const PAGE_SIZE_STORAGE_KEY = 'aws-access-bridge-page-size';
+const CURRENT_PAGE_STORAGE_KEY = 'aws-access-bridge-current-page';
+const DEFAULT_PAGE_SIZE = 10;
 
 export default function SpaApp() {
   const { t } = useTranslation();
@@ -22,14 +28,8 @@ export default function SpaApp() {
   const [showHidden, setShowHidden] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pageSize, setPageSize] = useState(() => {
-    const saved = localStorage.getItem('aws-access-bridge-page-size');
-    return saved ? Math.trunc(Number(saved)) : 10;
-  });
-  const [currentPage, setCurrentPage] = useState(() => {
-    const saved = sessionStorage.getItem('aws-access-bridge-current-page');
-    return saved ? Math.trunc(Number(saved)) : 1;
-  });
+  const [pageSize, setPageSize] = useState(() => readStoredInt(localStorage, PAGE_SIZE_STORAGE_KEY, DEFAULT_PAGE_SIZE));
+  const [currentPage, setCurrentPage] = useState(() => readStoredInt(sessionStorage, CURRENT_PAGE_STORAGE_KEY, 1));
   const [totalAccounts, setTotalAccounts] = useState(0);
 
   const handleSetTotalAccounts = useCallback((count: number) => {
@@ -37,11 +37,11 @@ export default function SpaApp() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('aws-access-bridge-page-size', pageSize.toString());
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, pageSize.toString());
   }, [pageSize]);
 
   useEffect(() => {
-    sessionStorage.setItem('aws-access-bridge-current-page', currentPage.toString());
+    sessionStorage.setItem(CURRENT_PAGE_STORAGE_KEY, currentPage.toString());
   }, [currentPage]);
 
   const navigateToView = useCallback(
@@ -214,14 +214,13 @@ export default function SpaApp() {
                       <>
                         <div className="text-sm text-gray-500">
                           {t('nav.showingOf', '{{from}}–{{to}} of {{total}}', {
-                            from: Math.min((currentPage - 1) * pageSize + 1, totalAccounts),
-                            to: Math.min(currentPage * pageSize, totalAccounts),
+                            ...pageRange(currentPage, pageSize, totalAccounts),
                             total: totalAccounts,
                           })}
                         </div>
                         <Pagination
                           currentPage={currentPage}
-                          totalPages={Math.ceil(totalAccounts / pageSize)}
+                          totalPages={totalPages(totalAccounts, pageSize)}
                           onPageChange={setCurrentPage}
                           variant="full"
                         />

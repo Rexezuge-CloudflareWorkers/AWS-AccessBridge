@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { CronTasksWorker } from '@aws-access-bridge/background/CronTasksWorker';
-
+import { CronTasksWorker, MAX_RUN_AGE_MS } from '@aws-access-bridge/background/CronTasksWorker';
 
 /**
  * The cron Durable Object had 55% branch coverage and 14% function coverage. Its job
@@ -23,11 +22,20 @@ import { CronTasksWorker } from '@aws-access-bridge/background/CronTasksWorker';
  */
 const registry = vi.hoisted(() => {
   const makeHandle = (): ReturnType<typeof vi.fn<() => Promise<unknown>>> => vi.fn<() => Promise<unknown>>();
-  return { phase1: [{ handle: makeHandle() }], phase2: [{ handle: makeHandle() }] };
+  return {
+    phase1: [{ handle: makeHandle() }],
+    phase2: [{ handle: makeHandle() }],
+    phase2WithoutCollections: [{ handle: makeHandle() }],
+    calls: [] as number[],
+  };
 });
 
 vi.mock('@aws-access-bridge/background/scheduled', () => ({
-  tasksForPhase: (phase: number) => (phase === 1 ? registry.phase1 : registry.phase2),
+  tasksForPhase: (phase: number, options?: { collections?: boolean }): TaskDouble[] => {
+    registry.calls.push(phase);
+    if (phase !== 2) return registry.phase1;
+    return options?.collections === false ? registry.phase2WithoutCollections : registry.phase2;
+  },
 }));
 
 /**
@@ -57,8 +65,48 @@ function worker(): CronTasksWorker {
   return new CronTasksWorker(state, ENV);
 }
 
+/**
+ * The two collection sweeps are durable work: with `COLLECTION_WORKFLOW` bound
+ * the DO must start one workflow instance per tick and must NOT run them
+ * inline, because the thing that hangs inside them is a network call.
+ */
+function envWithWorkflow(create: ReturnType<typeof vi.fn>): CloudflareEnv {
+  return { ...ENV, COLLECTION_WORKFLOW: { create } } as unknown as CloudflareEnv;
+}
+
+function workerWith(env: CloudflareEnv): CronTasksWorker {
+  const state = { ctx: createContext(), id: { name: () => 'cron' } } as unknown as DurableObjectState;
+  return new CronTasksWorker(state, env);
+}
+
+describe('collection workflow fan-out', () => {
+  it('starts one instance and leaves the collection tasks to it', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 'wf-1' });
+    const durable = workerWith(envWithWorkflow(create));
+    expect(await statusOf(durable, post({ cron: '*/10 * * * *', scheduledTime: 1 }))).toBe(200);
+    expect(create).toHaveBeenCalledWith({ params: { cron: '*/10 * * * *', scheduledTime: 1 } });
+    // Only the non-collection phase-2 tasks ran inside the DO.
+    expect(registry.phase2[0].handle).not.toHaveBeenCalled();
+    expect(registry.phase2WithoutCollections[0].handle).toHaveBeenCalled();
+  });
+
+  it('runs the collection tasks inline when no workflow is bound', async () => {
+    const durable = worker();
+    expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 1 }))).toBe(200);
+    expect(registry.phase2[0].handle).toHaveBeenCalled();
+  });
+
+  it('reports the run as failed when starting the instance fails', async () => {
+    const create = vi.fn().mockRejectedValue(new Error('workflow unavailable'));
+    const durable = workerWith(envWithWorkflow(create));
+    // An unhandled rejection here would be a silent tick: the collection simply
+    // would not happen.
+    expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 1 }))).toBe(500);
+  });
+});
+
 function handleOf(index: 0 | 1, phase: 1 | 2): TaskDouble['handle'] {
-  return (registry[`phase${phase}`][index]).handle;
+  return registry[`phase${phase}`][index].handle;
 }
 
 /**
@@ -224,5 +272,51 @@ describe('overlap protection', () => {
     const durable = worker();
     expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 1 }))).toBe(500);
     expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 2 }))).toBe(200);
+  });
+});
+
+describe('a wedged run does not hold the guard forever', () => {
+  /**
+   * `currentRun` lives in memory, so a task whose AWS call never settles would
+   * make every later tick answer 202 `already_running` until the object is
+   * evicted — retention and collection silently stop. The guard therefore
+   * carries the run's start time and expires after `MAX_RUN_AGE_MS`.
+   */
+  function hangFirstRun(): void {
+    handleOf(0, 1).mockImplementationOnce(() => new Promise<never>(() => undefined));
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is generous against the 10-minute cron interval', () => {
+    expect(MAX_RUN_AGE_MS).toBeGreaterThan(10 * 60 * 1000);
+  });
+
+  it('keeps refusing while the run is younger than the maximum age', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    hangFirstRun();
+    const durable = worker();
+    void durable.fetch(post({ cron: 'x', scheduledTime: 1 }));
+    await vi.advanceTimersByTimeAsync(MAX_RUN_AGE_MS - 1000);
+
+    expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 2 }))).toBe(202);
+    expect(handleOf(0, 1)).toHaveBeenCalledOnce();
+  });
+
+  it('expires the guard and starts a new run once the old one is older than the maximum age', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    hangFirstRun();
+    const durable = worker();
+    void durable.fetch(post({ cron: 'x', scheduledTime: 1 }));
+    await vi.advanceTimersByTimeAsync(MAX_RUN_AGE_MS + 1000);
+
+    expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 2 }))).toBe(200);
+    expect(handleOf(0, 1)).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalled();
+    // And the recovered object keeps working afterwards.
+    expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 3 }))).toBe(200);
   });
 });

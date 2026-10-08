@@ -13,6 +13,61 @@ import { apiRequest } from '../lib/api';
  * sent a singular `collectionType` where the route requires `collectionTypes`.
  */
 
+/**
+ * The identity AWS reports for a set of credentials (`sts:GetCallerIdentity`).
+ */
+interface ValidatedIdentity {
+  arn: string;
+  accountId: string;
+}
+
+/**
+ * One hop of a credential-chain test: the role assumed and how it went. A status
+ * beginning `ok` is a pass; anything else is the failure text.
+ */
+interface ChainTestEntry {
+  arn: string;
+  status: string;
+}
+
+interface ChainTestResult {
+  success: boolean;
+  chain: ChainTestEntry[];
+}
+
+/**
+ * An IAM role found in an account. A role typed in by hand has an empty `arn`.
+ */
+interface DiscoveredRole {
+  roleName: string;
+  arn: string;
+  description: string;
+}
+
+interface DiscoveredRolesResult {
+  roles: DiscoveredRole[];
+}
+
+/**
+ * The spend-alert body the route accepts (`CreateSpendAlertBodySchema`).
+ * `thresholdAmount` is a number, not the form's string, and strictly positive.
+ */
+interface SpendAlertInput {
+  awsAccountId: string;
+  thresholdAmount: number;
+  periodType?: string;
+}
+
+/**
+ * The optional fields of a role configuration. A field is *omitted* to leave it
+ * alone — the route distinguishes "not supplied" from "set to empty".
+ */
+interface RoleConfigOptions {
+  destinationPath?: string;
+  destinationRegion?: string;
+  roleSessionDurationSeconds?: number;
+}
+
 async function setAccountNickname(awsAccountId: string, nickname: string): Promise<void> {
   await apiRequest<void>('/user/admin/account/nickname', { method: 'PUT', body: { awsAccountId, nickname } });
 }
@@ -33,26 +88,22 @@ async function removeCredentialRelationship(principalArn: string): Promise<void>
   await apiRequest<void>('/user/admin/credentials/relationship', { method: 'DELETE', body: { principalArn } });
 }
 
-async function validateCredentials(
-  accessKeyId: string,
-  secretAccessKey: string,
-  sessionToken?: string,
-): Promise<{ arn: string; accountId: string }> {
-  return apiRequest<{ arn: string; accountId: string }>('/user/admin/credentials/validate', {
+async function validateCredentials(accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<ValidatedIdentity> {
+  return apiRequest<ValidatedIdentity>('/user/admin/credentials/validate', {
     method: 'POST',
     body: { accessKeyId, secretAccessKey, sessionToken },
   });
 }
 
-async function testCredentialChain(principalArn: string): Promise<{ success: boolean; chain: Array<{ arn: string; status: string }> }> {
-  return apiRequest<{ success: boolean; chain: Array<{ arn: string; status: string }> }>('/user/admin/credentials/test-chain', {
+async function testCredentialChain(principalArn: string): Promise<ChainTestResult> {
+  return apiRequest<ChainTestResult>('/user/admin/credentials/test-chain', {
     method: 'POST',
     body: { principalArn },
   });
 }
 
-async function discoverAccountRoles(principalArn: string): Promise<{ roles: Array<{ roleName: string; arn: string; description: string }> }> {
-  return apiRequest<{ roles: Array<{ roleName: string; arn: string; description: string }> }>('/user/admin/account/roles', {
+async function discoverAccountRoles(principalArn: string): Promise<DiscoveredRolesResult> {
+  return apiRequest<DiscoveredRolesResult>('/user/admin/account/roles', {
     method: 'POST',
     body: { principalArn },
   });
@@ -63,16 +114,18 @@ async function discoverAccountRoles(principalArn: string): Promise<{ roles: Arra
  * deletes independently and reports per-table `failures`, so a partial run
  * still answers 200 — this shape is the route's, not a simplification of it.
  */
+interface OrphanedDeletedCounts {
+  awsAccounts: number;
+  roleConfigs: number;
+  teamAccounts: number;
+  spendAlerts: number;
+  costData: number;
+  resourceInventory: number;
+  dataCollectionConfig: number;
+}
+
 interface CleanupOrphanedResult {
-  deletedCounts: {
-    awsAccounts: number;
-    roleConfigs: number;
-    teamAccounts: number;
-    spendAlerts: number;
-    costData: number;
-    resourceInventory: number;
-    dataCollectionConfig: number;
-  };
+  deletedCounts: OrphanedDeletedCounts;
   totalDeleted: number;
   /**
    * Tables that could not be cleaned; empty on a fully successful run.
@@ -93,7 +146,7 @@ async function revokeAccess(userEmail: string | undefined, awsAccountId: string,
   await apiRequest<void>('/user/admin/access', { method: 'DELETE', body: { userEmail, awsAccountId, roleName } });
 }
 
-async function setRoleConfig(awsAccountId: string, roleName: string, config: Record<string, unknown>): Promise<void> {
+async function setRoleConfig(awsAccountId: string, roleName: string, config: RoleConfigOptions): Promise<void> {
   await apiRequest<void>('/user/admin/role/config', { method: 'PUT', body: { awsAccountId, roleName, ...config } });
 }
 
@@ -119,8 +172,17 @@ async function disableDataCollection(principalArn: string, collectionType: strin
   await apiRequest<void>('/user/admin/collection/config', { method: 'DELETE', body: { principalArn, collectionType } });
 }
 
-async function createSpendAlert(alert: Record<string, unknown>): Promise<{ id?: string }> {
-  const data = await apiRequest<{ alert?: { id?: string } }>('/user/admin/costs/alerts', { method: 'POST', body: alert });
+/**
+ * The alert as the route echoes it back. Only `id` is read; it is optional
+ * because the response body is not validated, and a missing one is shown as
+ * "unknown" rather than crashing the toast.
+ */
+interface CreatedSpendAlert {
+  id?: string;
+}
+
+async function createSpendAlert(alert: SpendAlertInput): Promise<CreatedSpendAlert> {
+  const data = await apiRequest<{ alert?: CreatedSpendAlert }>('/user/admin/costs/alerts', { method: 'POST', body: alert });
   return data.alert ?? {};
 }
 
@@ -132,7 +194,18 @@ async function cleanupOrphaned(): Promise<CleanupOrphanedResult> {
   return apiRequest<CleanupOrphanedResult>('/user/admin/maintenance/cleanup-orphaned', { method: 'POST' });
 }
 
-export type { CleanupOrphanedResult };
+export type {
+  ChainTestEntry,
+  ChainTestResult,
+  CleanupOrphanedResult,
+  CreatedSpendAlert,
+  DiscoveredRole,
+  DiscoveredRolesResult,
+  OrphanedDeletedCounts,
+  RoleConfigOptions,
+  SpendAlertInput,
+  ValidatedIdentity,
+};
 export {
   cleanupOrphaned,
   createSpendAlert,

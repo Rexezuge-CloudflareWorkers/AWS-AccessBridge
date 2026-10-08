@@ -2,23 +2,20 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TeamMember } from '@aws-access-bridge/shared';
 import { formatUnixDate } from '../../lib/format';
+import { DEFAULT_TEAM_ROLE, isTeamRole } from '../../lib/teamRoles';
+import type { TeamRole } from '../../services/teamsService';
 import FocusInput from '../ui/FocusInput';
 import Spinner from '../ui/Spinner';
 import { cardStyle, inputStyle, tableCardStyle, thStyle, tdStyle, btnGreenStyle, btnSmallStyle } from '../ui/theme';
 
-interface TeamMember {
-  userEmail: string;
-  role: string;
-  joinedAt: number;
-}
-
 interface TeamMembersSectionProps {
   members: TeamMember[];
   isLoading: boolean;
-  onAdd: (email: string, role: string) => Promise<void>;
+  onAdd: (email: string, role: TeamRole) => Promise<void>;
   onRemove: (email: string) => Promise<void>;
-  onUpdateRole: (email: string, role: string) => void;
+  onUpdateRole: (email: string, role: TeamRole) => void;
 }
 
 const styles = {
@@ -40,7 +37,7 @@ const styles = {
 export default function TeamMembersSection({ members, isLoading, onAdd, onRemove, onUpdateRole }: TeamMembersSectionProps) {
   const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('member');
+  const [role, setRole] = useState<TeamRole>(DEFAULT_TEAM_ROLE);
 
   return (
     <div style={styles.card}>
@@ -51,17 +48,24 @@ export default function TeamMembersSection({ members, isLoading, onAdd, onRemove
           e.preventDefault();
           void onAdd(email.trim(), role).then(() => {
             setEmail('');
-            setRole('member');
+            setRole(DEFAULT_TEAM_ROLE);
           });
         }}
         style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}
       >
         <div style={{ flex: 1 }}>
-          <FocusInput type="email" placeholder={t('teams.emailPlaceholder', 'User email')} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <FocusInput
+            type="email"
+            placeholder={t('teams.emailPlaceholder', 'User email')}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => {
+            if (isTeamRole(e.target.value)) setRole(e.target.value);
+          }}
           style={{ ...styles.input, width: 'auto', padding: '12px 16px', cursor: 'pointer' }}
         >
           <option value="member">{t('teams.roleMember', 'Member')}</option>
@@ -106,7 +110,9 @@ export default function TeamMembersSection({ members, isLoading, onAdd, onRemove
                   <td style={styles.td}>
                     <select
                       value={m.role}
-                      onChange={(e) => onUpdateRole(m.userEmail, e.target.value)}
+                      onChange={(e) => {
+                        if (isTeamRole(e.target.value)) onUpdateRole(m.userEmail, e.target.value);
+                      }}
                       style={{
                         background: '#252d3d',
                         border: '1px solid #374151',
@@ -121,7 +127,9 @@ export default function TeamMembersSection({ members, isLoading, onAdd, onRemove
                       <option value="admin">{t('teams.roleAdmin', 'Admin')}</option>
                     </select>
                   </td>
-                  <td style={{ ...styles.td, color: '#6b7280', fontSize: '13px' }}>{formatUnixDate(m.joinedAt, i18n.resolvedLanguage ?? 'en')}</td>
+                  <td style={{ ...styles.td, color: '#6b7280', fontSize: '13px' }}>
+                    {formatUnixDate(m.joinedAt, i18n.resolvedLanguage ?? 'en')}
+                  </td>
                   <td style={{ ...styles.td, textAlign: 'right' }}>
                     <button
                       onClick={() => void onRemove(m.userEmail)}

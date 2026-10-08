@@ -3,7 +3,7 @@ import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
-import { TimestampUtil, UUIDUtil, log } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, TokenHashUtil, UUIDUtil, log } from '@aws-access-bridge/shared/utils';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';
@@ -41,9 +41,10 @@ class TokenService {
    */
   public async authenticateWithPAT(token: string, defer?: (work: Promise<unknown>) => void): Promise<string> {
     const dao: UserAccessTokenDAO = new UserAccessTokenDAO(this.env.AccessBridgeDB);
-    const tokenData: UserAccessTokenMetadata | undefined = await dao.getByToken(token, true);
+    const tokenHash: string = await TokenHashUtil.sha256Hex(token);
+    const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, true);
     if (tokenData) {
-      const stampLastUsed = dao.updateLastUsedByToken(token);
+      const stampLastUsed = dao.updateLastUsedByTokenHash(tokenHash);
       if (defer) {
         defer(stampLastUsed);
       } else {
@@ -79,10 +80,13 @@ class TokenService {
     }
     const tokenId: string = UUIDUtil.getRandomUUID();
     const token: string = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
+    const tokenHash: string = await TokenHashUtil.sha256Hex(token);
     const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), effectiveExpiryInDays);
     // The anchor goes in the `user_email` column because the foreign key on
     // that column is the one thing the schema cannot repoint.
-    await dao.create(tokenId, owner.anchorEmail, token, name, expiresAt, owner.userId);
+    // Only the digest is stored; the plaintext leaves this function exactly
+    // once, in the response, and is never persisted.
+    await dao.create(tokenId, owner.anchorEmail, tokenHash, name, expiresAt, owner.userId);
     return { tokenId, token, name, expiresAt };
   }
 

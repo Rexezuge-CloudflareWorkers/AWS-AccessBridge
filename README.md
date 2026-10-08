@@ -32,7 +32,9 @@ AWS AccessBridge is a pnpm monorepo deploying a Cloudflare Worker API, a cron Du
 - **Per-user role visibility** — control exactly which roles each user can see and assume, and let users hide roles they don't want cluttering their view.
 - **Account search** — server-side search across assumable accounts and roles.
 - **Favorites** — users can pin their most-used accounts to the top.
-- **Personal access tokens** — users can mint scoped PATs for use in scripts and CI.
+- **Personal access tokens** — users can mint scoped PATs for use in scripts and CI. Stored as
+  SHA-256 digests: a database read or a nightly backup cannot yield a working token. Migration
+  `0034` invalidated every token minted before it, so apply it and have users re-issue.
 
 ### Team Workspaces
 
@@ -308,7 +310,7 @@ A `Backup D1 Database` workflow (`.github/workflows/backup-d1.yml`) exports `Acc
 To enable it, add these repository secrets (`Settings → Secrets and variables → Actions → Secrets`):
 
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` — already present for deployment; nothing new.
-- `BACKUP_ENCRYPTION_KEY` — **required**. The D1 database stores API bearer tokens (`user_access_tokens.access_token`) and user addresses in plaintext, so the workflow refuses to run or upload anything unencrypted.
+- `BACKUP_ENCRYPTION_KEY` — **required**. The export carries user addresses and encrypted credential blobs whose keys sit in the same Secrets Store, so the workflow refuses to run or upload anything unencrypted. (Personal access tokens are stored as SHA-256 digests since migration `0034`, so a dump no longer contains usable bearer credentials.)
 - Destination credentials: `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` and/or `WEBDAV_URL` / `WEBDAV_USER` / `WEBDAV_PASSWORD`.
 - Optional: `S3_ENDPOINT` (required for R2, MinIO, B2), `S3_REGION` (defaults to `auto`; set only for providers that need a concrete region), `BACKUP_RETENTION_DAYS` (default 30), `WEBDAV_BASE_PATH` (default `aws-access-bridge`).
 

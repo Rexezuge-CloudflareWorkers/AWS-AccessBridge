@@ -37,17 +37,6 @@ describe('TeamsDAO', () => {
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO teams'));
   });
 
-  it('returns null for unknown teams', async () => {
-    const dao = new TeamsDAO(mockDb);
-    await expect(dao.getTeamById('missing')).resolves.toBeNull();
-  });
-
-  it('maps team rows to external models', async () => {
-    vi.mocked(mockStmt.first).mockResolvedValue({ team_id: 't1', team_name: 'Ops', created_at: 1, created_by: 'a@b.c' });
-    const dao = new TeamsDAO(mockDb);
-    await expect(dao.getTeamById('t1')).resolves.toEqual({ teamId: 't1', teamName: 'Ops', createdAt: 1, createdBy: 'a@b.c' });
-  });
-
   it('lists teams ordered by name', async () => {
     vi.mocked(mockStmt.all).mockResolvedValue({ results: [{ team_id: 't1', team_name: 'B', created_at: 1, created_by: 'x' }] });
     const dao = new TeamsDAO(mockDb);
@@ -104,31 +93,6 @@ describe('TeamMembersDAO', () => {
     expect(mockStmt.bind).toHaveBeenCalledWith('t1', 'usr_abc', 'user@example.com');
   });
 
-  it('detects team admins by role', async () => {
-    vi.mocked(mockStmt.first).mockResolvedValue({ role: 'admin' });
-    const dao = new TeamMembersDAO(mockDb);
-    const owner = { userId: 'usr_abc', anchorEmail: 'user@example.com' };
-    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(true);
-    vi.mocked(mockStmt.first).mockResolvedValue({ role: 'member' });
-    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(false);
-    vi.mocked(mockStmt.first).mockResolvedValue(null);
-    await expect(dao.isTeamAdmin('t1', owner)).resolves.toBe(false);
-  });
-
-  it('lists teams for an account id', async () => {
-    vi.mocked(mockStmt.all).mockResolvedValue({ results: [{ team_id: 't1', team_name: 'Ops', role: 'admin' }] });
-    const dao = new TeamMembersDAO(mockDb);
-    await expect(dao.getTeamsByUserId({ userId: 'usr_abc', anchorEmail: 'u@e.c' })).resolves.toEqual([
-      { teamId: 't1', teamName: 'Ops', role: 'admin' },
-    ]);
-  });
-
-  it('lists teams for a user', async () => {
-    vi.mocked(mockStmt.all).mockResolvedValue({ results: [{ team_id: 't1', team_name: 'Ops', role: 'admin' }] });
-    const dao = new TeamMembersDAO(mockDb);
-    await expect(dao.getTeamsByUserEmail('u@e.c')).resolves.toEqual([{ teamId: 't1', teamName: 'Ops', role: 'admin' }]);
-  });
-
   it('lists and maps team members', async () => {
     vi.mocked(mockStmt.all).mockResolvedValue({
       results: [{ team_id: 't1', user_email: 'u@e.c', role: 'member', joined_at: 5, display_email: 'u@e.c' }],
@@ -141,14 +105,10 @@ describe('TeamMembersDAO', () => {
   // current address rather than the frozen anchor it still stores.
   it('lists a member under its current address, not the frozen anchor', async () => {
     vi.mocked(mockStmt.all).mockResolvedValue({
-      results: [
-        { team_id: 't1', user_email: 'old@e.c', role: 'member', joined_at: 5, display_email: 'new@e.c' },
-      ],
+      results: [{ team_id: 't1', user_email: 'old@e.c', role: 'member', joined_at: 5, display_email: 'new@e.c' }],
     });
     const dao = new TeamMembersDAO(mockDb);
-    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([
-      { teamId: 't1', userEmail: 'new@e.c', role: 'member', joinedAt: 5 },
-    ]);
+    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([{ teamId: 't1', userEmail: 'new@e.c', role: 'member', joinedAt: 5 }]);
   });
 
   it('falls back to the stored address when no current address is known', async () => {
@@ -156,9 +116,7 @@ describe('TeamMembersDAO', () => {
       results: [{ team_id: 't1', user_email: 'u@e.c', role: 'member', joined_at: 5, display_email: null }],
     });
     const dao = new TeamMembersDAO(mockDb);
-    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([
-      { teamId: 't1', userEmail: 'u@e.c', role: 'member', joinedAt: 5 },
-    ]);
+    await expect(dao.getMembersByTeam('t1')).resolves.toEqual([{ teamId: 't1', userEmail: 'u@e.c', role: 'member', joinedAt: 5 }]);
   });
 
   it('updates member roles', async () => {

@@ -78,9 +78,16 @@ vi.mock('@aws-access-bridge/backend-services/composition', async (importOriginal
             return { get: (type: string) => stubCollectors.get(type), getAll: () => stubCollectors };
           }
           if (token === Tokens.StsService) {
-            return { assumeRole: (...args: unknown[]) => (stsModule.StsService.prototype.assumeRole as (...a: unknown[]) => unknown)(...args) };
+            return {
+              assumeRole: (...args: unknown[]) => (stsModule.StsService.prototype.assumeRole as (...a: unknown[]) => unknown)(...args),
+            };
           }
-          return token === Tokens.CostExplorerService ? { getCostAndUsage: (...args: unknown[]) => (ceModule.CostExplorerService.prototype.getCostAndUsage as (...a: unknown[]) => unknown)(...args) } : real.get(token);
+          return token === Tokens.CostExplorerService
+            ? {
+                getCostAndUsage: (...args: unknown[]) =>
+                  (ceModule.CostExplorerService.prototype.getCostAndUsage as (...a: unknown[]) => unknown)(...args),
+              }
+            : real.get(token);
         },
       };
     },
@@ -120,11 +127,7 @@ const CHAIN = {
 // A two-hop chain: target -> Mid -> base. Only `Mid` is pre-warmed.
 const CHAIN_WITH_INTERMEDIATE = {
   ...CHAIN,
-  principalArns: [
-    'arn:aws:iam::123456789012:role/Dev',
-    'arn:aws:iam::123456789012:role/Mid',
-    'arn:aws:iam::123456789012:user/base',
-  ],
+  principalArns: ['arn:aws:iam::123456789012:role/Dev', 'arn:aws:iam::123456789012:role/Mid', 'arn:aws:iam::123456789012:user/base'],
 };
 
 const ASSUMED = {
@@ -139,30 +142,44 @@ describe('CostDataCollectionTask', () => {
     vi.clearAllMocks();
   });
 
-  it('does not advance the collection interval when a principal reported no data', async () => {
+  it('does not advance the success clock when a principal reported no data, but still stamps the attempt', async () => {
     // The collectors answer 0 for a genuinely empty account and for one AWS is
-    // refusing, so stamping either way meant an inaccessible account was not
-    // retried until the next full interval — 6 hours for cost, 2 for resources.
-    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    // refusing, so `last_collected_at` must not move on either — but the
+    // attempt clock must, or the principal is retried on the next tick and
+    // starves the rest of the batch.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockResolvedValue([]);
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([]);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
+    vi.mocked(DataCollectionConfigDAO.prototype.updateLastAttemptTime).mockResolvedValue(undefined);
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-x');
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
 
     await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
 
     expect(DataCollectionConfigDAO.prototype.updateLastCollectedTime).not.toHaveBeenCalled();
+    expect(DataCollectionConfigDAO.prototype.updateLastAttemptTime).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/Dev', 'cost');
   });
 
   it('advances the collection interval when a principal produced data', async () => {
-    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockResolvedValue([
-      { accountId: '', periodStart: '2025-01-01', periodEnd: '2025-01-02', totalCost: 1.5, currency: 'USD', serviceBreakdown: { EC2: 1.5 } },
+      {
+        accountId: '',
+        periodStart: '2025-01-01',
+        periodEnd: '2025-01-02',
+        totalCost: 1.5,
+        currency: 'USD',
+        serviceBreakdown: { EC2: 1.5 },
+      },
     ]);
     vi.mocked(CostDataDAO.prototype.upsertCostData).mockResolvedValue(undefined);
     vi.mocked(DataCollectionConfigDAO.prototype.updateLastCollectedTime).mockResolvedValue(undefined);
@@ -236,7 +253,11 @@ describe('ResourceInventoryCollectionTask', () => {
     // S3 is global: one request regardless of the region list, recorded under
     // `global`. Reporting the full list here would make the task see more regions
     // read than it asked for and withhold the prune.
-    vi.mocked(stubCollectors.get('s3')!.collectAllRegions).mockResolvedValue({ failedRegions: [], items: [], succeededRegions: ['global'] });
+    vi.mocked(stubCollectors.get('s3')!.collectAllRegions).mockResolvedValue({
+      failedRegions: [],
+      items: [],
+      succeededRegions: ['global'],
+    });
   });
 
   it('collects resources and cleans stale rows', async () => {
@@ -269,7 +290,9 @@ describe('ResourceInventoryCollectionTask', () => {
     // Regression guard: a transient AWS failure (throttling, a lost IAM
     // permission) must not delete the account's previously collected rows of
     // that type. Only types that actually reported this run may be pruned.
-    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     vi.mocked(stubCollectors.get('ec2')!.collectAllRegions).mockResolvedValue({
@@ -299,7 +322,9 @@ describe('ResourceInventoryCollectionTask', () => {
   });
 
   it('prunes nothing when every collector fails', async () => {
-    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     for (const collector of stubCollectors.values()) {
@@ -320,7 +345,9 @@ describe('ResourceInventoryCollectionTask', () => {
     // The other half of the guard: an empty-but-successful call is a real
     // answer ("this account has none") and must clear stale rows. The distinction
     // the task relies on is empty-vs-threw, never empty-vs-non-empty.
-    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+    ]);
     vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
     vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
     vi.mocked(ResourceInventoryDAO.prototype.upsertResource).mockResolvedValue(undefined);
@@ -373,7 +400,10 @@ describe('CredentialCacheRefreshTask', () => {
     const mid = 'arn:aws:iam::123456789012:role/Mid';
     const lower = 'arn:aws:iam::123456789012:role/Lower';
     vi.mocked(CredentialCacheConfigDAO.prototype.getPrincipalArnsNeedingUpdate).mockResolvedValue(['arn:aws:iam::123456789012:role/Dev']);
-    primeRefreshMocks({ ...CHAIN, principalArns: ['arn:aws:iam::123456789012:role/Dev', mid, lower, 'arn:aws:iam::123456789012:user/base'] });
+    primeRefreshMocks({
+      ...CHAIN,
+      principalArns: ['arn:aws:iam::123456789012:role/Dev', mid, lower, 'arn:aws:iam::123456789012:user/base'],
+    });
 
     await new CredentialCacheRefreshTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
 

@@ -1,7 +1,13 @@
 import { OpenAPIRoute } from 'chanfana';
 import { Context } from 'hono';
 import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
-import { DefaultInternalServerError, DatabaseError, InternalServerError, IServiceError } from '@aws-access-bridge/backend-errors';
+import {
+  DefaultInternalServerError,
+  DatabaseError,
+  InternalServerError,
+  BadGatewayError,
+  IServiceError,
+} from '@aws-access-bridge/backend-errors';
 import { validateRequestInput } from '@/schema';
 import { getQueryParam, getRequestBaseUrl, isDemoModeEnv, withUnconstrainedD1Session } from './route-helpers';
 
@@ -67,15 +73,6 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
     return c.get('AuthenticatedUserEmailAddress');
   }
 
-  /**
-   * The stable account id for the authenticated caller, or null when the
-   * database predates migration 0032 or the account could not be resolved.
-   * Services prefer it where available but must not require it.
-   */
-  protected getAuthenticatedUserId(c: ActivityContext<TEnv>): string | null {
-    return c.get('AuthenticatedUserId') ?? null;
-  }
-
   protected getBaseUrl(c: ActivityContext<TEnv>): string {
     return getRequestBaseUrl(c.req.raw, c.env);
   }
@@ -87,6 +84,13 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
   protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {
     if (error instanceof IServiceError && error.getErrorCode() < 500) {
       log.warn(`Responding with ${error.getErrorType()}:`, { error: error.stack });
+      return this.exceptionResponse(c, error, error.getErrorCode());
+    }
+    if (error instanceof BadGatewayError) {
+      // 502 is a typed answer, not a fault: the upstream (STS, the console
+      // signin endpoint) failed, and the caller should know it is "someone
+      // else is broken" rather than the request or the session.
+      log.warn('Responding with BadGatewayError:', { error: error.stack });
       return this.exceptionResponse(c, error, error.getErrorCode());
     }
     if (error instanceof DatabaseError) {

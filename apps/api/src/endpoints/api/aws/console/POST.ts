@@ -1,6 +1,7 @@
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
+import { getRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
 
 import { badRequestResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlRequest, GenerateConsoleUrlResponse, GenerateConsoleUrlEnv> {
@@ -160,7 +161,7 @@ class GenerateConsoleUrlRoute extends IActivityAPIRoute<GenerateConsoleUrlReques
     _env: GenerateConsoleUrlEnv,
     cxt: ActivityContext<GenerateConsoleUrlEnv>,
   ): Promise<GenerateConsoleUrlResponse> {
-    const consoleService: ConsoleService = new ConsoleService();
+    const consoleService: ConsoleService = getRequestScope(cxt).get(Tokens.ConsoleService);
     const signinToken: string = await consoleService.getSigninToken(request.accessKeyId, request.secretAccessKey, request.sessionToken);
     const federateUrl: string = consoleService.buildIssuerUrl(this.getBaseUrl(cxt), request.awsAccountId, request.roleName);
     const destination: string = consoleService.buildDestination(request.destinationPath, request.destinationRegion);

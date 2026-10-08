@@ -19,44 +19,77 @@ function db(): never {
 
 const ENV = { AccessBridgeDB: db() } as never;
 
+const OWNER = { userId: null, anchorEmail: 'user@example.com' };
+
 function service(): ResourceService {
   vi.mocked(UserEmailDAO.prototype.get).mockResolvedValue(null);
   return new ResourceService(ENV);
+}
+
+function grant(...accounts: string[]): void {
+  vi.mocked(AssumableRolesDAO.prototype.getRolesByOwner).mockResolvedValue(
+    accounts.map((awsAccountId) => ({ awsAccountId, roleName: 'Dev' })),
+  );
 }
 
 describe('ResourceService.searchResources account filter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(ResourceInventoryDAO.prototype.searchResources).mockResolvedValue({ items: [], total: 0 });
-    vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue([]);
+    grant('111111111111');
   });
 
   /**
-   * Regression: the filter only narrowed `accountIds` on a hit, so an account the
-   * caller could not reach left the list untouched and the search returned
-   * resources from *every* account they do have.
+   * The account filter is no longer a post-filter over a caller's whole account
+   * list: it rides the DAO's own statement, which scopes rows by the owner
+   * subquery *and* the account id. So an account the caller cannot reach yields
+   * nothing there, rather than being caught by an in-service check that the
+   * previous shape relied on.
    */
-  it('returns nothing for an account the caller cannot reach', async () => {
-    vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['111111111111']);
-    const result = await service().searchResources('user@example.com', { accountId: '999999999999' });
-    expect(result).toEqual({ items: [], total: 0, rolesByAccount: {} });
-    expect(ResourceInventoryDAO.prototype.searchResources).not.toHaveBeenCalled();
+  it('passes the account filter to the DAO alongside the owner', async () => {
+    await service().searchResources('user@example.com', { accountId: '999999999999' });
+    expect(ResourceInventoryDAO.prototype.searchResources).toHaveBeenCalledWith(
+      expect.objectContaining(OWNER),
+      undefined,
+      undefined,
+      50,
+      0,
+      '999999999999',
+    );
   });
 
-  it('narrows to the requested account when it is accessible', async () => {
-    vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['111111111111', '222222222222']);
-    await service().searchResources('user@example.com', { accountId: '222222222222' });
-    expect(ResourceInventoryDAO.prototype.searchResources).toHaveBeenCalledWith(['222222222222'], undefined, undefined, 50, 0);
+  it('narrows the roles map to the requested account when it is accessible', async () => {
+    grant('111111111111', '222222222222');
+    const result = await service().searchResources('user@example.com', { accountId: '222222222222' });
+    expect(result.rolesByAccount).toEqual({ '222222222222': ['Dev'] });
+  });
+
+  it('reports no roles for a filtered account the caller cannot reach', async () => {
+    grant('111111111111');
+    const result = await service().searchResources('user@example.com', { accountId: '999999999999' });
+    expect(result.rolesByAccount).toEqual({});
   });
 
   it('searches every accessible account when no filter is given', async () => {
-    vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['111111111111', '222222222222']);
-    await service().searchResources('user@example.com');
-    expect(ResourceInventoryDAO.prototype.searchResources).toHaveBeenCalledWith(['111111111111', '222222222222'], undefined, undefined, 50, 0);
+    grant('111111111111', '222222222222');
+    const result = await service().searchResources('user@example.com');
+    expect(Object.keys(result.rolesByAccount)).toEqual(['111111111111', '222222222222']);
+    expect(ResourceInventoryDAO.prototype.searchResources).toHaveBeenCalledWith(
+      expect.objectContaining(OWNER),
+      undefined,
+      undefined,
+      50,
+      0,
+      undefined,
+    );
   });
 
   it('returns nothing when the caller has no accessible accounts at all', async () => {
-    vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue([]);
-    await expect(service().searchResources('user@example.com', { accountId: '111111111111' })).resolves.toEqual({ items: [], total: 0, rolesByAccount: {} });
+    grant();
+    await expect(service().searchResources('user@example.com', { accountId: '111111111111' })).resolves.toEqual({
+      items: [],
+      total: 0,
+      rolesByAccount: {},
+    });
   });
 });

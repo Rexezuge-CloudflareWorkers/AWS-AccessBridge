@@ -9,9 +9,9 @@
  *
  * Policy: no destination configured means every backup job skips and the
  * repository stays green. A destination configured *without* an encryption key
- * is a hard failure, because AccessBridgeDB stores `user_access_tokens.access_token`
- * and user email addresses in plaintext — an unencrypted dump is a working set
- * of live API credentials, not just a data leak.
+ * is a hard failure, because the export still carries user addresses and
+ * encrypted credential blobs whose keys sit in the same store
+ * — an unencrypted dump is a working set of user data, not just a data leak.
  */
 
 import { fail, setOutput } from '../lib/github-actions';

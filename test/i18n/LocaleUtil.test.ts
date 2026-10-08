@@ -90,17 +90,6 @@ describe('LocaleUtil', () => {
     expect(LocaleUtil.normalize(null)).toBe('en');
     expect(LocaleUtil.normalize(undefined)).toBe('en');
   });
-
-  it('negotiates preferred over fallback', () => {
-    expect(LocaleUtil.negotiate('de', 'fr')).toBe('de');
-    expect(LocaleUtil.negotiate('xx', 'fr')).toBe('fr');
-    expect(LocaleUtil.negotiate(null, null)).toBe('en');
-  });
-
-  it('resolves display names', () => {
-    expect(LocaleUtil.displayName('de')).toBe('Deutsch');
-    expect(LocaleUtil.displayName('xx')).toBe('English');
-  });
 });
 
 describe('web normalizeLanguage parity', () => {
@@ -164,8 +153,16 @@ describe('web locale catalogs', () => {
     for (const [locale, catalog] of Object.entries(LOCALE_CATALOGS)) {
       if (locale === 'en') continue;
       for (const { key, value } of leafValues(catalog)) {
-        const expected = (english.get(key) ?? '').matchAll(placeholderPattern).map((m) => m[0]).toArray().toSorted((left, right) => left.localeCompare(right));
-        const actual = value.matchAll(placeholderPattern).map((m) => m[0]).toArray().toSorted((left, right) => left.localeCompare(right));
+        const expected = (english.get(key) ?? '')
+          .matchAll(placeholderPattern)
+          .map((m) => m[0])
+          .toArray()
+          .toSorted((left, right) => left.localeCompare(right));
+        const actual = value
+          .matchAll(placeholderPattern)
+          .map((m) => m[0])
+          .toArray()
+          .toSorted((left, right) => left.localeCompare(right));
         expect(actual, `${locale}.${key}`).toEqual(expected);
       }
     }

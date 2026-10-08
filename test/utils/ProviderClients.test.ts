@@ -3,7 +3,7 @@ import { StsClient } from '@aws-access-bridge/provider-clients/aws';
 import { CostExplorerClient } from '@aws-access-bridge/provider-clients/aws';
 import { IamClient } from '@aws-access-bridge/provider-clients/aws';
 import { parseXmlTag } from '@aws-access-bridge/provider-clients/aws';
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 function signedFetch(response: Response) {
   return () => ({ fetch: vi.fn().mockResolvedValue(response) }) as never;
@@ -24,8 +24,13 @@ describe('provider-clients AWS parsers', () => {
     });
   });
 
-  it('StsClient maps failed calls to Unauthorized', async () => {
+  it('StsClient maps a 403 to ForbiddenError', async () => {
     const client = new StsClient(signedFetch(new Response('denied', { status: 403, statusText: 'Forbidden' })));
+    await expect(client.assumeRole('arn', { accessKeyId: 'a', secretAccessKey: 'b' }, 's')).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('StsClient maps non-403 failures to Unauthorized', async () => {
+    const client = new StsClient(signedFetch(new Response('denied', { status: 400, statusText: 'Bad Request' })));
     await expect(client.assumeRole('arn', { accessKeyId: 'a', secretAccessKey: 'b' }, 's')).rejects.toBeInstanceOf(UnauthorizedError);
   });
 

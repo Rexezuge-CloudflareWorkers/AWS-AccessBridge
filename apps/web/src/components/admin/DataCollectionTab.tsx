@@ -7,6 +7,7 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle, inputStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
 
 export default function DataCollectionTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -32,10 +33,13 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
 
     try {
       await enableDataCollection(enableForm.principalArn, collectionTypes);
-      showMessage('success', t('admin.collectionEnabledFor', 'Data collection enabled for {{types}}', { types: collectionTypes.join(', ') }));
+      showMessage(
+        'success',
+        t('admin.collectionEnabledFor', 'Data collection enabled for {{types}}', { types: collectionTypes.join(', ') }),
+      );
       setEnableForm({ principalArn: '', costEnabled: true, resourceEnabled: true });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.collectionEnableFailed', 'Failed to enable data collection'));
+      showMessage('error', toErrorMessage(err, t('admin.collectionEnableFailed', 'Failed to enable data collection')));
     }
   };
 
@@ -44,10 +48,13 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
 
     try {
       await disableDataCollection(disableForm.principalArn, disableForm.collectionType);
-      showMessage('success', t('admin.collectionDisabledFor', 'Data collection disabled for {{type}}', { type: disableForm.collectionType }));
+      showMessage(
+        'success',
+        t('admin.collectionDisabledFor', 'Data collection disabled for {{type}}', { type: disableForm.collectionType }),
+      );
       setDisableForm({ principalArn: '', collectionType: 'cost' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.collectionDisableFailed', 'Failed to disable data collection'));
+      showMessage('error', toErrorMessage(err, t('admin.collectionDisableFailed', 'Failed to disable data collection')));
     }
   };
 

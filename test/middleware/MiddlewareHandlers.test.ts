@@ -34,7 +34,7 @@ vi.mock('@aws-access-bridge/backend-data/dao/AuditLogDAO', () => {
   };
 });
 
-import { MiddlewareHandlers } from '@/middleware';
+import { MiddlewareHandlers, csrfProtectionHandler, rateLimitHandler } from '@/middleware';
 
 type TestApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -133,6 +133,162 @@ function withCloudflareMetadata(request: Request): Request {
   return request;
 }
 
+/**
+ * The auth boundary is the cheapest thing an unauthenticated caller can hit, so
+ * `/api/*` is throttled per CF-Connecting-IP. CF-Connecting-IP is the only
+ * header Cloudflare sets and a client cannot forge; `X-Forwarded-For` can be, and
+ * keying on it would let the caller rotate buckets.
+ */
+/**
+ * CSRF defence on the cookie-authenticated `/user/*` surface. A cross-site
+ * `<form enctype="text/plain">` POST carries the user's Cloudflare Access
+ * cookies and cannot set a JSON content type, so these two checks are what stop
+ * an administrator's browser from minting a PAT or granting access on another
+ * site's say-so.
+ */
+describe('csrfProtection', () => {
+  function csrfApp(): TestApp {
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', csrfProtectionHandler);
+    app.all('/user/test', (c) => c.json({ ok: true }));
+    return app;
+  }
+
+  async function call(method: string, headers: Record<string, string>): Promise<Response> {
+    return csrfApp().fetch(new Request(`https://worker.example.com/user/test`, { method, headers }), createEnv(), createExecutionContext());
+  }
+
+  it('refuses a state-changing request the browser marked cross-site', async () => {
+    for (const site of ['cross-site', 'same-site']) {
+      const response: Response = await call('POST', { 'Sec-Fetch-Site': site, 'Content-Type': 'application/json' });
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body).toMatchObject({ Exception: { Type: 'Forbidden' } });
+    }
+  });
+
+  it('refuses a body-bearing POST that is not JSON', async () => {
+    const response: Response = await call('POST', { 'Content-Type': 'text/plain', 'Content-Length': '9' });
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body).toMatchObject({ Exception: { Type: 'Forbidden' } });
+  });
+
+  it('allows same-origin JSON, a body-less write, and a missing Sec-Fetch-Site', async () => {
+    const sameOriginJson = await call('POST', {
+      'Sec-Fetch-Site': 'same-origin',
+      'Content-Type': 'application/json',
+      'Content-Length': '2',
+    });
+    expect(sameOriginJson.status).toBe(200);
+    const emptyBody = await call('POST', { 'Sec-Fetch-Site': 'same-origin', 'Content-Length': '0' });
+    expect(emptyBody.status).toBe(200);
+    // curl and server-to-server clients do not send the header at all.
+    const noSecFetchSite = await call('POST', { 'Content-Type': 'application/json' });
+    expect(noSecFetchSite.status).toBe(200);
+    // `none` is what a user-initiated navigation sends.
+    const navigation = await call('DELETE', { 'Sec-Fetch-Site': 'none' });
+    expect(navigation.status).toBe(200);
+  });
+
+  it('leaves reads alone whatever the headers say', async () => {
+    const crossSiteRead = await call('GET', { 'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'text/plain' });
+    expect(crossSiteRead.status).toBe(200);
+    const headRead = await call('HEAD', { 'Sec-Fetch-Site': 'cross-site' });
+    expect(headRead.status).toBe(200);
+  });
+});
+
+describe('hmacValidation', () => {
+  it('skips a request that carries no internal headers', async () => {
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', MiddlewareHandlers.hmacValidation());
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects a request wearing an internal header it cannot sign', async () => {
+    // The header alone is not identity: without a valid signature the request
+    // must never reach `authenticateApiIdentity`, which trusts the email header.
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', MiddlewareHandlers.hmacValidation());
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    const response: Response = await app.fetch(
+      new Request('https://worker.example.com/api/test', {
+        headers: { 'X-Internal-Signature': 'forged', 'X-Internal-User-Email': 'admin@evil.test' },
+      }),
+      createEnv(),
+      createExecutionContext(),
+    );
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('apiAuthentication', () => {
+  it('refuses an internal call with no user email header', async () => {
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', MiddlewareHandlers.apiAuthentication());
+    app.get('/api/test', (c) => c.json({ email: c.get('AuthenticatedUserEmailAddress') }));
+    const response: Response = await app.fetch(
+      new Request('https://worker.internal/api/test', { headers: { 'X-Internal-Timestamp': '1' } }),
+      createEnv(),
+      createExecutionContext(),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('refuses a request with no credentials at all', async () => {
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', MiddlewareHandlers.apiAuthentication());
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('rateLimit', () => {
+  it('lets a request through and keys it on CF-Connecting-IP', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: true });
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', rateLimitHandler);
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    const response = await app.fetch(
+      new Request('https://worker.example.com/api/test', {
+        headers: { 'CF-Connecting-IP': '203.0.113.7', 'X-Forwarded-For': '198.51.100.9' },
+      }),
+      createEnv({ AUTH_RATE_LIMITER: { limit } as unknown as RateLimit }),
+      createExecutionContext(),
+    );
+    expect(response.status).toBe(200);
+    expect(limit).toHaveBeenCalledWith({ key: '203.0.113.7' });
+  });
+
+  it('answers 429 with the shared envelope when the key is over the limit', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: false });
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', rateLimitHandler);
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    const response = await app.fetch(
+      new Request('https://worker.example.com/api/test', { headers: { 'CF-Connecting-IP': '203.0.113.7' } }),
+      createEnv({ AUTH_RATE_LIMITER: { limit } as unknown as RateLimit }),
+      createExecutionContext(),
+    );
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({ Exception: { Type: 'RateLimited', Message: expect.any(String) } });
+  });
+
+  it('fails open when the binding is absent', async () => {
+    const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+    mount(app, '*', rateLimitHandler);
+    app.get('/api/test', (c) => c.json({ ok: true }));
+    // Local development and any deployment that has not bound a namespace must
+    // keep working; 429ing every request would be its own outage.
+    const response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+    expect(response.status).toBe(200);
+  });
+});
+
 function createUserApp(includeAudit: boolean = false): TestApp {
   const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
   if (includeAudit) {
@@ -192,16 +348,16 @@ describe('MiddlewareHandlers', () => {
       // app was configured with", so that is what is asserted.
       expect(auditLogConstructorSpy).toHaveBeenCalledWith(env.AccessBridgeDB);
       expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'user@example.com',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        201,
-        undefined,
-        undefined,
-        '203.0.113.10',
-        'Vitest',
-        null,
+        expect.objectContaining({
+          userEmail: 'user@example.com',
+          action: 'GET:/api/test',
+          method: 'GET',
+          path: '/api/test',
+          statusCode: 201,
+          ipAddress: '203.0.113.10',
+          userAgent: 'Vitest',
+          userId: null,
+        }),
       );
       expect(waitUntilSpy).toHaveBeenCalledTimes(1);
     });
@@ -230,16 +386,16 @@ describe('MiddlewareHandlers', () => {
 
       expect(response.status).toBe(200);
       expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'user@example.com',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        200,
-        undefined,
-        undefined,
-        '203.0.113.10',
-        undefined,
-        null,
+        expect.objectContaining({
+          userEmail: 'user@example.com',
+          action: 'GET:/api/test',
+          method: 'GET',
+          path: '/api/test',
+          statusCode: 200,
+          ipAddress: '203.0.113.10',
+          userAgent: undefined,
+          userId: null,
+        }),
       );
     });
 
@@ -267,20 +423,20 @@ describe('MiddlewareHandlers', () => {
 
       expect(response.status).toBe(200);
       expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'user@example.com',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        200,
-        undefined,
-        undefined,
-        '192.0.2.10',
-        undefined,
-        null,
+        expect.objectContaining({
+          userEmail: 'user@example.com',
+          action: 'GET:/api/test',
+          method: 'GET',
+          path: '/api/test',
+          statusCode: 200,
+          ipAddress: '192.0.2.10',
+          userAgent: undefined,
+          userId: null,
+        }),
       );
     });
 
-    it('writes an audit log entry with unknown user when authentication has not populated the context', async () => {
+    it('writes no audit entry for an unauthenticated 401', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
       mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', async (c) => {
@@ -298,19 +454,11 @@ describe('MiddlewareHandlers', () => {
       const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
 
       expect(response.status).toBe(401);
-      expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'unknown',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        401,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        null,
-      );
-      expect(waitUntilSpy).toHaveBeenCalledTimes(1);
+      // An unauthenticated 401 writes no audit row. Recording every one of them
+      // let an unauthenticated caller fill the table with attacker-controlled
+      // path/user-agent values — a write amplification path with no principal.
+      expect(auditLogCreateSpy).not.toHaveBeenCalled();
+      expect(waitUntilSpy).not.toHaveBeenCalled();
     });
 
     it('hands waitUntil a promise that never rejects, and logs the failure', async () => {
@@ -362,19 +510,18 @@ describe('MiddlewareHandlers', () => {
       expect(response.status).toBe(500);
       // The failure must still be recorded; auditing a failed request matters
       // more than auditing a successful one.
-      const recordedStatus = auditLogCreateSpy.mock.calls[0][4];
-      expect(recordedStatus).toBeGreaterThanOrEqual(500);
+      const recorded: { statusCode: number } = auditLogCreateSpy.mock.calls[0][0];
+      expect(recorded.statusCode).toBeGreaterThanOrEqual(500);
       expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'unknown',
-        'GET:/api/test',
-        'GET',
-        '/api/test',
-        recordedStatus,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        null,
+        expect.objectContaining({
+          userEmail: 'unknown',
+          action: 'GET:/api/test',
+          method: 'GET',
+          path: '/api/test',
+          ipAddress: undefined,
+          userAgent: undefined,
+          userId: null,
+        }),
       );
     });
   });
@@ -461,7 +608,7 @@ describe('MiddlewareHandlers', () => {
       });
     });
 
-    it('returns a 401 response and audit log entry when authentication fails before route execution', async () => {
+    it('returns a 401 response and no audit entry when authentication fails before route execution', async () => {
       const app: TestApp = createUserApp(true);
 
       const response: Response = await app.fetch(
@@ -477,20 +624,10 @@ describe('MiddlewareHandlers', () => {
           Message: 'No Cloudflare Access JWT token provided in request headers.',
         },
       });
-      expect(auditLogCreateSpy).toHaveBeenCalledWith(
-        'unknown',
-        'GET:/user/test',
-        'GET',
-        '/user/test',
-        401,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        // No authenticated account, so no id: the entry is still written.
-        null,
-      );
-      expect(waitUntilSpy).toHaveBeenCalledTimes(1);
+      // Same rule as the `/api/*` surface: a 401 with no authenticated
+      // principal is an unauthenticated probe, not an auditable event.
+      expect(auditLogCreateSpy).not.toHaveBeenCalled();
+      expect(waitUntilSpy).not.toHaveBeenCalled();
     });
   });
 

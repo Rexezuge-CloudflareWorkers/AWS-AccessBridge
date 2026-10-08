@@ -19,6 +19,7 @@ classes; a caller resolves `getRequestScope(cxt).get(Tokens.X)` and a test swaps
 | `aws/ce/`          | `CostExplorerService`                                                                 | `Tokens.CostExplorerService`    | thin delegate over `CostExplorerClient`                      |
 | `aws/collectors/`  | `BaseAwsCollector` + 5 collectors, `CollectorRegistry`, `InjectableCollectorRegistry` | `Tokens.CollectorRegistry`      | EC2/S3/Lambda/RDS/DynamoDB discovery                         |
 | `aws/console/`     | `ConsoleService`                                                                      | `Tokens.ConsoleService`         | federation signin tokens and Console URL builders            |
+| `aws/federate/`    | `FederationService`                                                                   | `Tokens.FederationService`      | assume-role + signin token + login URL, composed in process  |
 | `aws/iam/`         | `IamService`                                                                          | `Tokens.IamService`             | thin delegate over `IamClient` (`ListRoles`)                 |
 | `aws/sts/`         | `StsService`                                                                          | `Tokens.StsService`             | `assumeRole`, `GetCallerIdentity`                            |
 | `cost/`            | `CostService`                                                                         | `Tokens.CostService`            | summary / per-account / trends, alerts, collection config    |
@@ -55,7 +56,16 @@ with the compiler staying silent. Each key is declared rather than hidden behind
 so reaching for an undeclared config key is a compile error instead of a runtime `undefined`.
 
 `Tokens.UserIdentityService` is bound once per scope, which is what makes `UserIdentityService`'s
-address→account memo a per-request cache rather than a cross-request leak.
+address→account memo a per-request cache rather than a cross-request leak — and it is _injected_ into
+every service that resolves owners, rather than each building its own. Fifteen private instances meant
+fifteen memo misses per request; the same applies to `CredentialChainService`, which
+`AssumeRoleService` and `AccountService` share so the memoized encryption keys are fetched once.
+
+`FederationService` exists because `/api/aws/federate` used to call its own assume-role and console
+routes over HMAC-signed loopback fetches. That serialized temporary credentials through the network
+stack, re-ran the auth and audit middleware, and produced three audit entries for one federation. The
+facade composes `AssumeRoleService` and `ConsoleService` directly, so one federation is one audit
+entry. The HMAC path still exists for genuinely internal callers.
 
 `composition/encryptionKeys.ts` holds the per-feature key chains (`Tokens.CredentialKey`,
 `Tokens.CredentialCacheKey`) and **injects** them into `CredentialChainService` and
@@ -91,6 +101,10 @@ becomes `null` for a `user_id` write, since binding `''` fails the 0032 foreign 
 Every place this code once turned a failure into an empty result now throws, because a caller that
 treats an empty answer as authoritative deletes real data.
 
+- **A partial page is not a complete page.** `BaseAwsCollector.paginate` throws `AwsCollectionError`
+  when it hits `MAX_COLLECTION_PAGES` or sees a repeated next-token, rather than returning what it
+  gathered. A partial list would be counted as success, and `deleteStaleResources` would then prune
+  every row it did not happen to see.
 - **`BaseAwsCollector`** throws `AwsCollectionError` (carrying `status` + `resourceType`, with
   `retryable` set for 429/5xx) on a non-OK response **or** a malformed body, rather than resolving
   to `[]`. `ResourceInventoryCollectionTask` prunes previously collected rows for every type that
@@ -163,14 +177,17 @@ In `AssumeRoleService`, the local named `userId` is the STS `RoleSessionName` (f
 - `shared/` — constants (canonical `StsMessages` / `HmacMessages`), models (dual camelCase /
   snake_case `Type` / `TypeInternal` pairs), schemas, and utils: `TimestampUtil` (current-time reads
   take an optional `Clock`, defaulting to `SystemClock`), `Clock` / `SystemClock` / `FixedClock`,
-  `Logger`, `UUIDUtil`, `RequestOriginUtil`, `EmailUtil`, `LocaleUtil`, `MoneyUtil`, and
+  `Logger`, `UUIDUtil`, `RequestOriginUtil`, `LocaleUtil`, `MoneyUtil`, and
   `RegexUtil.matchAll`. There is no backend locale bundle — `shared/src/i18n/` and its twelve empty
   tables were deleted, so `getBackendStrings('de').locale` used to answer `'en'` while a test
   asserted that wrong answer as correct.
-- `backend-errors/` — `BadRequestError`, `UnauthorizedError`, `ForbiddenError`,
-  `MethodNotAllowedError`, `ConflictError`, `InternalServerError` (+ the
-  `DefaultInternalServerError` singleton every 5xx is answered with), `DatabaseError` (+`retryable`),
-  `AwsCollectionError`, and the `IServiceError` taxonomy they implement.
+- `backend-errors/` — `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`,
+  `MethodNotAllowedError`, `ConflictError`, `RateLimitedError`, `BadGatewayError`,
+  `InternalServerError` (+ the `DefaultInternalServerError` singleton every 5xx is answered with),
+  `DatabaseError` (+`retryable`), `AwsCollectionError`, and the `IServiceError` taxonomy they
+  implement. **401 is reserved for the session.** The SPA keys its login redirect on 401 alone, so a
+  missing grant answers 403 and a failing AWS endpoint answers 502 — neither is something signing in
+  again can fix.
 - `backend-runtime/` — `ConfigurationDefaults`, `ConfigurationManager` (namespaced getters) and
   `EnvParser`; the `di/` `Container`; abstract worker bases; DO naming constants and `Pagination`;
   the checked-in `env.d.ts` binding source of truth.

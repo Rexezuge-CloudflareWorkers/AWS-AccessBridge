@@ -9,6 +9,19 @@ import { resolveOwner } from '../identity/resolveOwner';
 
 type ResourceServiceEnv = ServiceEnv;
 
+function groupRolesByAccount(rows: Array<{ awsAccountId: string; roleName: string }>): Record<string, string[]> {
+  const grouped: Record<string, string[]> = {};
+  for (const row of rows) {
+    const bucket: string[] | undefined = grouped[row.awsAccountId];
+    if (bucket) {
+      bucket.push(row.roleName);
+    } else {
+      grouped[row.awsAccountId] = [row.roleName];
+    }
+  }
+  return grouped;
+}
+
 interface ResourceSearchFilters {
   search?: string;
   type?: string;
@@ -39,7 +52,6 @@ class ResourceService {
     this.identity = identity ?? new UserIdentityService(env);
   }
 
-
   private ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
     return resolveOwner(this.identity, userEmail);
   }
@@ -47,38 +59,34 @@ class ResourceService {
   public async searchResources(userEmail: string, filters: ResourceSearchFilters = {}): Promise<ResourceList> {
     const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const owner: AssumableRoleOwner = await this.ownerFor(userEmail);
-    const accessibleAccountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(owner);
-
-    let accountIds: string[] = accessibleAccountIds;
-    if (filters.accountId) {
-      // A filter naming an account the caller cannot reach reads as "no such
-      // account" — the same answer as a filter that matches nothing. Narrowing
-      // only on a hit used to leave `accountIds` untouched, so asking for an
-      // inaccessible account returned *every* account the caller does have.
-      if (!accessibleAccountIds.includes(filters.accountId)) {
-        return { items: [], total: 0, rolesByAccount: {} };
-      }
-      accountIds = [filters.accountId];
-    }
 
     const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(this.env.AccessBridgeDB);
-    const { items, total } = await resourceDAO.searchResources(accountIds, filters.search, filters.type, Pagination.limit(filters.limit), Pagination.offset(filters.offset));
-    const rolesByAccountEntries: Array<[string, string[]]> = await Promise.all(
-      accountIds.map(async (accountId): Promise<[string, string[]]> => [
-        accountId,
-        await assumableRolesDAO.getRolesByUserAndAccount(owner, accountId),
-      ]),
+    const { items, total } = await resourceDAO.searchResources(
+      owner,
+      filters.search,
+      filters.type,
+      Pagination.limit(filters.limit),
+      Pagination.offset(filters.offset),
+      filters.accountId,
     );
+    // One query for the whole roles map: a per-account fan-out is N round
+    // trips for data that is a single scan over the caller's grants.
+    let rolesByAccount: Record<string, string[]> = groupRolesByAccount(await assumableRolesDAO.getRolesByOwner(owner));
+    if (filters.accountId) {
+      // The account filter narrows rolesByAccount to the same account: the
+      // client renders it span-by-span next to the items.
+      const rolesForAccount: string[] | undefined = rolesByAccount[filters.accountId];
+      rolesByAccount = rolesForAccount ? { [filters.accountId]: rolesForAccount } : {};
+    }
 
-    return { items, total, rolesByAccount: Object.fromEntries(rolesByAccountEntries) };
+    return { items, total, rolesByAccount };
   }
 
   public async getSummary(userEmail: string): Promise<ResourceSummary> {
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
+    const owner: AssumableRoleOwner = await this.ownerFor(userEmail);
 
     const resourceDAO: ResourceInventoryDAO = new ResourceInventoryDAO(this.env.AccessBridgeDB);
-    const counts: Record<string, Record<string, number>> = await resourceDAO.getResourceCounts(accountIds);
+    const counts: Record<string, Record<string, number>> = await resourceDAO.getResourceCounts(owner);
 
     let totalResources: number = 0;
     const byType: Record<string, number> = {};
@@ -91,5 +99,6 @@ class ResourceService {
 
     return { totalResources, byType, byAccount: counts };
   }
-}export { ResourceService };
+}
+export { ResourceService };
 export type { ResourceList, ResourceSearchFilters, ResourceServiceEnv, ResourceSummary };

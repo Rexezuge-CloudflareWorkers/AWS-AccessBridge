@@ -1,4 +1,3 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -111,4 +110,3 @@ interface RemoveAccountNicknameResponse extends IResponse {
 type RemoveAccountNicknameEnv = IAdminEnv;
 
 export { RemoveAccountNicknameRoute };
-export type { RemoveAccountNicknameRequest, RemoveAccountNicknameResponse };

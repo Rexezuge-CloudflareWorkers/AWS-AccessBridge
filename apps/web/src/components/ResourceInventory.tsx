@@ -9,6 +9,7 @@ import { getConsoleDestination } from '../services/resourceService';
 import { buildFederateUrl } from '../services/accountService';
 import type { ConsoleDestination, ResourceItem } from '../services/resourceService';
 import { useResources } from '../hooks/useResources';
+import { totalPages as countPages } from '../lib/pagination';
 
 export default function ResourceInventory() {
   const { t } = useTranslation();
@@ -21,6 +22,7 @@ export default function ResourceInventory() {
     selectedRoles,
     setSelectedRoles,
     isLoading,
+    resourcesError,
     filterType,
     setFilterType,
     searchQuery,
@@ -30,14 +32,18 @@ export default function ResourceInventory() {
     pageSize,
   } = useResources();
 
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = countPages(total, pageSize);
 
   const handleOpenResource = (resource: ResourceItem) => {
     const role: string | undefined = selectedRoles[resource.awsAccountId] || rolesByAccount[resource.awsAccountId]?.[0];
     const destination: ConsoleDestination | null = getConsoleDestination(resource);
     if (!role || !destination) return;
 
-    window.open(buildFederateUrl(resource.awsAccountId, role, { destinationPath: destination.path, destinationRegion: destination.region }), '_blank', 'noopener,noreferrer');
+    window.open(
+      buildFederateUrl(resource.awsAccountId, role, { destinationPath: destination.path, destinationRegion: destination.region }),
+      '_blank',
+      'noopener,noreferrer',
+    );
   };
 
   return (
@@ -45,9 +51,7 @@ export default function ResourceInventory() {
       {/* Summary Cards */}
       {/* Distinguishable from "no resources match", which renders no summary panel
           at all — a failed summary call previously looked identical. */}
-      {summaryError && (
-        <div style={{ color: '#f87171', fontSize: '0.875rem' }}>{summaryError}</div>
-      )}
+      {summaryError && <div style={{ color: '#f87171', fontSize: '0.875rem' }}>{summaryError}</div>}
       {summary && <ResourceSummaryCards summary={summary} />}
 
       {/* Filters */}
@@ -123,6 +127,12 @@ export default function ResourceInventory() {
       {/* Resource Table */}
       {isLoading ? (
         <Spinner size={24} padding="32px 0" />
+      ) : resourcesError && resources.length === 0 ? (
+        // A failed load is not "no resources found"; saying so would invite the
+        // user to conclude the account is empty.
+        <div style={{ background: 'rgba(127, 29, 29, 0.3)', color: '#fca5a5', padding: '12px 16px', borderRadius: '12px' }}>
+          {resourcesError}
+        </div>
       ) : resources.length === 0 ? (
         <div
           style={{

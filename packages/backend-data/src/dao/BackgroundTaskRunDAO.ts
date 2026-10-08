@@ -80,19 +80,6 @@ class BackgroundTaskRunDAO extends BaseDAO {
     assertD1Success(result, `fail background task run`);
   }
 
-  public async skipRun(runId: string, reason?: string): Promise<void> {
-    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        `UPDATE background_task_runs
-         SET status = 'skipped', summary = ?, completed_at = ?
-         WHERE run_id = ?`,
-      )
-      .bind(reason ?? null, now, runId)
-      .run();
-    assertD1Success(result, `skip background task run`);
-  }
-
   public async listRuns(options?: ListTaskRunsOptions): Promise<BackgroundTaskRun[]> {
     const conditions: string[] = [];
     const bindings: unknown[] = [];
@@ -118,18 +105,11 @@ class BackgroundTaskRunDAO extends BaseDAO {
     return (results.results || []).map((row) => BackgroundTaskRunDAO.toExternal(row));
   }
 
-  public async deleteOlderThan(cutoffTimestamp: number): Promise<number> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM background_task_runs WHERE started_at < ?')
-      .bind(cutoffTimestamp)
-      .run();
-    assertD1Success(result, `delete old background task runs`);
-    return result.meta?.changes ?? 0;
-  }
-
   public async deleteOlderThanBatch(cutoffTimestamp: number, batchSize: number): Promise<number> {
+    // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
+    // boundary is a rowid subquery with its own LIMIT instead.
     const result: D1Result = await this.database
-      .prepare('DELETE FROM background_task_runs WHERE started_at < ? LIMIT ?')
+      .prepare('DELETE FROM background_task_runs WHERE rowid IN (SELECT rowid FROM background_task_runs WHERE started_at < ? LIMIT ?)')
       .bind(cutoffTimestamp, batchSize)
       .run();
     assertD1Success(result, `delete old background task runs`);

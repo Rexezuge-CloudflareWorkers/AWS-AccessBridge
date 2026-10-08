@@ -1,33 +1,24 @@
 'use client';
 
 import type { ShowMessage } from '../hooks/useToast';
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatUnixTimestamp } from '../lib/format';
-import { useRequestGuard } from '../hooks/useRequestGuard';
+import { useResource } from '../hooks/useResource';
+import { totalPages as countPages } from '../lib/pagination';
 import { httpStatusColor } from '../lib/presentation';
 import Spinner from './ui/Spinner';
 import Pagination from './ui/Pagination';
 import { queryAuditLogs } from '../services/auditService';
+import type { AuditLogEntry } from '../services/auditService';
 import { cardStyle, tableCardStyle, inputStyle, btnBlueStyle, thStyle, tdStyle } from './ui/theme';
-
-interface AuditLog {
-  logId: string;
-  timestamp: number;
-  userEmail: string;
-  action: string;
-  resource?: string;
-  method: string;
-  path: string;
-  statusCode: number;
-  detail?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
 
 interface AuditLogsTabProps {
   showMessage: ShowMessage;
 }
+
+// Module-level so "no data yet" keeps one identity across renders.
+const NO_LOGS: AuditLogEntry[] = [];
 
 const styles = {
   card: { ...cardStyle, padding: '16px' },
@@ -49,10 +40,6 @@ const styles = {
 
 export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTabProps) {
   const { t, i18n } = useTranslation();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
 
@@ -61,39 +48,28 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
   const [filterAction, setFilterAction] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [refreshIndex, setRefreshIndex] = useState(0);
   const pageSize = 25;
-  // Typing a filter and paging both retrigger the query, so responses can arrive
-  // out of order; without the guard a slow earlier query rendered under a newer
-  // filter selection.
-  const { begin, isCurrent } = useRequestGuard();
 
-  useEffect(() => {
-    const request = begin();
-    queryAuditLogs({
-      userEmail: filterEmail.trim() || undefined,
-      action: filterAction.trim() || undefined,
-      limit: pageSize,
-      offset: page * pageSize,
-    })
-      .then((result) => {
-        if (!isCurrent(request)) return;
-        setLogs(result.logs);
-        setTotal(result.total);
-        setError(null);
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (!isCurrent(request)) return;
-        // Show the API's own message when there is one: a bare "Failed to load
-        // audit logs" hid the difference between an expired session, a rejected
-        // admin action, and a backend error the user could report.
-        setError(err instanceof Error && err.message ? err.message : t('audit.loadError', 'Failed to load audit logs'));
-        setIsLoading(false);
-      });
-  }, [filterEmail, filterAction, page, refreshIndex, t, begin, isCurrent]);
-
-  const totalPages = Math.ceil(total / pageSize);
+  // Typing a filter and paging both change the fetcher, so responses can arrive
+  // out of order; the request guard inside `useResource` keeps a slow earlier
+  // query from rendering under a newer filter selection.
+  const fetchLogs = useCallback(
+    () =>
+      queryAuditLogs({
+        userEmail: filterEmail.trim() || undefined,
+        action: filterAction.trim() || undefined,
+        limit: pageSize,
+        offset: page * pageSize,
+      }),
+    [filterEmail, filterAction, page],
+  );
+  // The API's own message is shown when there is one: a bare "Failed to load audit
+  // logs" hid the difference between an expired session, a rejected admin action,
+  // and a backend error the user could report.
+  const { data, error, isLoading, refresh } = useResource(fetchLogs, { errorFallback: t('audit.loadError', 'Failed to load audit logs') });
+  const logs = data?.logs ?? NO_LOGS;
+  const total = data?.total ?? 0;
+  const totalPages = countPages(total, pageSize);
 
   const getInputStyle = (name: string): React.CSSProperties => ({
     ...styles.input,
@@ -142,7 +118,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
             />
           </div>
           <button
-            onClick={() => setRefreshIndex((i) => i + 1)}
+            onClick={() => void refresh()}
             className="text-sm font-medium"
             style={styles.btnBlue}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#1d4ed8')}

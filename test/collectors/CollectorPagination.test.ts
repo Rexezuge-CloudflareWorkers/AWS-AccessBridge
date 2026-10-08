@@ -58,8 +58,12 @@ function xml(body: string): Response {
 describe('EC2 pagination', () => {
   it('follows NextToken until it is exhausted', async () => {
     const { bodies, clientFactory, fetch } = pagedClient(
-      xml('<DescribeInstancesResponse><nextToken>tok-1</nextToken><reservationSet><instancesSet><item><instanceId>i-1</instanceId></item></instancesSet></reservationSet></DescribeInstancesResponse>'),
-      xml('<DescribeInstancesResponse><reservationSet><instancesSet><item><instanceId>i-2</instanceId></item></instancesSet></reservationSet></DescribeInstancesResponse>'),
+      xml(
+        '<DescribeInstancesResponse><nextToken>tok-1</nextToken><reservationSet><instancesSet><item><instanceId>i-1</instanceId></item></instancesSet></reservationSet></DescribeInstancesResponse>',
+      ),
+      xml(
+        '<DescribeInstancesResponse><reservationSet><instancesSet><item><instanceId>i-2</instanceId></item></instancesSet></reservationSet></DescribeInstancesResponse>',
+      ),
     );
 
     const items = await new Ec2Collector(clientFactory as never).collect(KEYS);
@@ -76,14 +80,36 @@ describe('EC2 pagination', () => {
     expect(bodyOf(bodies, 0)).not.toContain('NextToken');
   });
 
-  it('stops rather than looping when a token repeats', async () => {
+  it('throws rather than returning a partial list when a token repeats', async () => {
     // A non-advancing service would otherwise re-fetch the same page until the
-    // request's wall-clock limit. Built as a factory so each call gets a fresh
+    // request's wall-clock limit. The walk must stop *and fail*: returning the
+    // pages read so far would let the caller count the region as a success and
+    // prune the unread remainder. Built as a factory so each call gets a fresh
     // readable body rather than an already-consumed one.
     const stuckPage = (): Response => xml('<DescribeInstancesResponse><nextToken>same</nextToken></DescribeInstancesResponse>');
     const { clientFactory, fetch } = pagedClient(stuckPage(), stuckPage(), stuckPage());
-    await new Ec2Collector(clientFactory as never).collect(KEYS);
+    await expect(new Ec2Collector(clientFactory as never).collect(KEYS)).rejects.toBeInstanceOf(AwsCollectionError);
     expect(fetch.mock.calls.length).toBeLessThanOrEqual(3);
+  });
+
+  it('throws once the page ceiling is hit even when every token is new', async () => {
+    let n = 0;
+    const fetch = vi.fn(() =>
+      Promise.resolve(xml(`<DescribeInstancesResponse><nextToken>tok-${n++}</nextToken></DescribeInstancesResponse>`)),
+    );
+    const clientFactory = vi.fn().mockReturnValue({ fetch });
+    await expect(new Ec2Collector(clientFactory as never).collect(KEYS)).rejects.toBeInstanceOf(AwsCollectionError);
+    expect(fetch).toHaveBeenCalledTimes(50);
+  });
+
+  it('reports a truncated region as FAILED in a sweep, so pruning is suppressed', async () => {
+    const stuckPage = (): Response => xml('<DescribeInstancesResponse><nextToken>same</nextToken></DescribeInstancesResponse>');
+    const { clientFactory } = pagedClient(stuckPage(), stuckPage());
+    const sweep = await new Ec2Collector(clientFactory as never).collectAllRegions(KEYS, ['us-east-1']);
+    expect(sweep.succeededRegions).toEqual([]);
+    expect(sweep.items).toEqual([]);
+    expect(sweep.failedRegions).toHaveLength(1);
+    expect(sweep.failedRegions[0]?.region).toBe('us-east-1');
   });
 
   it('still throws on a non-OK page, so a denial is not a short list', async () => {
@@ -118,8 +144,12 @@ describe('Lambda pagination', () => {
 describe('RDS pagination', () => {
   it('follows the Query-protocol Marker until it is exhausted', async () => {
     const { bodies, clientFactory } = pagedClient(
-      xml('<DescribeDBInstancesResponse><Marker>m-1</Marker><DBInstances><DBInstance><DBInstanceIdentifier>db-1</DBInstanceIdentifier></DBInstance></DBInstances></DescribeDBInstancesResponse>'),
-      xml('<DescribeDBInstancesResponse><DBInstances><DBInstance><DBInstanceIdentifier>db-2</DBInstanceIdentifier></DBInstance></DBInstances></DescribeDBInstancesResponse>'),
+      xml(
+        '<DescribeDBInstancesResponse><Marker>m-1</Marker><DBInstances><DBInstance><DBInstanceIdentifier>db-1</DBInstanceIdentifier></DBInstance></DBInstances></DescribeDBInstancesResponse>',
+      ),
+      xml(
+        '<DescribeDBInstancesResponse><DBInstances><DBInstance><DBInstanceIdentifier>db-2</DBInstanceIdentifier></DBInstance></DBInstances></DescribeDBInstancesResponse>',
+      ),
     );
 
     const items = await new RdsCollector(clientFactory as never).collect(KEYS);
@@ -148,7 +178,9 @@ describe('DynamoDB pagination', () => {
 describe('S3 pagination', () => {
   it('follows NextContinuationToken on the V2 listing', async () => {
     const { clientFactory, fetch } = pagedClient(
-      xml('<ListAllMyBucketsResult><Buckets><Bucket><Name>b1</Name></Bucket></Buckets><NextContinuationToken>tok</NextContinuationToken></ListAllMyBucketsResult>'),
+      xml(
+        '<ListAllMyBucketsResult><Buckets><Bucket><Name>b1</Name></Bucket></Buckets><NextContinuationToken>tok</NextContinuationToken></ListAllMyBucketsResult>',
+      ),
       xml('<ListAllMyBucketsResult><Buckets><Bucket><Name>b2</Name></Bucket></Buckets></ListAllMyBucketsResult>'),
     );
 
@@ -159,7 +191,9 @@ describe('S3 pagination', () => {
 
   it('keeps reporting global-region buckets across pages', async () => {
     const { clientFactory } = pagedClient(
-      xml('<ListAllMyBucketsResult><Buckets><Bucket><Name>b1</Name></Bucket></Buckets><NextContinuationToken>t</NextContinuationToken></ListAllMyBucketsResult>'),
+      xml(
+        '<ListAllMyBucketsResult><Buckets><Bucket><Name>b1</Name></Bucket></Buckets><NextContinuationToken>t</NextContinuationToken></ListAllMyBucketsResult>',
+      ),
       xml('<ListAllMyBucketsResult><Buckets><Bucket><Name>b2</Name></Bucket></Buckets></ListAllMyBucketsResult>'),
     );
     const items = await new S3Collector(clientFactory as never).collect(KEYS);

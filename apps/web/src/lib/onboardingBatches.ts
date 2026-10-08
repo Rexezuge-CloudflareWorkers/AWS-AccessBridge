@@ -1,7 +1,7 @@
 'use client';
 
 import { grantAccess, storeCredentialRelationship } from '../services/adminService';
-import type { DiscoveredRole } from './useOnboardingWizard';
+import type { DiscoveredRole } from './onboardingWizard';
 
 /**
  * The wizard's two batch operations.
@@ -74,7 +74,11 @@ async function saveRoleRelationships(
  *
  * @returns how many grants rejected, out of `emails.length * roles.length`.
  */
-async function grantSelectedRoles(emails: string[], roles: Set<string>, awsAccountId: string): Promise<{ attempted: number; failures: number }> {
+async function grantSelectedRoles(
+  emails: string[],
+  roles: Set<string>,
+  awsAccountId: string,
+): Promise<{ attempted: number; failures: number }> {
   const pairs: Array<{ email: string; role: string }> = [];
   for (const email of emails) {
     const trimmed = email.trim();

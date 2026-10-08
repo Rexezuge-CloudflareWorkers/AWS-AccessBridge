@@ -20,14 +20,14 @@ describe('TokenService', () => {
   });
 
   it('returns the user email for valid tokens and touches last-used', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
-    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).mockResolvedValue(undefined);
     await expect(tokenService().authenticateWithPAT('token')).resolves.toBe('user@example.com');
-    expect(UserAccessTokenDAO.prototype.updateLastUsedByToken).toHaveBeenCalledWith('token');
+    expect(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/));
   });
 
   it('throws UnauthorizedError for invalid tokens', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue(undefined);
     await expect(tokenService().authenticateWithPAT('bad')).rejects.toThrow(UnauthorizedError);
   });
 });
@@ -43,17 +43,32 @@ describe('ConsoleService', () => {
   });
 
   it('returns the signin token on success', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ SigninToken: 'tok', Expiration: 'x' }) });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ SigninToken: 'tok', Expiration: 'x' }),
+      arrayBuffer: async () => new TextEncoder().encode(JSON.stringify({ SigninToken: 'tok', Expiration: 'x' })).buffer,
+    });
     await expect(new ConsoleService().getSigninToken('AKIA', 'secret')).resolves.toBe('tok');
   });
 
   it('throws UnauthorizedError on 400', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({}) });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({}),
+      arrayBuffer: async () => new TextEncoder().encode('{}').buffer,
+    });
     await expect(new ConsoleService().getSigninToken('bad', 'bad')).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws InternalServerError on other failures', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({}),
+      arrayBuffer: async () => new TextEncoder().encode('{}').buffer,
+    });
     await expect(new ConsoleService().getSigninToken('AKIA', 'secret')).rejects.toThrow(InternalServerError);
   });
 

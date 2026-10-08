@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TokenService } from '@aws-access-bridge/backend-services/auth/TokenService';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
-import type { AccountIdentity, UserIdentityEnv, UserIdentityService } from '@aws-access-bridge/backend-services/identity/UserIdentityService';
+import type {
+  AccountIdentity,
+  UserIdentityEnv,
+  UserIdentityService,
+} from '@aws-access-bridge/backend-services/identity/UserIdentityService';
 import { BadRequestError, DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
@@ -32,24 +36,24 @@ describe('TokenService lifecycle', () => {
 
   it('authenticates valid PATs and touches last-used', async () => {
     // No id on the row (pre-0032): the stored address is the only answer.
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
-    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).mockResolvedValue(undefined);
     await expect(new TokenService(env(), identity(null)).authenticateWithPAT('pat')).resolves.toBe('user@example.com');
-    expect(UserAccessTokenDAO.prototype.updateLastUsedByToken).toHaveBeenCalledWith('pat');
+    expect(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/));
   });
 
   it('authenticates even when the last-used write fails', async () => {
-    // `updateLastUsedByToken` throws `DatabaseError` on `!result.success`, and it
+    // `updateLastUsedByTokenHash` throws `DatabaseError` on `!result.success`, and it
     // used to be awaited on the auth critical path — so a write-side blip turned a
     // perfectly valid PAT into a 500.
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
-    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockRejectedValue(new DatabaseError('D1 is busy'));
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).mockRejectedValue(new DatabaseError('D1 is busy'));
     await expect(new TokenService(env(), identity(null)).authenticateWithPAT('pat')).resolves.toBe('user@example.com');
   });
 
   it('hands the last-used write to the caller to detach', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({ userEmail: 'user@example.com' } as never);
-    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue({ userEmail: 'user@example.com' } as never);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).mockResolvedValue(undefined);
     const defer = vi.fn();
     await new TokenService(env(), identity(null)).authenticateWithPAT('pat', defer);
     // The middleware passes `ctx.waitUntil`, so the write leaves the response path.
@@ -60,16 +64,16 @@ describe('TokenService lifecycle', () => {
   // The whole point of stamping `user_id` on tokens: without this, a token
   // minted before an address change keeps authenticating as the old address.
   it('reports the owner current address for a token carrying an id', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue({
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue({
       userEmail: 'old@e.com',
       userId: 'usr_abc',
     } as never);
-    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.updateLastUsedByTokenHash).mockResolvedValue(undefined);
     await expect(new TokenService(env(), identity(ACCOUNT)).authenticateWithPAT('pat')).resolves.toBe('u@e.com');
   });
 
   it('rejects unknown or expired PATs with 401', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByToken).mockResolvedValue(undefined);
+    vi.mocked(UserAccessTokenDAO.prototype.getByTokenHash).mockResolvedValue(undefined);
     await expect(new TokenService(env(), identity(null)).authenticateWithPAT('bad')).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
@@ -144,9 +148,7 @@ describe('TokenService lifecycle', () => {
   // The list is shown to the user, so it must not report the anchor they no
   // longer sign in with.
   it('lists tokens under the address the account signs in with', async () => {
-    vi.mocked(UserAccessTokenDAO.prototype.getByUserId).mockResolvedValue([
-      { tokenId: 't1', userEmail: 'old@e.com' } as never,
-    ]);
+    vi.mocked(UserAccessTokenDAO.prototype.getByUserId).mockResolvedValue([{ tokenId: 't1', userEmail: 'old@e.com' } as never]);
     const listed = await new TokenService(env(), identity()).listTokens('u@e.com');
     expect(listed[0]?.userEmail).toBe('u@e.com');
   });

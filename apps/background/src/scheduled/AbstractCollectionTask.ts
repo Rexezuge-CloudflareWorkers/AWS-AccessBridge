@@ -39,11 +39,7 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
   protected abstract sessionName(): string;
   protected abstract collectForAccount(principalArn: string, credentials: AccessKeys, accountId: string, env: TEnv): Promise<number>;
 
-  protected override async handleScheduledTask(
-    _event: ScheduledController,
-    env: TEnv,
-    _ctx: ExecutionContext,
-  ): Promise<TaskRunSummary> {
+  protected override async handleScheduledTask(_event: ScheduledController, env: TEnv, _ctx: ExecutionContext): Promise<TaskRunSummary> {
     const intervalHours = this.collectionIntervalHours(env);
     const cutoffTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds() - intervalHours * 3600;
     const configDAO = new DataCollectionConfigDAO(env.AccessBridgeDB);
@@ -62,26 +58,36 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
     let failedAccounts = 0;
     for (const principalArn of principalArns) {
       try {
-        const { credentials }: { credentials: AccessKeys } = await credentialChain.resolveLeafCredentials(
-          principalArn,
-          this.sessionName(),
-        );
+        const { credentials }: { credentials: AccessKeys } = await credentialChain.resolveLeafCredentials(principalArn, this.sessionName());
         const accountId: string = ArnUtil.getAccountIdFromArn(principalArn);
         const collected: number = await this.collectForAccount(principalArn, credentials, accountId, env);
         succeededItems += collected;
-        // Only stamp the interval when something was actually collected. The
-        // collectors report 0 for a genuinely empty account just as they do for
-        // one that failed to answer, and advancing the cutoff either way means an
-        // account that AWS is refusing is not retried until the next full
-        // interval — 6 hours for cost, 2 for resources — instead of the next tick.
+        // Stamp the attempt on every outcome — success, empty or failure — or
+        // a permanently failing principal stays due and occupies the front of
+        // every batch, starving the healthy principals behind it. The success
+        // clock advances only when data actually arrived.
+        try {
+          await configDAO.updateLastAttemptTime(principalArn, this.collectionType());
+        } catch (error: unknown) {
+          failedAccounts += 1;
+          log.error(`Failed to stamp attempt time for ${principalArn}:`, { error: error });
+          continue;
+        }
         if (collected > 0) {
           await configDAO.updateLastCollectedTime(principalArn, this.collectionType());
         } else {
-          log.warn(`[${this.collectionType()}] ${principalArn} reported no data; leaving its collection interval unadvanced.`);
+          log.warn(
+            `[${this.collectionType()}] ${principalArn} reported no data; last_attempt_at advanced, last_collected_at left untouched.`,
+          );
         }
       } catch (error: unknown) {
         failedAccounts += 1;
         log.error(`Failed to collect ${this.collectionType()} data for ${principalArn}:`, { error: error });
+        try {
+          await configDAO.updateLastAttemptTime(principalArn, this.collectionType());
+        } catch (stampError: unknown) {
+          log.error(`Failed to stamp attempt time for ${principalArn}:`, { error: stampError });
+        }
       }
     }
     return {

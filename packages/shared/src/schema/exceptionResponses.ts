@@ -118,7 +118,10 @@ function unauthorizedResponse(description: string, message?: string): ExceptionR
  * re-authenticating cannot fix.
  */
 function forbiddenResponse(description: string, message?: string): ExceptionResponse {
-  return exceptionResponse(description, { message: message ?? 'You do not have permission to perform this action.', type: 'ForbiddenError' });
+  return exceptionResponse(description, {
+    message: message ?? 'You do not have permission to perform this action.',
+    type: 'ForbiddenError',
+  });
 }
 
 /**
@@ -126,13 +129,6 @@ function forbiddenResponse(description: string, message?: string): ExceptionResp
  */
 function notFoundResponse(description: string, message?: string): ExceptionResponse {
   return exceptionResponse(description, { message: message ?? 'The requested resource was not found.', type: 'NotFoundError' });
-}
-
-/**
- * 409 — the request conflicts with current state.
- */
-function conflictResponse(description: string, message?: string): ExceptionResponse {
-  return exceptionResponse(description, { message: message ?? 'The request conflicts with the current state.', type: 'ConflictError' });
 }
 
 /**
@@ -147,13 +143,5 @@ function internalServerErrorResponse(description: string): ExceptionResponse {
   return exceptionResponse(description, { message: 'An unexpected error occurred. Please try again later.', type: 'InternalServerError' });
 }
 
-export {
-  badRequestResponse,
-  conflictResponse,
-  exceptionResponse,
-  forbiddenResponse,
-  internalServerErrorResponse,
-  notFoundResponse,
-  unauthorizedResponse,
-};
+export { badRequestResponse, exceptionResponse, forbiddenResponse, internalServerErrorResponse, notFoundResponse, unauthorizedResponse };
 export type { ExceptionResponse, ExceptionSchema, ExceptionSchemaOptions };

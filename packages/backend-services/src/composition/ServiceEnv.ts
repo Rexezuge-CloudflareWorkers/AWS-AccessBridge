@@ -55,6 +55,13 @@ interface ServiceEnv {
 
   // Internal HMAC-signed self-calls
   INTERNAL_REQUEST_HMAC_SECRET?: SecretsStoreSecret;
+  SELF?: Fetcher;
+
+  // Auth-boundary rate limiter and the durable collection workflow. Both optional:
+  // the middleware and the cron fall back to their previous behaviour when a
+  // deployment has not bound them.
+  AUTH_RATE_LIMITER?: RateLimit;
+  COLLECTION_WORKFLOW?: Workflow;
 }
 
 export type { ServiceEnv };

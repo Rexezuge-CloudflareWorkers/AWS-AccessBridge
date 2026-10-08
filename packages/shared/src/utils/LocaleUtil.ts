@@ -4,21 +4,6 @@ const SUPPORTED_LOCALES = ['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja',
 
 type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
-const LOCALE_DISPLAY_NAMES: Record<SupportedLocale, string> = {
-  en: 'English',
-  de: 'Deutsch',
-  fr: 'Français',
-  es: 'Español',
-  it: 'Italiano',
-  nl: 'Nederlands',
-  pt: 'Português',
-  pl: 'Polski',
-  ja: '日本語',
-  'zh-CN': '简体中文',
-  'zh-TW': '繁體中文',
-  ko: '한국어',
-};
-
 function canonicalizeLocaleTag(tag: string): string {
   const normalized = tag.trim().replaceAll('_', '-');
   const parts = normalized.split('-').filter(Boolean);
@@ -61,17 +46,7 @@ class LocaleUtility {
     }
     return DEFAULT_LOCALE;
   }
-
-  public static negotiate(preferred: string | null | undefined, fallback?: string | null): SupportedLocale {
-    const primary = this.normalize(preferred);
-    return primary === DEFAULT_LOCALE ? this.normalize(fallback) : primary;
-  }
-
-  public static displayName(locale: string | null | undefined): string {
-    const normalized = this.normalize(locale);
-    return LOCALE_DISPLAY_NAMES[normalized] ?? normalized;
-  }
 }
 
-export { LocaleUtility as LocaleUtil, DEFAULT_LOCALE, SUPPORTED_LOCALES, LOCALE_DISPLAY_NAMES };
+export { LocaleUtility as LocaleUtil, SUPPORTED_LOCALES };
 export type { SupportedLocale };

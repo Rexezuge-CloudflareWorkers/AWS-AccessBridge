@@ -22,13 +22,6 @@ class TeamsDAO extends BaseDAO {
     return { teamId, teamName, createdAt, createdBy };
   }
 
-  public async getTeamById(teamId: string): Promise<Team | null> {
-    const result = await this.database.prepare('SELECT * FROM teams WHERE team_id = ?').bind(teamId).first<TeamInternal>();
-    return result
-      ? { teamId: result.team_id, teamName: result.team_name, createdAt: result.created_at, createdBy: result.created_by }
-      : null;
-  }
-
   public async listTeams(): Promise<Team[]> {
     const results = await this.database.prepare('SELECT * FROM teams ORDER BY team_name').all<TeamInternal>();
     return (results.results || []).map((r) => ({
@@ -55,7 +48,10 @@ class TeamsDAO extends BaseDAO {
   }
 
   public async updateTeamName(teamId: string, newName: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('UPDATE teams SET team_name = ? WHERE team_id = ?').bind(newName, teamId).run(), 'rename team');
+    await this.withRetry(
+      () => this.database.prepare('UPDATE teams SET team_name = ? WHERE team_id = ?').bind(newName, teamId).run(),
+      'rename team',
+    );
   }
 }
 

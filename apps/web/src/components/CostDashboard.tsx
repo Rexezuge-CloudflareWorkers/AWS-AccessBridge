@@ -1,44 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Spinner from './ui/Spinner';
 import { formatAmount, formatCurrency, formatMonthLabel } from '../lib/format';
-import { isUnauthorized } from '../lib/api';
+import { maxTrend, sortAccountsByCost, trendBarPercent } from '../lib/costTrends';
+import { useResource } from '../hooks/useResource';
 import { loadSummary, loadTrends } from '../services/costService';
-import type { CostSummary, TrendMonth } from '../services/costService';
+import type { TrendMonth } from '../services/costService';
+
+// Module-level, so the fetcher keeps one identity and the data loads once.
+const loadCostData = () => Promise.all([loadSummary(), loadTrends()]);
+const NO_TRENDS: TrendMonth[] = [];
 
 export default function CostDashboard() {
   const { t, i18n } = useTranslation();
   const lng = i18n.resolvedLanguage ?? 'en';
-  const [summary, setSummary] = useState<CostSummary | null>(null);
-  const [trends, setTrends] = useState<TrendMonth[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([loadSummary(), loadTrends()])
-      .then(([summaryData, trendsData]) => {
-        if (cancelled) return;
-        setSummary(summaryData);
-        setTrends(trendsData);
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (isUnauthorized(err)) {
-          globalThis.location.reload();
-          return;
-        }
-        setError(err instanceof Error ? err.message : t('costs.loadError', 'Failed to load cost data'));
-        setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
-
+  const { data, error, isLoading } = useResource(loadCostData, {
+    errorFallback: t('costs.loadError', 'Failed to load cost data'),
+    reloadOnUnauthorized: true,
+  });
   if (isLoading) {
     return <Spinner size={40} label={t('costs.loading', 'Loading cost data...')} padding="48px 0" />;
   }
@@ -49,7 +29,9 @@ export default function CostDashboard() {
     );
   }
 
-  const maxTrend: number = trends.length > 0 ? Math.max(...trends.map((trend) => trend.total), 1) : 1;
+  const summary = data?.[0] ?? null;
+  const trends = data?.[1] ?? NO_TRENDS;
+  const maxTotal = maxTrend(trends);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -57,7 +39,9 @@ export default function CostDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         <div style={{ background: '#1e2433', borderRadius: '12px', padding: '24px' }}>
           <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>{t('costs.totalSpend', 'Total Spend (30d)')}</p>
-          <p style={{ color: '#fff', fontSize: '30px', fontWeight: 700 }}>{formatAmount(summary?.grandTotal ?? 0, summary?.currency ?? null, lng)}</p>
+          <p style={{ color: '#fff', fontSize: '30px', fontWeight: 700 }}>
+            {formatAmount(summary?.grandTotal ?? 0, summary?.currency ?? null, lng)}
+          </p>
         </div>
         <div style={{ background: '#1e2433', borderRadius: '12px', padding: '24px' }}>
           <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '6px' }}>{t('costs.accountsTracked', 'Accounts Tracked')}</p>
@@ -78,20 +62,20 @@ export default function CostDashboard() {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '192px' }}>
             {trends.map((month) => (
               <div key={month.period} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>{formatAmount(month.total, summary?.currency ?? null, lng, true)}</span>
+                <span style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>
+                  {formatAmount(month.total, summary?.currency ?? null, lng, true)}
+                </span>
                 <div
                   style={{
                     width: '100%',
                     background: 'linear-gradient(to top, #2563eb, #60a5fa)',
                     borderRadius: '4px 4px 0 0',
-                    height: `${(month.total / maxTrend) * 100}%`,
+                    height: `${trendBarPercent(month.total, maxTotal)}%`,
                     minHeight: month.total > 0 ? '4px' : '0',
                     transition: 'all 0.2s',
                   }}
                 />
-                <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-                  {formatMonthLabel(month.period, lng)}
-                </span>
+                <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>{formatMonthLabel(month.period, lng)}</span>
               </div>
             ))}
           </div>
@@ -105,28 +89,24 @@ export default function CostDashboard() {
             {t('costs.accountBreakdown', 'Account Breakdown')}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {Object.entries(summary.accounts)
-              .sort(([, a], [, b]) => b.totalCost - a.totalCost)
-              .map(([accountId, data]) => (
-                <div
-                  key={accountId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    background: '#252d3d',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <span className="font-mono" style={{ fontSize: '14px', color: '#d1d5db' }}>
-                    {accountId}
-                  </span>
-                  <span style={{ fontWeight: 600, color: '#fff' }}>
-                    {formatCurrency(data.totalCost, data.currency, lng)}
-                  </span>
-                </div>
-              ))}
+            {sortAccountsByCost(summary.accounts).map(([accountId, account]) => (
+              <div
+                key={accountId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: '#252d3d',
+                  borderRadius: '8px',
+                }}
+              >
+                <span className="font-mono" style={{ fontSize: '14px', color: '#d1d5db' }}>
+                  {accountId}
+                </span>
+                <span style={{ fontWeight: 600, color: '#fff' }}>{formatCurrency(account.totalCost, account.currency, lng)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

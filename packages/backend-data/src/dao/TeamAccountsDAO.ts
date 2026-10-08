@@ -28,14 +28,6 @@ class TeamAccountsDAO extends BaseDAO {
     return (results.results || []).map((r) => r.aws_account_id);
   }
 
-  public async isAccountInTeam(teamId: string, awsAccountId: string): Promise<boolean> {
-    const result = await this.database
-      .prepare('SELECT 1 FROM team_accounts WHERE team_id = ? AND aws_account_id = ?')
-      .bind(teamId, awsAccountId)
-      .first();
-    return !!result;
-  }
-
   public async deleteOrphaned(): Promise<number> {
     const result: D1Result = await this.deleteOrphanedRows('team_accounts', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;

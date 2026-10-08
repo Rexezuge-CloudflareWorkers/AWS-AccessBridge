@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { applyHiddenToggle } from '../lib/accountVisibility';
 import { isUnauthorized } from '../lib/api';
+import { toErrorMessage } from '../lib/errors';
 import { assumeRoleKeys, buildFederateUrl, setFavorite, setRoleHidden } from '../services/accountService';
 import type { RoleMap } from '../services/accountService';
 import type { AccessKeysResponse } from '@aws-access-bridge/shared';
@@ -50,7 +52,7 @@ function useAccountMutations(showMessage: ShowMessage, showHidden: boolean): Use
   // the component, which is why these failures were easy to miss in review: the
   // toast is the app's established channel and the user actually sees it.
   const reportFailure = (thrown: unknown): void => {
-    const message = thrown instanceof Error ? thrown.message : t('accounts.unknownError', 'Unknown error occurred');
+    const message = toErrorMessage(thrown, t('accounts.unknownError', 'Unknown error occurred'));
     showMessage('error', `${t('common.errorPrefix', 'Error')}: ${message}`);
   };
 
@@ -76,19 +78,12 @@ function useAccountMutations(showMessage: ShowMessage, showHidden: boolean): Use
     const previous = rolesData[accountId];
     if (!previous) return;
 
-    const nextRoles: string[] = currentlyHidden ? [...previous.roles, role] : previous.roles.filter((r) => r !== role);
-    const prevHidden: string[] = previous.hiddenRoles ?? [];
-    // `hiddenRoles` only mirrors what the list is currently *showing*: with the
-    // "show hidden" filter on, a role being hidden must move from `roles` to
-    // `hiddenRoles` so the row is not lost; with the filter off it simply leaves
-    // the visible list, and recording it here would list a role the user cannot
-    // see. Either way the server is authoritative — toggling the filter refetches,
-    // so a stale mirror is never shown.
-    const nextHidden: string[] = currentlyHidden ? prevHidden.filter((r) => r !== role) : showHidden ? [...prevHidden, role] : prevHidden;
+    // The optimistic mirror rule is `lib/accountVisibility`.
+    const updated = applyHiddenToggle(previous, role, currentlyHidden, showHidden);
 
     setRolesData((prev) => ({
       ...prev,
-      [accountId]: { ...previous, roles: nextRoles, hiddenRoles: nextHidden },
+      [accountId]: updated,
     }));
 
     try {

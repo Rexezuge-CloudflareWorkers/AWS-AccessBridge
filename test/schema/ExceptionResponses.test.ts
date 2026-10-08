@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   badRequestResponse,
-  conflictResponse,
   exceptionResponse,
   forbiddenResponse,
   internalServerErrorResponse,
@@ -22,7 +21,10 @@ describe('exception response builders', () => {
 
     expect(schema.type).toBe('object');
     expect(schema.properties.Exception.type).toBe('object');
-    expect(Object.keys(schema.properties.Exception.properties).toSorted((left, right) => left.localeCompare(right))).toEqual(['Message', 'Type']);
+    expect(Object.keys(schema.properties.Exception.properties).toSorted((left, right) => left.localeCompare(right))).toEqual([
+      'Message',
+      'Type',
+    ]);
     expect(schema.properties.Exception.properties.Type.type).toBe('string');
     expect(schema.properties.Exception.properties.Message.type).toBe('string');
   });
@@ -37,11 +39,14 @@ describe('exception response builders', () => {
    */
   it('labels each status with the matching error type', () => {
     expect(badRequestResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('BadRequestError');
-    expect(unauthorizedResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('UnauthorizedError');
+    expect(unauthorizedResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe(
+      'UnauthorizedError',
+    );
     expect(forbiddenResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('ForbiddenError');
     expect(notFoundResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('NotFoundError');
-    expect(conflictResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('ConflictError');
-    expect(internalServerErrorResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('InternalServerError');
+    expect(internalServerErrorResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe(
+      'InternalServerError',
+    );
   });
 
   /**
@@ -66,7 +71,9 @@ describe('exception response builders', () => {
    * would advertise a shape the server never emits.
    */
   it('documents a generic 500 message rather than an internal one', () => {
-    const example = internalServerErrorResponse('Internal server error').content['application/json'].schema.properties.Exception.properties.Message.example;
+    const example =
+      internalServerErrorResponse('Internal server error').content['application/json'].schema.properties.Exception.properties.Message
+        .example;
     expect(example).toBe('An unexpected error occurred. Please try again later.');
     expect(example).not.toMatch(/SQLITE|D1|stack|at Object/i);
   });

@@ -124,7 +124,7 @@ class AddressRegistryService {
     email: string,
     userId: string,
   ): Promise<boolean> {
-    const registered = await Promise.resolve(userEmailDAO.get(email)).catch((error: unknown) => {
+    const registered = await Promise.resolve(userEmailDAO.get(email.toLowerCase())).catch((error: unknown) => {
       if (isMissingSchemaError(error)) return null;
       throw error;
     });

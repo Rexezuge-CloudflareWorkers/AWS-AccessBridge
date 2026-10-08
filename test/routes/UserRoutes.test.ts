@@ -109,13 +109,25 @@ describe('favorites routes', () => {
     vi.clearAllMocks();
   });
 
-  it('POST /user/favorites ensures the account then favorites it', async () => {
+  it('POST /user/favorites requires a grant and then favorites the account', async () => {
     vi.mocked(AwsAccountsDAO.prototype.ensureAccountExists).mockResolvedValue(undefined);
+    vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue(['Dev']);
     vi.mocked(UserFavoriteAccountsDAO.prototype.favoriteAccount).mockResolvedValue(undefined);
     const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012' } });
     await new FavoriteAccountRoute({} as never).handle(c);
     expect(AwsAccountsDAO.prototype.ensureAccountExists).toHaveBeenCalledWith('123456789012');
     expect(c.json).toHaveBeenCalledWith({ success: true });
+  });
+
+  it('POST /user/favorites refuses an account the caller cannot assume', async () => {
+    vi.mocked(AwsAccountsDAO.prototype.ensureAccountExists).mockResolvedValue(undefined);
+    vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue([]);
+    const c = createRouteContext({ method: 'POST', body: { awsAccountId: '123456789012' } });
+    await new FavoriteAccountRoute({} as never).handle(c);
+    // Otherwise the row appears in the user's list and can never be used — a
+    // grant-shaped no-op, and an unbounded way to add `aws_accounts` rows.
+    expect(UserFavoriteAccountsDAO.prototype.favoriteAccount).not.toHaveBeenCalled();
+    expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Forbidden' }) }), 403);
   });
 
   it('DELETE /user/favorites unfavorites', async () => {

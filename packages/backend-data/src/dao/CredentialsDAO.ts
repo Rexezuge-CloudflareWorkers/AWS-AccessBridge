@@ -1,4 +1,4 @@
-import { ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, InternalServerError, NotFoundError } from '@aws-access-bridge/backend-errors';
 import { Credential, CredentialChain, CredentialInternal } from '@aws-access-bridge/shared/model';
 import { decryptDataField, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
@@ -39,7 +39,10 @@ class CredentialsDAO extends EncryptedDAO {
       .first<CredentialInternal>();
 
     if (!result) {
-      throw new UnauthorizedError();
+      // 404, never 401: the SPA reads a 401 as "sign in again", and a principal with
+      // no stored credentials is a configuration gap that signing in cannot fix.
+      // The ARN is deliberately not echoed back to the caller.
+      throw new NotFoundError('No credentials are stored for this principal.');
     }
 
     const keys = this.encryptionKeys;
@@ -53,7 +56,11 @@ class CredentialsDAO extends EncryptedDAO {
       // since the per-feature split has all three on the current key, a row
       // untouched since has all three on the legacy one.
       accessKeyId: await decryptDataField(result.encrypted_access_key_id, result.salt, keys),
-      secretAccessKey: await decryptDataField(result.encrypted_secret_access_key, resolveIv(result.salt_secret_access_key, result.salt), keys),
+      secretAccessKey: await decryptDataField(
+        result.encrypted_secret_access_key,
+        resolveIv(result.salt_secret_access_key, result.salt),
+        keys,
+      ),
       sessionToken: await decryptDataField(result.encrypted_session_token, resolveIv(result.salt_session_token, result.salt), keys),
     };
   }
@@ -106,11 +113,21 @@ class CredentialsDAO extends EncryptedDAO {
     const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, key) : null;
     const result: D1Result = await this.database
       .prepare(
-        `INSERT OR REPLACE INTO credentials (
+        // An upsert that names its columns, not INSERT OR REPLACE: REPLACE deletes the
+        // row and inserts a new one, which blanks `assumed_by` and fires the
+        // `ON DELETE CASCADE` on `credential_cache_config`.
+        `INSERT INTO credentials (
            principal_arn, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token,
            salt, salt_secret_access_key, salt_session_token
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(principal_arn) DO UPDATE SET
+           encrypted_access_key_id = excluded.encrypted_access_key_id,
+           encrypted_secret_access_key = excluded.encrypted_secret_access_key,
+           encrypted_session_token = excluded.encrypted_session_token,
+           salt = excluded.salt,
+           salt_secret_access_key = excluded.salt_secret_access_key,
+           salt_session_token = excluded.salt_session_token`,
       )
       .bind(
         principalArn,
@@ -128,8 +145,9 @@ class CredentialsDAO extends EncryptedDAO {
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare(
-        `INSERT OR REPLACE INTO credentials (principal_arn, assumed_by)
-         VALUES (?, ?)`,
+        `INSERT INTO credentials (principal_arn, assumed_by)
+         VALUES (?, ?)
+         ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by`,
       )
       .bind(principalArn, assumedBy)
       .run();

@@ -1,28 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { AccessableAccount, AccessableAccountInternal } from '@aws-access-bridge/shared/model/AccessableAccount';
 import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model/AccessKeys';
 import type { Credential, CredentialInternal } from '@aws-access-bridge/shared/model/Credential';
 import type { CredentialCache } from '@aws-access-bridge/shared/model/CredentialCache';
 import type { CredentialChain } from '@aws-access-bridge/shared/model/CredentialChain';
 import type { UserAccessToken, UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
-import type { UserMetadata, UserMetadataInternal } from '@aws-access-bridge/shared/model/UserMetadata';
+import type { UserMetadataInternal } from '@aws-access-bridge/shared/model/UserMetadata';
 import type { RoleConfig, RoleConfigInternal } from '@aws-access-bridge/shared/model/RoleConfig';
-import type { AssumableAccount, AssumableAccountsMap } from '@aws-access-bridge/shared/model/AssumableAccount';
+import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model/AssumableAccount';
 
 describe('Model Types', () => {
-  describe('AccessableAccount', () => {
-    it('can be created with required fields', () => {
-      const account: AccessableAccount = { userEmail: 'user@test.com', awsAccountId: '123456789012' };
-      expect(account.userEmail).toBe('user@test.com');
-      expect(account.awsAccountId).toBe('123456789012');
-    });
-
-    it('internal model uses snake_case', () => {
-      const internal: AccessableAccountInternal = { user_email: 'user@test.com', aws_account_id: '123456789012' };
-      expect(internal.user_email).toBe('user@test.com');
-    });
-  });
-
   describe('AccessKeys', () => {
     it('can be created without session token', () => {
       const keys: AccessKeys = { accessKeyId: 'AKID', secretAccessKey: 'SECRET' };
@@ -103,16 +89,16 @@ describe('Model Types', () => {
   });
 
   describe('UserAccessToken', () => {
-    it('extends metadata with access token', () => {
+    it('extends metadata with the one-time plaintext token', () => {
       const token: UserAccessToken = {
         tokenId: 'tid',
         userEmail: 'user@test.com',
-        accessToken: 'secret-token',
+        token: 'plaintext-once',
         name: 'My Token',
         createdAt: 1_700_000_000,
         expiresAt: 1_800_000_000,
       };
-      expect(token.accessToken).toBe('secret-token');
+      expect(token.token).toBe('plaintext-once');
     });
 
     it('metadata has optional lastUsedAt', () => {
@@ -128,27 +114,6 @@ describe('Model Types', () => {
   });
 
   describe('UserMetadata', () => {
-    it('has all required fields', () => {
-      // **All four, and each asserted.** This test existed to pin the required set, and
-      // `preferredLanguage` was added to `UserMetadata` without it following — the
-      // literal still compiled because the field had not been required yet when it was
-      // written, and by the time it was required this test was the one place that
-      // should have said so. It also asserted only `isSuperAdmin`, so it would not have
-      // noticed a *missing* value on any of the others.
-      const meta: UserMetadata = {
-        userEmail: 'user@test.com',
-        isSuperAdmin: true,
-        federationUsername: 'ABCDEF123456',
-        preferredLanguage: 'en',
-      };
-      expect(meta).toEqual({
-        userEmail: 'user@test.com',
-        isSuperAdmin: true,
-        federationUsername: 'ABCDEF123456',
-        preferredLanguage: 'en',
-      });
-    });
-
     it('internal model uses snake_case with optional fields', () => {
       const internal: UserMetadataInternal = {};
       expect(internal.user_email).toBeUndefined();
@@ -180,15 +145,6 @@ describe('Model Types', () => {
   });
 
   describe('AssumableAccount', () => {
-    it('has roles array and optional fields', () => {
-      const account: AssumableAccount = {
-        roles: ['Admin', 'ReadOnly'],
-        nickname: 'Production',
-        favorite: true,
-      };
-      expect(account.roles).toHaveLength(2);
-    });
-
     it('map type maps account IDs to accounts', () => {
       const map: AssumableAccountsMap = {
         '123456789012': { roles: ['Admin'], nickname: 'Dev' },

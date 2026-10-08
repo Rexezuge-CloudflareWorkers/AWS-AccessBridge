@@ -2,6 +2,7 @@
 
 import type { ShowMessage } from '../hooks/useToast';
 import { useOnboardingWizard } from '../hooks/useOnboardingWizard';
+import { WIZARD_STEP } from '../lib/onboardingWizard';
 import WizardProgress from './onboarding/WizardProgress';
 import AccountStep from './onboarding/AccountStep';
 import CredentialsStep from './onboarding/CredentialsStep';
@@ -26,12 +27,12 @@ export default function OnboardingWizard({ showMessage }: OnboardingWizardProps)
   return (
     <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
       <WizardProgress step={wizard.step} />
-      {wizard.step === 0 && <AccountStep wizard={wizard} />}
-      {wizard.step === 1 && <CredentialsStep wizard={wizard} />}
-      {wizard.step === 2 && <ChainStep wizard={wizard} />}
-      {wizard.step === 3 && <RolesStep wizard={wizard} />}
-      {wizard.step === 4 && <UsersStep wizard={wizard} />}
-      {wizard.step === 5 && <SummaryStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.ACCOUNT && <AccountStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.CREDENTIALS && <CredentialsStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.CHAIN && <ChainStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.ROLES && <RolesStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.USERS && <UsersStep wizard={wizard} />}
+      {wizard.step === WIZARD_STEP.SUMMARY && <SummaryStep wizard={wizard} />}
     </div>
   );
 }

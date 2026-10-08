@@ -26,15 +26,25 @@ and the `Unauthorized` screen still work.
 
 ## Pure logic belongs in `lib/`, not in a component
 
-| File                  | Holds                                                                                                                                                                                           |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/routes.ts`       | `routeForPathname` / `pathForView` / `isAdminPath` — the pathname↔view mapping, pure so it is testable without a DOM. `hooks/useRouter` owns only the `location` read and the popstate listener |
-| `lib/presentation.ts` | `pageNumbers`, `resourceStateColor`, `httpStatusColor`                                                                                                                                          |
-| `lib/requestGuard.ts` | `createRequestGuard` — the framework-free ordering rule behind `hooks/useRequestGuard.ts`                                                                                                       |
-| `lib/authOutcome.ts`  | `classifyAuthFailure` — 401 → `expired-session`, everything else → `load-failed`                                                                                                                |
-| `lib/format.ts`       | locale-aware dates and numbers; `formatAmount` renders a symbol-less "mixed currency" figure when the currency is `null`                                                                        |
-| `lib/shellExport.ts`  | `formatShellExport`, the canonical home of the shell snippet (both rendered and copied text)                                                                                                    |
-| `lib/constants.ts`    | `ZERO_TRUST_AUTHENTICATION_PATH`, `DEFAULT_TEAM_ID`                                                                                                                                             |
+| File                       | Holds                                                                                                                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/routes.ts`            | `routeForPathname` / `pathForView` / `isAdminPath` — the pathname↔view mapping, pure so it is testable without a DOM. `hooks/useRouter` owns only the `location` read and the popstate listener |
+| `lib/presentation.ts`      | `pageNumbers`, `resourceStateColor`, `httpStatusColor`                                                                                                                                          |
+| `lib/requestGuard.ts`      | `createRequestGuard` — the framework-free ordering rule behind `hooks/useRequestGuard.ts`                                                                                                       |
+| `lib/authOutcome.ts`       | `classifyAuthFailure` — 401 → `expired-session`, everything else → `load-failed`                                                                                                                |
+| `lib/format.ts`            | locale-aware dates and numbers; `formatAmount` renders a symbol-less "mixed currency" figure when the currency is `null`                                                                        |
+| `lib/shellExport.ts`       | `formatShellExport`, the canonical home of the shell snippet (both rendered and copied text)                                                                                                    |
+| `lib/constants.ts`         | `ZERO_TRUST_AUTHENTICATION_PATH`, `DEFAULT_TEAM_ID`                                                                                                                                             |
+| `lib/asyncAction.ts`       | `runAction` (rejection → a typed result with display text) and `afterSuccess` (run the refresh only after the write succeeded) — the shape `hooks/useAsyncAction.ts` wraps with busy state      |
+| `lib/pagination.ts`        | `totalPages` / `clampPage` / `pageRange` — 1-based page arithmetic that reports `0` pages rather than `Infinity`/`NaN`                                                                          |
+| `lib/numbers.ts`           | `parsePositiveNumber` — form strings to numbers; `NaN`, `0` and negatives return `null` so the caller shows its own error and sends nothing                                                     |
+| `lib/storage.ts`           | `readStoredInt` — the whole-number read from `localStorage`, with a fallback for absent, garbage, below-min and throwing storage                                                                |
+| `lib/roleSelection.ts`     | `defaultRoleSelection` — defaults each account's selected role, returning the _same object_ when nothing changed so `setState` bails out                                                        |
+| `lib/costTrends.ts`        | `maxTrend` (floored at 1), `trendBarPercent` (clamped to `[0, 100]`), `sortAccountsByCost`                                                                                                      |
+| `lib/onboardingWizard.ts`  | the wizard's cross-step rules: steps, gates, and the credential/chain/role reducers                                                                                                             |
+| `lib/onboardingBatches.ts` | `settleAll` — a sequential batch that counts failures instead of aborting                                                                                                                       |
+| `lib/teamRoles.ts`         | `TEAM_ROLES` / `isTeamRole` — narrows a `<select>` value against the list the server accepts                                                                                                    |
+| `lib/errors.ts`            | `toErrorMessage` — one place that turns an unknown throw into display text, so no component re-spells `err instanceof Error ? …`                                                                |
 
 Keep new pure logic there rather than as a module-private function inside a component — a private
 function inside a `.tsx` reads as covered when it is not, and the logic is untestable without a DOM.
@@ -97,18 +107,23 @@ route requires `collectionTypes`.
 `onboarding/` per-step components and `WizardProgress`, `SpaNavbar`, `LanguageSelector`,
 `AccessKeyModal`, `ui/` primitives, and `Unauthorized`.
 
-### `useOnboardingWizard` is deliberately over the god-file warn limit
+### The onboarding wizard is split by step, and its rules live in `lib/`
 
-It is the one file above 300 lines, at 318, and the `check:god-files` warning is intentional: its
-length is 25 state slices for six steps whose cross-field invalidation _is_ the design (editing a
-credential clears `credentialValidated`; editing the intermediate ARN clears `chainConfigured`).
-Splitting it per step would fragment a coherent state machine — trading a warning for worse structure.
+`hooks/onboarding/*` holds one hook per step (`account`, `credentials`, `chain`, `roles`, `users`),
+composed by `hooks/useOnboardingWizard.ts`, so no file is over the god-file limit. The rules that
+span steps are pure functions in `lib/onboardingWizard.ts` — `WIZARD_STEP`, `canAdvanceFromStep`,
+`editCredentialField`, `editIntermediateRoleArn`, `addManualRole`, `validEmails` — and they are
+tested in `test/web/WebPureLogic.test.ts` without a renderer.
 
-What _was_ duplication has been extracted and tested: the two batch loops live in
-`hooks/onboardingBatches.ts` (`settleAll`, which counts failures rather than aborting and stays
-sequential because the operations are AWS-backed writes), the repeated "reset validation on edit"
-setters are one factory, and the five per-action spinner booleans are one `busyAction` flag. Prefer
-new pure or batch logic in `hooks/` over growing this file.
+The cross-field invalidation is the design, and it is one rule per field rather than one per call
+site: editing a credential clears `credentialValidated` (but not `credentialStored`, which describes
+what the server already has), and editing the intermediate ARN clears `chainConfigured` while
+keeping `roleForDiscovery`. Each action has its own `WIZARD_BUSY` key; the account save used to
+borrow `'validate'`, which spun the Validate button on the next step.
+
+`lib/onboardingBatches.ts` holds the two sequential batch loops (`settleAll` counts failures rather
+than aborting, and stays sequential because the operations are AWS-backed writes). Prefer new pure
+logic in `lib/` and new batch logic there, not inside a step hook.
 
 ## The favicon is generated
 

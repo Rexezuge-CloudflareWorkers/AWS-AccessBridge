@@ -1,17 +1,18 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from '@/endpoints/IActivityAPIRoute';
 import { BadRequestError } from '@aws-access-bridge/backend-errors';
-import type { AssumeRoleResponse } from '@/endpoints/api/aws/assume-role/POST';
-import type { GenerateConsoleUrlRequestInternal, GenerateConsoleUrlResponse } from '@/endpoints/api/aws/console/POST';
-import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws';
-import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error';
 
 import type { RoleConfig } from '@aws-access-bridge/shared/model';
 import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse, FederateEnv> {
   schema = {
     tags: ['AWS'],
@@ -92,7 +93,7 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
 
   protected async handleRequest(
     request: FederateRequest,
-    env: FederateEnv,
+    _env: FederateEnv,
     cxt: ActivityContext<FederateEnv>,
   ): Promise<ExtendedResponse<FederateResponse>> {
     const url: URL = new URL(request.raw.url);
@@ -109,43 +110,23 @@ class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse,
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const baseUrl: string = this.getBaseUrl(cxt);
     const roleConfig: RoleConfig | undefined = await getRequestScope(cxt).get(Tokens.AccountService).getRoleConfig(awsAccountId, roleName);
-    const hmacSecret: string = await env.INTERNAL_REQUEST_HMAC_SECRET.get();
-    const internalRequestHelper: InternalRequestHelper = new InternalRequestHelper(env.SELF, hmacSecret);
-    const assumeRoleResponse: Response = await internalRequestHelper.makeRequest(
-      '/api/aws/assume-role',
-      'POST',
-      JSON.stringify({ principalArn }),
-      baseUrl,
-      userEmail,
-    );
-    if (!assumeRoleResponse.ok) {
-      throw await ErrorDeserializationUtil.deserializeError(assumeRoleResponse);
-    }
-    const credentials: AssumeRoleResponse = await assumeRoleResponse.json();
-    const consoleUrlRequest: GenerateConsoleUrlRequestInternal = {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken,
-      awsAccountId: awsAccountId,
-      roleName: roleName,
-      destinationPath: destinationPath || roleConfig?.destinationPath,
-      destinationRegion: destinationRegion || roleConfig?.destinationRegion,
-    };
-    const consoleResponse: Response = await internalRequestHelper.makeRequest(
-      '/api/aws/console',
-      'POST',
-      JSON.stringify(consoleUrlRequest),
-      baseUrl,
-      userEmail,
-    );
-    if (!consoleResponse.ok) {
-      throw await ErrorDeserializationUtil.deserializeError(consoleResponse);
-    }
-    const consoleData: GenerateConsoleUrlResponse = await consoleResponse.json();
+    // In-process, not HMAC loopback: one audit event per federation, and the
+    // caller's own auth context is reused rather than a self-signed fetch cycle.
+    const consoleUrl: string = await getRequestScope(cxt)
+      .get(Tokens.FederationService)
+      .generateConsoleUrlForUser(
+        userEmail,
+        principalArn,
+        baseUrl,
+        awsAccountId,
+        roleName,
+        destinationPath || roleConfig?.destinationPath,
+        destinationRegion || roleConfig?.destinationRegion,
+      );
     return {
       statusCode: 302,
       headers: {
-        Location: consoleData.url,
+        Location: consoleUrl,
       },
     };
   }
@@ -161,4 +142,3 @@ interface FederateEnv extends IEnv {
 }
 
 export { FederateRoute };
-export type { FederateRequest, FederateResponse };

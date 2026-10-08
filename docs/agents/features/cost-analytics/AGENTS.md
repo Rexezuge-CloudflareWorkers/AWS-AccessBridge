@@ -56,15 +56,15 @@ Frontend: `CostDashboard` in `apps/web`, with `formatAmount` doing the rendering
 This is the current state, and it is worth stating plainly because the UI implies otherwise.
 
 `spend_alerts` rows are created (`POST /user/admin/costs/alerts`) and deleted
-(`DELETE …/alerts`) through `CostService`, and `SpendAlertDAO.getAlertsByAccount` /
-`getAllAlerts` exist. **Nothing evaluates a threshold and nothing notifies.** There is no alert
-evaluator in either cron phase, and the two read methods are called from tests only. A threshold
-crossing produces no event, no log line, and no message anywhere.
+(`DELETE …/alerts`) through `CostService`. **Nothing evaluates a threshold and nothing notifies.**
+There is no alert evaluator in either cron phase, and `SpendAlertDAO` has no read method at all
+(the two it once had were called from tests only, so they were deleted). A threshold crossing
+produces no event, no log line, and no message anywhere.
 
 The `SpendAlertsTab` copy ("alerts are evaluated against cost data collected in the background")
 describes intended behaviour, and it is the one place in the repository that claims something the
 code does not do. Treat an alert as configuration awaiting an evaluator: adding one means a new
-phase-2 task reading `getAlertsByAccount` against the freshly collected `cost_data`, plus a
+phase-2 task, with a new `SpendAlertDAO` read method, comparing alerts against the freshly collected `cost_data`, plus a
 notification channel that does not exist yet.
 
 Until then, the honest consumer of spend is the dashboard, not the alert table.

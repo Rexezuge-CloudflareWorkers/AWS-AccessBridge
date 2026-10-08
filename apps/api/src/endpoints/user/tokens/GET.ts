@@ -94,4 +94,3 @@ interface ListTokensResponse extends IResponse {
 type ListTokensEnv = IEnv;
 
 export { ListTokensRoute };
-export type { ListTokensRequest, ListTokensResponse };

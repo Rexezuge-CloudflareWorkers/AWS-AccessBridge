@@ -55,13 +55,6 @@ describe('BackgroundTaskRunDAO', () => {
     expect(bound[1]).toBe(1);
   });
 
-  it('skipRun records a skipped status with reason', async () => {
-    const dao = new BackgroundTaskRunDAO(mockDb);
-    await dao.skipRun('run-1', 'nothing due');
-    const bound: unknown[] = vi.mocked(mockStmt.bind).mock.calls[0] ?? [];
-    expect(bound[0]).toBe('nothing due');
-  });
-
   it('listRuns maps rows to external models and parses details JSON', async () => {
     vi.mocked(mockStmt.all).mockResolvedValue({
       results: [

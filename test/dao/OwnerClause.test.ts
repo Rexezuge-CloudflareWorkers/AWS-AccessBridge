@@ -95,7 +95,6 @@ describe('user-keyed DAOs emit valid, aliased SQL', () => {
       [(dao: TeamMembersDAO) => dao.removeMember('t1', owner), 'team_members'],
       [(dao: TeamMembersDAO) => dao.updateMemberRole('t1', owner, 'admin'), 'team_members'],
       [(dao: TeamMembersDAO) => dao.getMembersByTeam('t1'), 'tm'],
-      [(dao: TeamMembersDAO) => dao.isTeamAdmin('t1', owner), 'team_members'],
     ] as const) {
       const { db, sql } = capturingDb();
       await call(new TeamMembersDAO(db));

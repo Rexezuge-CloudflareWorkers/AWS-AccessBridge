@@ -26,7 +26,9 @@ class TrackedTask extends IScheduledTask<IEnv> {
 }
 
 class UntrackedTask extends IScheduledTask<IEnv> {
-  protected async handleScheduledTask(): Promise<void> {}
+  protected async handleScheduledTask(): Promise<TaskRunSummary> {
+    return { itemsProcessed: 0, itemsFailed: 0 };
+  }
 }
 
 describe('IScheduledTask run tracking', () => {
@@ -56,7 +58,7 @@ describe('IScheduledTask run tracking', () => {
         return 'failing-task';
       }
 
-      protected async handleScheduledTask(): Promise<void> {
+      protected async handleScheduledTask(): Promise<TaskRunSummary> {
         throw new Error('kaput');
       }
     }

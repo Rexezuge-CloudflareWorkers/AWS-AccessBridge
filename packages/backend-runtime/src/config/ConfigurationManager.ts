@@ -1,10 +1,10 @@
+import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
   DEFAULT_COST_COLLECTION_INTERVAL_HOURS,
   DEFAULT_COST_LOOKBACK_DAYS,
   DEFAULT_CREDENTIAL_REFRESH_INTERVAL_MINUTES,
-  DEFAULT_DEMO_MODE,
   DEFAULT_ENVIRONMENT,
   DEFAULT_INVENTORY_REGIONS,
   DEFAULT_INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS,
@@ -102,7 +102,6 @@ class ConfigurationManager {
   public static readonly environment = {
     isProduction: (env: unknown): boolean => EnvParser.string(env, 'ENVIRONMENT', DEFAULT_ENVIRONMENT) === 'production',
   };
-
-  }
+}
 
 export { ConfigurationManager };

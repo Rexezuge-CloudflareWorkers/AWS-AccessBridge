@@ -77,4 +77,4 @@ class ReplayGuard {
   }
 }
 
-export { REPLAY_NAMESPACE, REPLAY_TTL_SECONDS, ReplayGuard };
+export { REPLAY_TTL_SECONDS, ReplayGuard };

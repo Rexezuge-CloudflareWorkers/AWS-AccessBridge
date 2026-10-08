@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LANGUAGE_STORAGE_KEY, detectInitialLanguage, loadLanguage, normalizeLanguage } from '../i18n';
+import { LANGUAGE_STORAGE_KEY, detectInitialLanguage, detectLanguageForUser, loadLanguage, normalizeLanguage } from '../i18n';
 import { updatePreferredLanguage, type CurrentUser } from '../services/authService';
+import type { ShowMessage } from './useToast';
 
 interface UseSpaLanguageInput {
   user: CurrentUser | null;
   setUser: (user: CurrentUser) => void;
-  showMessage?: (type: 'success' | 'error', text: string) => void;
+  showMessage?: ShowMessage;
 }
 
 /**
  * Language state slice extracted from `SpaApp` so the shell stays thin.
- * Owns detection precedence (backend > localStorage > navigator > en),
+ * Owns detection precedence (backend > localStorage > navigator > en, see
+ * `lib/language`),
  * `<html lang>` sync, and the blocking manual-change flow.
  * Ported from Mail-Otter `useSpaLanguage` for Otter parity.
  */
@@ -39,16 +41,7 @@ function useSpaLanguage({ user, setUser, showMessage }: UseSpaLanguageInput) {
 
   useEffect(() => {
     if (!user || languagePendingRef.current) return;
-    const preferred = normalizeLanguage(
-      user.preferredLanguage ??
-        (() => {
-          try {
-            return localStorage.getItem(LANGUAGE_STORAGE_KEY);
-          } catch {
-            return null;
-          }
-        })(),
-    );
+    const preferred = detectLanguageForUser(user.preferredLanguage);
     let cancelled = false;
     setLanguageStatus('loading');
     loadLanguage(preferred)
