@@ -1,8 +1,10 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { WIZARD_STEP } from '../../lib/onboardingWizard';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
-import { getBtnPrimary, getBtnSuccess, getInputStyle, wizardStyles } from './wizardStyles';
+import WizardInput from './WizardInput';
+import { getBtnPrimary, getBtnSuccess, wizardStyles } from './wizardStyles';
 
 /**
  * Step 2: IAM credentials (extracted from `OnboardingWizard.tsx` god file).
@@ -12,47 +14,33 @@ export default function CredentialsStep({ wizard }: { wizard: OnboardingWizard }
   return (
     <div style={wizardStyles.card}>
       <div style={wizardStyles.cardInner}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>
-          {t('onboarding.storeCredentials', 'Store Credentials')}
-        </h3>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{t('onboarding.storeCredentials', 'Store Credentials')}</h3>
         <p className="text-sm" style={{ color: '#9ca3af' }}>
           {t('onboarding.credentialsStepHint', 'Enter IAM credentials. Validate first to confirm they work, then store them securely.')}
         </p>
-        <input
+        <WizardInput
           type="text"
           placeholder={t('admin.principalArnExample', 'Principal ARN (e.g., arn:aws:iam::123456789012:user/username)')}
           value={wizard.principalArn}
           onChange={(e) => wizard.setPrincipalArn(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'principalArn')}
-          onFocus={() => wizard.setFocusedInput('principalArn')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
-        <input
+        <WizardInput
           type="text"
           placeholder={t('admin.accessKeyPlaceholder', 'Access Key ID')}
           value={wizard.accessKeyId}
           onChange={(e) => wizard.setAccessKeyId(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'accessKeyId')}
-          onFocus={() => wizard.setFocusedInput('accessKeyId')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
-        <input
+        <WizardInput
           type="password"
           placeholder={t('admin.secretKeyPlaceholder', 'Secret Access Key')}
           value={wizard.secretAccessKey}
           onChange={(e) => wizard.setSecretAccessKey(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'secretAccessKey')}
-          onFocus={() => wizard.setFocusedInput('secretAccessKey')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
-        <input
+        <WizardInput
           type="password"
           placeholder={t('onboarding.sessionTokenPlaceholder', 'Session Token (optional)')}
           value={wizard.sessionToken}
           onChange={(e) => wizard.setSessionToken(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'sessionToken')}
-          onFocus={() => wizard.setFocusedInput('sessionToken')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
         {wizard.validationResult && (
           <p className="text-sm" style={{ color: '#4ade80' }}>
@@ -78,7 +66,9 @@ export default function CredentialsStep({ wizard }: { wizard: OnboardingWizard }
           </button>
           <button
             onClick={wizard.handleStoreCredentials}
-            disabled={wizard.isStoring || !wizard.credentialValidated || !wizard.principalArn || !wizard.accessKeyId || !wizard.secretAccessKey}
+            disabled={
+              wizard.isStoring || !wizard.credentialValidated || !wizard.principalArn || !wizard.accessKeyId || !wizard.secretAccessKey
+            }
             className="font-medium"
             style={getBtnSuccess(
               wizardStyles,
@@ -90,7 +80,7 @@ export default function CredentialsStep({ wizard }: { wizard: OnboardingWizard }
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
           <button
-            onClick={() => wizard.setStep(0)}
+            onClick={() => wizard.setStep(WIZARD_STEP.ACCOUNT)}
             className="font-medium"
             style={wizardStyles.btnSecondary}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
@@ -99,10 +89,10 @@ export default function CredentialsStep({ wizard }: { wizard: OnboardingWizard }
             {t('onboarding.back', 'Back')}
           </button>
           <button
-            onClick={() => wizard.setStep(2)}
-            disabled={!wizard.credentialStored}
+            onClick={wizard.goNext}
+            disabled={!wizard.canAdvance}
             className="font-medium"
-            style={getBtnSuccess(wizardStyles, !wizard.credentialStored)}
+            style={getBtnSuccess(wizardStyles, !wizard.canAdvance)}
           >
             {t('onboarding.next', 'Next')}
           </button>

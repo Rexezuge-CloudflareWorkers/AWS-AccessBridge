@@ -51,7 +51,7 @@ describe('CostService.getSummary currency', () => {
   });
 
   it('reports the shared currency when every account agrees', async () => {
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([row('111111111111', 1542.37), row('222222222222', 823.15)]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([row('111111111111', 1542.37), row('222222222222', 823.15)]);
 
     const summary = await service().getSummary('user@example.com');
 
@@ -67,7 +67,10 @@ describe('CostService.getSummary currency', () => {
     // currency declared from the first row alone would label a USD+EUR sum as
     // either one of them. `null` is the honest answer, and the client renders a
     // visibly-incomplete figure rather than a confident wrong symbol.
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([row('111111111111', 1542.37, 'USD'), row('222222222222', 823.15, 'EUR')]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([
+      row('111111111111', 1542.37, 'USD'),
+      row('222222222222', 823.15, 'EUR'),
+    ]);
 
     const summary = await service().getSummary('user@example.com');
 
@@ -79,7 +82,11 @@ describe('CostService.getSummary currency', () => {
 
   it('reports no currency when the disagreement appears late in the data', async () => {
     // Guards against a short-circuit that stops checking once it has decided.
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([row('111111111111', 1, 'USD'), row('222222222222', 1, 'USD'), row('333333333333', 1, 'JPY')]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([
+      row('111111111111', 1, 'USD'),
+      row('222222222222', 1, 'USD'),
+      row('333333333333', 1, 'JPY'),
+    ]);
 
     const summary = await service().getSummary('user@example.com');
 
@@ -87,7 +94,7 @@ describe('CostService.getSummary currency', () => {
   });
 
   it('reports no currency when the disagreement is only visible on a later row of one account', async () => {
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([row('111111111111', 1, 'USD'), row('111111111111', 2, 'GBP')]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([row('111111111111', 1, 'USD'), row('111111111111', 2, 'GBP')]);
 
     const summary = await service().getSummary('user@example.com');
 
@@ -95,7 +102,7 @@ describe('CostService.getSummary currency', () => {
   });
 
   it('reports no currency for an empty summary', async () => {
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([]);
 
     const summary = await service().getSummary('user@example.com');
 
@@ -103,7 +110,7 @@ describe('CostService.getSummary currency', () => {
   });
 
   it('still rounds the total and per-account costs', async () => {
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([row('111111111111', 0.1), row('111111111111', 0.2)]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([row('111111111111', 0.1), row('111111111111', 0.2)]);
 
     const summary = await service().getSummary('user@example.com');
 

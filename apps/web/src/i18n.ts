@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { LocaleUtil } from '@aws-access-bridge/shared';
+import { resolvePreferredLanguage } from './lib/language';
 import en from './locales/en/translation.json';
 
 export const SUPPORTED_LANGUAGES = ['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja', 'zh-CN', 'zh-TW', 'ko'] as const;
@@ -17,20 +18,40 @@ export function normalizeLanguage(tag: string | null | undefined): SupportedLang
   return LocaleUtil.normalize(tag);
 }
 
+/**
+ * The stored language choice, or `null` when there is none or storage is
+ * unavailable (private mode throws on access).
+ */
+export function readStoredLanguage(): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readNavigatorLanguage(): string | null {
+  try {
+    return typeof navigator === 'undefined' ? null : navigator.language;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The language before the profile has loaded: stored choice, then the browser's,
+ * then `en`. The precedence itself is `resolvePreferredLanguage` in `lib/language`.
+ */
 export function detectInitialLanguage(): SupportedLanguage {
-  try {
-    const stored = typeof localStorage === 'undefined' ? null : localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (stored) return normalizeLanguage(stored);
-  } catch {
-    // Ignore storage errors (private mode) and fall through.
-  }
-  try {
-    const nav = typeof navigator === 'undefined' ? null : navigator.language;
-    if (nav) return normalizeLanguage(nav);
-  } catch {
-    // Ignore and fall through to default.
-  }
-  return 'en';
+  return resolvePreferredLanguage({ stored: readStoredLanguage(), navigatorLanguage: readNavigatorLanguage() });
+}
+
+/**
+ * The language once the user is known: their saved backend preference wins, and
+ * the same stored/browser chain applies underneath it.
+ */
+export function detectLanguageForUser(backendPreference: string | null | undefined): SupportedLanguage {
+  return resolvePreferredLanguage({ backend: backendPreference, stored: readStoredLanguage(), navigatorLanguage: readNavigatorLanguage() });
 }
 
 const loadedLanguages = new Set<string>(['en']);

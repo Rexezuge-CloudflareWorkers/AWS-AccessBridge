@@ -1,4 +1,5 @@
 import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { AUDIT_MAX_PATH_LENGTH, AUDIT_MAX_USER_AGENT_LENGTH } from '@aws-access-bridge/shared/constants';
 
 interface AuditEventInput {
   /**
@@ -85,12 +86,14 @@ class AuditEventBuilder {
       userId: this.input.userId ?? null,
       action: this.input.action,
       method: this.input.method,
-      path: this.input.path,
+      // Capped: the path and UA are operator-controlled input, and an
+      // unbounded one would let a single request bloat the security log.
+      path: this.input.path.slice(0, AUDIT_MAX_PATH_LENGTH),
       statusCode: this.input.statusCode,
       resource: this.input.resource,
       detail: this.input.detail,
       ipAddress: this.input.ipAddress,
-      userAgent: this.input.userAgent,
+      userAgent: this.input.userAgent?.slice(0, AUDIT_MAX_USER_AGENT_LENGTH),
       logId: UUIDUtil.getRandomUUID(),
       timestamp: TimestampUtil.getCurrentUnixTimestampInSeconds(),
     };

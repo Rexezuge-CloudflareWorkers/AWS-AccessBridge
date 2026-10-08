@@ -20,19 +20,21 @@ class DynamoDbCollector extends BaseAwsCollector {
     // as `LastEvaluatedTableName`.
     const pages: DynamoDbListTablesResponse[] = await this.paginate<DynamoDbListTablesResponse>(
       async (token) => {
-        const page: DynamoDbListTablesResponse = await this.fetchJsonWithInit<DynamoDbListTablesResponse>(
+        const page: DynamoDbListTablesResponse = await this.fetchJson<DynamoDbListTablesResponse>(
           `https://dynamodb.${region}.amazonaws.com/`,
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-amz-json-1.1',
-              'X-Amz-Target': 'DynamoDB_20120810.ListTables',
+            accessKeys,
+            init: {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'DynamoDB_20120810.ListTables',
+              },
+              body: JSON.stringify(token ? { ExclusiveStartTableName: token } : {}),
             },
-            body: JSON.stringify(token ? { ExclusiveStartTableName: token } : {}),
+            region,
+            service: 'dynamodb',
           },
-          'dynamodb',
-          region,
-          accessKeys,
         );
         return { page, nextToken: page.LastEvaluatedTableName };
       },

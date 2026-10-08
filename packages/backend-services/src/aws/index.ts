@@ -13,6 +13,7 @@ export { LambdaCollector } from './collectors';
 export { RdsCollector } from './collectors';
 export { S3Collector } from './collectors';
 export { ConsoleService } from './console';
+export { FederationService } from './federate/FederationService';
 export { IamService } from './iam';
 export type { DiscoveredRole } from './iam';
 export { InternalRequestHelper } from './InternalRequestHelper';

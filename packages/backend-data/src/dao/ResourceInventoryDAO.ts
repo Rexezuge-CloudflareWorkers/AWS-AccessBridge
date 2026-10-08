@@ -2,6 +2,8 @@ import type { ResourceInventoryItem, ResourceInventoryItemInternal } from '@aws-
 import { LIKEUtil } from '../utils/LIKEUtil';
 import { BaseDAO } from './BaseDAO';
 import { ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
+import { ownerClause } from './AssumableRolesQueries';
+import type { AssumableRoleOwner } from './AssumableRolesDAO';
 
 class ResourceInventoryDAO extends BaseDAO {
   public async upsertResource(item: ResourceInventoryItem): Promise<void> {
@@ -42,19 +44,31 @@ class ResourceInventoryDAO extends BaseDAO {
     return result.meta?.changes ?? 0;
   }
 
+  /**
+   * Search the caller's reachable inventory.
+   *
+   * The account scope is a subquery on `assumable_roles` with the shared
+   * owner predicate, not a bound `IN (?,...)` list: the bound-parameter count
+   * D1 accepts caps how many accounts a caller can hold before the search
+   * fails outright, and binding the list also cost a round trip. An explicit
+   * `accountId` narrows further and reads as "no such account" when the
+   * subquery cannot reach it.
+   */
   public async searchResources(
-    accountIds: string[],
+    owner: AssumableRoleOwner,
     query?: string,
     resourceType?: string,
     limit: number = 50,
     offset: number = 0,
+    accountId?: string,
   ): Promise<{ items: ResourceInventoryItem[]; total: number }> {
-    if (accountIds.length === 0) return { items: [], total: 0 };
+    const conditions: string[] = [`aws_account_id IN (SELECT DISTINCT aws_account_id FROM assumable_roles ar WHERE ${ownerClause('ar')})`];
+    const bindings: unknown[] = [owner.userId, owner.anchorEmail];
 
-    const placeholders: string = accountIds.map(() => '?').join(',');
-    const conditions: string[] = [`aws_account_id IN (${placeholders})`];
-    const bindings: unknown[] = [...accountIds];
-
+    if (accountId) {
+      conditions.push('aws_account_id = ?');
+      bindings.push(accountId);
+    }
     if (resourceType) {
       conditions.push('resource_type = ?');
       bindings.push(resourceType);
@@ -84,14 +98,18 @@ class ResourceInventoryDAO extends BaseDAO {
     };
   }
 
-  public async getResourceCounts(accountIds: string[]): Promise<Record<string, Record<string, number>>> {
-    if (accountIds.length === 0) return {};
-    const placeholders: string = accountIds.map(() => '?').join(',');
+  public async getResourceCounts(owner: AssumableRoleOwner, accountId?: string): Promise<Record<string, Record<string, number>>> {
+    const conditions: string[] = [`aws_account_id IN (SELECT DISTINCT aws_account_id FROM assumable_roles ar WHERE ${ownerClause('ar')})`];
+    const bindings: unknown[] = [owner.userId, owner.anchorEmail];
+    if (accountId) {
+      conditions.push('aws_account_id = ?');
+      bindings.push(accountId);
+    }
     const results = await this.database
       .prepare(
-        `SELECT aws_account_id, resource_type, COUNT(*) as count FROM resource_inventory WHERE aws_account_id IN (${placeholders}) GROUP BY aws_account_id, resource_type`,
+        `SELECT aws_account_id, resource_type, COUNT(*) as count FROM resource_inventory WHERE ${conditions.join(' AND ')} GROUP BY aws_account_id, resource_type`,
       )
-      .bind(...accountIds)
+      .bind(...bindings)
       .all<{ aws_account_id: string; resource_type: string; count: number }>();
 
     const counts: Record<string, Record<string, number>> = {};

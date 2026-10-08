@@ -1,4 +1,3 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -145,4 +144,3 @@ interface GrantAccessResponse extends IResponse {
 type GrantAccessEnv = IAdminEnv;
 
 export { GrantAccessRoute };
-export type { GrantAccessRequest, GrantAccessResponse };

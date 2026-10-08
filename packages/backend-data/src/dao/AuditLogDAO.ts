@@ -4,18 +4,19 @@ import { BaseDAO } from './BaseDAO';
 
 import { assertD1Success } from '../utils/D1Utils';
 class AuditLogDAO extends BaseDAO {
-  public async create(
-    userEmail: string,
-    action: string,
-    method: string,
-    path: string,
-    statusCode: number,
-    resource?: string,
-    detail?: string,
-    ipAddress?: string,
-    userAgent?: string,
-    userId: string | null = null,
-  ): Promise<void> {
+  public async create(input: {
+    userEmail: string;
+    action: string;
+    method: string;
+    path: string;
+    statusCode: number;
+    resource?: string;
+    detail?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    userId?: string | null;
+  }): Promise<void> {
+    const { userEmail, action, method, path, statusCode, resource, detail, ipAddress, userAgent, userId = null } = input;
     const logId: string = UUIDUtil.getRandomUUID();
     const timestamp: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database
@@ -108,10 +109,12 @@ class AuditLogDAO extends BaseDAO {
     // Checked: `AbstractPruningTask` reads the returned count to decide whether
     // to loop, so a `{success: false}` result resolving as 0 rows made retention
     // log "pruned 0" and exit as a success while the table grew unbounded.
+    // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
+    // boundary is a rowid subquery with its own LIMIT instead.
     const result: D1Result = await this.withRetry(
       () =>
         this.database
-          .prepare('DELETE FROM audit_logs WHERE timestamp < ? LIMIT ?')
+          .prepare('DELETE FROM audit_logs WHERE rowid IN (SELECT rowid FROM audit_logs WHERE timestamp < ? LIMIT ?)')
           .bind(cutoffTimestamp, batchSize)
           .run(),
       'delete old audit logs',

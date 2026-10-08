@@ -1,8 +1,10 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { WIZARD_STEP } from '../../lib/onboardingWizard';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
-import { getBtnPrimary, getInputStyle, wizardStyles } from './wizardStyles';
+import WizardInput from './WizardInput';
+import { getBtnPrimary, wizardStyles } from './wizardStyles';
 
 /**
  * Step 3: credential chain (extracted from `OnboardingWizard.tsx` god file).
@@ -21,14 +23,11 @@ export default function ChainStep({ wizard }: { wizard: OnboardingWizard }) {
             'Enter the intermediate role ARN that the credentials from Step 2 will assume. Leave empty if no chain is needed.',
           )}
         </p>
-        <input
+        <WizardInput
           type="text"
           placeholder={t('onboarding.intermediatePlaceholder', 'Intermediate Role ARN (role that credentials from Step 2 will assume)')}
           value={wizard.intermediateRoleArn}
           onChange={(e) => wizard.setIntermediateRoleArn(e.target.value)}
-          style={getInputStyle(wizard.focusedInput, wizardStyles, 'intermediateRoleArn')}
-          onFocus={() => wizard.setFocusedInput('intermediateRoleArn')}
-          onBlur={() => wizard.setFocusedInput(null)}
         />
         {wizard.chainConfigured && (
           <p className="text-sm" style={{ color: '#4ade80' }}>
@@ -66,7 +65,7 @@ export default function ChainStep({ wizard }: { wizard: OnboardingWizard }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px' }}>
           <button
-            onClick={() => wizard.setStep(1)}
+            onClick={() => wizard.setStep(WIZARD_STEP.CREDENTIALS)}
             className="font-medium"
             style={wizardStyles.btnSecondary}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}
@@ -74,7 +73,7 @@ export default function ChainStep({ wizard }: { wizard: OnboardingWizard }) {
           >
             {t('onboarding.back', 'Back')}
           </button>
-          <button onClick={() => wizard.setStep(3)} className="font-medium" style={wizardStyles.btnSuccess}>
+          <button onClick={() => wizard.setStep(WIZARD_STEP.ROLES)} className="font-medium" style={wizardStyles.btnSuccess}>
             {t('onboarding.next', 'Next')}
           </button>
         </div>

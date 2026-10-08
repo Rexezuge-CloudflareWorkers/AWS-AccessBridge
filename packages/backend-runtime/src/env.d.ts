@@ -14,6 +14,14 @@ declare global {
     INTERNAL_REQUEST_HMAC_SECRET: SecretsStoreSecret;
     CRON_TASKS: DurableObjectNamespace;
     SELF: Fetcher;
+    // Rate limiting in front of the auth boundary on `/api/*`: every unauthenticated
+    // call used to cost a D1 audit write and a PAT lookup. Optional so local
+    // development without a configured namespace keeps working; the middleware
+    // treats an absent binding as fail-open, not as "allow everything forever".
+    AUTH_RATE_LIMITER?: RateLimit;
+    // The durable collection pipeline; CronTasksWorker fans one instance out per
+    // scheduled tick instead of walking regions and accounts inside the DO request.
+    COLLECTION_WORKFLOW?: Workflow;
     POLICY_AUD?: string;
     TEAM_DOMAIN?: string;
     DEV_AUTH_EMAIL?: string;

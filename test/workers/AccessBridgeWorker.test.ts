@@ -230,4 +230,53 @@ describe('AccessBridgeWorker', () => {
       expect(typeof body.email).toBe('string');
     });
   });
+
+  describe('scheduled', () => {
+    /**
+     * The cron fans into the `CRON_TASKS` Durable Object over its own fetch. A 202
+     * `already_running` means a tick was skipped; a run that wedges makes every
+     * tick answer that way, so the skip has to be visible at `warn`, not buried
+     * as an expected status.
+     */
+    async function runScheduled(status: number, body: string): Promise<void> {
+      const waited: Array<Promise<unknown>> = [];
+      const ctx = {
+        passThroughOnException: vi.fn(),
+        waitUntil: (promise: Promise<unknown>): void => {
+          waited.push(promise);
+        },
+      } as unknown as ExecutionContext;
+      const stub = { fetch: vi.fn().mockResolvedValue(new Response(body, { status })) };
+      const env = createEnv({ CRON_TASKS: { get: () => stub, idFromName: () => ({}) } as unknown as Env['CRON_TASKS'] });
+      await new AccessBridgeWorker().scheduled({ cron: '*/10 * * * *', noRetry: vi.fn(), scheduledTime: 1 }, env, ctx);
+      await Promise.all(waited);
+    }
+
+    it('logs a skipped (202 already_running) tick at warn level', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await runScheduled(202, '{"status":"already_running"}');
+      expect(warn).toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      warn.mockRestore();
+      error.mockRestore();
+    });
+
+    it('stays quiet on a completed run', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await runScheduled(200, '{"status":"completed"}');
+      expect(warn).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      warn.mockRestore();
+      error.mockRestore();
+    });
+
+    it('logs an error response at error level', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await runScheduled(500, '{"status":"failed"}');
+      expect(error).toHaveBeenCalled();
+      error.mockRestore();
+    });
+  });
 });

@@ -52,12 +52,12 @@ function idOf(account: AccountIdentity | null): string | null {
  * scope — a request that resolves the same address in several services pays for
  * it once.
  *
- * Addresses are matched EXACTLY against the registry. The registry is keyed on
- * the normalized address and migration 0032 deliberately never lowercases at
- * resolution time, so a pre-0032 mixed-case account (which has no registry row)
- * cannot be steered into another account's. Case-insensitive matching is
- * enforced where it matters instead: when an address is claimed, in
- * `setPrimaryEmail`.
+ * Addresses are matched case-insensitively against the registry (the registry
+ * lowercases its keys), so a mixed-case presentation of the same address
+ * resolves to the same account. A pre-0032 mixed-case account (which has no
+ * registry row) falls through to the `current_email` / anchor path and cannot
+ * be steered into another account's. Case-insensitive equality is also
+ * enforced when an address is claimed, in `setPrimaryEmail`.
  */
 class UserIdentityService {
   private readonly deps: Required<UserIdentityDeps>;
@@ -123,7 +123,12 @@ class UserIdentityService {
       // `retryable` flag intact. A raw `Error` is classified here rather than
       // wrapped blind: a busy or throttled database is retryable, and dropping the
       // verdict means the retry policy treats it as permanent.
-      throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve account: ${error instanceof Error ? error.message : String(error)}`, isD1ErrorRetryable(error instanceof Error ? error.message : String(error)));
+      throw error instanceof DatabaseError
+        ? error
+        : new DatabaseError(
+            `Failed to resolve account: ${error instanceof Error ? error.message : String(error)}`,
+            isD1ErrorRetryable(error instanceof Error ? error.message : String(error)),
+          );
     }
   }
 
@@ -142,13 +147,18 @@ class UserIdentityService {
     // A DAO that resolves to a non-promise is a test double, not the runtime.
     // Treat it as "no row" so an unstubbed registry degrades to the anchor path
     // instead of throwing a TypeError out of an `await`.
-    const registered = await Promise.resolve(userEmailDAO.get(email)).catch((error: unknown) => {
+    // Addresses are matched case-INSENSITIVELY against the registry: the
+    // registry stores normalized (lowercased) addresses, and Cloudflare Access
+    // does not guarantee the casing of the sign-in address, so an exact match
+    // would let `Alice@x.com` and `alice@x.com` resolve to two different
+    // outcomes for the same account.
+    const registered = await Promise.resolve(userEmailDAO.get(email.toLowerCase())).catch((error: unknown) => {
       // Registry absent on a database that has not run 0032. Not an outage.
       if (isMissingSchemaError(error)) return null;
       throw error;
     });
     if (registered) {
-      return registered.is_verified === 1 ? (await this.hydrate(registered.user_id)) : null;
+      return registered.is_verified === 1 ? await this.hydrate(registered.user_id) : null;
     }
 
     // No registry row. Migration 0032 backfilled a verified row for every
@@ -190,6 +200,14 @@ class UserIdentityService {
       throw error;
     });
     if (!row) return null;
+    // A row whose mutable address has moved away from the anchor may not
+    // authenticate through it: the anchor is frozen, and the registry is what
+    // revokes it. Falling through would let a *revoked* address keep signing
+    // in the account long after the account moved on. Rows whose anchor IS
+    // their current address resolve exactly as before.
+    if (row.current_email != null && row.current_email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      return null;
+    }
     // A row with no id is either a pre-0032 database or one of the ambiguous
     // mixed-case accounts 0032 left unresolved. Report the empty id rather than
     // a null account: the address still IS the identity in both cases, and a

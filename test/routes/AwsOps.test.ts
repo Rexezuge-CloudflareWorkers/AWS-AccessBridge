@@ -10,6 +10,7 @@ import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsD
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
+import { ForbiddenError } from '@aws-access-bridge/backend-errors';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');
@@ -91,7 +92,9 @@ describe('AssumeRoleRoute', () => {
     vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
     vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
     vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
-      return arn === pathed ? { principalArn: pathed, assumedBy: 'arn:aws:iam::123456789012:user/base' } : { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
+      return arn === pathed
+        ? { principalArn: pathed, assumedBy: 'arn:aws:iam::123456789012:user/base' }
+        : { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
     });
     vi.mocked(UserMetadataDAO.prototype.getOrCreateFederationUsername).mockResolvedValue('federated-user');
     vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockResolvedValue(undefined);
@@ -137,21 +140,50 @@ describe('FederateRoute', () => {
     vi.clearAllMocks();
   });
 
-  it('fans out to assume-role and console and redirects', async () => {
+  it('composes assume-role and console in process and redirects', async () => {
     vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
-    const assumeResponse = { ok: true, json: async () => ({ accessKeyId: 'A', secretAccessKey: 'S', sessionToken: 'T' }) };
-    const consoleResponse = { ok: true, json: async () => ({ url: 'https://signin.aws.amazon.com/login?x=1' }) };
-    vi.mocked(InternalRequestHelper.prototype.makeRequest)
-      .mockResolvedValueOnce(assumeResponse as Response)
-      .mockResolvedValueOnce(consoleResponse as Response);
+    vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockResolvedValue(undefined);
+    vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
+      return arn === PRINCIPAL
+        ? { principalArn: PRINCIPAL, assumedBy: 'arn:aws:iam::123456789012:user/base' }
+        : { principalArn: 'arn:aws:iam::123456789012:user/base', assumedBy: '', accessKeyId: 'AKIA', secretAccessKey: 'secret' };
+    });
+    vi.mocked(UserMetadataDAO.prototype.getOrCreateFederationUsername).mockResolvedValue('federated-user');
+    vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockResolvedValue(undefined);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue({
+      accessKeyId: 'A',
+      secretAccessKey: 'S',
+      sessionToken: 'T',
+      expiration: '2026-01-01T00:00:00Z',
+    });
+    vi.mocked(ConsoleService.prototype.getSigninToken).mockResolvedValue('signin-token');
     const c = createRouteContext({
       url: 'https://example.com/user/aws/federate?awsAccountId=123456789012&role=Dev',
       env: secretsEnv(),
     });
     await new FederateRoute({} as never).handle(c as never);
-    expect(InternalRequestHelper.prototype.makeRequest).toHaveBeenCalledTimes(2);
+    // One service call, not two HMAC-signed loopback fetches: the federation
+    // no longer serializes credentials through the network stack, and the
+    // audit trail holds one entry instead of three.
+    expect(InternalRequestHelper.prototype.makeRequest).not.toHaveBeenCalled();
+    expect(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).toHaveBeenCalledWith(expect.anything(), '123456789012', 'Dev');
+    expect(ConsoleService.prototype.getSigninToken).toHaveBeenCalledWith('A', 'S', 'T');
     expect(c.status).toHaveBeenCalledWith(302);
-    expect(c.header).toHaveBeenCalledWith('Location', 'https://signin.aws.amazon.com/login?x=1');
+    expect(c.header).toHaveBeenCalledWith('Location', expect.stringContaining('SigninToken=signin-token'));
+  });
+
+  it('answers 403 when the caller cannot assume the role', async () => {
+    vi.mocked(RoleConfigsDAO.prototype.getRoleConfig).mockResolvedValue(undefined);
+    vi.mocked(AssumableRolesDAO.prototype.verifyUserHasAccessToRole).mockRejectedValue(
+      new ForbiddenError('You do not have access to this role.'),
+    );
+    const c = createRouteContext({
+      url: 'https://example.com/user/aws/federate?awsAccountId=123456789012&role=Dev',
+      env: secretsEnv(),
+    });
+    await new FederateRoute({} as never).handle(c as never);
+    expect(ConsoleService.prototype.getSigninToken).not.toHaveBeenCalled();
+    expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Forbidden' }) }), 403);
   });
 
   it('rejects missing query parameters', async () => {

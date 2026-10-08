@@ -11,18 +11,18 @@ class AuditLogObserver implements IAuditObserver {
 
   public async notify(event: AuditEvent): Promise<void> {
     const dao: AuditLogDAO = new AuditLogDAO(this.database);
-    await dao.create(
-      event.userEmail,
-      event.action,
-      event.method,
-      event.path,
-      event.statusCode,
-      event.resource,
-      event.detail,
-      event.ipAddress,
-      event.userAgent,
-      event.userId ?? null,
-    );
+    await dao.create({
+      userEmail: event.userEmail,
+      action: event.action,
+      method: event.method,
+      path: event.path,
+      statusCode: event.statusCode,
+      resource: event.resource,
+      detail: event.detail,
+      ipAddress: event.ipAddress,
+      userAgent: event.userAgent,
+      userId: event.userId ?? null,
+    });
   }
 }
 

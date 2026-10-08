@@ -109,6 +109,8 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     app.use('/api/*', MiddlewareHandlers.noStore());
     app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/api/*', MiddlewareHandlers.activityAudit());
+    app.use('/user/*', MiddlewareHandlers.csrfProtection());
+    app.use('/api/*', MiddlewareHandlers.rateLimit());
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
     app.use('/api/*', MiddlewareHandlers.apiAuthentication());
 
@@ -248,7 +250,12 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
       cronTasksStub
         .fetch(cronTasksRequest)
         .then(async (response: Response): Promise<void> => {
-          if (!response.ok && response.status !== 202) {
+          if (response.status === 202) {
+            // A skipped tick is not an error, but a guard stuck on `already_running`
+            // for many consecutive ticks means the previous run wedged — that must
+            // be visible in logs rather than silent.
+            log.warn('CronTasksWorker skipped this tick (already running)', { status: response.status });
+          } else if (!response.ok) {
             log.error('CronTasksWorker returned an error response', { body: await response.text(), status: response.status });
           }
         })

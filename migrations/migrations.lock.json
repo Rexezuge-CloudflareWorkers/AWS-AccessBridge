@@ -4,6 +4,8 @@
   "migrations": {
     "0030_squash.sql": "sha256:5f8413f537af9edc43f2a58ef28449c4633fd269bc758db13dfee56f2154baf0",
     "0031_distinct_credential_ivs.sql": "sha256:470fcdc91d13dd0c027e7cb891b6de23b17073a87f0acda3d8f3879bcdc30e07",
-    "0032_user_identity.sql": "sha256:2b7388149ad158bbd8378f66c6f2d72e4fd55a2480ecbfbdf53f0ffa4e3942ba"
+    "0032_user_identity.sql": "sha256:2b7388149ad158bbd8378f66c6f2d72e4fd55a2480ecbfbdf53f0ffa4e3942ba",
+    "0033_collection_attempt_timestamps.sql": "sha256:f209727359003c26c201e9eb2a1557b090068c002e1317e3988a8f9647013f39",
+    "0034_pat_hashed_tokens.sql": "sha256:e8eb3791f35a91323575c98aa2b8134fc75ce3afd474d7688433635b13bf9cb5"
   }
 }

@@ -1,4 +1,5 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
+import type { createRemoteJWKSet as CreateRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
@@ -17,6 +18,32 @@ interface AccessIdentityContext {
   access?: {
     getIdentity: () => Promise<{ email?: string | null } | null>;
   };
+}
+
+/**
+ * One remote JWKS per team domain, cached process-wide. A fresh
+ * `createRemoteJWKSet` per request re-fetches the certs endpoint on every
+ * token verification — a needless dependency on the team domain's latency on
+ * the hot auth path.
+ */
+const jwksCache: Map<string, ReturnType<typeof CreateRemoteJWKSet>> = new Map();
+
+function remoteJwksFor(teamDomain: string): ReturnType<typeof CreateRemoteJWKSet> {
+  const url: string = `${teamDomain}/cdn-cgi/access/certs`;
+  let jwks = jwksCache.get(url);
+  if (!jwks) {
+    jwks = createRemoteJWKSet(new URL(url));
+    jwksCache.set(url, jwks);
+  }
+  return jwks;
+}
+
+/**
+ * Test-only: drop the memoized JWKS fetchers so a test re-pointing at a
+ * different certs endpoint does not inherit another test's cache.
+ */
+function resetJwksCacheForTests(): void {
+  jwksCache.clear();
 }
 
 class AccessAuthService {
@@ -40,15 +67,17 @@ class AccessAuthService {
       log.warn('Bypassing Cloudflare Access: DEV_AUTH_EMAIL is set. This is only safe outside production.');
       return this.env.DEV_AUTH_EMAIL;
     }
-    if (this.env.TEAM_DOMAIN && this.env.POLICY_AUD) {
-      return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+    const teamDomain: string | undefined = ConfigurationManager.auth.getTeamDomain(this.env);
+    const policyAud: string | undefined = ConfigurationManager.auth.getPolicyAud(this.env);
+    if (teamDomain && policyAud) {
+      return AccessAuthService.verifyAccessJwt(request, teamDomain, policyAud);
     }
     // No explicit JWT config: fall back to the platform-verified identity
     // (Worker-level Access). Required for same-account deploys that rely on
     // one-click Access instead of `POLICY_AUD`/`TEAM_DOMAIN` vars.
     const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
     const email = identity?.email;
-    return email || AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+    return email || AccessAuthService.verifyAccessJwt(request, teamDomain, policyAud);
   }
 
   public static async verifyAccessJwt(request: Request, teamDomain?: string, policyAud?: string): Promise<string> {
@@ -75,7 +104,7 @@ class AccessAuthService {
     }
 
     try {
-      const JWKS = createRemoteJWKSet(new URL(`${normalizedTeamDomain}/cdn-cgi/access/certs`));
+      const JWKS = remoteJwksFor(normalizedTeamDomain);
       const { payload } = await jwtVerify(token, JWKS, {
         issuer: normalizedTeamDomain,
         audience: normalizedPolicyAud,
@@ -87,8 +116,14 @@ class AccessAuthService {
       }
       return email;
     } catch (error) {
-      throw new UnauthorizedError(`JWT verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // The jose error text can name the expected issuer/audience or leak
+      // internals of the cert fetch — log it, but answer with a generic
+      // message so the client learns nothing about the verifier's config.
+      if (error instanceof UnauthorizedError) throw error;
+      log.warn('JWT verification failed:', { error: error instanceof Error ? error.message : error });
+      throw new UnauthorizedError('JWT verification failed.');
     }
   }
-}export { AccessAuthService };
+}
+export { AccessAuthService, resetJwksCacheForTests };
 export type { AccessAuthEnv, AccessIdentityContext };

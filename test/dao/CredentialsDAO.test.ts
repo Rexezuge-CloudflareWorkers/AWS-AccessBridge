@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
-import { DatabaseError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError, InternalServerError, NotFoundError } from '@aws-access-bridge/backend-errors';
 import { encryptData, generateAESGCMKey } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 /**
@@ -9,8 +9,18 @@ import { encryptData, generateAESGCMKey } from '@aws-access-bridge/backend-data/
  * fixture rows; production `encryptData` no longer accepts an IV.
  */
 async function encryptDataWithIv(data: string, keyBase64: string, ivBase64: string): Promise<{ encrypted: string }> {
-  const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, ['encrypt']);
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: Uint8Array.from(atob(ivBase64), (c) => c.codePointAt(0) ?? 0) }, key, new TextEncoder().encode(data));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: Uint8Array.from(atob(ivBase64), (c) => c.codePointAt(0) ?? 0) },
+    key,
+    new TextEncoder().encode(data),
+  );
   return { encrypted: btoa(String.fromCodePoint(...new Uint8Array(encrypted))) };
 }
 
@@ -37,9 +47,11 @@ describe('CredentialsDAO', () => {
   });
 
   describe('getCredentialByPrincipalArn', () => {
-    it('throws UnauthorizedError when credential not found', async () => {
+    // Not 401: the SPA treats a 401 as "your session ended" and bounces to the
+    // login page, which cannot fix a principal with no stored credentials.
+    it('throws NotFoundError when credential not found', async () => {
       const dao = new CredentialsDAO(mockDb, [masterKey], 3);
-      await expect(dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(UnauthorizedError);
+      await expect(dao.getCredentialByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(NotFoundError);
     });
 
     it('returns credential with decrypted fields when found without encryption', async () => {
@@ -75,7 +87,12 @@ describe('CredentialsDAO', () => {
       // of their plaintexts and the GCM auth subkey became recoverable.
       const key = await generateAESGCMKey();
       const dao = new CredentialsDAO(mockDb, [key], 3);
-      await dao.storeCredential('arn:aws:iam::123456789012:role/TestRole', 'AKIAIOSFODNN7EXAMPLE', 'wJalrXUtnFEMI/K7MDENG', 'session-token');
+      await dao.storeCredential(
+        'arn:aws:iam::123456789012:role/TestRole',
+        'AKIAIOSFODNN7EXAMPLE',
+        'wJalrXUtnFEMI/K7MDENG',
+        'session-token',
+      );
 
       const [, ...bound] = vi.mocked(mockStmt.bind).mock.calls[0] as unknown as string[];
       const [accessKeyId, secretAccessKey, sessionToken, ivA, ivB, ivC] = bound.slice(0, 6);
@@ -149,7 +166,9 @@ describe('CredentialsDAO', () => {
     it('stores a principal-to-parent relationship', async () => {
       const dao = new CredentialsDAO(mockDb, [masterKey], 3);
       await dao.storeCredentialRelationship('arn:aws:iam::123456789012:role/Child', 'arn:aws:iam::123456789012:user/Parent');
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR REPLACE'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by'),
+      );
       expect(mockStmt.bind).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/Child', 'arn:aws:iam::123456789012:user/Parent');
     });
 
@@ -176,9 +195,9 @@ describe('CredentialsDAO', () => {
   });
 
   describe('getCredentialChainByPrincipalArn', () => {
-    it('throws UnauthorizedError when first credential not found', async () => {
+    it('throws NotFoundError when first credential not found', async () => {
       const dao = new CredentialsDAO(mockDb, [masterKey], 3);
-      await expect(dao.getCredentialChainByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(UnauthorizedError);
+      await expect(dao.getCredentialChainByPrincipalArn('arn:aws:iam::123456789012:role/Missing')).rejects.toThrow(NotFoundError);
     });
 
     it('throws ForbiddenError for single-hop chain (just long-term creds)', async () => {

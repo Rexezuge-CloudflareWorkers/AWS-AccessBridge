@@ -1,6 +1,7 @@
 'use client';
 
 import { isUnauthorized } from './api';
+import { toErrorMessage } from './errors';
 
 /**
  * Why the app has no usable profile. The two cases look alike at the call site
@@ -29,10 +30,9 @@ type AuthOutcome = { kind: 'expired-session' } | { kind: 'load-failed'; reason: 
  * a generic string, and never leaks anything the caller did not already surface.
  */
 function classifyAuthFailure(error: unknown): AuthOutcome {
-  if (isUnauthorized(error)) {
-    return { kind: 'expired-session' };
-  }
-  return { kind: 'load-failed', reason: error instanceof Error && error.message ? error.message : 'Failed to load your profile.' };
+  return isUnauthorized(error)
+    ? { kind: 'expired-session' }
+    : { kind: 'load-failed', reason: toErrorMessage(error, 'Failed to load your profile.') };
 }
 
 export type { AuthOutcome };

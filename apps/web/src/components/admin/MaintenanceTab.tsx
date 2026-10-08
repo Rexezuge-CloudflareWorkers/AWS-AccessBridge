@@ -6,6 +6,7 @@ import { cleanupOrphaned, type CleanupOrphanedResult } from '../../services/admi
 import LoadingButton from '../ui/LoadingButton';
 import { cardStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
 
 const CLEANUP_ROW_LABELS: Array<{ key: keyof CleanupOrphanedResult['deletedCounts']; label: string }> = [
   { key: 'awsAccounts', label: 'aws_accounts' },
@@ -42,10 +43,13 @@ export default function MaintenanceTab({ showMessage }: { showMessage: ShowMessa
           }),
         );
       } else {
-        showMessage('success', t('admin.cleanupDone', 'Cleanup complete — {{count}} orphaned row(s) removed', { count: data.totalDeleted }));
+        showMessage(
+          'success',
+          t('admin.cleanupDone', 'Cleanup complete — {{count}} orphaned row(s) removed', { count: data.totalDeleted }),
+        );
       }
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.cleanupFailed', 'Failed to run cleanup'));
+      showMessage('error', toErrorMessage(err, t('admin.cleanupFailed', 'Failed to run cleanup')));
     }
   };
 

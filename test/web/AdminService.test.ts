@@ -29,7 +29,11 @@ The (url, method, parsed body) of the single request made.
 */
 function lastRequest(fetchMock: ReturnType<typeof vi.fn>): { url: string; method: string; body: Record<string, unknown> | undefined } {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-  return { url, method: init.method ?? 'GET', body: typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined };
+  return {
+    url,
+    method: init.method ?? 'GET',
+    body: typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined,
+  };
 }
 
 describe('adminService', () => {
@@ -47,11 +51,19 @@ describe('adminService', () => {
 
   it('maps each mutation to its route, method and body', async () => {
     await setAccountNickname('123456789012', 'Prod');
-    expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/account/nickname', method: 'PUT', body: { awsAccountId: '123456789012', nickname: 'Prod' } });
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/account/nickname',
+      method: 'PUT',
+      body: { awsAccountId: '123456789012', nickname: 'Prod' },
+    });
 
     vi.mocked(fetch).mockClear();
     await removeAccountNickname('123456789012');
-    expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/account/nickname', method: 'DELETE', body: { awsAccountId: '123456789012' } });
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/account/nickname',
+      method: 'DELETE',
+      body: { awsAccountId: '123456789012' },
+    });
 
     vi.mocked(fetch).mockClear();
     await storeCredentials('arn:role', 'AKID', 'SECRET', 'TOKEN');
@@ -67,7 +79,11 @@ describe('adminService', () => {
 
     vi.mocked(fetch).mockClear();
     await removeCredentialRelationship('arn:child');
-    expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/credentials/relationship', method: 'DELETE', body: { principalArn: 'arn:child' } });
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/credentials/relationship',
+      method: 'DELETE',
+      body: { principalArn: 'arn:child' },
+    });
   });
 
   it('omits the session token when validating long-lived credentials', async () => {
@@ -87,7 +103,9 @@ describe('adminService', () => {
     await expect(testCredentialChain('arn:role')).resolves.toEqual({ success: true, chain: [{ arn: 'arn:role', status: 'ok' }] });
 
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ roles: [{ roleName: 'Dev', arn: 'arn:role/Dev', description: 'dev' }] }));
-    await expect(discoverAccountRoles('arn:role')).resolves.toEqual({ roles: [{ roleName: 'Dev', arn: 'arn:role/Dev', description: 'dev' }] });
+    await expect(discoverAccountRoles('arn:role')).resolves.toEqual({
+      roles: [{ roleName: 'Dev', arn: 'arn:role/Dev', description: 'dev' }],
+    });
 
     // The route returns per-table counts plus a `failures` list, not a single
     // `deleted` number — `cleanupOrphanedData` settles each table independently
@@ -95,13 +113,29 @@ describe('adminService', () => {
     // previously asserted a `{deleted: 7}` shape that the route never produced.
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
-        deletedCounts: { awsAccounts: 1, roleConfigs: 2, teamAccounts: 1, spendAlerts: 1, costData: 1, resourceInventory: 1, dataCollectionConfig: 0 },
+        deletedCounts: {
+          awsAccounts: 1,
+          roleConfigs: 2,
+          teamAccounts: 1,
+          spendAlerts: 1,
+          costData: 1,
+          resourceInventory: 1,
+          dataCollectionConfig: 0,
+        },
         totalDeleted: 7,
         failures: [],
       }),
     );
     await expect(cleanupOrphaned()).resolves.toEqual({
-      deletedCounts: { awsAccounts: 1, roleConfigs: 2, teamAccounts: 1, spendAlerts: 1, costData: 1, resourceInventory: 1, dataCollectionConfig: 0 },
+      deletedCounts: {
+        awsAccounts: 1,
+        roleConfigs: 2,
+        teamAccounts: 1,
+        spendAlerts: 1,
+        costData: 1,
+        resourceInventory: 1,
+        dataCollectionConfig: 0,
+      },
       totalDeleted: 7,
       failures: [],
     });
@@ -112,7 +146,15 @@ describe('adminService', () => {
     // administrator which tables were missed rather than reporting success.
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
-        deletedCounts: { awsAccounts: 1, roleConfigs: 0, teamAccounts: 0, spendAlerts: 0, costData: 0, resourceInventory: 0, dataCollectionConfig: 0 },
+        deletedCounts: {
+          awsAccounts: 1,
+          roleConfigs: 0,
+          teamAccounts: 0,
+          spendAlerts: 0,
+          costData: 0,
+          resourceInventory: 0,
+          dataCollectionConfig: 0,
+        },
         totalDeleted: 1,
         failures: ['spend_alerts'],
       }),
@@ -122,16 +164,20 @@ describe('adminService', () => {
 
   it('flattens the spend alert id out of its envelope, tolerating a missing one', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ alert: { id: 'alert-1' } }));
-    await expect(createSpendAlert({ threshold: 100 })).resolves.toEqual({ id: 'alert-1' });
+    await expect(createSpendAlert({ awsAccountId: '123456789012', thresholdAmount: 100 })).resolves.toEqual({ id: 'alert-1' });
 
     // A 204 or an empty envelope must not throw on property access.
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}));
-    await expect(createSpendAlert({ threshold: 100 })).resolves.toEqual({});
+    await expect(createSpendAlert({ awsAccountId: '123456789012', thresholdAmount: 100 })).resolves.toEqual({});
   });
 
   it('sends access grants, revokes and role config with the right verbs', async () => {
     await grantAccess('u@e.com', '123456789012', 'Dev');
-    expect(lastRequest(vi.mocked(fetch))).toEqual({ url: '/user/admin/access', method: 'POST', body: { userEmail: 'u@e.com', awsAccountId: '123456789012', roleName: 'Dev' } });
+    expect(lastRequest(vi.mocked(fetch))).toEqual({
+      url: '/user/admin/access',
+      method: 'POST',
+      body: { userEmail: 'u@e.com', awsAccountId: '123456789012', roleName: 'Dev' },
+    });
 
     vi.mocked(fetch).mockClear();
     await revokeAccess('u@e.com', '123456789012', 'Dev');

@@ -35,12 +35,21 @@ class HMACHandler {
       throw new UnauthorizedError(HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS);
     }
 
+    // Strict shape first: `parseInt` would accept '1678886400000junk' or '1678...e12'
+    // fragments and compare them as numbers, and a lax parse is how a replay bypasses
+    // the window check. `Number.isFinite` guards the arithmetic after the shape check.
+    if (!/^\d{13}$/.test(timestamp)) {
+      throw new UnauthorizedError(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+    }
     const now: number = TimestampUtil.getCurrentUnixTimestampInMilliseconds(clock);
-    const requestTime: number = parseInt(timestamp);
-    if (Math.abs(now - requestTime) > ConfigurationManager.internal.getRequestTimeWindowMs(c.env)) {
+    const requestTime: number = Number(timestamp);
+    if (!Number.isFinite(requestTime) || Math.abs(now - requestTime) > ConfigurationManager.internal.getRequestTimeWindowMs(c.env)) {
       throw new UnauthorizedError(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
     }
 
+    // Body clone/hash and the secret fetch happen only after the timestamp is
+    // known-good: a badly shaped or stale request is rejected before any work
+    // that a forgery should not be able to make the worker do.
     const bodyHash: string = await hashBody(await c.req.raw.clone().text());
     // Sign the query string too. Without it a captured, validly signed request
     // stays valid after query parameters are appended, making the signature

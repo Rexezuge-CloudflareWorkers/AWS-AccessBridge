@@ -107,6 +107,22 @@ describe('createRequestScope', () => {
     await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['raw-key']);
   });
 
+  it('does NOT fall back to the raw var in production', async () => {
+    const scope = createRequestScope({
+      AccessBridgeDB: {},
+      ENVIRONMENT: 'production',
+      CREDENTIAL_ENCRYPTION_KEY: 'raw-key',
+      CREDENTIAL_CACHE_ENCRYPTION_KEY: 'raw-cache-key',
+    } as never);
+    await expect(scope.get(Tokens.CredentialKey)()).rejects.toThrow(InternalServerError);
+    await expect(scope.get(Tokens.CredentialCacheKey)()).rejects.toThrow(InternalServerError);
+  });
+
+  it('still reads the raw var outside production', async () => {
+    const scope = createRequestScope({ AccessBridgeDB: {}, ENVIRONMENT: 'development', CREDENTIAL_ENCRYPTION_KEY: 'raw-key' } as never);
+    await expect(scope.get(Tokens.CredentialKey)()).resolves.toEqual(['raw-key']);
+  });
+
   it('fails loudly when an encryption key is neither bound nor set as a var', async () => {
     const scope = createRequestScope({ AccessBridgeDB: {} } as never);
     await expect(scope.get(Tokens.CredentialKey)()).rejects.toThrow(InternalServerError);

@@ -1,6 +1,7 @@
 import { AssumableRolesDAO, AwsAccountsDAO, UserFavoriteAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
+import { ForbiddenError } from '@aws-access-bridge/backend-errors';
 import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
 import { LocaleUtil } from '@aws-access-bridge/shared/utils';
 import type { ServiceEnv } from '../composition/ServiceEnv';
@@ -85,9 +86,17 @@ class UserService {
   public async favoriteAccount(userEmail: string, awsAccountId: string): Promise<void> {
     const favoritesDAO: UserFavoriteAccountsDAO = new UserFavoriteAccountsDAO(this.env.AccessBridgeDB);
     const accountsDAO: AwsAccountsDAO = new AwsAccountsDAO(this.env.AccessBridgeDB);
+    const rolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
     const owner = await this.ownerFor(userEmail);
 
     await accountsDAO.ensureAccountExists(awsAccountId);
+    // Favouriting an account the caller cannot assume is a grant-shaped
+    // no-op: the row shows up in the list but can never be used. Require a
+    // real grant, and say so.
+    const roles: string[] = await rolesDAO.getRolesByUserAndAccount(owner, awsAccountId);
+    if (roles.length === 0) {
+      throw new ForbiddenError('You do not have access to this account.');
+    }
     await favoritesDAO.favoriteAccount(owner.anchorEmail, awsAccountId, owner.userId);
   }
 
@@ -127,7 +136,6 @@ class UserService {
     const owner = await this.ownerFor(userEmail);
     return assumableRolesDAO.searchAccountsByQuery(owner, query.trim(), showHidden);
   }
-
 }
 export { UserService };
 export type { AssumableListOptions, CurrentUser, UserServiceEnv };

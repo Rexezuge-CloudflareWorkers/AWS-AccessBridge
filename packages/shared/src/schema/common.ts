@@ -68,10 +68,9 @@ const AwsSessionTokenSchema = nonEmptyStringSchema('sessionToken', 8192).optiona
  * A legitimate console path never starts with a scheme — `ec2/home#Instances`,
  * `s3/buckets/<name>`, `lambda/home#/functions/<name>` — so nothing valid is lost.
  */
-const AwsDestinationPathSchema = nonEmptyStringSchema('destinationPath', 2048).refine(
-  (value: string): boolean => !/^[a-z][a-z0-9+.-]*:/i.test(value),
-  'destinationPath must be a console path, not a URL.',
-).optional();
+const AwsDestinationPathSchema = nonEmptyStringSchema('destinationPath', 2048)
+  .refine((value: string): boolean => !/^[a-z][a-z0-9+.-]*:/i.test(value), 'destinationPath must be a console path, not a URL.')
+  .optional();
 const AwsRegionSchema = z.string().regex(AWS_REGION_PATTERN, 'destinationRegion must be a valid AWS region.').optional();
 const AwsRoleSessionDurationSecondsSchema = z
   .number()
@@ -92,7 +91,6 @@ const BooleanQuerySchema = z.enum(['true', 'false']);
 export { AWS_ACCOUNT_ID_ERROR_MESSAGE, AWS_ACCOUNT_ID_PATTERN, isAwsAccountId } from '../utils/aws';
 export {
   AWS_IAM_PRINCIPAL_ARN_PATTERN,
-  AWS_REGION_PATTERN,
   AwsAccessKeyIdSchema,
   AwsAccountIdSchema,
   AwsDestinationPathSchema,

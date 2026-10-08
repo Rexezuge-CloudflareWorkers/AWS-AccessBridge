@@ -7,6 +7,7 @@ import {
 } from '@aws-access-bridge/shared/constants';
 import { Context, Next } from 'hono';
 import { HMACHandler } from './HMACHandler';
+import { csrfProtectionHandler, noStoreHandler, rateLimitHandler } from './RequestGuards';
 import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 
 import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
@@ -41,11 +42,11 @@ function exceptionBody(error: IServiceError): { Exception: { Type: string; Messa
 }
 
 async function validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
-  // A KV-backed guard would need to be resolved from the request scope, but that
-  // scope is not available on `*` — `hmacValidation` runs before any auth
-  // middleware. Constructed from the raw binding instead, and only for the
-  // internal surface.
-  await HMACHandler.validateInternalRequest(c, next, undefined, new ReplayGuard(c.env.AccessBridgeKV));
+  // The scope exists even on the `*` middleware path (the WeakMap is keyed on
+  // the Hono context), so the replay guard comes from the composition root like
+  // every other collaborator — one place for its TTL-vs-window invariant.
+  const replayGuard: ReplayGuard = getRequestScope(c).get(Tokens.ReplayGuard);
+  await HMACHandler.validateInternalRequest(c, next, undefined, replayGuard);
 }
 
 function hasInternalHeadersFor(headers: Headers): boolean {
@@ -61,7 +62,9 @@ async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   // Forward the Workers ExecutionContext so AccessAuthService can read the
   // platform-verified identity (`ctx.access`) when POLICY_AUD/TEAM_DOMAIN
   // are unset (Worker-level Access, same-account deploys).
-  return getRequestScope(c).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
+  return getRequestScope(c)
+    .get(Tokens.AccessAuthService)
+    .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
 }
 
 function isInternalRequest(c: RequestContext): boolean {
@@ -110,7 +113,15 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<void
     throw error;
   } finally {
     try {
-      const userEmail: string = c.get('AuthenticatedUserEmailAddress') || 'unknown';
+      const authenticatedEmail: string | undefined = c.get('AuthenticatedUserEmailAddress');
+      // A 401 with no authenticated principal is an unauthenticated request:
+      // recording each of them writes attacker-controlled "unknown" rows and
+      // turns the audit table into an amplification target. Genuine 401s after
+      // a successful handshake keep their entry.
+      if (statusCode === 401 && !authenticatedEmail) {
+        return;
+      }
+      const userEmail: string = authenticatedEmail || 'unknown';
       // The stable account id, so the entry stays findable after the account
       // changes address. Optional: a database without 0032 leaves it unset and
       // the entry is written address-keyed, exactly as before.
@@ -161,7 +172,11 @@ async function publishAccountId(c: RequestContext, userEmail: string): Promise<v
  * authenticate. The translation used to be copy-pasted across both, so a change
  * to either shape had to be made twice.
  */
-async function authenticateAndContinue(c: RequestContext, next: Next, authenticate: (context: RequestContext) => Promise<string>): Promise<Response | void> {
+async function authenticateAndContinue(
+  c: RequestContext,
+  next: Next,
+  authenticate: (context: RequestContext) => Promise<string>,
+): Promise<Response | void> {
   try {
     const userEmail: string = await authenticate(c);
     c.set('AuthenticatedUserEmailAddress', userEmail);
@@ -175,26 +190,6 @@ async function authenticateAndContinue(c: RequestContext, next: Next, authentica
   }
 }
 
-/**
- * Mark every response uncacheable.
- *
- * Registered FIRST on both surfaces, wrapping the rest of the chain. It awaits
- * `next()` and then sets the header, so it must sit outside any handler that can
- * return without calling `next()` — an authentication failure returns its JSON
- * directly, and a middleware registered after it would never run on that path.
- *
- * `/user/*` and `/api/*` answers carry AWS `SecretAccessKey`/`SessionToken`, a
- * 15-minute pre-authenticated console URL, and account and audit data — none of
- * which should survive in a shared cache or the browser's back/forward cache.
- */
-async function noStoreHandler(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
-  await next();
-  c.header('Cache-Control', 'no-store, max-age=0');
-  // Belt and braces for the redirect: a 302 whose `Location` carries a console
-  // token is itself the sensitive artefact.
-  c.header('Pragma', 'no-cache');
-}
-
 async function userAuthenticationHandler(c: RequestContext, next: Next): Promise<Response | void> {
   return authenticateAndContinue(c, next, authenticateUserIdentity);
 }
@@ -204,6 +199,10 @@ async function apiAuthenticationHandler(c: RequestContext, next: Next): Promise<
 }
 
 class MiddlewareHandlers {
+  public static csrfProtection(): (c: Context<{ Bindings: Env }>, next: Next) => Promise<Response | void> {
+    return csrfProtectionHandler;
+  }
+
   public static hmacValidation() {
     // eslint-disable-next-line unicorn/consistent-function-scoping -- middleware factory must return a closure capturing `this`
     return async (c: Context<{ Bindings: Env }>, next: Next): Promise<void> => {
@@ -223,6 +222,10 @@ class MiddlewareHandlers {
 
   public static noStore(): (c: Context<{ Bindings: Env }>, next: Next) => Promise<void> {
     return noStoreHandler;
+  }
+
+  public static rateLimit(): (c: Context<{ Bindings: Env }>, next: Next) => Promise<Response | void> {
+    return rateLimitHandler;
   }
 
   public static userAuthentication(): (c: RequestContext, next: Next) => Promise<Response | void> {

@@ -52,6 +52,29 @@
       },
     ],
   },
+  // Durable pipeline for the collection tasks. The cron DO no longer walks
+  // accounts and regions inside its own request: it starts one instance per
+  // scheduled tick, and each instance's steps are cached and retried by name.
+  "workflows": [
+    {
+      "name": "aws-access-bridge-collection",
+      "binding": "COLLECTION_WORKFLOW",
+      "class_name": "CollectionWorkflow",
+    },
+  ],
+  // One-minute windows at 120 calls per key: generous for an interactive
+  // client, tight enough that a script hammering an endpoint on an unknown key
+  // still hits the ceiling quickly. Keyed on CF-Connecting-IP in the middleware.
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 120,
+        "period": 60,
+      },
+    },
+  ],
   "migrations": [
     {
       "tag": "v1777211205",

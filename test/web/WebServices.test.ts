@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { listTeams, createTeam, addTeamMember, listTeamAccounts } from '@aws-access-bridge/web/services/teamsService';
+import {
+  addTeamAccount,
+  addTeamMember,
+  createTeam,
+  deleteTeam,
+  listTeamAccounts,
+  listTeamMembers,
+  listTeams,
+  removeTeamAccount,
+  removeTeamMember,
+  renameTeam,
+  updateTeamMemberRole,
+} from '@aws-access-bridge/web/services/teamsService';
 import { queryAuditLogs } from '@aws-access-bridge/web/services/auditService';
 import { setAccountNickname, testCredentialChain, cleanupOrphaned } from '@aws-access-bridge/web/services/adminService';
 
@@ -29,6 +41,44 @@ describe('web domain services', () => {
 
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ accountIds: ['123456789012'] }));
     await expect(listTeamAccounts('t1')).resolves.toEqual(['123456789012']);
+  });
+
+  it('teamsService sends every member and account mutation on its own verb', async () => {
+    const calls: Array<[string, RequestInit | undefined]> = [];
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push([input instanceof Request ? input.url : String(input), init]);
+      return jsonResponse({});
+    });
+
+    await deleteTeam('t1');
+    await renameTeam('t1', 'Blue');
+    await addTeamMember('t1', 'a@e.com', 'admin');
+    await removeTeamMember('t1', 'a@e.com');
+    await updateTeamMemberRole('t1', 'a@e.com', 'member');
+    await addTeamAccount('t1', '123456789012');
+    await removeTeamAccount('t1', '123456789012');
+
+    const verbs: string[] = calls.map(([, init]) => init?.method ?? 'GET');
+    expect(verbs).toEqual(['DELETE', 'PUT', 'POST', 'DELETE', 'PUT', 'POST', 'DELETE']);
+    expect(calls[2]?.[1]?.body).toContain('"role":"admin"');
+  });
+
+  it('teamsService tolerates a body without the list, rather than rendering undefined', async () => {
+    // A 204 or an unexpected envelope must read as an empty list, not crash the
+    // team view on `.map` of undefined.
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}));
+    await expect(listTeams()).resolves.toEqual([]);
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}));
+    await expect(listTeamMembers('t1')).resolves.toEqual([]);
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}));
+    await expect(listTeamAccounts('t1')).resolves.toEqual([]);
+  });
+
+  it('team list queries carry the team id, URL-encoded', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ members: [] }));
+    await listTeamMembers('team 1/../x');
+    const requested = vi.mocked(fetch).mock.calls[0]?.[0];
+    expect(requested instanceof Request ? requested.url : String(requested)).toContain('teamId=team%201%2F..%2Fx');
   });
 
   it('auditService queries with filters', async () => {

@@ -203,7 +203,7 @@ describe('useAccountMutations', () => {
       expect(showMessage).not.toHaveBeenCalled();
     });
 
-    it('appends rather than duplicating a role already hidden', async () => {
+    it('does not duplicate a role that is already in the hidden list', async () => {
       mocked.setRoleHidden.mockResolvedValue(undefined);
       const { result } = hook(true);
       seed(result, { '111111111111': { roles: ['Ops'], hiddenRoles: ['Dev'], favorite: false } });
@@ -212,7 +212,7 @@ describe('useAccountMutations', () => {
         await result.current.toggleHidden('111111111111', 'Dev', false);
       });
 
-      expect(result.current.rolesData['111111111111'].hiddenRoles).toEqual(['Dev', 'Dev']);
+      expect(result.current.rolesData['111111111111'].hiddenRoles).toEqual(['Dev']);
     });
   });
 
@@ -290,7 +290,11 @@ describe('useAccountMutations', () => {
         result.current.openConsole('111111111111', 'Dev');
       });
 
-      expect(globalThis.open).toHaveBeenCalledWith('/user/aws/federate?awsAccountId=111111111111&role=Dev', '_blank', 'noopener,noreferrer');
+      expect(globalThis.open).toHaveBeenCalledWith(
+        '/user/aws/federate?awsAccountId=111111111111&role=Dev',
+        '_blank',
+        'noopener,noreferrer',
+      );
     });
 
     it('reports a blocked popup instead of appearing to do nothing', () => {

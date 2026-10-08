@@ -1,4 +1,5 @@
 import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import type { RequestScopeEnvShape } from './tokens';
 
 /**
@@ -49,14 +50,19 @@ interface EncryptionBindings {
   varName: string;
 }
 
-function resolveKey({ binding, rawVar, bindingName, varName }: EncryptionBindings): KeyResolver {
+function resolveKey({ binding, rawVar, bindingName, varName }: EncryptionBindings, isProduction: boolean): KeyResolver {
   let pending: Promise<string> | undefined;
   return (): Promise<string> => {
     // The rejected promise is cached too, so a failing binding is not retried
     // once per lookup.
     pending ??= (async (): Promise<string> => {
       if (binding) return binding.get();
-      if (rawVar) return rawVar;
+      // The raw-var fallback exists for local dev and tests, where no Secrets
+      // Store is provisioned. In production it must never mask a missing
+      // binding: encrypting with a key that sits in plaintext env vars — or
+      // silently treating the two as interchangeable — is a different trust
+      // boundary entirely.
+      if (rawVar && !isProduction) return rawVar;
       throw new InternalServerError(`${bindingName} is not configured for this environment (set ${varName} for tests).`);
     })();
     return pending;
@@ -70,18 +76,25 @@ function createEncryptionKeys(env: RequestScopeEnvShape): {
   credentialKey: KeyResolver;
   credentialCacheKey: KeyResolver;
 } {
-  const credentialKey = resolveKey({
-    binding: env.CREDENTIAL_ENCRYPTION_KEY_SECRET,
-    rawVar: env.CREDENTIAL_ENCRYPTION_KEY,
-    bindingName: 'CREDENTIAL_ENCRYPTION_KEY_SECRET',
-    varName: 'CREDENTIAL_ENCRYPTION_KEY',
-  });
-  const credentialCacheKey = resolveKey({
-    binding: env.CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET,
-    rawVar: env.CREDENTIAL_CACHE_ENCRYPTION_KEY,
-    bindingName: 'CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET',
-    varName: 'CREDENTIAL_CACHE_ENCRYPTION_KEY',
-  });
+  const isProduction: boolean = ConfigurationManager.environment.isProduction(env);
+  const credentialKey = resolveKey(
+    {
+      binding: env.CREDENTIAL_ENCRYPTION_KEY_SECRET,
+      rawVar: env.CREDENTIAL_ENCRYPTION_KEY,
+      bindingName: 'CREDENTIAL_ENCRYPTION_KEY_SECRET',
+      varName: 'CREDENTIAL_ENCRYPTION_KEY',
+    },
+    isProduction,
+  );
+  const credentialCacheKey = resolveKey(
+    {
+      binding: env.CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET,
+      rawVar: env.CREDENTIAL_CACHE_ENCRYPTION_KEY,
+      bindingName: 'CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET',
+      varName: 'CREDENTIAL_CACHE_ENCRYPTION_KEY',
+    },
+    isProduction,
+  );
   return { credentialKey, credentialCacheKey };
 }
 

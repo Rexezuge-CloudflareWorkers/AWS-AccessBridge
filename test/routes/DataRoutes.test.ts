@@ -35,7 +35,7 @@ describe('cost routes', () => {
 
   it('GET /user/costs/summary aggregates account costs', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['123456789012']);
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([
       {
         awsAccountId: '123456789012',
         periodStart: '2025-01-01',
@@ -53,6 +53,7 @@ describe('cost routes', () => {
 
   it('GET /user/costs/summary returns empty for users without accounts', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue([]);
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([]);
     const c = createRouteContext({ url: 'https://example.com/user/costs/summary', env: userEnv() });
     await new GetCostSummaryRoute({} as never).handle(c);
     // `currency: null` — with no rows there is no currency to report, and the
@@ -87,7 +88,7 @@ describe('cost routes', () => {
 
   it('GET /user/costs/trends aggregates by month', async () => {
     vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['123456789012']);
-    vi.mocked(CostDataDAO.prototype.getCostDataForAccounts).mockResolvedValue([
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([
       {
         awsAccountId: '123456789012',
         periodStart: '2025-01-05',
@@ -126,7 +127,8 @@ describe('resource routes', () => {
       ],
       total: 1,
     });
-    vi.mocked(AssumableRolesDAO.prototype.getRolesByUserAndAccount).mockResolvedValue(['Dev']);
+    vi.mocked(AssumableRolesDAO.prototype.getRolesByOwner).mockResolvedValue([{ awsAccountId: '123456789012', roleName: 'Dev' }]);
+    vi.mocked(AssumableRolesDAO.prototype.getDistinctAccountIds).mockResolvedValue(['123456789012']);
     const c = createRouteContext({ url: 'https://example.com/user/resources?type=ec2&limit=50&offset=0', env: userEnv() });
     await new ListResourcesRoute({} as never).handle(c);
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ total: 1, rolesByAccount: { '123456789012': ['Dev'] } }));

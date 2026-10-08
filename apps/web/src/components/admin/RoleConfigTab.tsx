@@ -7,6 +7,12 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
+import { parsePositiveNumber } from '../../lib/numbers';
+
+// The route's bounds for `roleSessionDurationSeconds` (AWS's own limits).
+const MIN_SESSION_DURATION_SECONDS = 900;
+const MAX_SESSION_DURATION_SECONDS = 43_200;
 
 export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -24,6 +30,24 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
   const handleSetConfig = async () => {
     if (!isSetConfigValid) return;
 
+    // Blank means "not supplied". Anything else must be a usable duration: a
+    // typed `abc` would otherwise reach the API as `null` and a negative as-is.
+    const durationText = configForm.roleSessionDurationSeconds.trim();
+    const roleSessionDurationSeconds =
+      durationText === ''
+        ? undefined
+        : parsePositiveNumber(durationText, { integer: true, min: MIN_SESSION_DURATION_SECONDS, max: MAX_SESSION_DURATION_SECONDS });
+    if (roleSessionDurationSeconds === null) {
+      showMessage(
+        'error',
+        t('admin.sessionDurationInvalid', 'Role Session Duration must be a whole number of seconds between {{min}} and {{max}}.', {
+          min: MIN_SESSION_DURATION_SECONDS,
+          max: MAX_SESSION_DURATION_SECONDS,
+        }),
+      );
+      return;
+    }
+
     try {
       // Blank optional fields are omitted rather than sent empty: the route
       // distinguishes "not supplied" from "set to empty", so forwarding `''`
@@ -31,14 +55,12 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
       await setRoleConfig(configForm.awsAccountId, configForm.roleName, {
         ...(configForm.destinationPath && { destinationPath: configForm.destinationPath }),
         ...(configForm.destinationRegion && { destinationRegion: configForm.destinationRegion }),
-        ...(configForm.roleSessionDurationSeconds && {
-          roleSessionDurationSeconds: Number(configForm.roleSessionDurationSeconds),
-        }),
+        ...(roleSessionDurationSeconds !== undefined && { roleSessionDurationSeconds }),
       });
       showMessage('success', t('admin.roleConfigSet', 'Role configuration set successfully'));
       setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.roleConfigSetFailed', 'Failed to set role configuration'));
+      showMessage('error', toErrorMessage(err, t('admin.roleConfigSetFailed', 'Failed to set role configuration')));
     }
   };
 
@@ -50,7 +72,7 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
       showMessage('success', t('admin.roleConfigDeleted', 'Role configuration deleted successfully'));
       setConfigForm({ awsAccountId: '', roleName: '', destinationPath: '', destinationRegion: '', roleSessionDurationSeconds: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.roleConfigDeleteFailed', 'Failed to delete role configuration'));
+      showMessage('error', toErrorMessage(err, t('admin.roleConfigDeleteFailed', 'Failed to delete role configuration')));
     }
   };
 
@@ -60,10 +82,7 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
         {t('admin.manageRoleConfig', 'Manage Role Configurations')}
       </h3>
       <p style={{ color: '#d1d5db', marginBottom: '24px' }}>
-        {t(
-          'admin.roleConfigHint',
-          'Configure custom destination paths, regions, and session durations for AWS Console access.',
-        )}
+        {t('admin.roleConfigHint', 'Configure custom destination paths, regions, and session durations for AWS Console access.')}
       </p>
       <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} onSubmit={(e) => e.preventDefault()}>
         <FocusInput

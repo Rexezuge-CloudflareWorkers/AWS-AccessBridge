@@ -45,7 +45,9 @@ const ASSUMABLE_ROLES_FROM_JOIN = `FROM assumable_roles ar
 
 const ASSUMABLE_ROLES_ORDER_BY = `ORDER BY is_favorite DESC,
                    CASE WHEN aa.aws_account_nickname IS NOT NULL THEN 0 ELSE 1 END,
-                   COALESCE(aa.aws_account_nickname, ar.aws_account_id)`;
+                   COALESCE(aa.aws_account_nickname, ar.aws_account_id),
+                   ar.aws_account_id,
+                   ar.role_name`;
 
 const ASSUMABLE_ROLES_SELECT = `SELECT ar.aws_account_id, ar.role_name, ar.hidden, aa.aws_account_nickname,
                 CASE WHEN ufa.aws_account_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite`;
@@ -56,11 +58,28 @@ function hiddenFilterClause(showHidden: boolean): string {
 
 function buildListRolesQuery(showHidden: boolean): string {
   const hiddenFilter: string = hiddenFilterClause(showHidden);
+  // Paginate over a distinct-account subquery, not over role rows: one account
+  // with many roles used to consume the whole page and produce a map an
+  // account-keyed client could not render. The subquery carries the same
+  // favourites/nickname ordering as the outer row set so the page of accounts
+  // matches the rows it brings along.
   return `${ASSUMABLE_ROLES_SELECT}
           ${ASSUMABLE_ROLES_FROM_JOIN}
           WHERE ${ownerClause('ar')} ${hiddenFilter}
-          ${ASSUMABLE_ROLES_ORDER_BY}
-          LIMIT ? OFFSET ?`;
+            AND ar.aws_account_id IN (
+              SELECT ar2.aws_account_id
+              FROM assumable_roles ar2
+              LEFT JOIN aws_accounts aa2 ON ar2.aws_account_id = aa2.aws_account_id
+              LEFT JOIN user_favorite_accounts ufa2 ON ar2.aws_account_id = ufa2.aws_account_id AND ${ownerClause('ufa2')}
+              WHERE ${ownerClause('ar2')} ${hiddenFilter}
+              GROUP BY ar2.aws_account_id
+              ORDER BY MAX(CASE WHEN ufa2.aws_account_id IS NOT NULL THEN 1 ELSE 0 END) DESC,
+                       CASE WHEN MAX(aa2.aws_account_nickname) IS NOT NULL THEN 0 ELSE 1 END,
+                       COALESCE(MAX(aa2.aws_account_nickname), ar2.aws_account_id),
+                       ar2.aws_account_id
+              LIMIT ? OFFSET ?
+            )
+          ${ASSUMABLE_ROLES_ORDER_BY}`;
 }
 
 function buildSearchRolesQuery(showHidden: boolean): string {

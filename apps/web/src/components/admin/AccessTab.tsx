@@ -7,6 +7,7 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
 
 export default function AccessTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ export default function AccessTab({ showMessage }: { showMessage: ShowMessage })
       showMessage('success', t('admin.accessGranted', 'Access granted successfully'));
       setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.accessGrantFailed', 'Failed to grant access'));
+      showMessage('error', toErrorMessage(err, t('admin.accessGrantFailed', 'Failed to grant access')));
     }
   };
 
@@ -41,7 +42,7 @@ export default function AccessTab({ showMessage }: { showMessage: ShowMessage })
       showMessage('success', t('admin.accessRevoked', 'Access revoked successfully'));
       setAccessForm({ userEmail: '', awsAccountId: '', roleName: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.accessRevokeFailed', 'Failed to revoke access'));
+      showMessage('error', toErrorMessage(err, t('admin.accessRevokeFailed', 'Failed to revoke access')));
     }
   };
 

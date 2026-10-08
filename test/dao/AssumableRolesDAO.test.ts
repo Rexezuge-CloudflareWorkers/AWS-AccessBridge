@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
-import { DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError, ForbiddenError } from '@aws-access-bridge/backend-errors';
 
 // Migration 0032: user-keyed statements take the account id plus its frozen
 // anchor, rather than a bare address.
@@ -127,10 +127,18 @@ describe('AssumableRolesDAO', () => {
       await expect(dao.verifyUserHasAccessToRole(OWNER, '123456789012', 'AdminRole')).resolves.toBeUndefined();
     });
 
-    it('throws UnauthorizedError when user does not have access', async () => {
+    it('throws ForbiddenError when user does not have access', async () => {
       vi.mocked(mockStmt.first).mockResolvedValue(null);
       const dao = new AssumableRolesDAO(mockDb);
-      await expect(dao.verifyUserHasAccessToRole(OWNER, '123456789012', 'AdminRole')).rejects.toThrow(UnauthorizedError);
+      await expect(dao.verifyUserHasAccessToRole(OWNER, '123456789012', 'AdminRole')).rejects.toThrow(ForbiddenError);
+    });
+
+    it('does not interpolate the caller\u{2019}s anchor email into the no-grant message', async () => {
+      vi.mocked(mockStmt.first).mockResolvedValue(null);
+      const dao = new AssumableRolesDAO(mockDb);
+      const failure = await dao.verifyUserHasAccessToRole(OWNER, '123456789012', 'AdminRole').catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(ForbiddenError);
+      expect((failure as Error).message).not.toContain(OWNER.anchorEmail);
     });
   });
 

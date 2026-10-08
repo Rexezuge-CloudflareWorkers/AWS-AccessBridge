@@ -66,7 +66,14 @@ class CostExplorerClient {
     let nextPageToken: string | undefined;
 
     for (;;) {
-      const page: CostExplorerGetCostAndUsageResponse = await this.getCostAndUsagePage(accessKeys, startDate, endDate, granularity, region, nextPageToken);
+      const page: CostExplorerGetCostAndUsageResponse = await this.getCostAndUsagePage(
+        accessKeys,
+        startDate,
+        endDate,
+        granularity,
+        region,
+        nextPageToken,
+      );
       const timeResults: CostExplorerTimeResult[] = page.ResultsByTime ?? [];
       for (const result of timeResults) {
         this.accumulatePeriod(periods, result, startDate, endDate);
@@ -108,7 +115,12 @@ class CostExplorerClient {
    * earlier one and the stored period would carry only the last page's cost —
    * under-reporting spend while still looking like a complete record.
    */
-  private accumulatePeriod(periods: Map<string, AccumulatedPeriod>, result: CostExplorerTimeResult, startDate: string, endDate: string): void {
+  private accumulatePeriod(
+    periods: Map<string, AccumulatedPeriod>,
+    result: CostExplorerTimeResult,
+    startDate: string,
+    endDate: string,
+  ): void {
     const periodStart: string = result.TimePeriod?.Start ?? startDate;
     const periodEnd: string = result.TimePeriod?.End ?? endDate;
     const key: string = `${periodStart}|${periodEnd}`;
@@ -174,42 +186,10 @@ class CostExplorerClient {
     } catch (error: unknown) {
       // A malformed body would otherwise throw a raw `SyntaxError`, bypassing the
       // `IServiceError` taxonomy and the typed 4xx/5xx mapping the callers rely on.
-      throw new InternalServerError(`Cost Explorer returned a malformed response body: ${error instanceof Error ? error.message : 'unknown error'}`);
+      throw new InternalServerError(
+        `Cost Explorer returned a malformed response body: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
     }
-  }
-
-  private toResults(data: CostExplorerGetCostAndUsageResponse, startDate: string, endDate: string): CostExplorerResult[] {
-    const results: CostExplorerResult[] = [];
-    const resultsByTime: CostExplorerTimeResult[] = data.ResultsByTime ?? [];
-
-    for (const result of resultsByTime) {
-      const serviceBreakdown: Record<string, number> = {};
-      let totalCost = 0;
-      let currency = 'USD';
-      const groups: CostExplorerGroup[] = result.Groups ?? [];
-
-      for (const group of groups) {
-        const serviceName: string = group.Keys?.[0] ?? 'Unknown';
-        const amount: number = Number(group.Metrics?.UnblendedCost?.Amount ?? '0');
-        currency = group.Metrics?.UnblendedCost?.Unit ?? 'USD';
-        if (amount <= 0) {
-          continue;
-        }
-        serviceBreakdown[serviceName] = amount;
-        totalCost += amount;
-      }
-
-      results.push({
-        accountId: '',
-        periodStart: result.TimePeriod?.Start ?? startDate,
-        periodEnd: result.TimePeriod?.End ?? endDate,
-        totalCost: MoneyUtil.round(totalCost),
-        currency,
-        serviceBreakdown,
-      });
-    }
-
-    return results;
   }
 }
 

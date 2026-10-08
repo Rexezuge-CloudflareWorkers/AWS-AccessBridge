@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AccessKeyModal from './AccessKeyModal';
 import AccountRoleRow from './AccountRoleRow';
 import type { HideDialogInfo } from './AccountRoleRow';
 import HideRoleConfirmDialog from './HideRoleConfirmDialog';
 import Spinner from './ui/Spinner';
-import { isUnauthorized } from '../lib/api';
-import { useRequestGuard } from '../hooks/useRequestGuard';
+import { useResource } from '../hooks/useResource';
 import { useAccountMutations } from '../hooks/useAccountMutations';
 import { listAccounts } from '../services/accountService';
 import type { ShowMessage } from '../hooks/useToast';
@@ -25,37 +24,38 @@ interface AccountListProps {
 export default function AccountList({ showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, showMessage }: AccountListProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  // The search box and pagination both retrigger this fetch, so responses can
-  // arrive out of order and a slow earlier one would render under a newer query.
-  const { begin, isCurrent } = useRequestGuard();
   // Optimistic mutations and their loading state; see the hook for why the two
   // toggles roll back on failure.
-  const { rolesData, setRolesData, loadingKeys, loadingConsole, modalData, setModalData, toggleFavorite, toggleHidden, openAccessKeys, openConsole } =
-    useAccountMutations(showMessage, showHidden);
+  const {
+    rolesData,
+    setRolesData,
+    loadingKeys,
+    loadingConsole,
+    modalData,
+    setModalData,
+    toggleFavorite,
+    toggleHidden,
+    openAccessKeys,
+    openConsole,
+  } = useAccountMutations(showMessage, showHidden);
 
-  useEffect(() => {
-    const request = begin();
-    listAccounts({ showHidden, searchTerm, pageSize, currentPage })
-      .then(({ roles, total }) => {
-        if (!isCurrent(request)) return;
-        setRolesData(roles);
-        setTotalAccounts(total);
-        setExpanded(Object.fromEntries(Object.keys(roles).map((id) => [id, false])));
-        setError(null);
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (!isCurrent(request)) return;
-        if (isUnauthorized(err)) {
-          globalThis.location.reload();
-          return;
-        }
-        setError(err instanceof Error ? err.message : t('accounts.loadError', 'Failed to load AWS accounts'));
-        setIsLoading(false);
-      });
-  }, [showHidden, searchTerm, pageSize, currentPage, setTotalAccounts, t, begin, isCurrent]);
+  // The search box and pagination both change the fetcher, so responses can
+  // arrive out of order; the request guard inside `useResource` keeps a slow
+  // earlier one from rendering under a newer query. The list itself lives in
+  // `rolesData` because the optimistic mutations edit it.
+  const fetchAccounts = useCallback(
+    () => listAccounts({ showHidden, searchTerm, pageSize, currentPage }),
+    [showHidden, searchTerm, pageSize, currentPage],
+  );
+  const { error, isLoading } = useResource(fetchAccounts, {
+    errorFallback: t('accounts.loadError', 'Failed to load AWS accounts'),
+    reloadOnUnauthorized: true,
+    onSuccess: ({ roles, total }) => {
+      setRolesData(roles);
+      setTotalAccounts(total);
+      setExpanded(Object.fromEntries(Object.keys(roles).map((id) => [id, false])));
+    },
+  });
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));

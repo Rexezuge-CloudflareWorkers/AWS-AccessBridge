@@ -93,4 +93,3 @@ interface UpdateCurrentUserResponse extends IResponse {
 type UpdateCurrentUserEnv = IEnv;
 
 export { UpdateCurrentUserRoute };
-export type { UpdateCurrentUserRequest, UpdateCurrentUserResponse };

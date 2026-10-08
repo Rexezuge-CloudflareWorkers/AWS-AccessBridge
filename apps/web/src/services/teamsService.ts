@@ -1,18 +1,13 @@
+import type { Team, TeamMember } from '@aws-access-bridge/shared';
 import { apiRequest } from '../lib/api';
 
-interface Team {
-  teamId: string;
-  teamName: string;
-  createdBy: string;
-  createdAt: number;
-}
-
-interface TeamMember {
-  teamId: string;
-  userEmail: string;
-  role: string;
-  joinedAt: number;
-}
+/**
+ * `Team` and `TeamMember` are the shared model types, not local look-alikes. This
+ * file used to redeclare both with `role: string`, which widened the shared
+ * `'admin' | 'member'` to anything and meant a role the server would reject
+ * typechecked fine.
+ */
+type TeamRole = TeamMember['role'];
 
 async function listTeams(): Promise<Team[]> {
   const data = await apiRequest<{ teams: Team[] }>('/user/admin/teams', { method: 'GET' });
@@ -39,7 +34,7 @@ async function listTeamMembers(teamId: string): Promise<TeamMember[]> {
   return data.members ?? [];
 }
 
-async function addTeamMember(teamId: string, userEmail: string, role: string): Promise<void> {
+async function addTeamMember(teamId: string, userEmail: string, role: TeamRole): Promise<void> {
   await apiRequest<void>('/user/admin/team/member', { method: 'POST', body: { teamId, userEmail, role } });
 }
 
@@ -47,7 +42,7 @@ async function removeTeamMember(teamId: string, userEmail: string): Promise<void
   await apiRequest<void>('/user/admin/team/member', { method: 'DELETE', body: { teamId, userEmail } });
 }
 
-async function updateTeamMemberRole(teamId: string, userEmail: string, role: string): Promise<void> {
+async function updateTeamMemberRole(teamId: string, userEmail: string, role: TeamRole): Promise<void> {
   await apiRequest<void>('/user/admin/team/member/role', { method: 'PUT', body: { teamId, userEmail, role } });
 }
 
@@ -66,7 +61,7 @@ async function removeTeamAccount(teamId: string, awsAccountId: string): Promise<
   await apiRequest<void>('/user/admin/team/account', { method: 'DELETE', body: { teamId, awsAccountId } });
 }
 
-export type { Team, TeamMember };
+export type { TeamRole };
 export {
   addTeamAccount,
   addTeamMember,
@@ -80,3 +75,5 @@ export {
   renameTeam,
   updateTeamMemberRole,
 };
+
+export { type Team, type TeamMember } from '@aws-access-bridge/shared';

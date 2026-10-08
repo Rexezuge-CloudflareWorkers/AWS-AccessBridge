@@ -1,6 +1,7 @@
 'use client';
 
 import { paginationBtnStyle } from './theme';
+import { clampPage } from '../../lib/pagination';
 import { pageNumbers } from '../../lib/presentation';
 
 interface PaginationProps {
@@ -26,7 +27,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, vari
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
         <button
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          onClick={() => onPageChange(clampPage(currentPage - 1, totalPages))}
           disabled={currentPage === 1}
           className="text-sm"
           style={btn(currentPage === 1)}
@@ -37,7 +38,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, vari
           Page {currentPage} of {totalPages}
         </span>
         <button
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          onClick={() => onPageChange(clampPage(currentPage + 1, totalPages))}
           disabled={currentPage >= totalPages}
           className="text-sm"
           style={btn(currentPage >= totalPages)}
@@ -51,7 +52,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, vari
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <button
-        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        onClick={() => onPageChange(clampPage(currentPage - 1, totalPages))}
         disabled={currentPage === 1}
         className="text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
@@ -82,7 +83,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, vari
         </button>
       ))}
       <button
-        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        onClick={() => onPageChange(clampPage(currentPage + 1, totalPages))}
         disabled={currentPage === totalPages}
         className="text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed"
         style={{

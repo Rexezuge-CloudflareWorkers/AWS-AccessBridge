@@ -53,10 +53,13 @@ describe('search DAOs bind an escaped LIKE pattern', () => {
 
   it('ResourceInventoryDAO escapes the search term and declares ESCAPE', async () => {
     const { db, bindings } = capturingDb();
-    await new ResourceInventoryDAO(db).searchResources(['123456789012'], '100%');
+    await new ResourceInventoryDAO(db).searchResources({ userId: 'usr_1', anchorEmail: 'u@e.com' }, '100%');
     const bound = bindings().flat();
     expect(bound).toContain(String.raw`%100\%%`);
-    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => sql).join('\n');
+    const sql = vi
+      .mocked(db.prepare)
+      .mock.calls.map(([sql]) => sql)
+      .join('\n');
     expect(sql).toContain(String.raw`ESCAPE '\'`);
   });
 
@@ -65,7 +68,10 @@ describe('search DAOs bind an escaped LIKE pattern', () => {
     await new AssumableRolesDAO(db).searchAccountsByQuery({ userId: 'usr_1', anchorEmail: 'user@example.com' }, 'a_b');
     const bound = bindings().flat();
     expect(bound).toContain(String.raw`%a\_b%`);
-    const sql = vi.mocked(db.prepare).mock.calls.map(([sql]) => sql).join('\n');
+    const sql = vi
+      .mocked(db.prepare)
+      .mock.calls.map(([sql]) => sql)
+      .join('\n');
     expect(sql).toContain(String.raw`ESCAPE '\'`);
   });
 });

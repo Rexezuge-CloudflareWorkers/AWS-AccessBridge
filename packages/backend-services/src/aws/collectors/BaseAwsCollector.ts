@@ -4,7 +4,7 @@ import type { AwsClientFactory, AwsSignedClient } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import type { CollectorSweepResult, IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log, toErrorMessage } from '@aws-access-bridge/shared/utils';
 /**
  * Region recorded for a global service's resources, so they are distinguishable
  * from a regional resource in `us-east-1`.
@@ -16,8 +16,9 @@ const GLOBAL_REGION = 'global';
  *
  * Not a correctness limit — every service here finishes in a handful of pages at
  * its own page size. It exists so a service that keeps returning a token fails
- * fast inside the request instead of running until the wall-clock limit, and the
- * truncation is logged rather than silent.
+ * fast inside the request instead of running until the wall-clock limit. Hitting
+ * it **throws**: a partial list is not an answer, and a caller that pruned on one
+ * would delete the unread remainder.
  */
 const MAX_COLLECTION_PAGES = 50;
 
@@ -35,6 +36,19 @@ const MAX_COLLECTION_PAGES = 50;
  * caller's job — `ResourceInventoryCollectionTask` catches per collector and
  * skips pruning for every type that failed.
  */
+/**
+ * What a JSON collector call needs besides the URL.
+ *
+ * `init` carries the method, headers and body for a service that needs POST plus
+ * its own headers (DynamoDB's JSON protocol); omit it for a bare GET.
+ */
+interface CollectorJsonRequest {
+  accessKeys: AccessKeys;
+  init?: RequestInit;
+  region: string;
+  service: string;
+}
+
 abstract class BaseAwsCollector implements IAwsResourceCollector {
   public abstract readonly resourceType: string;
   protected readonly clientFactory: AwsClientFactory;
@@ -83,15 +97,13 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
     }
 
     const settled: Array<{ items: ResourceDiscoveryItem[]; region: string; reason?: string }> = await Promise.all(
-      regions.map(
-        async (region: string): Promise<{ items: ResourceDiscoveryItem[]; region: string; reason?: string }> => {
-          try {
-            return { items: await this.collect(accessKeys, region), region };
-          } catch (error: unknown) {
-            return { items: [], reason: error instanceof Error ? error.message : String(error), region };
-          }
-        },
-      ),
+      regions.map(async (region: string): Promise<{ items: ResourceDiscoveryItem[]; region: string; reason?: string }> => {
+        try {
+          return { items: await this.collect(accessKeys, region), region };
+        } catch (error: unknown) {
+          return { items: [], reason: toErrorMessage(error), region };
+        }
+      }),
     );
 
     const result: CollectorSweepResult = { failedRegions: [], items: [], succeededRegions: [] };
@@ -128,21 +140,26 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
 
   /**
   Signed request, returning the response body as JSON. Throws on non-OK or a malformed body.
-  */
-  protected fetchJson<T>(url: string, service: string, region: string, accessKeys: AccessKeys, init?: RequestInit): Promise<T> {
-    return this.parseJson<T>(() => this.send(url, service, region, accessKeys, init), service, region);
-  }
 
-  /**
-  As `fetchJson`, but for a service that needs POST plus its own headers (DynamoDB's JSON protocol).
+  * One method for every JSON caller. It used to be two (`fetchJson` and
+  * `fetchJsonWithInit`) with the same logic and different parameter orders,
+  * which is exactly the kind of pair where a fix lands in one half.
   */
-  protected fetchJsonWithInit<T>(url: string, init: RequestInit, service: string, region: string, accessKeys: AccessKeys): Promise<T> {
-    return this.parseJson<T>(async () => {
-      const client = this.clientFactory({ service, region, keys: accessKeys });
-      const response: Response = await client.fetch(url, init);
-      this.assertOk(response, service, region);
-      return response;
-    }, service, region);
+  protected async fetchJson<T>(url: string, options: CollectorJsonRequest): Promise<T> {
+    const { accessKeys, init, region, service } = options;
+    const response: Response = await this.send(url, service, region, accessKeys, init);
+    try {
+      return await response.json();
+    } catch (error: unknown) {
+      // A malformed body is a failure, not an empty result: letting the
+      // `SyntaxError` escape would bypass the `IServiceError` taxonomy and the
+      // caller would prune the type it just failed to read.
+      throw new AwsCollectionError(
+        `${this.resourceType} collection returned a malformed JSON body from ${service}.${region}: ${toErrorMessage(error)}`,
+        response.status,
+        this.resourceType,
+      );
+    }
   }
 
   /**
@@ -165,7 +182,9 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
    *
    * A non-OK response still throws, so a denied region or a throttled page is a
    * failure rather than a short list, and the caller's existing "denied is not
-   * empty" rule still holds.
+   * empty" rule still holds. So does a walk that cannot finish — `MAX_COLLECTION_PAGES`
+   * reached or a repeated token throws `AwsCollectionError` instead of returning the
+   * pages read so far.
    */
   protected async paginate<TPage>(
     fetchPage: (token: string | undefined) => Promise<{ page: TPage; nextToken: string | undefined }>,
@@ -187,12 +206,13 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
         break;
       }
       // A service that keeps handing back tokens would otherwise loop until the
-      // request's own wall-clock limit. Stop with what was read and say so —
-      // truncating loudly beats hanging, and beats silently treating a partial
-      // read as the whole list.
+      // request's own wall-clock limit. Stop — but by *failing*: returning the
+      // pages read so far would let `collectAllRegions` count this region as a
+      // success, and the task would then prune everything beyond them.
       if (pageCount >= MAX_COLLECTION_PAGES || seenTokens.has(nextToken)) {
-        log.error(`${this.resourceType} collection from ${service}.${region} stopped after ${pageCount} page(s) without exhausting its pagination; returning a partial list.`);
-        break;
+        const message = `${this.resourceType} collection from ${service}.${region} stopped after ${pageCount} page(s) without exhausting its pagination; refusing to return a partial list.`;
+        log.error(message);
+        throw new AwsCollectionError(message, 200, this.resourceType);
       }
       seenTokens.add(nextToken);
       token = nextToken;
@@ -210,22 +230,6 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
     return response;
   }
 
-  private async parseJson<T>(send: () => Promise<Response>, service: string, region: string): Promise<T> {
-    const response: Response = await send();
-    try {
-      return (await response.json());
-    } catch (error: unknown) {
-      // A malformed body is a failure, not an empty result: letting the
-      // `SyntaxError` escape would bypass the `IServiceError` taxonomy and the
-      // caller would prune the type it just failed to read.
-      throw new AwsCollectionError(
-        `${this.resourceType} collection returned a malformed JSON body from ${service}.${region}: ${error instanceof Error ? error.message : 'unknown error'}`,
-        response.status,
-        this.resourceType,
-      );
-    }
-  }
-
   private assertOk(response: Response, service: string, region: string): void {
     if (response.ok) {
       return;
@@ -240,3 +244,4 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
 }
 
 export { BaseAwsCollector };
+export type { CollectorJsonRequest };

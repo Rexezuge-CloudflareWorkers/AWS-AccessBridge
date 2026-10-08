@@ -22,7 +22,8 @@ describe('UserEmailDAO', () => {
   beforeEach(() => {
     mockStmt = {
       bind: vi.fn().mockReturnThis(),
-      run: vi.fn().mockResolvedValue({ success: true }),
+      // `meta.changes` is how the DAO tells a written row from a lost race.
+      run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } }),
       first: vi.fn().mockResolvedValue(null),
       all: vi.fn().mockResolvedValue({ results: [] }),
       raw: vi.fn(),
@@ -46,8 +47,10 @@ describe('UserEmailDAO', () => {
       await expect(dao.register({ email: 'Alice@Example.com', userId: 'usr_abc', isVerified: true, now: 100 })).resolves.toBe('claimed');
 
       expect(mockStmt.bind).toHaveBeenCalledWith('alice@example.com', 'usr_abc', 1, 100);
-      // The upsert is what releases a previously-revoked address.
+      // The upsert is what releases a previously-revoked address, and it is
+      // conditional: only an UNVERIFIED row may be re-pointed.
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE user_emails.is_verified = 0'));
     });
 
     it('stores is_verified as 0/1 rather than a boolean', async () => {
@@ -56,13 +59,15 @@ describe('UserEmailDAO', () => {
       expect(mockStmt.bind).toHaveBeenCalledWith('alice@example.com', 'usr_abc', 0, 100);
     });
 
-    it("refuses to re-point an address another account already holds", async () => {
+    it('refuses to re-point an address another account already holds', async () => {
       // The core safety property. Silently re-pointing would let one account
       // authenticate as another the moment the address was claimed.
       vi.mocked(mockStmt.first).mockResolvedValue(existing({ user_id: 'usr_other' }));
       const dao = new UserEmailDAO(mockDb);
 
-      await expect(dao.register({ email: 'alice@example.com', userId: 'usr_new', isVerified: true, now: 100 })).resolves.toBe('already-claimed');
+      await expect(dao.register({ email: 'alice@example.com', userId: 'usr_new', isVerified: true, now: 100 })).resolves.toBe(
+        'already-claimed',
+      );
 
       // No write at all — not merely a write that is later rolled back.
       expect(mockStmt.run).not.toHaveBeenCalled();
@@ -97,7 +102,9 @@ describe('UserEmailDAO', () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'disk full' } as unknown as D1Result);
       const dao = new UserEmailDAO(mockDb);
 
-      await expect(dao.register({ email: 'alice@example.com', userId: 'usr_abc', isVerified: true, now: 1 })).rejects.toThrow(DatabaseError);
+      await expect(dao.register({ email: 'alice@example.com', userId: 'usr_abc', isVerified: true, now: 1 })).rejects.toThrow(
+        DatabaseError,
+      );
       await expect(dao.register({ email: 'alice@example.com', userId: 'usr_abc', isVerified: true, now: 1 })).rejects.toThrow(/disk full/);
     });
   });
@@ -151,7 +158,9 @@ describe('UserEmailDAO', () => {
       const dao = new UserEmailDAO(mockDb);
       await dao.revokeAllVerified('usr_abc', 'New@Example.com');
 
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?'),
+      );
       expect(mockStmt.bind).toHaveBeenCalledWith('usr_abc', 'new@example.com');
     });
 

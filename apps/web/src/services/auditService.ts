@@ -1,16 +1,12 @@
+import type { AuditLog } from '@aws-access-bridge/shared';
 import { apiRequest } from '../lib/api';
 
-interface AuditLogEntry {
-  logId: string;
-  userEmail: string;
-  action: string;
-  method: string;
-  path: string;
-  statusCode: number;
-  resource?: string;
-  detail?: string;
-  timestamp: number;
-}
+/**
+ * The shared model type, not a local copy: the service used to declare a subset
+ * (no `ipAddress` / `userAgent`) and `AuditLogsTab` a second full one, so a field
+ * added to the route's response had two places to be forgotten.
+ */
+type AuditLogEntry = AuditLog;
 
 interface AuditLogsResult {
   logs: AuditLogEntry[];

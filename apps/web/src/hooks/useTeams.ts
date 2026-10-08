@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRequestGuard } from './useRequestGuard';
+import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { afterSuccess } from '../lib/asyncAction';
+import { useResource } from './useResource';
 import {
   addTeamAccount,
   addTeamMember,
@@ -16,6 +18,7 @@ import {
   updateTeamMemberRole,
   type Team,
   type TeamMember,
+  type TeamRole,
 } from '../services/teamsService';
 
 interface UseTeamsResult {
@@ -28,208 +31,112 @@ interface UseTeamsResult {
   accountsLoading: boolean;
   selectTeam: (teamId: string | null) => void;
   refreshTeams: () => Promise<void>;
-  refreshMembers: (teamId: string) => Promise<void>;
-  refreshAccounts: (teamId: string) => Promise<void>;
+  /**
+   * Re-reads the *selected* team's members; resolves at once with nothing selected.
+   */
+  refreshMembers: () => Promise<void>;
+  /**
+   * Re-reads the *selected* team's accounts; resolves at once with nothing selected.
+   */
+  refreshAccounts: () => Promise<void>;
   createTeam: (teamName: string) => Promise<Team>;
   deleteTeam: (teamId: string) => Promise<void>;
   renameTeam: (teamId: string, teamName: string) => Promise<void>;
-  addMember: (teamId: string, userEmail: string, role: string) => Promise<void>;
+  addMember: (teamId: string, userEmail: string, role: TeamRole) => Promise<void>;
   removeMember: (teamId: string, userEmail: string) => Promise<void>;
-  updateMemberRole: (teamId: string, userEmail: string, role: string) => Promise<void>;
+  updateMemberRole: (teamId: string, userEmail: string, role: TeamRole) => Promise<void>;
   addAccount: (teamId: string, awsAccountId: string) => Promise<void>;
   removeAccount: (teamId: string, awsAccountId: string) => Promise<void>;
 }
 
+// Module-level so the "no data yet" answer keeps one identity across renders.
+const NO_TEAMS: Team[] = [];
+const NO_MEMBERS: TeamMember[] = [];
+const NO_ACCOUNTS: string[] = [];
+
 /**
  * Teams domain hook (vertical slice). Previously `TeamsTab.tsx` (579
  * lines) held 11× `apiCall`, 10+ `useState`, and all CRUD inline.
+ *
+ * Three `useResource`s carry the reads. The members and accounts fetchers are
+ * keyed on the selected team, which is what makes switching teams safe: a new
+ * selection is a new fetcher, so the slower earlier request is retired by the
+ * request guard inside `useResource` rather than rendering team A's members under
+ * team B. A `null` selection is a `null` fetcher, which clears the data and
+ * retires anything in flight.
+ *
+ * A failed *read* reaches `onError` as a toast. A failed *mutation* is not caught
+ * here — it rejects to the caller, which toasts it.
  */
 function useTeams(onError: (message: string) => void): UseTeamsResult {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { t } = useTranslation();
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [accounts, setAccounts] = useState<string[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [accountsLoading, setAccountsLoading] = useState(false);
-  const onErrorRef = useRef(onError);
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
-  // Switching teams quickly fires overlapping requests, and without a guard the
-  // slower earlier one can resolve last and render the previously-selected
-  // team's members/accounts under the new selection.
-  const membersGuard = useRequestGuard();
-  const accountsGuard = useRequestGuard();
+  // `useResource` also passes the raw error, which a toast has no use for.
+  const reportError = (message: string): void => onError(message);
 
-  const refreshTeams = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      setTeams(await listTeams());
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to load teams');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onError]);
+  const teamsResource = useResource(listTeams, {
+    errorFallback: t('teams.loadError', 'Failed to load teams'),
+    onError: reportError,
+  });
 
-  const refreshMembers = useCallback(
-    async (teamId: string) => {
-      const request = membersGuard.begin();
-      setMembersLoading(true);
-      try {
-        const result = await listTeamMembers(teamId);
-        if (membersGuard.isCurrent(request)) {
-          setMembers(result);
-        }
-      } catch (err) {
-        if (membersGuard.isCurrent(request)) {
-          onError(err instanceof Error ? err.message : 'Failed to load members');
-        }
-      } finally {
-        if (membersGuard.isCurrent(request)) {
-          setMembersLoading(false);
-        }
-      }
-    },
-    [onError, membersGuard],
-  );
+  const membersFetcher = useMemo(() => (selectedTeamId ? () => listTeamMembers(selectedTeamId) : null), [selectedTeamId]);
+  const membersResource = useResource(membersFetcher, {
+    errorFallback: t('teams.membersLoadFailed', 'Failed to load members'),
+    onError: reportError,
+  });
 
-  const refreshAccounts = useCallback(
-    async (teamId: string) => {
-      const request = accountsGuard.begin();
-      setAccountsLoading(true);
-      try {
-        const result = await listTeamAccounts(teamId);
-        if (accountsGuard.isCurrent(request)) {
-          setAccounts(result);
-        }
-      } catch (err) {
-        if (accountsGuard.isCurrent(request)) {
-          onError(err instanceof Error ? err.message : 'Failed to load accounts');
-        }
-      } finally {
-        if (accountsGuard.isCurrent(request)) {
-          setAccountsLoading(false);
-        }
-      }
-    },
-    [onError, accountsGuard],
-  );
+  const accountsFetcher = useMemo(() => (selectedTeamId ? () => listTeamAccounts(selectedTeamId) : null), [selectedTeamId]);
+  const accountsResource = useResource(accountsFetcher, {
+    errorFallback: t('teams.accountsLoadFailed', 'Failed to load accounts'),
+    onError: reportError,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    listTeams()
-      .then((result) => {
-        if (cancelled) return;
-        setTeams(result);
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        onErrorRef.current(err instanceof Error ? err.message : 'Failed to load teams');
-        setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const refreshTeams = teamsResource.refresh;
+  const refreshMembers = membersResource.refresh;
+  const refreshAccounts = accountsResource.refresh;
+
+  const selectTeam = useCallback((teamId: string | null) => {
+    setSelectedTeamId(teamId);
   }, []);
 
-  const selectTeam = useCallback(
-    (teamId: string | null) => {
-      setSelectedTeamId(teamId);
-      if (teamId) {
-        // `refresh*` report their own failures via `onError` and never reject, so
-        // the trailing `.catch` would be a no-op guard that only reads as if the
-        // swallow were deliberate.
-        void refreshMembers(teamId);
-        void refreshAccounts(teamId);
-      } else {
-        // Invalidate any in-flight request for the previously selected team so
-        // it cannot repopulate members/accounts after the selection is cleared.
-        membersGuard.invalidate();
-        accountsGuard.invalidate();
-        setMembers([]);
-        setAccounts([]);
-        setMembersLoading(false);
-        setAccountsLoading(false);
+  const mutations = useMemo(
+    () => ({
+      createTeam: afterSuccess(createTeam, refreshTeams),
+      renameTeam: afterSuccess(renameTeam, refreshTeams),
+      addMember: afterSuccess(addTeamMember, refreshMembers),
+      removeMember: afterSuccess(removeTeamMember, refreshMembers),
+      updateMemberRole: afterSuccess(updateTeamMemberRole, refreshMembers),
+      addAccount: afterSuccess(addTeamAccount, refreshAccounts),
+      removeAccount: afterSuccess(removeTeamAccount, refreshAccounts),
+    }),
+    [refreshTeams, refreshMembers, refreshAccounts],
+  );
+
+  const deleteTeamAndRefresh = useCallback(
+    async (teamId: string) => {
+      await deleteTeam(teamId);
+      if (selectedTeamId === teamId) {
+        selectTeam(null);
       }
+      await refreshTeams();
     },
-    [refreshAccounts, refreshMembers, membersGuard, accountsGuard],
+    [refreshTeams, selectTeam, selectedTeamId],
   );
 
   return {
-    teams,
-    isLoading,
+    teams: teamsResource.data ?? NO_TEAMS,
+    isLoading: teamsResource.isFetching,
     selectedTeamId,
-    members,
-    accounts,
-    membersLoading,
-    accountsLoading,
+    members: membersResource.data ?? NO_MEMBERS,
+    accounts: accountsResource.data ?? NO_ACCOUNTS,
+    membersLoading: membersResource.isFetching,
+    accountsLoading: accountsResource.isFetching,
     selectTeam,
     refreshTeams,
     refreshMembers,
     refreshAccounts,
-    createTeam: useCallback(
-      async (teamName: string) => {
-        const team = await createTeam(teamName);
-        await refreshTeams();
-        return team;
-      },
-      [refreshTeams],
-    ),
-    deleteTeam: useCallback(
-      async (teamId: string) => {
-        await deleteTeam(teamId);
-        if (selectedTeamId === teamId) {
-          selectTeam(null);
-        }
-        await refreshTeams();
-      },
-      [refreshTeams, selectTeam, selectedTeamId],
-    ),
-    renameTeam: useCallback(
-      async (teamId: string, teamName: string) => {
-        await renameTeam(teamId, teamName);
-        await refreshTeams();
-      },
-      [refreshTeams],
-    ),
-    addMember: useCallback(
-      async (teamId: string, userEmail: string, role: string) => {
-        await addTeamMember(teamId, userEmail, role);
-        await refreshMembers(teamId);
-      },
-      [refreshMembers],
-    ),
-    removeMember: useCallback(
-      async (teamId: string, userEmail: string) => {
-        await removeTeamMember(teamId, userEmail);
-        await refreshMembers(teamId);
-      },
-      [refreshMembers],
-    ),
-    updateMemberRole: useCallback(
-      async (teamId: string, userEmail: string, role: string) => {
-        await updateTeamMemberRole(teamId, userEmail, role);
-        await refreshMembers(teamId);
-      },
-      [refreshMembers],
-    ),
-    addAccount: useCallback(
-      async (teamId: string, awsAccountId: string) => {
-        await addTeamAccount(teamId, awsAccountId);
-        await refreshAccounts(teamId);
-      },
-      [refreshAccounts],
-    ),
-    removeAccount: useCallback(
-      async (teamId: string, awsAccountId: string) => {
-        await removeTeamAccount(teamId, awsAccountId);
-        await refreshAccounts(teamId);
-      },
-      [refreshAccounts],
-    ),
+    ...mutations,
+    deleteTeam: deleteTeamAndRefresh,
   };
 }
 

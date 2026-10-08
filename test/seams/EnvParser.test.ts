@@ -12,12 +12,6 @@ describe('EnvParser', () => {
     expect(EnvParser.positiveInt({ N: '2.5' }, 'N', '3')).toBe(3);
   });
 
-  it('parses non-negative ints including zero', () => {
-    expect(EnvParser.nonNegativeInt({ N: '0' }, 'N', '7')).toBe(0);
-    expect(EnvParser.nonNegativeInt({ N: '-1' }, 'N', '7')).toBe(7);
-    expect(EnvParser.nonNegativeInt({}, 'N', '7')).toBe(7);
-  });
-
   it('reads strings and booleans', () => {
     expect(EnvParser.string({ S: 'x' }, 'S', 'd')).toBe('x');
     expect(EnvParser.string({}, 'S', 'd')).toBe('d');

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { WIZARD_STEP, validEmails } from '../../lib/onboardingWizard';
 import type { OnboardingWizard } from '../../hooks/useOnboardingWizard';
 import { getBtnPrimary, wizardStyles } from './wizardStyles';
 
@@ -32,20 +33,20 @@ export default function SummaryStep({ wizard }: { wizard: OnboardingWizard }) {
           </div>
           <div style={wizardStyles.summaryItem}>
             <span style={{ color: '#9ca3af' }}>{t('onboarding.usersLabel', 'Users:')}</span>{' '}
-            {wizard.userEmails.filter((e) => e.trim()).join(', ') || t('onboarding.noneAssigned', '(none assigned)')}
+            {validEmails(wizard.userEmails).join(', ') || t('onboarding.noneAssigned', '(none assigned)')}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
           <button
             onClick={wizard.handleTestChain}
-            disabled={wizard.isLoading}
+            disabled={wizard.isTestingChain}
             className="font-medium"
-            style={getBtnPrimary(wizardStyles, wizard.isLoading)}
+            style={getBtnPrimary(wizardStyles, wizard.isTestingChain)}
           >
-            {wizard.isLoading ? t('onboarding.testingConnection', 'Testing...') : t('onboarding.testConnection', 'Test Connection')}
+            {wizard.isTestingChain ? t('onboarding.testingConnection', 'Testing...') : t('onboarding.testConnection', 'Test Connection')}
           </button>
           <button
-            onClick={() => wizard.setStep(0)}
+            onClick={() => wizard.setStep(WIZARD_STEP.ACCOUNT)}
             className="font-medium"
             style={wizardStyles.btnSecondary}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#4b5563')}

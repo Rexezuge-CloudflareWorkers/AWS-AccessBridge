@@ -74,4 +74,3 @@ interface DeleteTokenResponse extends IResponse {
 type DeleteTokenEnv = IEnv;
 
 export { DeleteTokenRoute };
-export type { DeleteTokenRequest, DeleteTokenResponse };

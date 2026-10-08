@@ -90,6 +90,13 @@ export default defineConfig({
         // left to cover.
         'packages/backend-services/src/composition/ServiceEnv.ts',
         'packages/backend-services/src/composition/tokens.ts',
+        // A Workflow class is the platform's entrypoint, like a Durable Object
+        // class: it can only be constructed inside the Workers runtime, so the
+        // node project cannot execute it at all. What is worth asserting about
+        // it — that the cron starts one instance per tick and leaves the
+        // collection tasks to it — is asserted against `CronTasksWorker` in
+        // `test/workers/CronTasksWorkerContract.test.ts`.
+        'apps/background/src/CollectionWorkflow.ts',
       ],
       // Raised as coverage improved (was 93/80/94/93, before that 92/78/93/92,
       // before that 91/78/93/90). Set a little under the measured figures

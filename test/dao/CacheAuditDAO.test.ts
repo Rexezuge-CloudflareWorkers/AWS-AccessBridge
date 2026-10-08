@@ -88,7 +88,13 @@ describe('AuditLogDAO', () => {
 
   it('creates audit log entries', async () => {
     const dao = new AuditLogDAO(mockDb);
-    await dao.create('user@example.com', 'ASSUME_ROLE', 'POST', '/user/aws/assume-role', 200);
+    await dao.create({
+      userEmail: 'user@example.com',
+      action: 'ASSUME_ROLE',
+      method: 'POST',
+      path: '/user/aws/assume-role',
+      statusCode: 200,
+    });
     expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO audit_logs'));
   });
 

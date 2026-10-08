@@ -26,51 +26,45 @@ class TeamMembersDAO extends BaseDAO {
     return ownerClause(alias);
   }
 
-  public async addMember(teamId: string, owner: TeamMemberOwner, role: string = 'member'): Promise<void> {
+  /**
+   * Add a member, reporting whether the row was actually written.
+   *
+   * The count is the whole point: `INSERT OR IGNORE` makes a re-add — including
+   * a re-add that was meant to promote the member — a silent success, so the
+   * caller cannot tell "added" from "already there" unless the number comes
+   * back. Zero changes is a conflict, not a no-op.
+   */
+  public async addMember(teamId: string, owner: TeamMemberOwner, role: string = 'member'): Promise<number> {
     const joinedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database
       .prepare('INSERT OR IGNORE INTO team_members (team_id, user_email, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)')
       .bind(teamId, owner.anchorEmail, owner.userId, role, joinedAt)
       .run();
     assertD1Success(result, `add team member`);
+    return result.meta?.changes ?? 0;
   }
 
-  public async removeMember(teamId: string, owner: TeamMemberOwner): Promise<void> {
+  public async removeMember(teamId: string, owner: TeamMemberOwner): Promise<number> {
     const result: D1Result = await this.database
       .prepare(`DELETE FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`)
       .bind(teamId, owner.userId, owner.anchorEmail)
       .run();
     assertD1Success(result, `remove team member`);
+    return result.meta?.changes ?? 0;
   }
 
-  public async isTeamAdmin(teamId: string, owner: TeamMemberOwner): Promise<boolean> {
+  /**
+   * How many admins a team has.
+   *
+   * Read before a demotion or a removal: the admin rows are the only handle on
+   * who can still administer the team, so the last one cannot be taken away.
+   */
+  public async countAdmins(teamId: string): Promise<number> {
     const result = await this.database
-      .prepare(`SELECT role FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`)
-      .bind(teamId, owner.userId, owner.anchorEmail)
-      .first<{ role: string }>();
-    return result?.role === 'admin';
-  }
-
-  public async getTeamsByUserEmail(userEmail: string): Promise<Array<{ teamId: string; teamName: string; role: string }>> {
-    const results = await this.database
-      .prepare(
-        'SELECT tm.team_id, t.team_name, tm.role FROM team_members tm JOIN teams t ON tm.team_id = t.team_id WHERE tm.user_email = ?',
-      )
-      .bind(userEmail)
-      .all<{ team_id: string; team_name: string; role: string }>();
-    return (results.results || []).map((r) => ({ teamId: r.team_id, teamName: r.team_name, role: r.role }));
-  }
-
-  public async getTeamsByUserId(owner: TeamMemberOwner): Promise<Array<{ teamId: string; teamName: string; role: string }>> {
-    const results = await this.database
-      .prepare(
-        `SELECT tm.team_id, t.team_name, tm.role
-         FROM team_members tm JOIN teams t ON tm.team_id = t.team_id
-         WHERE ${TeamMembersDAO.ownerClause('tm')}`,
-      )
-      .bind(owner.userId, owner.anchorEmail)
-      .all<{ team_id: string; team_name: string; role: string }>();
-    return (results.results || []).map((r) => ({ teamId: r.team_id, teamName: r.team_name, role: r.role }));
+      .prepare('SELECT COUNT(*) AS total FROM team_members WHERE team_id = ? AND role = ?')
+      .bind(teamId, 'admin')
+      .first<{ total: number }>();
+    return result?.total ?? 0;
   }
 
   /**
@@ -100,12 +94,24 @@ class TeamMembersDAO extends BaseDAO {
     }));
   }
 
-  public async updateMemberRole(teamId: string, owner: TeamMemberOwner, newRole: string): Promise<void> {
+  public async updateMemberRole(teamId: string, owner: TeamMemberOwner, newRole: string): Promise<number> {
     const result: D1Result = await this.database
       .prepare(`UPDATE team_members SET role = ? WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`)
       .bind(newRole, teamId, owner.userId, owner.anchorEmail)
       .run();
     assertD1Success(result, `update team member role`);
+    return result.meta?.changes ?? 0;
+  }
+
+  /**
+  The member's current role, or null when they are not a member.
+  */
+  public async getMemberRole(teamId: string, owner: TeamMemberOwner): Promise<string | null> {
+    const result = await this.database
+      .prepare(`SELECT role FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')} LIMIT 1`)
+      .bind(teamId, owner.userId, owner.anchorEmail)
+      .first<{ role: string }>();
+    return result?.role ?? null;
   }
 }
 

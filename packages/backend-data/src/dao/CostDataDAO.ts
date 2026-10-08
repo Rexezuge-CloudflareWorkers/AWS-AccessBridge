@@ -2,6 +2,8 @@ import type { CostData, CostDataInternal } from '@aws-access-bridge/shared/model
 import { TimestampUtil } from '@aws-access-bridge/shared/utils';
 import { BaseDAO } from './BaseDAO';
 import { ORPHANED_BY_ASSUMABLE_ROLES } from './AwsAccountsDAO';
+import { ownerClause } from './AssumableRolesQueries';
+import type { AssumableRoleOwner } from './AssumableRolesDAO';
 
 class CostDataDAO extends BaseDAO {
   public async upsertCostData(data: CostData): Promise<void> {
@@ -34,14 +36,21 @@ class CostDataDAO extends BaseDAO {
     return (results.results || []).map((row) => CostDataDAO.mapToExternal(row));
   }
 
-  public async getCostDataForAccounts(accountIds: string[], startDate: string, endDate: string): Promise<CostData[]> {
-    if (accountIds.length === 0) return [];
-    const placeholders: string = accountIds.map(() => '?').join(',');
+  /**
+   * Costs across every account the caller may assume a role in.
+   *
+   * The account list is a subquery on `assumable_roles` rather than a bound
+   * `IN (?,...)` list: D1 caps bound parameters per statement, so an auth
+   * context spanning more than that many accounts failed to read costs at
+   * all. Scoping inside the database also collapses "fetch the ids, then ask
+   * again" into one round trip.
+   */
+  public async getCostDataForOwner(owner: AssumableRoleOwner, startDate: string, endDate: string): Promise<CostData[]> {
     const results = await this.database
       .prepare(
-        `SELECT * FROM cost_data WHERE aws_account_id IN (${placeholders}) AND period_start >= ? AND period_start <= ? ORDER BY aws_account_id, period_start ASC`,
+        `SELECT * FROM cost_data WHERE aws_account_id IN (SELECT DISTINCT aws_account_id FROM assumable_roles ar WHERE ${ownerClause('ar')}) AND period_start >= ? AND period_start <= ? ORDER BY aws_account_id, period_start ASC`,
       )
-      .bind(...accountIds, startDate, endDate)
+      .bind(owner.userId, owner.anchorEmail, startDate, endDate)
       .all<CostDataInternal>();
 
     return (results.results || []).map((row) => CostDataDAO.mapToExternal(row));
@@ -50,19 +59,6 @@ class CostDataDAO extends BaseDAO {
   public async deleteOrphaned(): Promise<number> {
     const result: D1Result = await this.deleteOrphanedRows('cost_data', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;
-  }
-
-  public async getLatestCostSummary(accountIds: string[]): Promise<CostData[]> {
-    if (accountIds.length === 0) return [];
-    const placeholders: string = accountIds.map(() => '?').join(',');
-    const results = await this.database
-      .prepare(
-        `SELECT cd.* FROM cost_data cd INNER JOIN (SELECT aws_account_id, MAX(period_start) as max_period FROM cost_data WHERE aws_account_id IN (${placeholders}) GROUP BY aws_account_id) latest ON cd.aws_account_id = latest.aws_account_id AND cd.period_start = latest.max_period`,
-      )
-      .bind(...accountIds)
-      .all<CostDataInternal>();
-
-    return (results.results || []).map((row) => CostDataDAO.mapToExternal(row));
   }
 
   private static mapToExternal(row: CostDataInternal): CostData {

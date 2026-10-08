@@ -89,8 +89,8 @@ Keep the bucket private. The workflow uploads with the `aws s3 cp` CLI, so bucke
 
 The workflow is only a job graph; each step delegates to an entrypoint in `scripts/backup/`, so the rules are testable without running Actions:
 
-| Entrypoint                      | Step                           | Notes                                                                         |
-| ------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Entrypoint                       | Step                           | Notes                                                                         |
+| -------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
 | `evaluate-destination-config.ts` | Detect Configured Destinations | Decides which jobs run; holds the fail-closed encryption policy               |
 | `resolve-d1-target.ts`           | Resolve D1 Database            | Reads `wrangler.jsonc` with `jsonc-parser`; enforces the empty-database guard |
 | `encrypt-backup.ts`              | Compress And Encrypt Backup    | Refuses to run without `BACKUP_ENCRYPTION_KEY`; deletes the plaintext         |
@@ -119,15 +119,15 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 
 ### What a backup contains
 
-| Table                                             | Sensitivity in a dump                                                                                                                         |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `user_access_tokens`                              | **Plaintext bearer tokens.** Usable against `/api/*` until they expire; revocation is manual (`DELETE /user/tokens`).                         |
-| `user_metadata`, `user_emails`                    | Sign-in addresses, superadmin flags, stable account ids.                                                                                      |
-| `audit_logs`                                      | Who did what, from which IP, with which user agent.                                                                                           |
-| `teams`, `team_members`, `team_accounts`          | Tenant structure and membership.                                                                                                              |
+| Table                                             | Sensitivity in a dump                                                                                                                                |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user_access_tokens`                              | **Plaintext bearer tokens.** Usable against `/api/*` until they expire; revocation is manual (`DELETE /user/tokens`).                                |
+| `user_metadata`, `user_emails`                    | Sign-in addresses, superadmin flags, stable account ids.                                                                                             |
+| `audit_logs`                                      | Who did what, from which IP, with which user agent.                                                                                                  |
+| `teams`, `team_members`, `team_accounts`          | Tenant structure and membership.                                                                                                                     |
 | `credentials`                                     | AES-GCM ciphertext. The key lives in the Secrets Store (`CREDENTIAL_ENCRYPTION_KEY_SECRET`), **not** in D1, so a dump alone cannot decrypt IAM keys. |
-| `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                    |
-| `background_task_runs`                            | Cron phase history.                                                                                                                           |
+| `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                           |
+| `background_task_runs`                            | Cron phase history.                                                                                                                                  |
 
 This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working set of API credentials.
 

@@ -3,6 +3,7 @@
 import type { ShowMessage } from '../hooks/useToast';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useTeams } from '../hooks/useTeams';
 import TeamListSection from './teams/TeamListSection';
 import TeamMembersSection from './teams/TeamMembersSection';
@@ -58,18 +59,15 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
     setRenameTeamName(team?.teamName ?? '');
   };
 
+  const actions = useAsyncAction(showMessage);
+
   /**
    * Run a mutation and report the outcome. Resolves either way, never rejects:
    * the sections clear their own form field on resolve, and a rejected promise
    * there would leave an unhandled rejection behind.
    */
   const run = async (action: () => Promise<unknown>, success: string, failure: string): Promise<void> => {
-    try {
-      await action();
-      showMessage('success', success);
-    } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : failure);
-    }
+    await actions.run('teams', action, { successMessage: success, errorFallback: failure });
   };
 
   return (
@@ -79,7 +77,13 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
         isLoading={isLoading}
         selectedTeamId={selectedTeamId}
         onSelect={selectTeam}
-        onCreate={(name) => run(() => createTeamInHook(name), t('teams.created', 'Team created successfully'), t('teams.createFailed', 'Failed to create team'))}
+        onCreate={(name) =>
+          run(
+            () => createTeamInHook(name),
+            t('teams.created', 'Team created successfully'),
+            t('teams.createFailed', 'Failed to create team'),
+          )
+        }
         onDelete={(teamId) =>
           run(
             () => deleteTeamInHook(teamId),
@@ -126,7 +130,8 @@ export default function TeamsTab({ showMessage }: TeamsTabProps) {
                   cursor: !renameTeamName.trim() || renameTeamName.trim() === selectedTeam.teamName ? 'not-allowed' : 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  if (renameTeamName.trim() && renameTeamName.trim() !== selectedTeam.teamName) e.currentTarget.style.background = '#1d4ed8';
+                  if (renameTeamName.trim() && renameTeamName.trim() !== selectedTeam.teamName)
+                    e.currentTarget.style.background = '#1d4ed8';
                 }}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#2563eb')}
               >

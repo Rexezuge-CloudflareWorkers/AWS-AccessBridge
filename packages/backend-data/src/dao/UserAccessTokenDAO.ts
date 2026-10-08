@@ -9,7 +9,7 @@ class UserAccessTokenDAO extends BaseDAO {
   public async create(
     tokenId: string,
     userEmail: string,
-    token: string,
+    tokenHash: string,
     name: string,
     expiresAt: number,
     userId: string | null = null,
@@ -17,9 +17,9 @@ class UserAccessTokenDAO extends BaseDAO {
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database
       .prepare(
-        'INSERT INTO user_access_tokens (token_id, user_email, access_token, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(tokenId, userEmail, token, name, createdAt, expiresAt, userId)
+      .bind(tokenId, userEmail, tokenHash, name, createdAt, expiresAt, userId)
       .run();
     assertD1Success(result, `create access token`);
   }
@@ -30,7 +30,7 @@ class UserAccessTokenDAO extends BaseDAO {
     const bindings: unknown[] = activeOnly ? [tokenId, currentTime] : [tokenId];
     const result: UserAccessTokenInternal | null = await this.database
       .prepare(
-        `SELECT token_id, user_email, user_id, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE token_id = ? ${activeFilter} LIMIT 1`,
+        `SELECT token_id, user_email, user_id, token_hash, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE token_id = ? ${activeFilter} LIMIT 1`,
       )
       .bind(...bindings)
       .first<UserAccessTokenInternal>();
@@ -54,13 +54,13 @@ class UserAccessTokenDAO extends BaseDAO {
    * without it, a token minted before an address change would keep
    * authenticating as the old address forever.
    */
-  public async getByToken(token: string, activeOnly: boolean): Promise<UserAccessTokenMetadata | undefined> {
+  public async getByTokenHash(tokenHash: string, activeOnly: boolean): Promise<UserAccessTokenMetadata | undefined> {
     const currentTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const activeFilter: string = activeOnly ? 'AND expires_at > ?' : '';
-    const bindings: unknown[] = activeOnly ? [token, currentTime] : [token];
+    const bindings: unknown[] = activeOnly ? [tokenHash, currentTime] : [tokenHash];
     const result: UserAccessTokenInternal | null = await this.database
       .prepare(
-        `SELECT token_id, user_email, user_id, access_token, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE access_token = ? ${activeFilter} LIMIT 1`,
+        `SELECT token_id, user_email, user_id, token_hash, name, created_at, expires_at, last_used_at FROM user_access_tokens WHERE token_hash = ? ${activeFilter} LIMIT 1`,
       )
       .bind(...bindings)
       .first<UserAccessTokenInternal>();
@@ -157,20 +157,11 @@ class UserAccessTokenDAO extends BaseDAO {
     return result?.total ?? 0;
   }
 
-  public async updateLastUsedById(tokenId: string): Promise<void> {
+  public async updateLastUsedByTokenHash(tokenHash: string): Promise<void> {
     const lastUsedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const result: D1Result = await this.database
-      .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE token_id = ?')
-      .bind(lastUsedAt, tokenId)
-      .run();
-    assertD1Success(result, `update last used`);
-  }
-
-  public async updateLastUsedByToken(token: string): Promise<void> {
-    const lastUsedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE access_token = ?')
-      .bind(lastUsedAt, token)
+      .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE token_hash = ?')
+      .bind(lastUsedAt, tokenHash)
       .run();
     assertD1Success(result, `update last used`);
   }
@@ -190,7 +181,8 @@ class UserAccessTokenDAO extends BaseDAO {
     // shared `ownerClause`. Aliased to this table so the shared predicate — the
     // `user_id IS NULL` guard this security control depends on — has a single
     // definition without an empty alias leaking `.user_id` into the SQL.
-    const ownership: string = userId === null ? `user_access_tokens.user_id IS NULL AND user_access_tokens.user_email = ?` : ownerClause('user_access_tokens');
+    const ownership: string =
+      userId === null ? `user_access_tokens.user_id IS NULL AND user_access_tokens.user_email = ?` : ownerClause('user_access_tokens');
     const bindings: unknown[] = userId === null ? [tokenId, anchorEmail] : [tokenId, userId, anchorEmail];
     const result: D1Result = await this.database
       .prepare(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`)

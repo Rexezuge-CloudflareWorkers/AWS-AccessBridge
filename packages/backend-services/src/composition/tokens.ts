@@ -5,6 +5,7 @@ import type { AccessService } from '../access/AccessService';
 import type { AccountService } from '../account/AccountService';
 import type { AssumeRoleService } from '../aws/assume-role/AssumeRoleService';
 import type { ConsoleService } from '../aws/console/ConsoleService';
+import type { FederationService } from '../aws/federate/FederationService';
 import type { CostExplorerService } from '../aws/ce/CostExplorerService';
 import type { IamService } from '../aws/iam/IamService';
 import type { StsService } from '../aws/sts/StsService';
@@ -12,6 +13,8 @@ import type { InjectableCollectorRegistry } from '../aws/collectors/InjectableCo
 import type { AuditService } from '../audit/AuditService';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
+import type { ReplayGuard } from '../auth/ReplayGuard';
+import type { InternalRequestHelper } from '../aws/InternalRequestHelper';
 import type { CostService } from '../cost/CostService';
 import type { UserIdentityService } from '../identity/UserIdentityService';
 import type { CredentialChainService } from '../credential/CredentialChainService';
@@ -43,6 +46,7 @@ const Tokens = {
   CredentialStoreService: Symbol('CredentialStoreService') as Token<CredentialStoreService>,
   AssumeRoleService: Symbol('AssumeRoleService') as Token<AssumeRoleService>,
   ConsoleService: Symbol('ConsoleService') as Token<ConsoleService>,
+  FederationService: Symbol('FederationService') as Token<FederationService>,
   StsService: Symbol('StsService') as Token<StsService>,
   IamService: Symbol('IamService') as Token<IamService>,
   CostExplorerService: Symbol('CostExplorerService') as Token<CostExplorerService>,
@@ -57,6 +61,8 @@ const Tokens = {
   TokenService: Symbol('TokenService') as Token<TokenService>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   UserIdentityService: Symbol('UserIdentityService') as Token<UserIdentityService>,
+  ReplayGuard: Symbol('ReplayGuard') as Token<ReplayGuard>,
+  InternalRequestHelper: Symbol('InternalRequestHelper') as Token<() => Promise<InternalRequestHelper>>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

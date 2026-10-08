@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { grantSelectedRoles, saveRoleRelationships, settleAll } from '@aws-access-bridge/web/hooks/onboardingBatches';
+import { grantSelectedRoles, saveRoleRelationships, settleAll } from '@aws-access-bridge/web/lib/onboardingBatches';
 import * as adminService from '@aws-access-bridge/web/services/adminService';
-import type { DiscoveredRole } from '@aws-access-bridge/web/hooks/useOnboardingWizard';
+import type { DiscoveredRole } from '@aws-access-bridge/web/lib/onboardingWizard';
 
 vi.mock('@aws-access-bridge/web/services/adminService');
 
@@ -18,9 +18,11 @@ const mocked = vi.mocked(adminService);
 describe('settleAll', () => {
   it('runs every item and reports no failures', async () => {
     const seen: number[] = [];
-    expect(await settleAll([1, 2, 3], async (n) => {
+    expect(
+      await settleAll([1, 2, 3], async (n) => {
         seen.push(n);
-      })).toBe(0);
+      }),
+    ).toBe(0);
     expect(seen).toEqual([1, 2, 3]);
   });
 
@@ -78,7 +80,10 @@ describe('saveRoleRelationships', () => {
 
     expect(result).toEqual({ ok: true, attempted: 2, failures: 0 });
     expect(mocked.storeCredentialRelationship).toHaveBeenCalledTimes(2);
-    expect(mocked.storeCredentialRelationship).toHaveBeenCalledWith('arn:aws:iam::123456789012:role/Dev', 'arn:aws:iam::123456789012:role/Admin');
+    expect(mocked.storeCredentialRelationship).toHaveBeenCalledWith(
+      'arn:aws:iam::123456789012:role/Dev',
+      'arn:aws:iam::123456789012:role/Admin',
+    );
   });
 
   it('skips a manually added role, which has no ARN', async () => {
@@ -118,7 +123,11 @@ describe('saveRoleRelationships', () => {
   it('treats a selection with no resolvable ARN as success', async () => {
     // Nothing was attempted, so there is nothing that could have failed; the
     // wizard must still be able to advance.
-    const result = await saveRoleRelationships(new Set(['Manual']), [{ roleName: 'Manual', arn: '', description: '' }], 'arn:aws:iam::123456789012:role/Admin');
+    const result = await saveRoleRelationships(
+      new Set(['Manual']),
+      [{ roleName: 'Manual', arn: '', description: '' }],
+      'arn:aws:iam::123456789012:role/Admin',
+    );
     expect(result.ok).toBe(true);
   });
 });

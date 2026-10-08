@@ -13,12 +13,14 @@ import { ListTeamAccountsRoute } from '@/endpoints/user/admin/team/accounts/GET'
 import { TeamsDAO } from '@aws-access-bridge/backend-data/dao/TeamsDAO';
 import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao/TeamMembersDAO';
 import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao/TeamAccountsDAO';
+import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/TeamsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamMembersDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamAccountsDAO');
+vi.mock('@aws-access-bridge/backend-data/dao/AwsAccountsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
 // Migration 0032: account resolution consults the address registry before the
 // anchor, so this suite stubs `UserEmailDAO` alongside `UserMetadataDAO`. The
@@ -85,23 +87,19 @@ describe('team member routes', () => {
   });
 
   it('POST /user/admin/team/member adds members', async () => {
-    vi.mocked(TeamMembersDAO.prototype.addMember).mockResolvedValue(undefined);
+    vi.mocked(TeamMembersDAO.prototype.addMember).mockResolvedValue(1);
     const c = createRouteContext({
       method: 'POST',
       body: { teamId: 't1', userEmail: 'dev@example.com', role: 'member' },
       env: adminEnv(),
     });
     await new AddTeamMemberRoute({} as never).handle(c);
-    expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith(
-      't1',
-      { userId: null, anchorEmail: 'dev@example.com' },
-      'member',
-    );
+    expect(TeamMembersDAO.prototype.addMember).toHaveBeenCalledWith('t1', { userId: null, anchorEmail: 'dev@example.com' }, 'member');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
   it('DELETE /user/admin/team/member removes members', async () => {
-    vi.mocked(TeamMembersDAO.prototype.removeMember).mockResolvedValue(undefined);
+    vi.mocked(TeamMembersDAO.prototype.removeMember).mockResolvedValue(1);
     const c = createRouteContext({
       method: 'DELETE',
       body: { teamId: 't1', userEmail: 'dev@example.com' },
@@ -126,18 +124,14 @@ describe('team member routes', () => {
   });
 
   it('PUT /user/admin/team/member/role updates roles', async () => {
-    vi.mocked(TeamMembersDAO.prototype.updateMemberRole).mockResolvedValue(undefined);
+    vi.mocked(TeamMembersDAO.prototype.updateMemberRole).mockResolvedValue(1);
     const c = createRouteContext({
       method: 'PUT',
       body: { teamId: 't1', userEmail: 'dev@example.com', role: 'admin' },
       env: adminEnv(),
     });
     await new UpdateTeamMemberRoleRoute({} as never).handle(c);
-    expect(TeamMembersDAO.prototype.updateMemberRole).toHaveBeenCalledWith(
-      't1',
-      { userId: null, anchorEmail: 'dev@example.com' },
-      'admin',
-    );
+    expect(TeamMembersDAO.prototype.updateMemberRole).toHaveBeenCalledWith('t1', { userId: null, anchorEmail: 'dev@example.com' }, 'admin');
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 });
@@ -149,6 +143,7 @@ describe('team account routes', () => {
 
   it('POST /user/admin/team/account adds accounts', async () => {
     vi.mocked(TeamAccountsDAO.prototype.addAccountToTeam).mockResolvedValue(undefined);
+    vi.mocked(AwsAccountsDAO.prototype.accountExists).mockResolvedValue(true);
     const c = createRouteContext({
       method: 'POST',
       body: { teamId: 't1', awsAccountId: '123456789012' },

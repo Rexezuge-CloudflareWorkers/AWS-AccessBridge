@@ -21,7 +21,6 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config test/integration/vitest.config.mts",
     "test:floci": "vitest run --config test/floci/vitest.config.mts",
-    "test:coverage:integration": "vitest run --coverage --config test/integration/vitest.config.mts",
     "lint": "NODE_OPTIONS=--max-old-space-size=6144 eslint --fix --quiet .",
     "typegen": "wrangler types --config ./apps/api/wrangler.template.jsonc --env-interface CloudflareEnv"
   },
@@ -29,7 +28,6 @@
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
     "@types/node": "26.6.4",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.11.0",

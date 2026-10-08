@@ -1,5 +1,5 @@
 import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
-import { BadRequestError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import { ASSUME_ROLE_UTIL_ERROR_STS_CALL, ASSUME_ROLE_UTIL_ERROR_STS_RESPONSE_PARSE } from '@aws-access-bridge/shared/constants';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
@@ -48,6 +48,12 @@ class StsClient {
 
     if (!response.ok) {
       log.error(`STS AssumeRole failed: ${response.status} ${response.statusText}\n${xmlText}`);
+      // A 403-class STS failure is an authorization problem at the AWS boundary:
+      // the role denied the assumption. Answering 401 would send the SPA to the
+      // Zero Trust login page for something re-authenticating cannot fix.
+      if (response.status === 403) {
+        throw new ForbiddenError(ASSUME_ROLE_UTIL_ERROR_STS_CALL);
+      }
       throw new UnauthorizedError(ASSUME_ROLE_UTIL_ERROR_STS_CALL);
     }
 

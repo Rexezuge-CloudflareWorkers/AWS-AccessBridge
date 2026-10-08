@@ -78,8 +78,8 @@ const wizardStyles = {
   } as React.CSSProperties,
 };
 
-function getInputStyle(focusedInput: string | null, styles: typeof wizardStyles, name: string): React.CSSProperties {
-  return { ...styles.input, borderColor: focusedInput === name ? '#3b82f6' : '#374151' };
+function getInputStyle(focused: boolean): React.CSSProperties {
+  return { ...wizardStyles.input, borderColor: focused ? '#3b82f6' : '#374151' };
 }
 
 function getBtnPrimary(styles: typeof wizardStyles, disabled: boolean): React.CSSProperties {

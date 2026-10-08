@@ -95,7 +95,9 @@ async function executeD1WithRetry(
  * untouched, because wrapping it would discard what it actually is.
  */
 function toDatabaseError(error: Error, context: string): DatabaseError {
-  return error instanceof DatabaseError ? error : new DatabaseError(`Failed to ${context}: ${error.message}`, isD1ErrorRetryable(error.message));
+  return error instanceof DatabaseError
+    ? error
+    : new DatabaseError(`Failed to ${context}: ${error.message}`, isD1ErrorRetryable(error.message));
 }
 
-export { assertD1Success, executeD1WithRetry, toDatabaseError };
+export { assertD1Success, executeD1WithRetry };

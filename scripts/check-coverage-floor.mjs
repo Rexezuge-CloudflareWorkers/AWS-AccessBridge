@@ -21,43 +21,63 @@ import { existsSync, readFileSync } from 'node:fs';
 /**
 Line/branch percentage floors, keyed by path suffix so the check survives moves.
 */
+/**
+ * These are *measured* figures minus a few points, so ordinary churn does not
+ * fail the build but a real decay does. They used to sit 40-60 points under the
+ * measurement, which meant a file could lose half its branch coverage without
+ * the gate noticing.
+ */
 const FLOORS = [
   // --- Authentication and the internal trust boundary -------------------------
-  { branch: 60, file: 'apps/api/src/middleware/MiddlewareHandlers.ts', line: 80 },
-  { branch: 50, file: 'apps/api/src/middleware/HMACHandler.ts', line: 90 },
-  { branch: 50, file: 'packages/backend-services/src/auth/AccessAuthService.ts', line: 85 },
-  { branch: 50, file: 'packages/backend-services/src/auth/TokenService.ts', line: 80 },
+  { branch: 85, file: 'apps/api/src/middleware/MiddlewareHandlers.ts', line: 93 },
+  { branch: 90, file: 'apps/api/src/middleware/HMACHandler.ts', line: 90 },
+  { branch: 82, file: 'packages/backend-services/src/auth/AccessAuthService.ts', line: 84 },
+  { branch: 84, file: 'packages/backend-services/src/auth/TokenService.ts', line: 95 },
   { branch: 45, file: 'packages/backend-data/src/crypto/hmac.ts', line: 90 },
-  { branch: 60, file: 'packages/backend-services/src/identity/UserIdentityService.ts', line: 85 },
-  { branch: 50, file: 'packages/backend-services/src/auth/ReplayGuard.ts', line: 85 },
+  { branch: 67, file: 'packages/backend-services/src/identity/UserIdentityService.ts', line: 87 },
+  { branch: 95, file: 'packages/backend-services/src/auth/ReplayGuard.ts', line: 95 },
 
   // --- Request validation and the error taxonomy -------------------------------
-  { branch: 60, file: 'packages/shared/src/schema/input.ts', line: 90 },
-  { branch: 50, file: 'packages/shared/src/schema/common.ts', line: 85 },
-  { branch: 50, file: 'packages/shared/src/utils/RequestOriginUtil.ts', line: 80 },
+  { branch: 58, file: 'packages/shared/src/schema/input.ts', line: 95 },
+  { branch: 95, file: 'packages/shared/src/schema/common.ts', line: 95 },
+  { branch: 78, file: 'packages/shared/src/utils/RequestOriginUtil.ts', line: 79 },
+  { branch: 73, file: 'apps/api/src/endpoints/IActivityAPIRoute.ts', line: 87 },
+  { branch: 95, file: 'apps/api/src/endpoints/IAdminActivityAPIRoute.ts', line: 95 },
 
   // --- Credential encryption and chain resolution ------------------------------
-  { branch: 60, file: 'packages/backend-data/src/crypto/aes-gcm.ts', line: 90 },
-  { branch: 45, file: 'packages/backend-services/src/credential/CredentialChainWalker.ts', line: 80 },
-  { branch: 45, file: 'packages/backend-services/src/credential/CredentialChainService.ts', line: 80 },
-  { branch: 40, file: 'packages/backend-services/src/aws/assume-role/AssumeRoleService.ts', line: 75 },
+  { branch: 83, file: 'packages/backend-data/src/crypto/aes-gcm.ts', line: 95 },
+  { branch: 45, file: 'packages/backend-services/src/credential/CredentialChainWalker.ts', line: 91 },
+  { branch: 91, file: 'packages/backend-services/src/credential/CredentialChainService.ts', line: 92 },
+  { branch: 84, file: 'packages/backend-services/src/aws/assume-role/AssumeRoleService.ts', line: 84 },
+  // Federation composes the assume-role path with the console signin token in
+  // one call, and it is the one route that hands a browser an AWS session.
+  { branch: 100, file: 'packages/backend-services/src/aws/federate/FederationService.ts', line: 95 },
 
   // --- Data integrity ----------------------------------------------------------
-  { branch: 45, file: 'packages/backend-data/src/utils/D1Utils.ts', line: 85 },
-  { branch: 40, file: 'packages/backend-data/src/dao/UserAccessTokenDAO.ts', line: 75 },
-  { branch: 35, file: 'packages/backend-data/src/dao/CredentialsDAO.ts', line: 75 },
-  { branch: 35, file: 'packages/backend-data/src/dao/BackgroundTaskRunDAO.ts', line: 70 },
+  { branch: 78, file: 'packages/backend-data/src/utils/D1Utils.ts', line: 90 },
+  { branch: 65, file: 'packages/backend-data/src/dao/UserAccessTokenDAO.ts', line: 74 },
+  { branch: 64, file: 'packages/backend-data/src/dao/CredentialsDAO.ts', line: 77 },
+  { branch: 59, file: 'packages/backend-data/src/dao/BackgroundTaskRunDAO.ts', line: 85 },
+  // The grants themselves, and the credential writes an admin performs.
+  { branch: 61, file: 'packages/backend-data/src/dao/AssumableRolesDAO.ts', line: 78 },
+  { branch: 71, file: 'packages/backend-services/src/credential/CredentialStoreService.ts', line: 75 },
+  { branch: 57, file: 'packages/backend-data/src/dao/AuditLogDAO.ts', line: 75 },
 
   // --- Background pipeline -----------------------------------------------------
-  { branch: 45, file: 'apps/background/src/CronTasksWorker.ts', line: 75 },
-  { branch: 45, file: 'apps/background/src/scheduled/AbstractCollectionTask.ts', line: 75 },
-  { branch: 40, file: 'apps/background/src/scheduled/ResourceInventoryCollectionTask.ts', line: 75 },
+  { branch: 90, file: 'apps/background/src/CronTasksWorker.ts', line: 92 },
+  { branch: 95, file: 'apps/background/src/scheduled/AbstractCollectionTask.ts', line: 81 },
+  { branch: 95, file: 'apps/background/src/scheduled/ResourceInventoryCollectionTask.ts', line: 95 },
+  { branch: 45, file: 'apps/background/src/scheduled/CredentialCacheRefreshTask.ts', line: 83 },
+
+  // --- Services whose reads are authorization decisions -------------------------
+  { branch: 79, file: 'packages/backend-services/src/cost/CostService.ts', line: 89 },
+  { branch: 77, file: 'packages/backend-services/src/team/TeamService.ts', line: 79 },
 
   // --- Routing -----------------------------------------------------------------
-  { branch: 30, file: 'apps/api/src/workers/AccessBridgeWorker.ts', line: 80 },
+  { branch: 95, file: 'apps/api/src/workers/AccessBridgeWorker.ts', line: 92 },
 
   // --- Logging (a leak here is silent) -----------------------------------------
-  { branch: 80, file: 'packages/shared/src/utils/Logger.ts', line: 90 },
+  { branch: 95, file: 'packages/shared/src/utils/Logger.ts', line: 92 },
 ];
 
 const LCOV = 'coverage/lcov.info';

@@ -60,10 +60,10 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.storeCredential(principalArn, accessKeyId, secretAccessKey, sessionToken);
-    // Track the principal so the scheduled refresh task has work to do. Without
-    // this the `credential_cache_config` table stays empty and phase 1 of the
-    // cron silently iterates nothing while reporting success.
-    await new CredentialCacheConfigDAO(this.env.AccessBridgeDB).create(principalArn);
+    // Deliberately NOT registered for pre-warm. A principal holding keys is the
+    // *base* of a chain: its own chain has length one and `getCredentialChain`
+    // refuses it, so the cron could only ever fail on it. The roles worth keeping
+    // warm are the ones that sit above a base — see `storeCredentialRelationship`.
   }
 
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
@@ -78,6 +78,11 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.storeCredentialRelationship(principalArn, assumedBy);
+    // Track the role so the scheduled refresh has work to do. Registered here, where
+    // `assumed_by` is set, because only a principal that assumes another has a chain
+    // with a hop to pre-assume; without any registration phase 1 of the cron
+    // iterates nothing while reporting success.
+    await new CredentialCacheConfigDAO(this.env.AccessBridgeDB).create(principalArn);
   }
 
   public async removeCredential(principalArn: string): Promise<void> {
@@ -111,5 +116,5 @@ class CredentialStoreService {
   }
 }
 
-export { CredentialStoreService, PRINCIPAL_ARN_PATTERN };
+export { CredentialStoreService };
 export type { CredentialStoreServiceEnv };

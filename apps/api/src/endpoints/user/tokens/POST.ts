@@ -85,4 +85,3 @@ interface CreateTokenEnv extends IEnv {
 }
 
 export { CreateTokenRoute };
-export type { CreateTokenRequest, CreateTokenResponse };

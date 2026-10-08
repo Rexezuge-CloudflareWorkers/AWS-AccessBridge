@@ -62,9 +62,13 @@ parameter, DynamoDB an `ExclusiveStartTableName` body field, and S3 the V2 `Next
 because the V1 listing cannot be paginated at all — which is why `paginate` takes `fetchPage` and
 `readNextToken` from the caller rather than inferring them.
 
-A repeated continuation token stops the walk and logs, rather than re-fetching one page until the
-request's wall-clock limit. Tests: `test/collectors/CollectorPagination.test.ts`,
-`test/collectors/MultiRegionSweep.test.ts`.
+**A truncated walk throws; it does not return what it gathered.** A repeated continuation token or
+`MAX_COLLECTION_PAGES` (50) raises `AwsCollectionError` rather than `break`-ing out with a short
+list. It used to log and stop, and the task counted the region as succeeded — so
+`deleteStaleResources` pruned every row past the page it happened to reach. A region that cannot be
+read completely must count as a region that was not read.
+
+Tests: `test/collectors/CollectorPagination.test.ts`, `test/collectors/MultiRegionSweep.test.ts`.
 
 ## Query parameters ride in the form-encoded body
 

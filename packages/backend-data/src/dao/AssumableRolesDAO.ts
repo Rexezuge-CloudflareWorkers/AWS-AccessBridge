@@ -1,4 +1,4 @@
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError } from '@aws-access-bridge/backend-errors';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { mapRowsToAssumableMap } from './AssumableRolesMapper';
 import type { AssumableRoleRow } from './AssumableRolesMapper';
@@ -45,6 +45,24 @@ class AssumableRolesDAO extends BaseDAO {
    * @param userEmail The email address of the user.
    * @returns A list of distinct AWS account IDs.
    */
+  /**
+   * Every role the caller holds, one row per (account, role).
+   *
+   * Used to build the roles-per-account map without one query per account:
+   * the N+1 cost is identical to the N queries it replaces only when an
+   * account has zero roles, which cannot happen — an account only appears in
+   * the inventory result when it has a grant.
+   */
+  public async getRolesByOwner(owner: AssumableRoleOwner): Promise<Array<{ awsAccountId: string; roleName: string }>> {
+    const results = await this.database
+      .prepare(
+        `SELECT aws_account_id, role_name FROM assumable_roles WHERE ${ownerClause('assumable_roles')} ORDER BY aws_account_id, role_name`,
+      )
+      .bind(owner.userId, owner.anchorEmail)
+      .all<{ aws_account_id: string; role_name: string }>();
+    return (results.results || []).map((row) => ({ awsAccountId: row.aws_account_id, roleName: row.role_name }));
+  }
+
   public async getDistinctAccountIds(owner: AssumableRoleOwner): Promise<string[]> {
     const results = await this.database
       .prepare(`SELECT DISTINCT aws_account_id FROM assumable_roles WHERE ${ownerClause('assumable_roles')}`)
@@ -89,21 +107,33 @@ class AssumableRolesDAO extends BaseDAO {
   ): Promise<AssumableAccountsMap> {
     const results: D1Result<AssumableRoleRow> = await this.database
       .prepare(buildListRolesQuery(showHidden))
-      // Favourites join owner, then role owner, then paging. See the note in
+      // Favourites join owner, then role owner, then the subquery's favourites
+      // join owner, the subquery's role owner, then paging. See the note in
       // `AssumableRolesQueries` for why the first two are separate bindings.
-      .bind(owner.userId, owner.anchorEmail, owner.userId, owner.anchorEmail, limit, offset)
+      .bind(
+        owner.userId,
+        owner.anchorEmail,
+        owner.userId,
+        owner.anchorEmail,
+        owner.userId,
+        owner.anchorEmail,
+        owner.userId,
+        owner.anchorEmail,
+        limit,
+        offset,
+      )
       .all<AssumableRoleRow>();
     return results?.results ? mapRowsToAssumableMap(results.results) : {};
   }
 
   /**
    * Verifies whether the specified user has permission to assume a given role in a specific AWS account.
-   * Throws an UnauthorizedError if the user does not have access.
+   * Throws a ForbiddenError if the user does not have access.
    *
-   * @param userEmail - The email address of the user.
+   * @param owner - The resolved account owner.
    * @param awsAccountId - The AWS account ID.
    * @param roleName - The name of the role to verify.
-   * @throws UnauthorizedError if the user is not authorized to assume the specified role in the given AWS account.
+   * @throws ForbiddenError if the user is not authorized to assume the specified role in the given AWS account.
    */
   public async verifyUserHasAccessToRole(owner: AssumableRoleOwner, awsAccountId: string, roleName: string): Promise<void> {
     const result: Record<string, unknown> | null = await this.database
@@ -119,12 +149,12 @@ class AssumableRolesDAO extends BaseDAO {
       .first();
 
     if (!result) {
-      // The address reported here is the caller's, not the anchor: an account
-      // that changed address must not be told it is unauthorized under a name
-      // it no longer uses.
-      throw new UnauthorizedError(
-        `${owner.anchorEmail} is not authorized to assume role '${roleName}' in AWS account ${awsAccountId}.`,
-      );
+      // No-grant is a 403, not a 401: re-authenticating cannot manufacture a
+      // grant, and the SPA reads 401 as "sign in again". The message carries
+      // no anchor address — telling an account that changed addresses it lost
+      // access under a name it no longer uses leaks account state, and the
+      // anchor must never surface to the caller.
+      throw new ForbiddenError(`Not authorized to assume role '${roleName}' in AWS account ${awsAccountId}.`);
     }
   }
 
@@ -208,11 +238,7 @@ class AssumableRolesDAO extends BaseDAO {
    * @param showHidden Whether to include hidden roles. Defaults to false.
    * @returns A map of matching AWS account IDs to objects containing roles and account nickname.
    */
-  public async searchAccountsByQuery(
-    owner: AssumableRoleOwner,
-    query: string,
-    showHidden: boolean = false,
-  ): Promise<AssumableAccountsMap> {
+  public async searchAccountsByQuery(owner: AssumableRoleOwner, query: string, showHidden: boolean = false): Promise<AssumableAccountsMap> {
     const results: D1Result<AssumableRoleRow> = await this.database
       .prepare(buildSearchRolesQuery(showHidden))
       // LIKE metacharacters escaped: an unescaped `%` in the search box matched

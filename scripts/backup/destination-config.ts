@@ -82,7 +82,7 @@ export function evaluateConfig(env: BackupSecretEnvironment): DestinationConfig 
     }
     if (!encryption) {
       errors.push(
-        'BACKUP_ENCRYPTION_KEY is required. AccessBridgeDB stores user_access_tokens.access_token and user addresses in plaintext.',
+        'BACKUP_ENCRYPTION_KEY is required. AccessBridgeDB stores user addresses and credential material in plaintext form or encrypted blobs.',
       );
     }
   }

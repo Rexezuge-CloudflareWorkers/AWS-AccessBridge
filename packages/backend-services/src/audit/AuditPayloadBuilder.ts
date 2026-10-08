@@ -1,4 +1,5 @@
 import { RequestOriginUtil } from '@aws-access-bridge/shared/utils';
+import { AUDIT_MAX_PATH_LENGTH } from '@aws-access-bridge/shared/constants';
 import { AUDIT_ACTIONS } from './AuditActions';
 import { AuditEventBuilder, type AuditEvent } from './AuditEventBuilder';
 
@@ -21,7 +22,9 @@ class AuditPayloadBuilder {
     userId: string | null = null,
   ): AuditEvent {
     const method: string = request.method;
-    const path: string = new URL(request.url).pathname;
+    // Capped up front: the action is derived from the path, so an unbounded
+    // path would also make the action column attacker-bloatable.
+    const path: string = new URL(request.url).pathname.slice(0, AUDIT_MAX_PATH_LENGTH);
     return AuditEventBuilder.create()
       .userEmail(userEmail)
       .userId(userId)

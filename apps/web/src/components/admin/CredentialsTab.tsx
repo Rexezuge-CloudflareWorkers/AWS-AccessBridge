@@ -7,6 +7,7 @@ import LoadingButton from '../ui/LoadingButton';
 import FocusInput from '../ui/FocusInput';
 import { cardStyle } from '../ui/theme';
 import type { ShowMessage } from '../../hooks/useToast';
+import { toErrorMessage } from '../../lib/errors';
 
 export default function CredentialsTab({ showMessage }: { showMessage: ShowMessage }) {
   const { t } = useTranslation();
@@ -32,16 +33,11 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
     try {
       // Omitted rather than sent empty: the route treats an absent session token
       // as "long-lived credentials", so a blank string would be a real value.
-      await storeCredentials(
-        credForm.principalArn,
-        credForm.accessKeyId,
-        credForm.secretAccessKey,
-        credForm.sessionToken || undefined,
-      );
+      await storeCredentials(credForm.principalArn, credForm.accessKeyId, credForm.secretAccessKey, credForm.sessionToken || undefined);
       showMessage('success', t('admin.credentialsAdded', 'Credentials added successfully'));
       setCredForm({ principalArn: '', accessKeyId: '', secretAccessKey: '', sessionToken: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.credentialsAddFailed', 'Failed to add credentials'));
+      showMessage('error', toErrorMessage(err, t('admin.credentialsAddFailed', 'Failed to add credentials')));
     }
   };
 
@@ -53,7 +49,7 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
       showMessage('success', t('admin.relationshipAdded', 'Credential relationship added successfully'));
       setRelationForm({ principalArn: '', assumedBy: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.relationshipAddFailed', 'Failed to add relationship'));
+      showMessage('error', toErrorMessage(err, t('admin.relationshipAddFailed', 'Failed to add relationship')));
     }
   };
 
@@ -65,7 +61,7 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
       showMessage('success', t('admin.relationshipRemoved', 'Credential relationship removed successfully'));
       setRelationForm({ principalArn: '', assumedBy: '' });
     } catch (err) {
-      showMessage('error', err instanceof Error ? err.message : t('admin.relationshipRemoveFailed', 'Failed to remove relationship'));
+      showMessage('error', toErrorMessage(err, t('admin.relationshipRemoveFailed', 'Failed to remove relationship')));
     }
   };
 

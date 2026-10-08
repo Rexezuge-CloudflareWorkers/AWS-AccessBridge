@@ -1,4 +1,3 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -125,4 +124,3 @@ interface RemoveCredentialRelationshipEnv extends IAdminEnv {
 }
 
 export { RemoveCredentialRelationshipRoute };
-export type { RemoveCredentialRelationshipRequest, RemoveCredentialRelationshipResponse };

@@ -1,9 +1,9 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRoute';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
+import { BadRequestError } from '@aws-access-bridge/backend-errors';
 
 import { badRequestResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, SearchAccountsResponse, SearchAccountsEnv> {
@@ -136,7 +136,7 @@ class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, Searc
     const query: string | null = url.searchParams.get('q');
 
     if (!query || query.trim().length === 0) {
-      throw new Error('Query parameter "q" is required');
+      throw new BadRequestError('Query parameter "q" is required');
     }
 
     const showHidden: boolean = url.searchParams.get('showHidden') === 'true';
@@ -151,4 +151,3 @@ type SearchAccountsResponse = AssumableAccountsMap;
 type SearchAccountsEnv = IEnv;
 
 export { SearchAccountsRoute };
-export type { SearchAccountsRequest, SearchAccountsResponse };

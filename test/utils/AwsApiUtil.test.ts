@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { IamService } from '@aws-access-bridge/backend-services/aws/iam';
 import { CostExplorerService } from '@aws-access-bridge/backend-services/aws/ce';
-import { BadRequestError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 const mockFetch = vi.fn();
@@ -24,7 +24,13 @@ const ASSUME_XML = `<AssumeRoleResponse><AssumeRoleResult><Credentials>
 </Credentials></AssumeRoleResult></AssumeRoleResponse>`;
 
 function xmlResponse(xml: string, ok = true, status = 200): Response {
-  return { ok, status, statusText: ok ? 'OK' : 'Error', text: async () => xml } as Response;
+  return {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    text: async () => xml,
+    arrayBuffer: async () => new TextEncoder().encode(xml).buffer,
+  } as Response;
 }
 
 describe('StsService.assumeRole', () => {
@@ -39,8 +45,13 @@ describe('StsService.assumeRole', () => {
     expect(result.expiration).toBe('2025-01-01T00:00:00Z');
   });
 
-  it('throws UnauthorizedError when STS rejects', async () => {
+  it('throws ForbiddenError when STS rejects with a 403', async () => {
     mockFetch.mockResolvedValue(xmlResponse('<Error/>', false, 403));
+    await expect(new StsService().assumeRole('arn:aws:iam::123456789012:role/Dev', KEYS, 's')).rejects.toThrow(ForbiddenError);
+  });
+
+  it('throws UnauthorizedError for non-403 failures', async () => {
+    mockFetch.mockResolvedValue(xmlResponse('<Error/>', false, 401));
     await expect(new StsService().assumeRole('arn:aws:iam::123456789012:role/Dev', KEYS, 's')).rejects.toThrow(UnauthorizedError);
   });
 
@@ -122,7 +133,12 @@ describe('CostExplorerService.getCostAndUsage', () => {
         },
       ],
     });
-    mockFetch.mockResolvedValue({ ok: true, status: 200, text: async () => body });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => body,
+      arrayBuffer: async () => new TextEncoder().encode(body).buffer,
+    });
     const results = await new CostExplorerService().getCostAndUsage(KEYS, '2025-01-01', '2025-01-02');
     expect(results).toHaveLength(1);
     expect(results[0]?.totalCost).toBe(1.5);
@@ -130,8 +146,12 @@ describe('CostExplorerService.getCostAndUsage', () => {
   });
 
   it('throws InternalServerError when Cost Explorer rejects', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'nope' });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => 'nope',
+      arrayBuffer: async () => new TextEncoder().encode('nope').buffer,
+    });
     await expect(new CostExplorerService().getCostAndUsage(KEYS, '2025-01-01', '2025-01-02')).rejects.toThrow(InternalServerError);
   });
 });
-

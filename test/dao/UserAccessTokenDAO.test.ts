@@ -55,7 +55,7 @@ describe('UserAccessTokenDAO', () => {
       vi.mocked(mockStmt.first).mockResolvedValue({
         token_id: 'tid',
         user_email: 'user@test.com',
-        access_token: 'tok',
+        token_hash: 'tok-hash',
         name: 'My Token',
         created_at: 1_700_000_000,
         expires_at: 1_800_000_000,
@@ -82,12 +82,12 @@ describe('UserAccessTokenDAO', () => {
     });
   });
 
-  describe('getByToken', () => {
+  describe('getByTokenHash', () => {
     it('returns token metadata when found', async () => {
       vi.mocked(mockStmt.first).mockResolvedValue({
         token_id: 'tid',
         user_email: 'user@test.com',
-        access_token: 'tok',
+        token_hash: 'tok-hash',
         name: 'My Token',
         created_at: 1_700_000_000,
         expires_at: 1_800_000_000,
@@ -95,7 +95,7 @@ describe('UserAccessTokenDAO', () => {
         last_used_at: undefined,
       });
       const dao = new UserAccessTokenDAO(mockDb);
-      const result = await dao.getByToken('tok', false);
+      const result = await dao.getByTokenHash('tok', false);
       // A token with no id (pre-0032) reports null, which is what makes
       // TokenService fall back to the stored address.
       expect(result).toEqual({
@@ -126,32 +126,17 @@ describe('UserAccessTokenDAO', () => {
     });
   });
 
-  describe('updateLastUsedById', () => {
-    it('updates the last_used_at timestamp', async () => {
-      const dao = new UserAccessTokenDAO(mockDb);
-      await dao.updateLastUsedById('tid');
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE'));
-      expect(mockStmt.bind).toHaveBeenCalledWith(expect.any(Number), 'tid');
-    });
-
-    it('throws DatabaseError on failure', async () => {
-      vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'fail' } as unknown as D1Result);
-      const dao = new UserAccessTokenDAO(mockDb);
-      await expect(dao.updateLastUsedById('tid')).rejects.toThrow(DatabaseError);
-    });
-  });
-
-  describe('updateLastUsedByToken', () => {
+  describe('updateLastUsedByTokenHash', () => {
     it('updates the last_used_at timestamp by token value', async () => {
       const dao = new UserAccessTokenDAO(mockDb);
-      await dao.updateLastUsedByToken('my-token');
+      await dao.updateLastUsedByTokenHash('my-token');
       expect(mockStmt.bind).toHaveBeenCalledWith(expect.any(Number), 'my-token');
     });
 
     it('throws DatabaseError on failure', async () => {
       vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'fail' } as unknown as D1Result);
       const dao = new UserAccessTokenDAO(mockDb);
-      await expect(dao.updateLastUsedByToken('my-token')).rejects.toThrow(DatabaseError);
+      await expect(dao.updateLastUsedByTokenHash('my-token')).rejects.toThrow(DatabaseError);
     });
   });
 

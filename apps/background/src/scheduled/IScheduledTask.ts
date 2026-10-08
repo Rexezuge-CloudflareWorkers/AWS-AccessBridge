@@ -10,8 +10,8 @@ interface TaskRunSummary {
 
 abstract class IScheduledTask<TEnv extends IEnv> {
   // Override to opt into automatic global run tracking via the Template Method.
-  // Tasks returning void skip run tracking; tasks returning a TaskRunSummary
-  // get a `background_task_runs` record (visible via GET /user/admin/maintenance/task-runs).
+  // Tasks that leave this null skip run tracking; tasks that return a type get a
+  // `background_task_runs` record (visible via GET /user/admin/maintenance/task-runs).
   protected getTaskType(): string | null {
     return null;
   }
@@ -41,7 +41,7 @@ abstract class IScheduledTask<TEnv extends IEnv> {
       const result = await this.handleScheduledTask(event, tEnv, ctx);
       if (runId && db) {
         const dao = this.createTaskRunDAO(db);
-        await dao.succeedRun(runId, result ?? { itemsProcessed: 0, itemsFailed: 0 }).catch((error: unknown) => {
+        await dao.succeedRun(runId, result).catch((error: unknown) => {
           log.warn(`[${this.constructor.name}] Failed to mark task run succeeded:`, { error: error });
         });
       }
@@ -60,10 +60,8 @@ abstract class IScheduledTask<TEnv extends IEnv> {
     }
   }
 
-  // Return type is widened to TaskRunSummary | void for backward compatibility.
-  // Existing tasks returning void satisfy this signature without changes.
-  // New observable tasks return TaskRunSummary for richer run records.
-  protected abstract handleScheduledTask(event: ScheduledController, env: TEnv, ctx: ExecutionContext): Promise<TaskRunSummary | void>;
+  // Every task reports a TaskRunSummary; it is recorded only when `getTaskType()` opts in.
+  protected abstract handleScheduledTask(event: ScheduledController, env: TEnv, ctx: ExecutionContext): Promise<TaskRunSummary>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

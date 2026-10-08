@@ -1,10 +1,14 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class HideRoleRoute extends IActivityAPIRoute<HideRoleRequest, HideRoleResponse, HideRoleEnv> {
   schema = {
     tags: ['User'],
@@ -83,4 +87,3 @@ interface HideRoleResponse extends IResponse {
 type HideRoleEnv = IEnv;
 
 export { HideRoleRoute };
-export type { HideRoleRequest, HideRoleResponse };

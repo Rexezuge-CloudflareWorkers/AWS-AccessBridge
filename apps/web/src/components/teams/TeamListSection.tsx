@@ -2,18 +2,12 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Team } from '@aws-access-bridge/shared';
 import { formatUnixDate } from '../../lib/format';
 import { DEFAULT_TEAM_ID } from '../../lib/constants';
 import FocusInput from '../ui/FocusInput';
 import Spinner from '../ui/Spinner';
 import { cardStyle, btnGreenStyle, btnSmallStyle } from '../ui/theme';
-
-interface Team {
-  teamId: string;
-  teamName: string;
-  createdBy: string;
-  createdAt: number;
-}
 
 interface TeamListSectionProps {
   teams: Team[];
@@ -52,7 +46,12 @@ export default function TeamListSection({ teams, isLoading, selectedTeamId, onSe
           style={{ display: 'flex', gap: '12px', alignItems: 'center' }}
         >
           <div style={{ flex: 1 }}>
-            <FocusInput type="text" placeholder={t('teams.namePlaceholder', 'Team name')} value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+            <FocusInput
+              type="text"
+              placeholder={t('teams.namePlaceholder', 'Team name')}
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+            />
           </div>
           <button
             type="submit"
@@ -78,7 +77,9 @@ export default function TeamListSection({ teams, isLoading, selectedTeamId, onSe
         {isLoading && <Spinner size={24} />}
 
         {!isLoading && teams.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280' }}>{t('teams.noTeams', 'No teams found. Create one above.')}</div>
+          <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280' }}>
+            {t('teams.noTeams', 'No teams found. Create one above.')}
+          </div>
         )}
 
         {!isLoading && teams.length > 0 && (

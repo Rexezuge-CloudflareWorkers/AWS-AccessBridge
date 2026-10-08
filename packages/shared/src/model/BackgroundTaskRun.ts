@@ -28,4 +28,4 @@ interface BackgroundTaskRunInternal {
   created_at: number;
 }
 
-export type { BackgroundTaskRun, BackgroundTaskRunInternal, BackgroundTaskRunStatus };
+export type { BackgroundTaskRun, BackgroundTaskRunInternal };

@@ -1,15 +1,12 @@
-export type { AccessableAccount, AccessableAccountInternal } from './AccessableAccount';
 export type { AccessKeysResponse } from './AccessBridge';
-export type { BackgroundTaskRun, BackgroundTaskRunInternal, BackgroundTaskRunStatus } from './BackgroundTaskRun';
+export type { BackgroundTaskRun, BackgroundTaskRunInternal } from './BackgroundTaskRun';
 export type { AccessKeys, AccessKeysWithExpiration } from './AccessKeys';
-export type { AssumableRole, AssumableRoleInternal } from './AssumableRoles';
-export type { AssumableAccount, AssumableAccountsMap, AssumableAccountsResponse } from './AssumableAccount';
+export type { AssumableAccountsMap, AssumableAccountsResponse } from './AssumableAccount';
 export type { Credential, CredentialInternal } from './Credential';
 export type { CredentialCache } from './CredentialCache';
-export type { CredentialCacheConfig, CredentialCacheConfigInternal } from './CredentialCacheConfig';
 export type { CredentialChain } from './CredentialChain';
 export type { RoleConfig, RoleConfigInternal } from './RoleConfig';
-export type { UserMetadata, UserMetadataInternal } from './UserMetadata';
+export type { UserMetadataInternal } from './UserMetadata';
 export type { UserAccessToken, UserAccessTokenMetadata, UserAccessTokenInternal } from './UserAccessToken';
 export type { AuditLog, AuditLogInternal } from './AuditLog';
 export type { CostData, CostDataInternal } from './CostData';

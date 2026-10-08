@@ -1,4 +1,3 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -148,13 +147,15 @@ class SetRoleConfigRoute extends IAdminActivityAPIRoute<SetRoleConfigRequest, Se
     env: SetRoleConfigEnv,
     _cxt: ActivityContext<SetRoleConfigEnv>,
   ): Promise<SetRoleConfigResponse> {
-    await getRequestScope(_cxt).get(Tokens.AccountService).setRoleConfig(
-      request.awsAccountId,
-      request.roleName,
-      request.destinationPath,
-      request.destinationRegion,
-      request.roleSessionDurationSeconds,
-    );
+    await getRequestScope(_cxt)
+      .get(Tokens.AccountService)
+      .setRoleConfig(
+        request.awsAccountId,
+        request.roleName,
+        request.destinationPath,
+        request.destinationRegion,
+        request.roleSessionDurationSeconds,
+      );
 
     return {
       success: true,
@@ -179,4 +180,3 @@ interface SetRoleConfigResponse extends IResponse {
 type SetRoleConfigEnv = IAdminEnv;
 
 export { SetRoleConfigRoute };
-export type { SetRoleConfigRequest, SetRoleConfigResponse };

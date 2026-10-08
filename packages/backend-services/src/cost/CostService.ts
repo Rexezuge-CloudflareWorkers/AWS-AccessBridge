@@ -60,21 +60,17 @@ class CostService {
     this.identity = identity ?? new UserIdentityService(env);
   }
 
-
   private ownerFor(userEmail: string): Promise<AssumableRoleOwner> {
     return resolveOwner(this.identity, userEmail);
   }
 
   public async getSummary(userEmail: string, lookbackDays: number = 30): Promise<CostSummary> {
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
-
-    if (accountIds.length === 0) return { accounts: {}, grandTotal: 0, currency: null };
+    const owner = await this.ownerFor(userEmail);
 
     const { startDate, endDate } = MoneyUtil.lookbackWindow(lookbackDays);
 
     const costDataDAO: CostDataDAO = new CostDataDAO(this.env.AccessBridgeDB);
-    const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
+    const costData: CostData[] = await costDataDAO.getCostDataForOwner(owner, startDate, endDate);
 
     const accounts: Record<string, AccountCostSummary> = {};
     let grandTotal: number = 0;
@@ -134,17 +130,14 @@ class CostService {
 
   public async getTrends(userEmail: string, months: number = 6): Promise<{ months: MonthlyTrend[] }> {
     const boundedMonths: number = Math.min(months, 12);
-    const assumableRolesDAO: AssumableRolesDAO = new AssumableRolesDAO(this.env.AccessBridgeDB);
-    const accountIds: string[] = await assumableRolesDAO.getDistinctAccountIds(await this.ownerFor(userEmail));
-
-    if (accountIds.length === 0) return { months: [] };
+    const owner = await this.ownerFor(userEmail);
 
     // A month is 30 days here because Cost Explorer's granularity cannot express a
     // calendar month; the previous code hardcoded the same `* 30`.
-const { startDate, endDate } = MoneyUtil.lookbackWindow(boundedMonths * DAYS_PER_MONTH);
+    const { startDate, endDate } = MoneyUtil.lookbackWindow(boundedMonths * DAYS_PER_MONTH);
 
     const costDataDAO: CostDataDAO = new CostDataDAO(this.env.AccessBridgeDB);
-    const costData: CostData[] = await costDataDAO.getCostDataForAccounts(accountIds, startDate, endDate);
+    const costData: CostData[] = await costDataDAO.getCostDataForOwner(owner, startDate, endDate);
 
     // Aggregate by month
     const monthlyData: Record<string, { total: number; byAccount: Record<string, number> }> = {};
@@ -197,5 +190,6 @@ const { startDate, endDate } = MoneyUtil.lookbackWindow(boundedMonths * DAYS_PER
     const dao: DataCollectionConfigDAO = new DataCollectionConfigDAO(this.env.AccessBridgeDB);
     await dao.delete(principalArn, collectionType);
   }
-}export { CostService };
+}
+export { CostService };
 export type { AccountCost, AccountCostSummary, CostServiceEnv, CostSummary, MonthlyTrend };
