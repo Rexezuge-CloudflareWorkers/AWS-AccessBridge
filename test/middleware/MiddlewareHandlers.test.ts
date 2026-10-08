@@ -186,9 +186,45 @@ describe('csrfProtection', () => {
     // curl and server-to-server clients do not send the header at all.
     const noSecFetchSite = await call('POST', { 'Content-Type': 'application/json' });
     expect(noSecFetchSite.status).toBe(200);
-    // `none` is what a user-initiated navigation sends.
-    const navigation = await call('DELETE', { 'Sec-Fetch-Site': 'none' });
+    // `none` is what a user-initiated navigation sends. It carries the JSON
+    // content type because `apiRequest` sets it on every mutating call — which
+    // is also what a body-less DELETE must do now that only `Content-Length: 0`
+    // exempts a write from the content-type check.
+    const navigation = await call('DELETE', { 'Sec-Fetch-Site': 'none', 'Content-Type': 'application/json' });
     expect(navigation.status).toBe(200);
+    // The explicit empty body is the other exemption.
+    const explicitEmpty = await call('DELETE', { 'Sec-Fetch-Site': 'none', 'Content-Length': '0' });
+    expect(explicitEmpty.status).toBe(200);
+  });
+
+  /**
+   * `Content-Length: 0` is the only thing that counts as a body-less write.
+   *
+   * A request carrying neither `Content-Length` nor `Transfer-Encoding` has an
+   * *unknown* body, not an empty one, so it has to declare JSON as well. This
+   * is what stops the guard depending on a framing header — and a JSON parser —
+   * that an attacker influences: today the browser always frames a form post, so
+   * the case is not reachable from the CSRF threat model, but the conservative
+   * reading costs the SPA nothing because `apiRequest` sends the header on
+   * every mutating call.
+   */
+  it('treats an unframed write as an unknown body rather than an empty one', async () => {
+    const unframedNoType = await call('POST', { 'Sec-Fetch-Site': 'same-origin' });
+    expect(unframedNoType.status).toBe(403);
+    await expect(unframedNoType.json()).resolves.toMatchObject({ Exception: { Type: 'Forbidden' } });
+
+    // Unframed but explicitly JSON is allowed — that is `apiRequest`'s shape
+    // before the network layer attaches a length.
+    const unframedJson = await call('PUT', { 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' });
+    expect(unframedJson.status).toBe(200);
+
+    // A chunked write is a body whatever its length says.
+    const chunked = await call('POST', { 'Sec-Fetch-Site': 'same-origin', 'Transfer-Encoding': 'chunked' });
+    expect(chunked.status).toBe(403);
+
+    // Whitespace around the zero is still a zero.
+    const paddedEmpty = await call('DELETE', { 'Sec-Fetch-Site': 'same-origin', 'Content-Length': ' 0 ' });
+    expect(paddedEmpty.status).toBe(200);
   });
 
   it('leaves reads alone whatever the headers say', async () => {
@@ -459,6 +495,35 @@ describe('MiddlewareHandlers', () => {
       // path/user-agent values — a write amplification path with no principal.
       expect(auditLogCreateSpy).not.toHaveBeenCalled();
       expect(waitUntilSpy).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Regression guard on the `finally` that skips an unauthenticated 401.
+     *
+     * The skip used to be an early `return` from inside the `finally`, and a
+     * `return` there discards any exception the `catch` had just re-threw, so a
+     * downstream fault reaching `next()` as a rejection would have become a 200:
+     * the audit skip hiding a real failure behind a successful-looking response.
+     * The skip is now a guard *before* the write.
+     *
+     * Hono absorbs a handler's throw and renders it before this middleware sees
+     * it, so the observable property is that a failing request stays failing.
+     */
+    it('never turns a failing request into a success while skipping the audit write', async () => {
+      const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      mount(app, '*', MiddlewareHandlers.activityAudit());
+      app.get('/api/test', () => {
+        throw Object.assign(new Error('upstream exploded'), { status: 401 });
+      });
+
+      const response: Response = await app.fetch(new Request('https://worker.example.com/api/test'), createEnv(), createExecutionContext());
+
+      expect(response.status).not.toBe(200);
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      // The middleware saw a non-401 status, so this one *is* recorded — a 500 is
+      // exactly what an audit trail exists for.
+      expect(auditLogCreateSpy).toHaveBeenCalled();
     });
 
     it('hands waitUntil a promise that never rejects, and logs the failure', async () => {

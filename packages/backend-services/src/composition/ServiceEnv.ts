@@ -55,11 +55,14 @@ interface ServiceEnv {
 
   // Internal HMAC-signed self-calls
   INTERNAL_REQUEST_HMAC_SECRET?: SecretsStoreSecret;
-  SELF?: Fetcher;
 
   // Auth-boundary rate limiter and the durable collection workflow. Both optional:
   // the middleware and the cron fall back to their previous behaviour when a
   // deployment has not bound them.
+  //
+  // There is no `SELF` here: it existed only to construct the
+  // `InternalRequestHelper` this scope used to register, and nothing has resolved
+  // that token since federation stopped looping back over the service binding.
   AUTH_RATE_LIMITER?: RateLimit;
   COLLECTION_WORKFLOW?: Workflow;
 }

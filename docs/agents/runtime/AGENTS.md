@@ -15,6 +15,19 @@ Scope: Wrangler bindings, build output, migrations, env vars. Parent index: [`..
 
 **Per-feature encryption keys.** Each encrypted surface has its own key: `CREDENTIAL_ENCRYPTION_KEY_SECRET` for the `credentials` D1 table, `CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET` for the `credentials_cache` KV namespace. Reads and writes both use the surface's own key. The former single `AES_ENCRYPTION_KEY_SECRET` (and the `AES_ENCRYPTION_KEY` dev var) were a read-only fallback for rows written before the split; they are gone, so a row that is still encrypted only under it can no longer be read. An existing deployment can delete the `aws-access-bridge-aes-encryption-key` secret from its Secrets Store after deploying — `init-secrets.ts` no longer creates it, seeds from it, or deletes it. `INTERNAL_HMAC_SECRET` was renamed to `INTERNAL_REQUEST_HMAC_SECRET` for naming consistency; it was already single-purpose. Binding source of truth: `packages/backend-runtime/src/env.d.ts` (checked in) + generated root `worker-configuration.d.ts` (`pnpm run typegen`).
 
+**The plaintext `CREDENTIAL_ENCRYPTION_KEY` / `CREDENTIAL_CACHE_ENCRYPTION_KEY` vars are refused when
+`ENVIRONMENT` is `production`.** `composition/encryptionKeys.ts` reads them as a fallback for local
+development and tests, which have no Secrets Store, and it used to read them unconditionally — which
+meant a production deployment could encrypt the IAM credentials table with a key sitting in an
+ordinary env var while the code reported a Secrets Store key in use. The fallback is now gated on
+`ConfigurationManager.environment.isProduction`, so a deployment with no binding and only the raw var
+**fails loudly** with `InternalServerError` rather than encrypting under a weaker boundary.
+`isProduction` is the literal string `production` — not `prod`, not unset — so a staging environment
+still gets the var fallback. This is an availability-breaking change for any deployment that only
+ever set the raw var: bind `CREDENTIAL_ENCRYPTION_KEY_SECRET` /
+`CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET` in the Secrets Store (`scripts/deploy/init-secrets.ts`
+creates them) before deploying the version that introduced this.
+
 - `functions/[[path]].ts` — Pages catch-all proxy → `API_WORKER.fetch()` with `X-Forwarded-*` headers.
 
 ## Migrations

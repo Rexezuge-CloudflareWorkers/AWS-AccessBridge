@@ -65,7 +65,13 @@ fifteen memo misses per request; the same applies to `CredentialChainService`, w
 routes over HMAC-signed loopback fetches. That serialized temporary credentials through the network
 stack, re-ran the auth and audit middleware, and produced three audit entries for one federation. The
 facade composes `AssumeRoleService` and `ConsoleService` directly, so one federation is one audit
-entry. The HMAC path still exists for genuinely internal callers.
+entry.
+
+**That removed the last in-repo producer of an internal self-call, so the composition root no longer
+registers a signing helper.** There is deliberately no `Tokens.InternalRequestHelper`: the token had
+no consumer, and a DI registration nothing resolves reads as a live dependency.
+`aws/InternalRequestHelper` stays exported as the library an external holder of
+`INTERNAL_REQUEST_HMAC_SECRET` would use, and `ServiceEnv` therefore has no `SELF`.
 
 `composition/encryptionKeys.ts` holds the per-feature key chains (`Tokens.CredentialKey`,
 `Tokens.CredentialCacheKey`) and **injects** them into `CredentialChainService` and
@@ -164,8 +170,10 @@ which alters billing-visible behaviour.
 
 ## Pure statics stay static
 
-`aws/ArnUtil`, `aws/BaseUrlUtil`, `aws/InternalRequestHelper` (instance — it holds a fetcher and a
-secret), `error/ErrorTranslationUtil`, `error/ErrorDeserializationUtil`.
+`aws/ArnUtil`, `aws/BaseUrlUtil`, `aws/InternalRequestHelper` (instance — holds a fetcher and the HMAC
+secret; no in-repo consumer since federation went in-process, kept as the signer for an external
+holder of `INTERNAL_REQUEST_HMAC_SECRET`), `error/ErrorTranslationUtil`,
+`error/ErrorDeserializationUtil`.
 
 ## One naming collision to know
 

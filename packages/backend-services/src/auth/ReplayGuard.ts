@@ -8,8 +8,8 @@ import { log } from '@aws-access-bridge/shared/utils';
  * handler's ±`INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` check bounds how
  * long a captured request stays replayable, but every request inside that window
  * is still replayable — and `authenticateApiIdentity` trusts the
- * `X-Internal-User-Email` header on it, so one captured fan-out call can be
- * re-run as that user.
+ * `X-Internal-User-Email` header on it, so one captured call can be re-run as
+ * that user.
  *
  * This closes that gap with a KV-backed seen-set: a signature is recorded on
  * acceptance and rejected on a second presentation. KV is the right store because

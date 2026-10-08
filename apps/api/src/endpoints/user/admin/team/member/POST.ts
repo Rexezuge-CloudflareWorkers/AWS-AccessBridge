@@ -1,11 +1,16 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  conflictResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class AddTeamMemberRoute extends IAdminActivityAPIRoute<AddTeamMemberRequest, AddTeamMemberResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -78,14 +83,20 @@ class AddTeamMemberRoute extends IAdminActivityAPIRoute<AddTeamMemberRequest, Ad
       '400': badRequestResponse('Bad request - Missing required fields'),
       '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
       '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '409': conflictResponse('Conflict - That user is already a member of this team'),
       '500': internalServerErrorResponse('Internal server error while adding team member'),
     },
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: AddTeamMemberRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<AddTeamMemberResponse> {
-    await getRequestScope(cxt).get(Tokens.TeamService).addMember(request.teamId, request.userEmail, request.role || 'member');
+  protected async handleAdminRequest(
+    request: AddTeamMemberRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<AddTeamMemberResponse> {
+    await getRequestScope(cxt)
+      .get(Tokens.TeamService)
+      .addMember(request.teamId, request.userEmail, request.role || 'member');
     return { success: true, message: 'Member added.' };
   }
 }

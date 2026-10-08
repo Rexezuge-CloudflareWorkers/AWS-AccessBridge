@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   badRequestResponse,
+  conflictResponse,
   exceptionResponse,
   forbiddenResponse,
   internalServerErrorResponse,
@@ -44,6 +45,7 @@ describe('exception response builders', () => {
     );
     expect(forbiddenResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('ForbiddenError');
     expect(notFoundResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('NotFoundError');
+    expect(conflictResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('ConflictError');
     expect(internalServerErrorResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe(
       'InternalServerError',
     );

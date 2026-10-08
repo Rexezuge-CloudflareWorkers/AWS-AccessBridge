@@ -128,6 +128,9 @@ describe('favorites routes', () => {
     // grant-shaped no-op, and an unbounded way to add `aws_accounts` rows.
     expect(UserFavoriteAccountsDAO.prototype.favoriteAccount).not.toHaveBeenCalled();
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Forbidden' }) }), 403);
+    // `/docs` is the only place a caller learns the 403 exists, and the
+    // published document is data that builds whatever it says.
+    expect(Object.keys(new FavoriteAccountRoute({} as never).schema.responses)).toContain('403');
   });
 
   it('DELETE /user/favorites unfavorites', async () => {

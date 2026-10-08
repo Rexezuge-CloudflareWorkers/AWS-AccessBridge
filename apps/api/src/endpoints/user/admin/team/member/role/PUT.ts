@@ -1,11 +1,17 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  conflictResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class UpdateTeamMemberRoleRoute extends IAdminActivityAPIRoute<UpdateRoleRequest, UpdateRoleResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -77,13 +83,18 @@ class UpdateTeamMemberRoleRoute extends IAdminActivityAPIRoute<UpdateRoleRequest
       '400': badRequestResponse('Bad request - Missing required fields'),
       '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
       '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '404': notFoundResponse('Not Found - That user is not a member of this team'),
+      '409': conflictResponse('Conflict - The team must keep at least one admin'),
       '500': internalServerErrorResponse('Internal server error while updating role'),
     },
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: UpdateRoleRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<UpdateRoleResponse> {
+  protected async handleAdminRequest(
+    request: UpdateRoleRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<UpdateRoleResponse> {
     await getRequestScope(cxt).get(Tokens.TeamService).updateMemberRole(request.teamId, request.userEmail, request.role);
     return { success: true, message: 'Role updated.' };
   }

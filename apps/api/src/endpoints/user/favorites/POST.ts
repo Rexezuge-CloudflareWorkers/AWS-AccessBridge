@@ -2,6 +2,12 @@ import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 
 class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, FavoriteAccountResponse, FavoriteAccountEnv> {
   schema = {
@@ -41,6 +47,12 @@ class FavoriteAccountRoute extends IActivityAPIRoute<FavoriteAccountRequest, Fav
           },
         },
       },
+      '400': badRequestResponse('Bad request - Missing required fields'),
+      '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
+      // Favouriting an account the caller has no grant for is refused rather
+      // than stored: the row would show in the list and never be usable.
+      '403': forbiddenResponse('Forbidden - You do not have access to that account'),
+      '500': internalServerErrorResponse('Internal server error while favoriting account'),
     },
     security: [{ CloudflareAccess: [] }],
   };

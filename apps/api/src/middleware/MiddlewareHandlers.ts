@@ -104,41 +104,62 @@ async function authenticateApiIdentity(c: RequestContext): Promise<string> {
 
 async function activityAuditHandler(c: RequestContext, next: Next): Promise<void> {
   let statusCode: number = 200;
+  let authenticatedEmail: string | undefined;
 
   try {
     await next();
     statusCode = c.res.status;
+    authenticatedEmail = c.get('AuthenticatedUserEmailAddress');
   } catch (error: unknown) {
     statusCode = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500;
+    authenticatedEmail = c.get('AuthenticatedUserEmailAddress');
     throw error;
   } finally {
-    try {
-      const authenticatedEmail: string | undefined = c.get('AuthenticatedUserEmailAddress');
-      // A 401 with no authenticated principal is an unauthenticated request:
-      // recording each of them writes attacker-controlled "unknown" rows and
-      // turns the audit table into an amplification target. Genuine 401s after
-      // a successful handshake keep their entry.
-      if (statusCode === 401 && !authenticatedEmail) {
-        return;
-      }
-      const userEmail: string = authenticatedEmail || 'unknown';
-      // The stable account id, so the entry stays findable after the account
-      // changes address. Optional: a database without 0032 leaves it unset and
-      // the entry is written address-keyed, exactly as before.
-      const userId: string | null = c.get('AuthenticatedUserId') ?? null;
-      const auditService = getRequestScope(c).get(Tokens.AuditService);
-      const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env, userId);
-      // `waitUntil` returns void, so the promise it is handed is detached: a
-      // rejection here would escape as an unhandled rejection in the runtime
-      // rather than reach the catch below. Attach the handler to the promise.
-      c.executionCtx.waitUntil(
-        auditService.record(event).catch((auditError: unknown): void => {
-          log.error('Failed to write audit log:', { error: auditError });
-        }),
-      );
-    } catch (error: unknown) {
-      log.error('Failed to build audit log event:', { error: error });
+    // A 401 with no authenticated principal is an unauthenticated request:
+    // recording each of them writes attacker-controlled "unknown" rows and
+    // turns the audit table into an amplification target. Genuine 401s after
+    // a successful handshake keep their entry.
+    //
+    // This is a guard *before* the write, deliberately not an early `return` from
+    // inside this `finally`: a `return` here discards the exception the `catch`
+    // just re-threw, so a real fault would surface as a 200. Nothing follows the
+    // guard, so a `return` would happen to be safe — but only by coincidence of
+    // ordering, and `no-unsafe-finally` is not enabled here to catch the day
+    // someone appends a line below it.
+    if (statusCode !== 401 || authenticatedEmail) {
+      writeAuditEntry(c, statusCode, authenticatedEmail);
     }
+  }
+}
+
+/**
+ * Record one request in the audit trail. Failures are logged, never propagated:
+ * a rejected audit write must not become an unhandled rejection, and must not
+ * fail the request it describes.
+ *
+ * Synchronous by design, so the caller's `finally` never awaits and therefore
+ * never has to reason about how an await there interacts with the exception the
+ * `catch` above re-threw.
+ */
+function writeAuditEntry(c: RequestContext, statusCode: number, authenticatedEmail: string | undefined): void {
+  try {
+    const userEmail: string = authenticatedEmail || 'unknown';
+    // The stable account id, so the entry stays findable after the account
+    // changes address. Optional: a database without 0032 leaves it unset and
+    // the entry is written address-keyed, exactly as before.
+    const userId: string | null = c.get('AuthenticatedUserId') ?? null;
+    const auditService = getRequestScope(c).get(Tokens.AuditService);
+    const event = auditService.buildRequestEvent(c.req.raw, userEmail, statusCode, c.env, userId);
+    // `waitUntil` returns void, so the promise it is handed is detached: a
+    // rejection here would escape as an unhandled rejection in the runtime
+    // rather than reach the catch below. Attach the handler to the promise.
+    c.executionCtx.waitUntil(
+      auditService.record(event).catch((auditError: unknown): void => {
+        log.error('Failed to write audit log:', { error: auditError });
+      }),
+    );
+  } catch (error: unknown) {
+    log.error('Failed to build audit log event:', { error: error });
   }
 }
 

@@ -9,8 +9,12 @@ import { ResourceInventoryCollectionTask } from './scheduled/ResourceInventoryCo
  * Each scheduled tick starts one instance; each collection task runs as its own
  * named step. Step names are stable across ticks because the task type is
  * constant, so a step's cached result — or its single retry — is addressable.
- * One collection task throwing fails the instance loudly, and the cron DO
- *   still records the failure via the run record it wrote before handing off.
+ *
+ * The `background_task_runs` record is written by the step itself, not by the
+ * cron DO: each step calls `task.handle(...)`, so a collection failure still
+ * lands in `GET /user/admin/maintenance/task-runs` even though the DO answered
+ * `completed` the moment it handed the work over. That is why a failed step
+ * throws — the DO's own response no longer reports the collection outcome.
  */
 interface CollectionWorkflowParams {
   cron?: string;

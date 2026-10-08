@@ -175,3 +175,103 @@ describe('team account routes', () => {
     expect(c.json).toHaveBeenCalledWith(expect.objectContaining({ accountIds: ['123456789012'] }));
   });
 });
+
+/**
+ * The member and account writes answer 404 and 409 rather than reporting a no-op
+ * as success: a duplicate add, a role change for a non-member, a demotion that
+ * would empty the admin set, and an account this deployment has never connected.
+ *
+ * Those statuses only exist in `TeamService`, so the published OpenAPI document
+ * is the only place a caller learns they are possible — and `/docs` is data that
+ * typechecks and builds whatever it says. This drives each failure and asserts the
+ * route *declares* the status it actually produced.
+ */
+describe('member and account write statuses are declared', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * The status `c.json` was last called with, or undefined for a non-error answer.
+   */
+  function statusOf(c: ReturnType<typeof createRouteContext>): number | undefined {
+    const mocked = c.json as unknown as { mock: { calls: unknown[][] } };
+    const call = mocked.mock.calls.at(-1);
+    return typeof call?.[1] === 'number' ? call[1] : undefined;
+  }
+
+  function declaredStatuses(route: { schema: { responses: Record<string, unknown> } }): string[] {
+    return Object.keys(route.schema.responses);
+  }
+
+  it('a duplicate add answers 409 and the route declares it', async () => {
+    vi.mocked(TeamMembersDAO.prototype.addMember).mockResolvedValue(0);
+    const c = createRouteContext({
+      method: 'POST',
+      body: { teamId: 't1', userEmail: 'dev@example.com', role: 'member' },
+      env: adminEnv(),
+    });
+    const route = new AddTeamMemberRoute({} as never);
+    await route.handle(c);
+
+    expect(statusOf(c)).toBe(409);
+    expect(declaredStatuses(route)).toContain('409');
+  });
+
+  it('removing a non-member answers 404 and the route declares it', async () => {
+    vi.mocked(TeamMembersDAO.prototype.getMemberRole).mockResolvedValue(null);
+    const c = createRouteContext({
+      method: 'DELETE',
+      body: { teamId: 't1', userEmail: 'dev@example.com' },
+      env: adminEnv(),
+    });
+    const route = new RemoveTeamMemberRoute({} as never);
+    await route.handle(c);
+
+    expect(statusOf(c)).toBe(404);
+    expect(declaredStatuses(route)).toContain('404');
+  });
+
+  it('demoting the last admin answers 409 and the route declares it', async () => {
+    vi.mocked(TeamMembersDAO.prototype.getMemberRole).mockResolvedValue('admin');
+    vi.mocked(TeamMembersDAO.prototype.countAdmins).mockResolvedValue(1);
+    const c = createRouteContext({
+      method: 'PUT',
+      body: { teamId: 't1', userEmail: 'dev@example.com', role: 'member' },
+      env: adminEnv(),
+    });
+    const route = new UpdateTeamMemberRoleRoute({} as never);
+    await route.handle(c);
+
+    expect(statusOf(c)).toBe(409);
+    expect(declaredStatuses(route)).toContain('409');
+  });
+
+  it('role-changing a non-member answers 404 and the route declares it', async () => {
+    vi.mocked(TeamMembersDAO.prototype.getMemberRole).mockResolvedValue(null);
+    const c = createRouteContext({
+      method: 'PUT',
+      body: { teamId: 't1', userEmail: 'dev@example.com', role: 'admin' },
+      env: adminEnv(),
+    });
+    const route = new UpdateTeamMemberRoleRoute({} as never);
+    await route.handle(c);
+
+    expect(statusOf(c)).toBe(404);
+    expect(declaredStatuses(route)).toContain('404');
+  });
+
+  it('adding an unconnected account answers 404 and the route declares it', async () => {
+    vi.mocked(AwsAccountsDAO.prototype.accountExists).mockResolvedValue(false);
+    const c = createRouteContext({
+      method: 'POST',
+      body: { teamId: 't1', awsAccountId: '123456789012' },
+      env: adminEnv(),
+    });
+    const route = new AddTeamAccountRoute({} as never);
+    await route.handle(c);
+
+    expect(statusOf(c)).toBe(404);
+    expect(declaredStatuses(route)).toContain('404');
+  });
+});

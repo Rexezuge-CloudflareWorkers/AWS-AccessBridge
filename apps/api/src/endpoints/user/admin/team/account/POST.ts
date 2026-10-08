@@ -1,11 +1,16 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, AddTeamAccountResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -68,13 +73,17 @@ class AddTeamAccountRoute extends IAdminActivityAPIRoute<AddTeamAccountRequest, 
       '400': badRequestResponse('Bad request - Missing required fields'),
       '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
       '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '404': notFoundResponse('Not Found - That AWS account is not connected to this deployment'),
       '500': internalServerErrorResponse('Internal server error while adding account to team'),
     },
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: AddTeamAccountRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<AddTeamAccountResponse> {
+  protected async handleAdminRequest(
+    request: AddTeamAccountRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<AddTeamAccountResponse> {
     await getRequestScope(cxt).get(Tokens.TeamService).addAccount(request.teamId, request.awsAccountId);
     return { success: true, message: 'Account added to team.' };
   }
