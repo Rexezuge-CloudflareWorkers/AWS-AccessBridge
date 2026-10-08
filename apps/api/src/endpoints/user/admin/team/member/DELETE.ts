@@ -1,11 +1,17 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  conflictResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class RemoveTeamMemberRoute extends IAdminActivityAPIRoute<RemoveTeamMemberRequest, RemoveTeamMemberResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -68,13 +74,18 @@ class RemoveTeamMemberRoute extends IAdminActivityAPIRoute<RemoveTeamMemberReque
       '400': badRequestResponse('Bad request - Missing required fields'),
       '401': unauthorizedResponse('Unauthorized - Missing or invalid authentication'),
       '403': forbiddenResponse('Forbidden - User is not a superadmin'),
+      '404': notFoundResponse('Not Found - That user is not a member of this team'),
+      '409': conflictResponse('Conflict - The team must keep at least one admin'),
       '500': internalServerErrorResponse('Internal server error while removing team member'),
     },
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: RemoveTeamMemberRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<RemoveTeamMemberResponse> {
+  protected async handleAdminRequest(
+    request: RemoveTeamMemberRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<RemoveTeamMemberResponse> {
     await getRequestScope(cxt).get(Tokens.TeamService).removeMember(request.teamId, request.userEmail);
     return { success: true, message: 'Member removed.' };
   }

@@ -32,14 +32,20 @@ service from the request scope, which is what `MiddlewareHandlers` is for. Split
 keeps that file under the god-file limit.
 
 `csrfProtection` rejects a `POST`/`PUT`/`PATCH`/`DELETE` on `/user/*` when `Sec-Fetch-Site` is present
-and is not `same-origin`/`none`, or when a body-bearing write is not `application/json`. A missing
+and is not `same-origin`/`none`, or when the write is not `application/json`. A missing
 `Sec-Fetch-Site` is allowed: curl and server-to-server clients do not send it, and `/api/*` is not
-covered because programmatic clients have no browser to have sent it.
+covered because programmatic clients have no browser to have sent it. "Has a body" means anything but
+an explicit `Content-Length: 0` — a request with neither framing header has an unknown body, not an
+empty one, so it has to declare JSON too. `apiRequest` sets that header on every mutating call.
 
 `rateLimit` calls the platform's Rate Limiting binding on `CF-Connecting-IP` — the one header
 Cloudflare sets that a client cannot forge, where `X-Forwarded-For` would let a caller rotate
 buckets. It answers 429 with the standard envelope, and **fails open** when the binding is absent:
-local development and any deployment that has not bound a namespace must keep working.
+local development and any deployment that has not bound a namespace must keep working. Two limits on
+the protection are worth knowing: Cloudflare's guidance is that IP keys are "not recommended" because
+shared NAT or carrier egress puts many users behind one address, and the counters are per Cloudflare
+location, so the effective ceiling is `limit × colos`. It bounds one attacker's spend from one colo,
+which is the goal, not a global quota.
 
 `noStore` awaits `next()` and sets the header afterwards, so it must **wrap** rather than sit behind
 the auth handlers — one of those returns its JSON directly without calling `next()`, and the header
@@ -128,16 +134,20 @@ message embeds raw D1/SQLite text, is logged and answered with the generic
 
 `@aws-access-bridge/shared/schema/exceptionResponses` holds status-keyed builders
 (`badRequestResponse`, `unauthorizedResponse`, `forbiddenResponse`, `notFoundResponse`,
-`internalServerErrorResponse`) for the `{Exception: {Type, Message}}` shape. Use
+`conflictResponse`, `internalServerErrorResponse`) for the `{Exception: {Type, Message}}` shape. Use
 them rather than inlining a schema; 147 openapi error blocks were collapsed into them.
 
-Two properties are load-bearing and asserted:
+Three properties are load-bearing and asserted:
 
 - **401 and 403 stay distinct.** The SPA's `isUnauthorized` keys on 401 alone, so a 403 rendered as
   401 sends an administrator to the Zero Trust login page for something re-authenticating cannot fix.
 - **The documented 500 message is generic.** `DatabaseError` embeds raw D1/SQLite text and
   `toErrorResponse` already answers a 5xx with `DefaultInternalServerError`, so an example quoting a
   real internal message would advertise a shape the server never emits.
+- **Every status a route can produce is declared.** A typed answer that `/docs` does not mention is
+  invisible to a caller, and the document is data — it typechecks and builds whatever it says.
+  `test/routes/TeamRoutes.test.ts` and `test/routes/UserRoutes.test.ts` drive each new 403/404/409
+  and assert the route declares it.
 
 The builders return a `type` alias rather than an interface because Chanfana's `SchemaObject` carries
 an `x-<string>` index signature, which only a type alias satisfies.
@@ -170,6 +180,17 @@ working.
 Either a Bearer PAT (`TokenService.authenticateWithPAT`) or an HMAC-signed internal self-call
 (`X-Internal-*` + `X-Internal-User-Email`, after `hmacValidation()`).
 
+**The internal branch has no in-repo caller.** Federation used to loop back over `SELF` to sign its
+own assume-role and console calls; `FederationService` replaced that with in-process composition, so
+nothing in `apps/` or `packages/` signs an internal request any more. The verification half is kept
+deliberately — `hmacValidation()` on `*` is what _rejects_ a forged `X-Internal-*` header from the
+open internet, so removing it would widen the surface rather than narrow it — and a holder of
+`INTERNAL_REQUEST_HMAC_SECRET` can still call `/api/*` with it, signing via
+`backend-services/aws/InternalRequestHelper`. Read the tests below as covering a capability with no
+current caller, not a live path; if you add a caller, this section and
+[`../../docs/agents/features/assume-role/AGENTS.md`](../../docs/agents/features/assume-role/AGENTS.md)
+change in the same commit.
+
 **A valid internal signature is rejected on a second presentation.** `HMACHandler` verifies that a
 request was _authored_ by the secret holder, not that it is presented once. The
 ±`INTERNAL_REQUEST_VALID_TIME_WINDOW_MILLISECONDS` check bounds how long a capture stays replayable,
@@ -182,8 +203,8 @@ binding or a KV error returns `true`, because the timestamp window still bounds 
 outage should not cost the whole `/api/*` internal surface. The failure is logged, never silent.
 
 `authenticateWithPAT` takes an optional `defer` callback. The `last_used_at` stamp is a D1 write that
-`updateLastUsedByToken` throws on, so the middleware hands it `ctx.waitUntil` rather than awaiting it
-on the auth path — a write-side blip must not turn a valid PAT into a 500.
+`updateLastUsedByTokenHash` throws on, so the middleware hands it `ctx.waitUntil` rather than
+awaiting it on the auth path — a write-side blip must not turn a valid PAT into a 500.
 
 ### Identity and auditing
 
@@ -195,12 +216,15 @@ the account key is consumed only by the middleware (the audit event), and routes
 address-based by design, since the services resolve the account internally.
 
 Every `/user/*` and `/api/*` call is audited by `activityAudit()`, which builds the event through
-`AuditService` and writes it in `waitUntil` with its own `.catch` — except a **401 with no
-authenticated principal**, which writes nothing. Recording each unauthenticated request meant an
-attacker with no credentials could fill `audit_logs` with rows carrying an attacker-controlled path
-and user-agent, which is a write-amplification target. A genuine 401 after a successful handshake
-still keeps its entry. — a rejected audit write must not
-become an unhandled rejection. The event carries the account id alongside the address, best-effort and
+`AuditService` and writes it in `waitUntil` with its own `.catch` — a rejected audit write must not
+become an unhandled rejection — **except a 401 with no authenticated principal, which writes
+nothing.** Recording each unauthenticated request meant an attacker with no credentials could fill
+`audit_logs` with rows carrying an attacker-controlled path and user-agent, which is a
+write-amplification target. A genuine 401 after a successful handshake still keeps its entry.
+
+The skip is a guard _before_ the write, in `writeAuditEntry`'s caller — never an early `return`
+from inside the `finally`, which would discard the exception the `catch` just re-threw and turn a
+real fault into a 200. The event carries the account id alongside the address, best-effort and
 absent on a database without migration 0032, so an entry stays findable after an address change.
 
 ### Rules

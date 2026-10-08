@@ -3,7 +3,6 @@ import { InternalServerError } from '@aws-access-bridge/backend-errors';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createEncryptionKeys, keyChain } from './encryptionKeys';
 import { ReplayGuard } from '../auth/ReplayGuard';
-import { InternalRequestHelper } from '../aws/InternalRequestHelper';
 import { AccessService } from '../access/AccessService';
 import { AccountService } from '../account/AccountService';
 import { AssumeRoleService } from '../aws/assume-role/AssumeRoleService';
@@ -107,20 +106,17 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
   scope.bind(Tokens.TokenService, () => new TokenService(env, identity));
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env));
 
-  // The replay-seen-set and the self-call signing helper come from the same
-  // root as the services: the ttl outlives the handler's request window, so a
-  // signature cannot age out while its request is still acceptable.
+  // The replay-seen-set comes from the same root as the services: the ttl
+  // outlives the handler's request window, so a signature cannot age out while
+  // its request is still acceptable.
+  //
+  // There is deliberately no `InternalRequestHelper` here. The signing helper has
+  // no in-repo caller since federation stopped looping back over `SELF`, and a DI
+  // token nothing resolves is a registration that reads as a live dependency.
+  // `InternalRequestHelper` stays exported from `aws/` as the library an external
+  // holder of `INTERNAL_REQUEST_HMAC_SECRET` would use.
   const replayTtlSeconds: number = Math.max(300, (ConfigurationManager.internal.getRequestTimeWindowMs(env) / 1000) * 2);
   scope.bind(Tokens.ReplayGuard, () => new ReplayGuard(env.AccessBridgeKV, replayTtlSeconds));
-  scope.bindValue(
-    Tokens.InternalRequestHelper,
-    memoize(async (): Promise<InternalRequestHelper> => {
-      if (!env.SELF || !env.INTERNAL_REQUEST_HMAC_SECRET) {
-        throw new InternalServerError('SELF binding and INTERNAL_REQUEST_HMAC_SECRET are required for internal self-calls.');
-      }
-      return new InternalRequestHelper(env.SELF, await env.INTERNAL_REQUEST_HMAC_SECRET.get());
-    }),
-  );
 
   return scope;
 }

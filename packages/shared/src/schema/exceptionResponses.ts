@@ -132,6 +132,17 @@ function notFoundResponse(description: string, message?: string): ExceptionRespo
 }
 
 /**
+ * 409 — the request conflicts with current state.
+ *
+ * Carried by the writes that used to report a no-op as success: a duplicate team
+ * member add (`INSERT OR IGNORE` reports zero changes) and a demotion or removal
+ * that would leave a team with no admin.
+ */
+function conflictResponse(description: string, message?: string): ExceptionResponse {
+  return exceptionResponse(description, { message: message ?? 'The request conflicts with the current state.', type: 'ConflictError' });
+}
+
+/**
  * 500 — an unexpected server fault.
  *
  * The message shown is deliberately generic. `DatabaseError` embeds raw D1/SQLite
@@ -143,5 +154,13 @@ function internalServerErrorResponse(description: string): ExceptionResponse {
   return exceptionResponse(description, { message: 'An unexpected error occurred. Please try again later.', type: 'InternalServerError' });
 }
 
-export { badRequestResponse, exceptionResponse, forbiddenResponse, internalServerErrorResponse, notFoundResponse, unauthorizedResponse };
+export {
+  badRequestResponse,
+  conflictResponse,
+  exceptionResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
+  unauthorizedResponse,
+};
 export type { ExceptionResponse, ExceptionSchema, ExceptionSchemaOptions };

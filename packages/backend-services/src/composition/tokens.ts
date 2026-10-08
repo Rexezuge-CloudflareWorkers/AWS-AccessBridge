@@ -14,7 +14,6 @@ import type { AuditService } from '../audit/AuditService';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
 import type { ReplayGuard } from '../auth/ReplayGuard';
-import type { InternalRequestHelper } from '../aws/InternalRequestHelper';
 import type { CostService } from '../cost/CostService';
 import type { UserIdentityService } from '../identity/UserIdentityService';
 import type { CredentialChainService } from '../credential/CredentialChainService';
@@ -62,7 +61,6 @@ const Tokens = {
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   UserIdentityService: Symbol('UserIdentityService') as Token<UserIdentityService>,
   ReplayGuard: Symbol('ReplayGuard') as Token<ReplayGuard>,
-  InternalRequestHelper: Symbol('InternalRequestHelper') as Token<() => Promise<InternalRequestHelper>>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

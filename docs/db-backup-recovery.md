@@ -20,7 +20,7 @@ The run is split into four jobs so a broken destination never blocks the other:
 
 > [!IMPORTANT]
 >
-> - **Encryption is required, not optional.** `AccessBridgeDB` stores `user_access_tokens.access_token` in plaintext — bearer tokens for the `/api/*` routes are matched against that column directly — along with `user_metadata` email addresses, audit logs, and team membership. An unencrypted dump is a live credential leak, so the workflow refuses to run without `BACKUP_ENCRYPTION_KEY`. See [What a backup contains](#what-a-backup-contains).
+> - **Encryption is required, not optional.** `AccessBridgeDB` stores `user_metadata` email addresses, audit logs, and team membership in plaintext, and `user_access_tokens` holds only SHA-256 digests since migration `0034` — no bearer token can be replayed from a dump. An unencrypted dump is still a full disclosure of who can reach which AWS account, so the workflow refuses to run without `BACKUP_ENCRYPTION_KEY`. See [What a backup contains](#what-a-backup-contains).
 > - **Manual trigger required for the first run:** scheduled workflows only start after you run the workflow once from the Actions tab (GitHub → Actions → Backup D1 Database → Run workflow).
 > - **Keep backups off this Cloudflare account.** The Worker, its D1 database, and the Secrets Store holding the IAM encryption key all live in one account. Storing backups in R2 in that _same_ account means a single suspension or ban takes down production and recovery alike. Use a different S3-compatible provider (AWS S3, Backblaze B2, MinIO) or a separate Cloudflare account.
 > - **If you configure no destination at all, every backup job skips silently.** That is the intended state for a repository that does not want off-site backups — not a failure.
@@ -121,7 +121,7 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 
 | Table                                             | Sensitivity in a dump                                                                                                                                |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `user_access_tokens`                              | **Plaintext bearer tokens.** Usable against `/api/*` until they expire; revocation is manual (`DELETE /user/tokens`).                                |
+| `user_access_tokens`                              | **SHA-256 digests only**, since migration `0034`. No usable credential survives in a dump; revocation is manual (`DELETE /user/tokens`).             |
 | `user_metadata`, `user_emails`                    | Sign-in addresses, superadmin flags, stable account ids.                                                                                             |
 | `audit_logs`                                      | Who did what, from which IP, with which user agent.                                                                                                  |
 | `teams`, `team_members`, `team_accounts`          | Tenant structure and membership.                                                                                                                     |
@@ -129,7 +129,7 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 | `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                           |
 | `background_task_runs`                            | Cron phase history.                                                                                                                                  |
 
-This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working set of API credentials.
+This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working directory of who reaches which AWS account, which IAM roles exist, and what spend and inventory look like. Since `0034` it is no longer a set of usable API credentials — that is what the digest column bought.
 
 ### Decrypting a backup
 

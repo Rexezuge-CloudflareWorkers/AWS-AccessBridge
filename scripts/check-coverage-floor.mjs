@@ -31,6 +31,11 @@ const FLOORS = [
   // --- Authentication and the internal trust boundary -------------------------
   { branch: 85, file: 'apps/api/src/middleware/MiddlewareHandlers.ts', line: 93 },
   { branch: 90, file: 'apps/api/src/middleware/HMACHandler.ts', line: 90 },
+  // The pre-authentication guards — CSRF and the auth-boundary rate limit. These
+  // were split out of `MiddlewareHandlers`, which keeps its own floor; a split
+  // that moved the floor with it would leave the new file unmeasured, and this
+  // is the file whose branches decide whether a request is refused.
+  { branch: 85, file: 'apps/api/src/middleware/RequestGuards.ts', line: 90 },
   { branch: 82, file: 'packages/backend-services/src/auth/AccessAuthService.ts', line: 84 },
   { branch: 84, file: 'packages/backend-services/src/auth/TokenService.ts', line: 95 },
   { branch: 45, file: 'packages/backend-data/src/crypto/hmac.ts', line: 90 },
@@ -43,6 +48,10 @@ const FLOORS = [
   { branch: 78, file: 'packages/shared/src/utils/RequestOriginUtil.ts', line: 79 },
   { branch: 73, file: 'apps/api/src/endpoints/IActivityAPIRoute.ts', line: 87 },
   { branch: 95, file: 'apps/api/src/endpoints/IAdminActivityAPIRoute.ts', line: 95 },
+
+  // Every outbound AWS call is bounded by this deadline, so its branches are the
+  // difference between a retryable 502 and a wedged cron run.
+  { branch: 80, file: 'packages/provider-clients/src/aws/FetchTimeout.ts', line: 85 },
 
   // --- Credential encryption and chain resolution ------------------------------
   { branch: 83, file: 'packages/backend-data/src/crypto/aes-gcm.ts', line: 95 },

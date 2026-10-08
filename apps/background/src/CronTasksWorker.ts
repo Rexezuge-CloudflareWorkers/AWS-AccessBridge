@@ -99,7 +99,11 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
     // `allSettled` so one failing task neither aborts its phase-mates nor hides
     // behind a bare `Promise.all` rejection; the aggregate is re-thrown below so
     // the run is still reported as failed.
-    const collectionWorkflow: Workflow | undefined = (this.env as unknown as { COLLECTION_WORKFLOW?: Workflow }).COLLECTION_WORKFLOW;
+    // `COLLECTION_WORKFLOW` is declared in `packages/backend-runtime/src/env.d.ts`,
+    // so `this.env` is typed and a rename is a compile error rather than a silent
+    // `undefined`. It is optional because a deployment that has not bound it must
+    // keep running both sweeps inline.
+    const collectionWorkflow: Workflow | undefined = this.env.COLLECTION_WORKFLOW;
     if (collectionWorkflow) {
       // The collection sweeps are the durable part of the cron. Each tick starts
       // one instance; the workflow runs the cost and inventory steps with

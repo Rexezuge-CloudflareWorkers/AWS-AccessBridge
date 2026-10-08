@@ -49,9 +49,12 @@ address keeping its access. And `findByAnchor` rejects a row whose
 `current_email` differs, because "the anchor" is a floor for accounts that have
 never moved, not a permanent alias for one that has.
 
-Addresses are otherwise matched **exactly**, so a straggler with no registry row
-cannot be steered into another account's. Case-insensitivity is enforced where it
-matters instead — when an address is claimed.
+Matching is case-insensitive at every arm, because every address compared here is one
+either the registry or `setPrimaryEmail` already normalized — `Alice@x.com` and
+`alice@x.com` are the same address by construction, and treating them as two would
+hand the difference to whoever chose the casing. What the exactness claim _does_ cover
+is the `WHERE` itself: a straggler with no registry row is matched on the anchor
+verbatim, so it cannot be steered into another account's by a case variant alone.
 
 Services take the caller's sign-in address and resolve internally, so routes,
 the OpenAPI document and the web client are unaffected. Every write targets the

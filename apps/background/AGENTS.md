@@ -32,6 +32,12 @@ in-memory `already_running` guard, so every later tick answered 202 and the whol
 silently. A workflow step is bounded by the platform, is retried once on a transient fault, and its
 result is cached under its name.
 
+**The run record is written by the step, not by the DO.** Each step calls `task.handle(...)`, and
+that is what writes `background_task_runs` — so a collection failure still shows up in
+`GET /user/admin/maintenance/task-runs` even though the DO answered `completed` the moment it handed
+the work over. That is also why a step must throw rather than swallow: the DO's own response no longer
+reports the collection outcome, so the step is the only thing left saying a sweep failed.
+
 `TaskRegistry`'s definitions carry `collection: true` for the two sweeps, and `tasksForPhase(2,
 { collections: false })` is what the DO runs when the binding is present. **With no binding, the same
 tasks run inline exactly as before** — the workflow is an optimization and a resilience change, not

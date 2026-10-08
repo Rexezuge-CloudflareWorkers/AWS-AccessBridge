@@ -65,7 +65,7 @@ AWS AccessBridge is a pnpm monorepo deploying a Cloudflare Worker API, a cron Du
 
 - **Cloudflare Zero Trust** enforces identity at the edge — AccessBridge never handles passwords or OIDC directly. `POLICY_AUD`/`TEAM_DOMAIN` JWT verification is used when set; otherwise the platform-verified Worker-level Access identity (`ctx.access`) is used.
 - **AES-GCM encryption** for all stored AWS credentials, with a separate key per encrypted surface (long-term IAM keys and the temporary-credential cache), each held in Cloudflare Secrets Store.
-- **HMAC-signed internal requests** between worker components, with a 1-second timestamp window to block replay.
+- **HMAC-signed internal requests** accepted on the programmatic surface, with a 1-second timestamp window, a single-use replay guard, and a strict timestamp shape check. No component signs one today — federation composes in process — so this is the surface that _rejects_ a forged internal header rather than a path in use.
 - **Every `/user/*` and `/api/*` call is audit-logged** automatically and retained for the period you configure (`/docs`, `/openapi.json`, and health-check routes bypass auditing).
 - **Demo mode** flag disables all admin write operations — safe for public demo deployments.
 
@@ -168,10 +168,17 @@ openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_
 openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
   --name aws-access-bridge-credential-cache-encryption-key --scopes workers --remote
 
-# HMAC secret for internal self-calls
+# HMAC secret for HMAC-signed internal self-calls
 openssl rand -base64 32 | pnpm exec wrangler secrets-store secret create <STORE_ID> \
   --name aws-access-bridge-internal-request-hmac-secret --scopes workers --remote
 ```
+
+These three bindings are what the deployed worker reads. The plaintext `CREDENTIAL_ENCRYPTION_KEY` /
+`CREDENTIAL_CACHE_ENCRYPTION_KEY` vars are a local-development and test fallback only: when
+`ENVIRONMENT` is `production` the worker refuses them and fails with `InternalServerError` rather
+than encrypting the IAM credentials table under a key that sits in an ordinary env var. If your
+deployment predates the Secrets Store and sets only those vars, **bind the two encryption secrets
+before deploying** or credential reads will start failing.
 
 ### Step 4. Wire up Cloudflare Zero Trust
 
@@ -209,13 +216,17 @@ When the vars are set they always take precedence; when unset, requests authenti
 pnpm exec wrangler d1 migrations apply --remote AccessBridgeDB
 ```
 
-You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql` and `0032_user_identity.sql`. Re-running is safe.
+You should see the squashed migration file apply cleanly, followed by `0031_distinct_credential_ivs.sql`, `0032_user_identity.sql`, `0033_collection_attempt_timestamps.sql`, and `0034_pat_hashed_tokens.sql`. Re-running is safe.
 
 Once a migration has been applied, **do not edit it** — D1 records the filename, not the file's contents, so it would never re-apply your change and production would keep the old schema. `migrations/migrations.lock.json` records a checksum per migration and CI fails on drift. After adding a migration, run `pnpm run migrations:lock` to record it. The squashed baseline (`0030_squash.sql`) is exempt, since rewriting it is what a squash is.
 
 `0031` adds `salt_secret_access_key` and `salt_session_token` to `credentials`. Every encrypted field now gets its own AES-GCM IV instead of sharing one (nonce reuse leaks the XOR of the plaintexts and enables authentication-tag forgery). **No backfill is required**: existing rows keep their shared `salt` and are read with it, then rewritten with distinct IVs the next time a credential is stored. The same applies to the KV credential cache, whose entries simply expire.
 
 `0032` decouples the sign-in address from the account key: `user_metadata.id` (`usr_<hex>`) becomes the stable account key every user-keyed table points at, `current_email` holds the address a user signs in with today, and a `user_emails` registry maps addresses to accounts. `user_email` stays as a frozen anchor because live foreign keys still target it. It is purely additive and the code tolerates a database without it (reads fall back to address lookups), but apply it before or with the deploy that first relies on `user_id`. Accounts whose address collides case-insensitively with another's are deliberately left unresolved — find them with `SELECT user_email FROM user_metadata WHERE current_email IS NULL`.
+
+`0033` adds `data_collection_config.last_attempt_at`, separating "when did we last try" from "when did we last succeed". The due-query used to read the success clock, so a principal AWS kept failing stayed due and occupied the front of every batch, starving the healthy ones behind it. The backfill copies `last_collected_at` forward so nothing is instantly due again.
+
+`0034` **invalidates every personal access token minted before it.** PATs are now stored as SHA-256 digests (`token_hash`, uniquely indexed) rather than plaintext, so a D1 read or a nightly backup can no longer yield a working bearer credential. SQLite cannot hash a stored value retroactively, so the migration deletes the rows and drops the plaintext column rather than upgrading them. Re-issue is self-service: each affected user mints a new token from the profile page (`POST /user/tokens`). Tokens are short-lived (≤ 90 days) and few (≤ 5 per user).
 
 ### Step 6. Build and deploy
 

@@ -9,13 +9,19 @@ Scope: the browser, programmatic and federate surfaces, and the chain walk they 
 | `POST /user/aws/assume-role`                       | Cloudflare Access                            |
 | `POST /api/aws/assume-role`                        | Bearer PAT or HMAC-signed internal self-call |
 | `POST /user/aws/console` · `POST /api/aws/console` | as above; `ConsoleService.getSigninToken`    |
-| `GET /user/aws/federate` · `GET /api/aws/federate` | as above; fans out internally                |
+| `GET /user/aws/federate` · `GET /api/aws/federate` | as above; composes both in process           |
 
 The `/user/aws/*` and `/api/aws/*` paths register **the same route classes**
-(`apps/api/src/endpoints/api/aws/`). That is why federate, which is a browser entry point, can call
-the programmatic pair: it reaches them over the `SELF` service binding through
-`InternalRequestHelper`, HMAC-signing each call, so the inner request authenticates as the same
-user without a PAT.
+(`apps/api/src/endpoints/api/aws/`). Federate used to be able to reach the programmatic pair
+because it looped back over the `SELF` service binding through `InternalRequestHelper`,
+HMAC-signing each call so the inner request authenticated as the same user without a PAT. It does
+not any more: `FederationService` composes `AssumeRoleService.assumeRoleForUser` and
+`ConsoleService` directly, so one federation is one audit entry instead of three and the temporary
+credentials never touch the network stack. Nothing in `apps/` or `packages/` produces an
+HMAC-signed self-call any more — the verification half (`hmacValidation`, `ReplayGuard`,
+`INTERNAL_REQUEST_HMAC_SECRET`) stays so a holder of the secret can still call `/api/*`, and
+`InternalRequestHelper` stays exported from `backend-services/aws/` as the signer for such a
+caller, but it has no in-repo consumer. See [`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md).
 
 ## The order the walk happens in
 

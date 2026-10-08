@@ -19,16 +19,27 @@ type PlainContext = Context<{ Bindings: Env }>;
  *
  * Every unauthenticated hit used to cost the worker a PAT row lookup and an
  * audit write; with one lookup per request a client can DoS the D1 subrequest
- * budget without holding any connection. The platform's Rate Limiting binding
- * answers 120/min per CF-Connecting-IP from each colo. CF-Connecting-IP is the
- * only header the platform guarantees is unforgeable; X-Forwarded-For et al.
- * would let the caller rotate keys. A deployment without the binding is
- * intentionally fail-open: local development and the free tier's default
- * template carry no `ratelimits` block, and silently 429ing every request
- * because a binding is absent would be an availability bug in its own right.
+ * budget without holding any connection.
+ *
+ * Keyed on `CF-Connecting-IP` because it is the only client IP header the platform
+ * guarantees a caller cannot set — `X-Forwarded-For` and friends would let a
+ * caller rotate buckets by rewriting one header. The trade-off that buys is real
+ * and worth stating: Cloudflare's own guidance says IP keys are "not recommended"
+ * because a corporate NAT or a mobile carrier puts many users behind one address,
+ * so 120/min is a shared ceiling for such an egress rather than a per-user one.
+ * The counters are also per Cloudflare location, so the effective global ceiling
+ * is roughly `limit × colos` — this bounds one attacker's spend from one colo,
+ * which is the goal, not a global quota.
+ *
+ * A deployment without the binding is intentionally fail-open: local development
+ * and the free tier's default template carry no `ratelimits` block, and silently
+ * 429ing every request because a binding is absent would be an availability bug in
+ * its own right. The binding is declared in `wrangler.template.jsonc` and in
+ * `packages/backend-runtime/src/env.d.ts`, so `env.AUTH_RATE_LIMITER` is typed —
+ * no cast, and a rename is a compile error rather than a runtime `undefined`.
  */
 async function rateLimitHandler(c: PlainContext, next: Next): Promise<Response | void> {
-  const limiter: RateLimit | undefined = (c.env as { AUTH_RATE_LIMITER?: RateLimit }).AUTH_RATE_LIMITER;
+  const limiter: RateLimit | undefined = c.env.AUTH_RATE_LIMITER;
   if (!limiter) {
     await next();
     return;
@@ -77,6 +88,15 @@ async function noStoreHandler(c: PlainContext, next: Next): Promise<void> {
  *    and JSON is the one type a simple form cannot forge — parsing a
  *    non-JSON body as JSON must fail, so this also stops content-type
  *    confusion on the routes.
+ *
+ * "Carrying a body" is answered conservatively: only an explicit
+ * `Content-Length: 0` counts as body-less, and a request carrying neither
+ * `Content-Length` nor `Transfer-Encoding` has an *unknown* body rather than an
+ * empty one — so it must declare JSON too. A browser always frames a form post,
+ * so the frameless case is not reachable from the CSRF threat model; treating it
+ * as "has a body" means the guard never depends on a header an attacker
+ * influences. `apiRequest` sends `Content-Type: application/json` on every
+ * mutating call including the body-less ones, so this costs the SPA nothing.
  */
 const STATE_CHANGING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -92,13 +112,16 @@ async function csrfProtectionHandler(c: PlainContext, next: Next): Promise<Respo
       return c.json({ Exception: { Type: 'Forbidden', Message: CSRF_ERROR_CROSS_SITE_FETCH } }, 403);
     }
   }
-  const contentType: string | undefined = c.req.header('Content-Type');
   const contentLength: string | undefined = c.req.header('Content-Length');
-  const hasBody: boolean =
-    (contentLength !== undefined && contentLength.trim() !== '' && contentLength !== '0') ||
-    c.req.header('Transfer-Encoding') !== undefined;
-  if (hasBody && (contentType === undefined || !contentType.trim().toLowerCase().startsWith('application/json'))) {
-    return c.json({ Exception: { Type: 'Forbidden', Message: CSRF_ERROR_UNSUPPORTED_CONTENT_TYPE } }, 403);
+  // Only an explicit `Content-Length: 0` is a body-less write. Everything else —
+  // including a request carrying neither framing header, whose body size is
+  // simply unknown — has to declare JSON.
+  const hasBody: boolean = contentLength === undefined || contentLength.trim() !== '0';
+  if (hasBody) {
+    const contentType: string | undefined = c.req.header('Content-Type');
+    if (contentType === undefined || !contentType.trim().toLowerCase().startsWith('application/json')) {
+      return c.json({ Exception: { Type: 'Forbidden', Message: CSRF_ERROR_UNSUPPORTED_CONTENT_TYPE } }, 403);
+    }
   }
   await next();
 }
