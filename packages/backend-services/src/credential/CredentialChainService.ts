@@ -70,12 +70,23 @@ class CredentialChainService {
     const cacheDAO: CredentialsCacheDAO = await this.createCacheDAO();
     const limit: number = this.getTrustChainLimit();
     const trustChain: string[] = [];
-    let depth = 0;
+    let hops: number = 0;
     let assumedBy: string = principalArn;
     let credential: Credential;
     do {
       trustChain.push(assumedBy);
-      if (assumedBy !== principalArn) {
+      hops += 1;
+      // The cache is not consulted at the boundary. A hit there is the one case
+      // where the short-circuit can serve a chain the cold walk refuses: the cached
+      // hop is the last one the budget reaches, so whether the chain continues past
+      // it is precisely what is unknown — and returning here answers "it is fine"
+      // without ever asking. Every position below the boundary is already accounted
+      // for by hops this walk took, so those still short-circuit, and still cost no
+      // extra D1 read. That is the whole point of the cache, so it is not traded
+      // away to make the boundary decidable; the boundary is decided by the read
+      // below, which only the rejected case pays for.
+      const atBoundary: boolean = hops >= limit;
+      if (assumedBy !== principalArn && !atBoundary) {
         const cachedCredential: CredentialCache | undefined = await cacheDAO.getCachedCredential(assumedBy);
         if (cachedCredential) {
           return {
@@ -87,13 +98,21 @@ class CredentialChainService {
         }
       }
       credential = await dao.getCredentialByPrincipalArn(assumedBy);
+      // Mirrors `CredentialsDAO.getCredentialChainByPrincipalArn`, and the two must
+      // agree: that walk is what the cron and the collection tasks use, so if it
+      // refuses a chain this one serves it, the answer depends on cache warmth.
+      // `atBoundary` leads only because it is a plain boolean computed above; the
+      // two operands have no side effects either way.
+      if (atBoundary && credential.assumedBy && credential.assumedBy.length > 0) {
+        log.error('Principal chain exceeds the maximum allowed depth', { principalArn: principalArn, limit: limit, hops: hops });
+        throw new InternalServerError('Principal chain exceeds the maximum allowed depth. Contact system administrator.');
+      }
       if (credential.assumedBy) {
         assumedBy = credential.assumedBy;
       }
-    // `++depth < limit`, not `<=`: this is a do/while, so the increment runs in
-    // the condition and `<=` would admit `limit + 1` hops. Mirrors the walk in
-    // `CredentialsDAO.getCredentialChainByPrincipalArn`.
-    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth < limit);
+    // No depth term here either; see the throw above. Bounding the walk by a counter
+    // in the condition is what let the increment and the boundary check disagree.
+    } while (credential.assumedBy && credential.assumedBy.length > 0);
     if (credential.accessKeyId && credential.secretAccessKey) {
       if (trustChain.length > 1) {
         return {
@@ -104,9 +123,6 @@ class CredentialChainService {
         };
       }
       throw new ForbiddenError('For security reasons, long-term credentials are not retrievable.');
-    }
-    if (depth >= limit) {
-      log.error('Principal chain exceeds the maximum allowed depth', { limit });
     }
     throw new InternalServerError('Principal chain is not valid. Contact system administrator.');
   }

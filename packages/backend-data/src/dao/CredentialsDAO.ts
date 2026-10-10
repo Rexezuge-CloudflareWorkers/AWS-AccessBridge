@@ -68,23 +68,37 @@ class CredentialsDAO extends EncryptedDAO {
   public async getCredentialChainByPrincipalArn(principalArn: string): Promise<CredentialChain> {
     const trustChain: Array<Credential> = [];
 
-    let depth: number = 0;
+    let hops: number = 0;
     let assumedBy: string = principalArn;
     let credential: Credential;
     do {
       credential = await this.getCredentialByPrincipalArn(assumedBy);
+      trustChain.push(credential);
+      hops += 1;
+      // Two ways out of this loop: the chain ended, or the budget ran out. Only the
+      // first is a usable chain. A walk that stops with `assumedBy` still set stopped
+      // at the limit rather than at the base, and returning the last row's keys
+      // anyway would quietly turn an over-long chain into a working `limit`-hop
+      // prefix. This cannot be left to the key check below: an operator can store
+      // credentials for any principal ARN, mid-chain ones included, so whether the
+      // boundary row carries keys says nothing about whether the chain is over-long.
+      if (credential.assumedBy && credential.assumedBy.length > 0 && hops >= this.principalTrustChainLimit) {
+        log.error('Principal chain exceeds the maximum allowed depth', {
+          principalArn: principalArn,
+          limit: this.principalTrustChainLimit,
+          hops: hops,
+        });
+        throw new InternalServerError('Principal chain exceeds the maximum allowed depth. Contact system administrator.');
+      }
       if (credential.assumedBy) {
         assumedBy = credential.assumedBy;
       }
-      trustChain.push(credential);
-      // `++depth < limit`, not `<=`: this is a do/while, so the increment runs in
-      // the condition and `<=` would admit `limit + 1` hops.
-    } while (credential.assumedBy && credential.assumedBy.length > 0 && ++depth < this.principalTrustChainLimit);
+      // The depth bound is the throw above, not a term in this condition: a counter
+      // incremented in the condition can drift out of step with the `hops` the check
+      // reads, which is how the boundary came to mean two different things.
+    } while (credential.assumedBy && credential.assumedBy.length > 0);
 
     if (!credential.accessKeyId || !credential.secretAccessKey) {
-      if (depth >= this.principalTrustChainLimit) {
-        log.error('Principal chain exceeds the maximum allowed depth', { limit: this.principalTrustChainLimit });
-      }
       throw new InternalServerError('Principal chain is not valid. Contact system administrator.');
     }
 

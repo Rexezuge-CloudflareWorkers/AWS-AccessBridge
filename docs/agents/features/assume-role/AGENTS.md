@@ -58,14 +58,15 @@ them, with the message "long-term credentials are not retrievable").
 
 ## Chain length
 
-`CredentialChainService.getTrustChainLimit` reads `PRINCIPAL_TRUST_CHAIN_LIMIT` (default 3). The
-walks use `++depth < limit` inside a `do`/`while`, not `<=` — the increment runs in the condition,
-so `<=` would admit `limit + 1` hops. `CredentialsDAO.getCredentialChainByPrincipalArn` mirrors that
-arithmetic, and the two must agree or the interactive path and the cron path disagree about what a
-chain is.
+`CredentialChainService.getTrustChainLimit` reads `PRINCIPAL_TRUST_CHAIN_LIMIT` (default 3), and it
+bounds how many principals a chain may have. A chain longer than that is refused outright — this is
+not a walking budget that a warm cache can spend differently, and `assumeRoleChain` never sees such a
+chain. The interactive walk and the cron walk must agree on that, or the answer depends on whether
+the chain happens to be warm.
 
-See [`credential-chains/AGENTS.md`](../credential-chains/AGENTS.md) for storage, encryption and the KV
-cache; [`resource-inventory/AGENTS.md`](../resource-inventory/AGENTS.md) for what consumes a leaf.
+See [`credential-chains/AGENTS.md`](../credential-chains/AGENTS.md) for the boundary rule itself, the
+walk's shape and why the cache is skipped at the boundary; [`resource-inventory/AGENTS.md`](../resource-inventory/AGENTS.md)
+for what consumes a leaf.
 
 ## Validation and discovery
 

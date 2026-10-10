@@ -12,6 +12,7 @@ vi.mock('@aws-access-bridge/backend-services/aws/sts');
 
 const BASE = 'arn:aws:iam::123456789012:user/base';
 const MID = 'arn:aws:iam::123456789012:role/Mid';
+const MID_TWO = 'arn:aws:iam::123456789012:role/MidTwo';
 const LEAF = 'arn:aws:iam::123456789012:role/Leaf';
 
 function env() {
@@ -82,6 +83,60 @@ describe('CredentialChainService', () => {
 
     vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockResolvedValue({} as never);
     await expect(svc.getCredentialChainToFirstCachedPrincipal(BASE)).rejects.toBeInstanceOf(InternalServerError);
+  });
+
+  describe('depth limit', () => {
+    /**
+    A four-principal chain: LEAF <- MID <- MID_TWO <- BASE, one hop past the limit of 3.
+    */
+    function overLongChain(): void {
+      vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) => {
+        if (arn === LEAF) return { assumedBy: MID } as never;
+        if (arn === MID) return { assumedBy: MID_TWO } as never;
+        return arn === MID_TWO ? ({ assumedBy: BASE } as never) : ({ assumedBy: '', accessKeyId: 'AK', secretAccessKey: 'SK' } as never);
+      });
+    }
+
+    it('refuses a cached hop sitting at the boundary, cold and warm alike', async () => {
+      // The warm/cold split. MID_TWO is cached, and it is the last position a
+      // limit-3 budget reaches — so the short-circuit used to serve a four-principal
+      // chain that the very same walk refuses one cache read later. The cache entry
+      // itself is legitimate (MID's own chain is exactly 3 and pre-warms MID_TWO),
+      // which is what made this reachable rather than a contrived fixture.
+      overLongChain();
+      vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockImplementation(async (arn: string) =>
+        arn === MID_TWO ? ({ accessKeyId: 'AK', secretAccessKey: 'SK', sessionToken: 'ST' } as never) : undefined,
+      );
+      await expect(new CredentialChainService(env()).getCredentialChainToFirstCachedPrincipal(LEAF)).rejects.toThrow(
+        'Principal chain exceeds the maximum allowed depth',
+      );
+    });
+
+    it('never consults the cache for the boundary hop', async () => {
+      // Asserted separately from the rejection: the boundary must be decided by the
+      // credentials row, so a warm entry there cannot short-circuit the decision.
+      overLongChain();
+      vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockImplementation(async (arn: string) =>
+        arn === MID_TWO ? ({ accessKeyId: 'AK', secretAccessKey: 'SK', sessionToken: 'ST' } as never) : undefined,
+      );
+      await expect(new CredentialChainService(env()).getCredentialChainToFirstCachedPrincipal(LEAF)).rejects.toThrow();
+      expect(CredentialsCacheDAO.prototype.getCachedCredential).not.toHaveBeenCalledWith(MID_TWO);
+    });
+
+    it('still short-circuits below the boundary, without an extra credentials read', async () => {
+      // The property that makes the boundary fix affordable: the cache exists to
+      // skip the base credentials on the interactive path, and this pins that a warm
+      // hop one short of the limit costs exactly one row read — the target's.
+      vi.mocked(CredentialsDAO.prototype.getCredentialByPrincipalArn).mockImplementation(async (arn: string) =>
+        arn === LEAF ? ({ assumedBy: MID } as never) : ({ assumedBy: '', accessKeyId: 'AK', secretAccessKey: 'SK' } as never),
+      );
+      vi.mocked(CredentialsCacheDAO.prototype.getCachedCredential).mockImplementation(async (arn: string) =>
+        arn === MID ? ({ accessKeyId: 'AK', secretAccessKey: 'SK', sessionToken: 'ST' } as never) : undefined,
+      );
+      const chain = await new CredentialChainService(env()).getCredentialChainToFirstCachedPrincipal(LEAF);
+      expect(chain.principalArns).toEqual([LEAF, MID]);
+      expect(CredentialsDAO.prototype.getCredentialByPrincipalArn).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('throws without a credential cache KV binding', async () => {

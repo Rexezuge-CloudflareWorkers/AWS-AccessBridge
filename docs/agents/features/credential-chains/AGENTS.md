@@ -7,8 +7,9 @@ Scope: how long-term IAM keys become usable session credentials, and how hot cha
 Long-term IAM keys live AES-GCM-encrypted in D1 (`CredentialsDAO`, an `EncryptedDAO`), one row per
 principal ARN. A `credential.assumed_by` value makes that row an intermediate hop pointing at the
 row it may assume, so the chain is the relation itself — there is no separate chain table.
-`principalArns` is ordered **base → target**, and `CredentialsDAO.getCredentialChainByPrincipalArn`
-is the single walk that produces it.
+`principalArns` is ordered **target → base** (`principalArns[0]` is the role being reached, the last
+entry is the base IAM user), and `CredentialsDAO.getCredentialChainByPrincipalArn` is the single
+walk that produces it.
 
 Relationships are managed through `POST|DELETE /user/admin/credentials/relationship`; access grants
 through `POST|DELETE /user/admin/access`. Those are different things: a relationship says _this
@@ -25,14 +26,35 @@ key.
 `AwsAccountsDAO` holds account nicknames; `RoleConfigsDAO` holds the per-role session duration and
 Console destination path/region.
 
-## Depth is bounded
+## Depth is bounded, and the bound is the chain's
 
-`PRINCIPAL_TRUST_CHAIN_LIMIT` (default 3) bounds how many hops a walk will take, in both
-`CredentialsDAO.getCredentialChainByPrincipalArn` and
-`CredentialChainService.getCredentialChainToFirstCachedPrincipal`. Both use `++depth < limit` inside
-a `do`/`while`, where the increment runs in the condition — `<=` would admit `limit + 1` hops. When
-the limit is hit the chain walk logs and raises `InternalServerError`; the credential walk raises
-`ForbiddenError` for a single-hop request, because long-term keys are deliberately not retrievable.
+`PRINCIPAL_TRUST_CHAIN_LIMIT` (default 3) bounds how many principals a chain may have. A chain
+longer than that is **refused** — `InternalServerError`, with the walk logged at `error` — whether
+it is warm or cold, and whether it is walked by `CredentialsDAO.getCredentialChainByPrincipalArn`
+(the cron and the collection tasks) or by
+`CredentialChainService.getCredentialChainToFirstCachedPrincipal` (the interactive path). The
+credential walk still answers a single-hop request with `ForbiddenError`, because long-term keys are
+deliberately not retrievable; that refusal is about _what_ a chain yields, not how deep it is.
+
+Both walks decide this the same way, and that is the part worth not breaking. The check is
+"did the walk stop with `assumed_by` still set?", evaluated on its own — **not** folded into the
+key check below it. An operator can store credentials for any principal ARN
+(`POST /user/admin/credentials`), mid-chain ones included, so whether the row a walk stops on
+happens to carry keys says nothing about whether the chain is over-long. Reading it that way is how
+a four-principal chain came to be served as a silent three-hop prefix: no error, no log, and the
+`exceeds the maximum allowed depth` line unreachable.
+
+**The cache must not decide this.** `getCredentialChainToFirstCachedPrincipal` skips the cache at
+the boundary position — the last one the budget reaches — because that hop is exactly the one whose
+successor is unknown, and returning on a hit there answers "the chain is fine" without asking. A
+warm entry there made the answer depend on cache warmth: the same chain was refused cold and served
+warm. Every position below the boundary still short-circuits, and still costs no extra row read,
+which is what keeps the fix free on the hot path; only the rejected case pays for the extra read.
+
+The bound is the `throw` inside the loop, not a term in the `while` condition. A counter incremented
+in the condition drifts out of step with the counter the check reads — which is how "the limit was
+hit" came to mean both "the chain ended here" and "we ran out of budget" depending on which line you
+read. It is also what still terminates a cyclic `assumed_by` relation.
 
 ## The cache is a KV namespace, not a D1 table
 
@@ -58,6 +80,13 @@ counted as a failure.
 `last_cached_at` is stamped on **failure** as well as success, for the same reason: a row that
 always throws would otherwise sort first forever and starve every principal behind it. The error is
 still logged and counted in `itemsFailed` — the stamp is about scheduling, not about pretending.
+
+**An over-long chain counts as a failure, deliberately, and unlike the length-1 skip above.** There
+is nothing to warm for a chain that must not be served, so it fails every cycle and stays visible in
+the maintenance tab until someone raises `PRINCIPAL_TRUST_CHAIN_LIMIT` or shortens the chain. That is
+the intended reading: it is an operator-actionable misconfiguration, not the scheduling noise the
+`ForbiddenError` skip exists to absorb. Quietly skipping it would leave the deep principal with no
+pre-warm and no signal that anything is wrong with it.
 
 Each principal is isolated in its own `try`: one unresolvable chain — a credentials row deleted out
 from under a stale `credential_cache_config` entry — must not abort the remaining principals.

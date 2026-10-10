@@ -3,6 +3,7 @@ import { env } from 'cloudflare:test';
 import { applyMigrations } from '../helpers/migrations';
 import { CredentialCacheRefreshTask } from '@aws-access-bridge/background/scheduled/CredentialCacheRefreshTask';
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
+import type { CredentialChainService } from '@aws-access-bridge/backend-services/credential';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 
@@ -160,6 +161,110 @@ describe('Credential pre-warm cron against real D1 and KV', () => {
     const remaining = await registered();
     expect(remaining).not.toContain(TARGET);
     expect(remaining).toContain(MID);
+  });
+});
+
+/**
+ * The cache used to decide whether an over-long chain was servable.
+ *
+ * `MID_TWO` sits at the last position a limit-3 budget reaches, so a cached entry
+ * for it short-circuited the walk one read before the depth check and served a
+ * four-principal chain that the cold walk refused. Nothing about the entry was
+ * illegitimate: `MID`'s own chain is `[Mid, MidTwo, Base]` — exactly the limit — so
+ * the cron cached it on its ordinary schedule. This needs real D1 and real KV
+ * because the whole defect is the interaction between a row the walk reads and an
+ * entry the walk does not; a mock that stubs the cache independently of the
+ * credentials rows cannot express it.
+ */
+describe('An over-long chain is refused whether or not a cached hop is warm', () => {
+  const assumed: string[] = [];
+
+  // Deliberately not the BASE/MID/TARGET of the block above. Storage is not
+  // isolated between tests in this file, and the chain above caches an entry for
+  // `MID` — reused here it would short-circuit at hop two and this suite would
+  // pass for the wrong reason while measuring nothing about a four-principal chain.
+  const DEEP_BASE = 'arn:aws:iam::777777777777:user/DeepBase';
+  const DEEP_MID = 'arn:aws:iam::888888888888:role/DeepMid';
+  const DEEP_MID_TWO = 'arn:aws:iam::999999999999:role/DeepMidTwo';
+  const DEEP_TARGET = 'arn:aws:iam::121212121212:role/DeepTarget';
+
+  beforeAll(async () => {
+    await applyMigrations(env.AccessBridgeDB);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    assumed.length = 0;
+  });
+
+  /**
+  DEEP_TARGET <- DEEP_MID <- DEEP_MID_TWO <- DEEP_BASE: four against a limit of three.
+  */
+  async function seedOverLongChain(): Promise<void> {
+    const store = createRequestScope(scopeEnv()).get(Tokens.CredentialStoreService);
+    // Registrations left by the block above share this table and this batch, and
+    // one of them (`TARGET`, whose credential that block removes) fails on its own.
+    // Drop them so the run counters below describe this chain and nothing else.
+    await env.AccessBridgeDB.prepare('DELETE FROM credential_cache_config WHERE principal_arn NOT IN (?, ?, ?)')
+      .bind(DEEP_MID, DEEP_MID_TWO, DEEP_TARGET)
+      .run();
+    await store.storeCredential(DEEP_BASE, 'AKIABASEXAMPLE000000', 'baseSecretValue');
+    await store.storeCredentialRelationship(DEEP_MID_TWO, DEEP_BASE);
+    await store.storeCredentialRelationship(DEEP_MID, DEEP_MID_TWO);
+    await store.storeCredentialRelationship(DEEP_TARGET, DEEP_MID);
+    await env.AccessBridgeDB.prepare('UPDATE credential_cache_config SET last_cached_at = 0').run();
+  }
+
+  function stubSts(): void {
+    vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit): Promise<Response> => {
+      const body = input instanceof Request ? await input.text() : typeof init?.body === 'string' ? init.body : '';
+      const params = new URLSearchParams(body);
+      assumed.push(params.get('RoleArn') ?? '');
+      return stsResponse(`ASIA${assumed.length}EXAMPLEKEY`);
+    });
+  }
+
+  function chainService(): CredentialChainService {
+    return createRequestScope(scopeEnv()).get(Tokens.CredentialChainService);
+  }
+
+  it('refuses it cold, and still refuses it once the cron has warmed a hop on the way past', async () => {
+    await seedOverLongChain();
+
+    await expect(chainService().getCredentialChainToFirstCachedPrincipal(DEEP_TARGET)).rejects.toThrow(
+      'Principal chain exceeds the maximum allowed depth',
+    );
+
+    stubSts();
+    await new CredentialCacheRefreshTask().handle({} as ScheduledController, scopeEnv(), {} as ExecutionContext);
+
+    // The cron warmed `DEEP_MID_TWO` legally, off `DEEP_MID`'s own three-principal
+    // chain, and could not warm `DEEP_TARGET`, whose chain runs past the limit.
+    const cache = new CredentialsCacheDAO(env.AccessBridgeKV, [CACHE_KEY]);
+    expect(await cache.getCachedCredential(DEEP_MID_TWO)).toBeDefined();
+    expect(await cache.getCachedCredential(DEEP_TARGET)).toBeUndefined();
+    expect(await latestRun()).toMatchObject({ items_processed: 1, items_failed: 1 });
+
+    // The point of the test: the entry exists, and the answer does not change.
+    await expect(chainService().getCredentialChainToFirstCachedPrincipal(DEEP_TARGET)).rejects.toThrow(
+      'Principal chain exceeds the maximum allowed depth',
+    );
+  });
+
+  it('refuses it through the cron walk too, not only the interactive one', async () => {
+    // `getCredentialChain` is what the collection tasks and the pre-warm use. It
+    // used to be the stricter of the two, which is the wrong way round: a limit
+    // that refuses only when nothing is cached is not a limit.
+    await seedOverLongChain();
+    stubSts();
+    await new CredentialCacheRefreshTask().handle({} as ScheduledController, scopeEnv(), {} as ExecutionContext);
+
+    for (const resolve of [
+      () => chainService().getCredentialChain(DEEP_TARGET),
+      () => chainService().getCredentialChainToFirstCachedPrincipal(DEEP_TARGET),
+    ]) {
+      await expect(resolve()).rejects.toThrow('Principal chain exceeds the maximum allowed depth');
+    }
   });
 });
 
