@@ -214,4 +214,106 @@ describe('CredentialsDAO', () => {
       await expect(dao.getCredentialChainByPrincipalArn('arn:aws:iam::123456789012:user/User')).rejects.toThrow(InternalServerError);
     });
   });
+
+  describe('chain depth limit', () => {
+    const LEAF = 'arn:aws:iam::123456789012:role/Leaf';
+    const MID = 'arn:aws:iam::123456789012:role/Mid';
+    const MID_TWO = 'arn:aws:iam::123456789012:role/MidTwo';
+    const BASE = 'arn:aws:iam::123456789012:user/Base';
+
+    /**
+     * Binds each ARN to its own row so the walk is a real multi-hop traversal
+     * rather than one row answered repeatedly. `keys: true` writes genuine
+     * ciphertext, so the walk decrypts long-term credentials the way it would in
+     * production rather than stubbing the field to a truthy value.
+     */
+    async function seedChain(rows: Record<string, { assumedBy?: string; keys?: boolean }>, key: string): Promise<void> {
+      let boundArn = '';
+      vi.mocked(mockStmt.bind).mockImplementation((...args: unknown[]) => {
+        boundArn = String(args[0]);
+        return mockStmt;
+      });
+      const encrypted = new Map<string, { id: string; secret: string; salt: string; saltSecret: string }>();
+      for (const [arn, row] of Object.entries(rows)) {
+        if (!row.keys) {
+          continue;
+        }
+
+        const id = await encryptData('AKIAIOSFODNN7EXAMPLE', key);
+        const secret = await encryptData('wJalrXUtnFEMI/K7MDENG', key);
+        encrypted.set(arn, { id: id.encrypted, secret: secret.encrypted, salt: id.iv, saltSecret: secret.iv });
+      }
+      vi.mocked(mockStmt.first).mockImplementation(async () => {
+        const row = rows[boundArn];
+        if (!row) return null;
+        const enc = encrypted.get(boundArn);
+        return {
+          principal_arn: boundArn,
+          assumed_by: row.assumedBy,
+          encrypted_access_key_id: enc?.id,
+          encrypted_secret_access_key: enc?.secret,
+          encrypted_session_token: undefined,
+          salt: enc?.salt,
+          salt_secret_access_key: enc?.saltSecret,
+          salt_session_token: undefined,
+        };
+      });
+    }
+
+    it('rejects an over-long chain even when the boundary row carries long-term keys', async () => {
+      // The truncation regression. An operator can store credentials for any
+      // principal ARN, so the row a walk stops on may hold keys — and key presence
+      // says nothing about whether the chain is over-long. Treating it as the base
+      // served this 4-principal chain as a working 3-hop prefix, with no error and
+      // no log, while the documented promise was that the limit raises.
+      const key = await generateAESGCMKey();
+      await seedChain(
+        {
+          [LEAF]: { assumedBy: MID },
+          [MID]: { assumedBy: MID_TWO },
+          [MID_TWO]: { assumedBy: BASE, keys: true },
+          [BASE]: { keys: true },
+        },
+        key,
+      );
+      const dao = new CredentialsDAO(mockDb, [key], 3);
+      await expect(dao.getCredentialChainByPrincipalArn(LEAF)).rejects.toThrow('Principal chain exceeds the maximum allowed depth');
+    });
+
+    it('rejects an over-long chain whose boundary row is a bare relationship', async () => {
+      const key = await generateAESGCMKey();
+      await seedChain(
+        {
+          [LEAF]: { assumedBy: MID },
+          [MID]: { assumedBy: MID_TWO },
+          [MID_TWO]: { assumedBy: BASE },
+          [BASE]: { keys: true },
+        },
+        key,
+      );
+      const dao = new CredentialsDAO(mockDb, [key], 3);
+      await expect(dao.getCredentialChainByPrincipalArn(LEAF)).rejects.toThrow('Principal chain exceeds the maximum allowed depth');
+    });
+
+    it('accepts a chain that ends exactly at the limit', async () => {
+      // The boundary is where a walk stops, not a length that is refused: three
+      // principals with the third holding the keys is the deepest legal chain.
+      const key = await generateAESGCMKey();
+      await seedChain({ [LEAF]: { assumedBy: MID }, [MID]: { assumedBy: BASE }, [BASE]: { keys: true } }, key);
+      const dao = new CredentialsDAO(mockDb, [key], 3);
+      await expect(dao.getCredentialChainByPrincipalArn(LEAF)).resolves.toMatchObject({
+        principalArns: [LEAF, MID, BASE],
+        accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+      });
+    });
+
+    it('terminates on a cyclic relation instead of walking it', async () => {
+      // The depth bound used to live in the `while` condition; it is now the throw
+      // inside the loop, which is what still stops P -> h1 -> P.
+      const key = await generateAESGCMKey();
+      await seedChain({ [LEAF]: { assumedBy: MID }, [MID]: { assumedBy: LEAF, keys: true } }, key);
+      const dao = new CredentialsDAO(mockDb, [key], 3);
+      await expect(dao.getCredentialChainByPrincipalArn(LEAF)).rejects.toThrow('Principal chain exceeds the maximum allowed depth');
+    });
+  });
 });
