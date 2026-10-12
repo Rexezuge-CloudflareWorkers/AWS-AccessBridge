@@ -1,5 +1,5 @@
 import { BaseUrlUtil } from '@aws-access-bridge/backend-services/aws';
-import { createD1SessionEnv } from '@aws-access-bridge/backend-data/utils';
+import { createD1SessionEnv } from '@aws-access-bridge/backend-data/utils/D1SessionUtil';
 import { DEFAULT_DEMO_MODE } from '@aws-access-bridge/shared/constants';
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toErrorMessage } from '@aws-access-bridge/shared/utils';
+import { toErrorMessage } from '@aws-access-bridge/shared/utils/ErrorMessage';
 
 describe('toErrorMessage', () => {
   it('returns the message of an Error', () => {

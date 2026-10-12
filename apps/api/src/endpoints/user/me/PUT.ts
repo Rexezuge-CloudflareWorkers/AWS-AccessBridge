@@ -1,8 +1,8 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
-import { LocaleUtil } from '@aws-access-bridge/shared/utils';
+import { LocaleUtil } from '@rexezuge/shared';
 import { unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';

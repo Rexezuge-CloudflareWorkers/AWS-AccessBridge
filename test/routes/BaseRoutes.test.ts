@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
-import { BadRequestError, DatabaseError, ForbiddenError, MethodNotAllowedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, DatabaseError, ForbiddenError, MethodNotAllowedError } from '@rexezuge/errors';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
@@ -86,7 +86,7 @@ describe('IActivityAPIRoute', () => {
   it('maps client errors to their type and code', async () => {
     const c = createContext();
     await new FailRoute(new BadRequestError('bad input')).handle(c);
-    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('x').getErrorType(), Message: 'bad input' } }, 400);
+    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('x').type, Message: 'bad input' } }, 400);
   });
 
   it('does not leak raw database error text to the client', async () => {
@@ -102,7 +102,7 @@ describe('IActivityAPIRoute', () => {
   it('still surfaces client errors with their own message', async () => {
     const c = createContext();
     await new FailRoute(new BadRequestError('q is required')).handle(c);
-    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('q is required').getErrorType(), Message: 'q is required' } }, 400);
+    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: new BadRequestError('q is required').type, Message: 'q is required' } }, 400);
   });
 });
 
@@ -125,7 +125,7 @@ describe('IAdminActivityAPIRoute', () => {
     // 403, not 401: the caller is authenticated by Cloudflare Access and simply
     // lacks the role, so a 401 would tell them to sign in again, which cannot help.
     expect(c.json).toHaveBeenCalledWith(
-      expect.objectContaining({ Exception: expect.objectContaining({ Type: new ForbiddenError('x').getErrorType() }) }),
+      expect.objectContaining({ Exception: expect.objectContaining({ Type: new ForbiddenError('x').type }) }),
       403,
     );
   });
@@ -139,6 +139,6 @@ describe('IAdminActivityAPIRoute', () => {
       expect.any(Number),
     );
     const [body] = vi.mocked(c.json).mock.calls[0] as unknown as [{ Exception: { Type: string } }];
-    expect(body.Exception.Type).toBe(new MethodNotAllowedError('x').getErrorType());
+    expect(body.Exception.Type).toBe(new MethodNotAllowedError('x').type);
   });
 });

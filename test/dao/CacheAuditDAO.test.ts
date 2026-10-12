@@ -38,7 +38,7 @@ function createMockKv(stored: Record<string, string> = {}) {
 describe('CredentialsCacheDAO', () => {
   it('round-trips cached credentials through encryption', async () => {
     const kv = createMockKv();
-    const dao = new CredentialsCacheDAO(kv, ['0123456789abcdef0123456789abcdef']);
+    const dao = new CredentialsCacheDAO(kv, ['MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=']);
     await dao.storeCachedCredential({
       principalArn: 'arn:aws:iam::123456789012:role/Dev',
       accessKeyId: 'ASIA',
@@ -59,13 +59,13 @@ describe('CredentialsCacheDAO', () => {
     // so the key list silently became 32 one-character keys, and the assertion only
     // survived because a *missing* entry never reaches the decryption loop. The test
     // looked like it covered decryption and covered none of it.
-    const dao = new CredentialsCacheDAO(createMockKv(), ['0123456789abcdef0123456789abcdef']);
+    const dao = new CredentialsCacheDAO(createMockKv(), ['MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=']);
     await expect(dao.getCachedCredential('arn:missing')).resolves.toBeUndefined();
   });
 
   it('evicts expired entries', async () => {
     const kv = createMockKv();
-    const dao = new CredentialsCacheDAO(kv, ['0123456789abcdef0123456789abcdef']);
+    const dao = new CredentialsCacheDAO(kv, ['MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=']);
     await dao.storeCachedCredential({
       principalArn: 'arn:expired',
       accessKeyId: 'A',

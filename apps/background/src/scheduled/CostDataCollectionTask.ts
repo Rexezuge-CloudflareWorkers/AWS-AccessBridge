@@ -1,7 +1,8 @@
 import { CostDataDAO } from '@aws-access-bridge/backend-data/dao';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createRequestScope, Tokens } from '@aws-access-bridge/backend-services/composition';
-import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import { COST_COLLECTION_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import type { AccessKeys, CostData } from '@aws-access-bridge/shared/model';

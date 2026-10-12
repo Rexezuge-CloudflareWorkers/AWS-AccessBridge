@@ -1,5 +1,5 @@
 import { AWS_ACCOUNT_ID_PATTERN } from '@aws-access-bridge/shared/schema';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 /**
 The IAM resource-type segment that marks a role ARN, including its separator.

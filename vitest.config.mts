@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 const apiSrcPath = fileURLToPath(new URL('apps/api/src', import.meta.url));
 const backgroundSrcPath = fileURLToPath(new URL('apps/background/src', import.meta.url));
 const backendDataSrcPath = fileURLToPath(new URL('packages/backend-data/src', import.meta.url));
-const backendErrorsSrcPath = fileURLToPath(new URL('packages/backend-errors/src', import.meta.url));
 const backendRuntimeSrcPath = fileURLToPath(new URL('packages/backend-runtime/src', import.meta.url));
 const backendServicesSrcPath = fileURLToPath(new URL('packages/backend-services/src', import.meta.url));
 const providerClientsSrcPath = fileURLToPath(new URL('packages/provider-clients/src', import.meta.url));
@@ -13,7 +12,15 @@ const webSrcPath = fileURLToPath(new URL('apps/web/src', import.meta.url));
 const cloudflareWorkersMockPath = fileURLToPath(new URL('test/mocks/cloudflare-workers.ts', import.meta.url));
 
 export default defineConfig({
+  // The runtime package is built as ESM and its public root re-exports worker
+  // bases that import `cloudflare:workers`. Inline it so Vitest's resolver can
+  // apply the Workers mock alias below instead of handing that scheme to Node.
   test: {
+    server: {
+      deps: {
+        inline: ['@rexezuge/runtime'],
+      },
+    },
     globals: true,
     // Two projects, because `environment` is per-project and the DOM stack cannot
     // be switched per file. `node` keeps the fast suite for the backend and for
@@ -121,8 +128,6 @@ export default defineConfig({
       { find: /^@aws-access-bridge\/background\/(.*)$/, replacement: `${backgroundSrcPath}/$1` },
       { find: /^@aws-access-bridge\/backend-data$/, replacement: `${backendDataSrcPath}/index.ts` },
       { find: /^@aws-access-bridge\/backend-data\/(.*)$/, replacement: `${backendDataSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/backend-errors$/, replacement: `${backendErrorsSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/backend-errors\/(.*)$/, replacement: `${backendErrorsSrcPath}/$1` },
       { find: /^@aws-access-bridge\/backend-runtime$/, replacement: `${backendRuntimeSrcPath}/index.ts` },
       { find: /^@aws-access-bridge\/backend-runtime\/(.*)$/, replacement: `${backendRuntimeSrcPath}/$1` },
       { find: /^@aws-access-bridge\/backend-services$/, replacement: `${backendServicesSrcPath}/index.ts` },

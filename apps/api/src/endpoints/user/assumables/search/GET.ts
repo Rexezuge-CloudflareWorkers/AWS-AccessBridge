@@ -3,7 +3,7 @@ import type { ActivityContext, IEnv, IRequest } from '@/endpoints/IActivityAPIRo
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 import { badRequestResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class SearchAccountsRoute extends IActivityAPIRoute<SearchAccountsRequest, SearchAccountsResponse, SearchAccountsEnv> {

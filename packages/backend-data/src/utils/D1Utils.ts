@@ -1,15 +1,6 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
-import { isD1ErrorRetryable } from './D1ErrorClassifier';
-
-const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_BASE_DELAY_MS = 100;
-
-/**
- * Backoff only; module-private, since nothing outside the retry loop needs it.
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve: (value: void) => void): unknown => setTimeout(resolve, ms));
-}
+import { DatabaseError } from '@rexezuge/errors';
+import { executeWithRetry, isD1ErrorRetryable } from '@rexezuge/d1';
+import type { D1RetryOptions, D1Result } from '@rexezuge/d1';
 
 /**
  * Turn a failed D1 result into a `DatabaseError`, or `undefined` if it succeeded.
@@ -47,57 +38,9 @@ function assertD1Success(result: D1Result, context: string): void {
 async function executeD1WithRetry(
   operation: () => Promise<D1Result>,
   context: string,
-  options?: { maxRetries?: number; baseDelayMs?: number },
+  options?: D1RetryOptions,
 ): Promise<D1Result> {
-  const maxRetries: number = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const baseDelayMs: number = options?.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
-  let lastError: DatabaseError | undefined;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const result: D1Result = await operation();
-      assertD1Success(result, context);
-      return result;
-    } catch (error: unknown) {
-      // A thrown value that is not an `Error` is re-thrown untouched. Wrapping it
-      // would discard whatever it actually is — a rejected string, a DOM
-      // exception — and the `IServiceError` taxonomy has nothing useful to say
-      // about it.
-      if (!(error instanceof Error)) {
-        throw error;
-      }
-
-      // Classified before the retry decision, and wrapped even when there is no
-      // attempt left: callers map `DatabaseError` to a typed 5xx and a raw `Error`
-      // would fall out of that taxonomy. An already-classified error passes
-      // through unchanged, since re-wrapping would discard its `retryable` flag.
-      const failure: DatabaseError = toDatabaseError(error, context);
-      if (!failure.retryable || attempt >= maxRetries) {
-        throw failure;
-      }
-      lastError = failure;
-      await sleep(baseDelayMs * Math.pow(2, attempt));
-    }
-  }
-
-  throw lastError ?? new DatabaseError(`Failed to ${context} after ${maxRetries + 1} attempts`);
-}
-
-/**
- * Classify an `Error` as a `DatabaseError`.
- *
- * An already-classified error passes through unchanged — most importantly a
- * `DatabaseError` raised by `assertD1Success`, whose verdict came from
- * `isD1ErrorRetryable` on the driver's own message and would be lost to a blanket
- * re-wrap.
- *
- * Only accepts an `Error`: a non-`Error` rejection is re-thrown by the caller
- * untouched, because wrapping it would discard what it actually is.
- */
-function toDatabaseError(error: Error, context: string): DatabaseError {
-  return error instanceof DatabaseError
-    ? error
-    : new DatabaseError(`Failed to ${context}: ${error.message}`, isD1ErrorRetryable(error.message));
+  return executeWithRetry(operation, context, options);
 }
 
 export { assertD1Success, executeD1WithRetry };

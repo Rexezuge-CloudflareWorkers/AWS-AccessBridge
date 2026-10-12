@@ -1,4 +1,4 @@
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 
 /**
  * Single-use enforcement for HMAC-signed internal requests.

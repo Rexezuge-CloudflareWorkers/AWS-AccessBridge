@@ -36,17 +36,15 @@ the base.
 `createD1SessionEnv`) and `LIKEUtil`. `crypto/` holds `aes-gcm` and `hmac`. `constants/d1/` and
 `constants/kv/` hold the session constraint and the KV namespaces, TTLs and value types.
 
-## Every write goes through `withRetry`
+## Every write goes through the SDK DAO and retry policy
 
-D1 resolves a failed statement with `{success: false}` rather than throwing, so a DAO that checks
-`result.success` by hand is checking only the route that throws. **`assertD1Success` is the one
-place that check is written**, and `executeD1WithRetry` calls it rather than reimplementing it, so
-both D1 failure routes converge on one policy. The check used to be inlined at 31 call sites across
-10 DAOs, which meant `isD1ErrorRetryable` applied to exactly one write and a fix to the policy
-would have silently missed the rest. A thrown value that is not an `Error` is re-thrown untouched
-rather than wrapped.
+D1 resolves failed statements with `{success: false}` rather than throwing. DAOs extend the SDK
+`BaseDAO`, whose `run(sql, bindings)` and `batch(statements)` paths validate results and apply the
+shared retry policy. `D1Utils.executeD1WithRetry` delegates to the SDK `executeWithRetry`; use those
+shared entry points instead of recreating retry loops or manually checking results. AWS-specific
+`deleteOrphanedRows`, key-chain handling, and the wider Cloudflare `D1Queryable` binding remain local.
 
-`isMissingSchemaError` recognises a missing table or column **only**. It exists so a partially
+The SDK `isMissingSchemaError` recognises a missing table or column **only**. It exists so a partially
 migrated database still authenticates; widening it would swallow a constraint violation or a
 timeout, which is a far worse failure to explain.
 

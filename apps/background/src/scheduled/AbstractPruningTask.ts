@@ -1,4 +1,5 @@
-import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';

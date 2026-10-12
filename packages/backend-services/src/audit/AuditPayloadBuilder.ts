@@ -1,4 +1,4 @@
-import { RequestOriginUtil } from '@aws-access-bridge/shared/utils';
+import { RequestOriginUtil } from '@aws-access-bridge/shared/utils/RequestOriginUtil';
 import { AUDIT_MAX_PATH_LENGTH } from '@aws-access-bridge/shared/constants';
 import { AUDIT_ACTIONS } from './AuditActions';
 import { AuditEventBuilder, type AuditEvent } from './AuditEventBuilder';

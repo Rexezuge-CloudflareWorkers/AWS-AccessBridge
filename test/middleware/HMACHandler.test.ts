@@ -1,16 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HMACHandler } from '@/middleware/HMACHandler';
-import {
-  HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
-  HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
-  HMAC_HANDLER_ERROR_REQUEST_REPLAYED,
-  HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
-} from '@aws-access-bridge/shared/constants';
+import { HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS, HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW, HMAC_HANDLER_ERROR_REQUEST_REPLAYED, HMAC_HANDLER_ERROR_SIGNATURE_INVALID } from '@aws-access-bridge/shared/constants';
 import { INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { UnauthorizedError } from '@rexezuge/errors';
 import { generateHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
 import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuard';
-import { FixedClock } from '@aws-access-bridge/shared/utils/Clock';
+import { FixedClock } from '@rexezuge/shared/Clock';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 
 /**
@@ -55,8 +50,8 @@ describe('HMACHandler constants and validation logic', () => {
   describe('error types', () => {
     it('throws UnauthorizedError for missing headers', () => {
       const error = new UnauthorizedError(HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS);
-      expect(error.getErrorCode()).toBe(401);
-      expect(error.getErrorType()).toBe('Unauthorized');
+      expect(error.status).toBe(401);
+      expect(error.type).toBe('Unauthorized');
     });
   });
 

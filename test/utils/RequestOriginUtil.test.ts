@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CF_CONNECTING_IP_HEADER,
-  CF_RAY_HEADER,
-  API_WORKER_BASE_HOSTNAME,
-  FORWARDED_FOR_HEADER,
-  FORWARDED_HOST_HEADER,
-  FORWARDED_PROTO_HEADER,
-} from '@aws-access-bridge/shared/constants';
+import { CF_CONNECTING_IP_HEADER, CF_RAY_HEADER, API_WORKER_BASE_HOSTNAME, FORWARDED_FOR_HEADER, FORWARDED_HOST_HEADER, FORWARDED_PROTO_HEADER } from '@aws-access-bridge/shared/constants';
 import { RequestOriginUtil } from '@aws-access-bridge/shared/utils/RequestOriginUtil';
 
 function withCloudflareMetadata(request: Request): Request {

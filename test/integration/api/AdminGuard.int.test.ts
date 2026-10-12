@@ -43,7 +43,7 @@ describe('Admin guard + programmatic auth matrix', () => {
         body: call.body ? JSON.stringify(call.body) : undefined,
       });
       expect(response.status).toBe(403);
-      // `ForbiddenError.getErrorType()` is the wire name: 'Forbidden'.
+      // `ForbiddenError.type` is the wire name: 'Forbidden'.
       await expect(response.json()).resolves.toMatchObject({ Exception: { Type: 'Forbidden' } });
     });
   }

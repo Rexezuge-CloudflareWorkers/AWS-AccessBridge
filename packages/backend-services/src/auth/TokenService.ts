@@ -1,9 +1,10 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao';
 
-import { BadRequestError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, UnauthorizedError } from '@rexezuge/errors';
 import type { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
-import { TimestampUtil, TokenHashUtil, UUIDUtil, log } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, TokenHashUtil, UUIDUtil } from '@rexezuge/shared';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';

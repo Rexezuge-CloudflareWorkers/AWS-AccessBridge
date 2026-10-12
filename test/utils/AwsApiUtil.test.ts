@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { IamService } from '@aws-access-bridge/backend-services/aws/iam';
 import { CostExplorerService } from '@aws-access-bridge/backend-services/aws/ce';
-import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@rexezuge/errors';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 const mockFetch = vi.fn();

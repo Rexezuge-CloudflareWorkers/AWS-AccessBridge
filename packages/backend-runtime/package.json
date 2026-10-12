@@ -12,8 +12,6 @@
     "./config/*": "./src/config/*.ts",
     "./constants": "./src/constants/index.ts",
     "./constants/*": "./src/constants/*.ts",
-    "./di": "./src/di/index.ts",
-    "./di/*": "./src/di/*.ts",
     "./constants/*/*": "./src/constants/*/*.ts",
     "./constants/*/index": "./src/constants/*/index.ts"
   },

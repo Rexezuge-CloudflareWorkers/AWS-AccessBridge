@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { TokenHashUtil } from '@aws-access-bridge/shared/utils/TokenHashUtil';
+import { TokenHashUtil } from '@rexezuge/shared/TokenHashUtil';
 import { FederationService } from '@aws-access-bridge/backend-services/aws/federate/FederationService';
 import type { AssumeRoleService } from '@aws-access-bridge/backend-services/aws/assume-role/AssumeRoleService';
 import type { ConsoleService } from '@aws-access-bridge/backend-services/aws/console/ConsoleService';
-import { BadGatewayError, NotFoundError, RateLimitedError } from '@aws-access-bridge/backend-errors';
+import { BadGatewayError, NotFoundError, RateLimitedError } from '@rexezuge/errors';
 
 describe('TokenHashUtil', () => {
   it('is a stable 64-hex SHA-256 digest', async () => {
@@ -96,10 +96,10 @@ describe('the errors the hardening added', () => {
   it('map to the statuses the SPA relies on', () => {
     // 401 means "your session ended" and redirects to Zero Trust, so a missing
     // grant or a failed upstream must never answer with it.
-    expect(new NotFoundError('x').getErrorCode()).toBe(404);
-    expect(new BadGatewayError('x').getErrorCode()).toBe(502);
-    expect(new RateLimitedError('x').getErrorCode()).toBe(429);
-    expect(new RateLimitedError().getErrorType()).toBe('RateLimited');
-    expect(new RateLimitedError('slow down').getErrorMessage()).toBe('slow down');
+    expect(new NotFoundError('x').status).toBe(404);
+    expect(new BadGatewayError('x').status).toBe(502);
+    expect(new RateLimitedError('x').status).toBe(429);
+    expect(new RateLimitedError().type).toBe('RateLimited');
+    expect(new RateLimitedError('slow down').message).toBe('slow down');
   });
 });

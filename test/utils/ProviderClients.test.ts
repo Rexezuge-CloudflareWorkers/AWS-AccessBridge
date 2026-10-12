@@ -3,7 +3,7 @@ import { StsClient } from '@aws-access-bridge/provider-clients/aws';
 import { CostExplorerClient } from '@aws-access-bridge/provider-clients/aws';
 import { IamClient } from '@aws-access-bridge/provider-clients/aws';
 import { parseXmlTag } from '@aws-access-bridge/provider-clients/aws';
-import { ForbiddenError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, UnauthorizedError } from '@rexezuge/errors';
 
 function signedFetch(response: Response) {
   return () => ({ fetch: vi.fn().mockResolvedValue(response) }) as never;

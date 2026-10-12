@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 
 abstract class AbstractDurableObjectWorker extends DurableObject<CloudflareEnv> {
   protected printExecId(): string {

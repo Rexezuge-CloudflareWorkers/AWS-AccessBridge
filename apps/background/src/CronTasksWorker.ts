@@ -1,7 +1,8 @@
 import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-runtime/base';
 import { tasksForPhase } from '@aws-access-bridge/background/scheduled';
 
-import { log, toErrorMessage } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
+import { toErrorMessage } from '@aws-access-bridge/shared/utils/ErrorMessage';
 const CRON_TASKS_RUN_PATH: string = '/run';
 
 /**

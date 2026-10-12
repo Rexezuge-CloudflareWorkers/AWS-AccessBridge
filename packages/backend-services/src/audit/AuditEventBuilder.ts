@@ -1,4 +1,4 @@
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 import { AUDIT_MAX_PATH_LENGTH, AUDIT_MAX_USER_AGENT_LENGTH } from '@aws-access-bridge/shared/constants';
 
 interface AuditEventInput {

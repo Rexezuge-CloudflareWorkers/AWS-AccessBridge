@@ -1,17 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  AwsCollectionError,
-  BadGatewayError,
-  BadRequestError,
-  ConflictError,
-  ForbiddenError,
-  InternalServerError,
-  MethodNotAllowedError,
-  NotFoundError,
-  RateLimitedError,
-  UnauthorizedError,
-} from '@aws-access-bridge/backend-errors';
-import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-runtime/base';
+import { BadGatewayError, BadRequestError, ConflictError, ForbiddenError, InternalServerError, MethodNotAllowedError, NotFoundError, RateLimitedError, UnauthorizedError } from '@rexezuge/errors';
+import { AwsCollectionError } from '@aws-access-bridge/backend-services/aws/collectors/AwsCollectionError';
+import { AbstractDurableObjectWorker } from '@rexezuge/runtime/base/AbstractDurableObjectWorker';
 
 /**
  * Every typed error carries three things the response layer depends on: a status
@@ -39,17 +29,19 @@ describe('the error taxonomy', () => {
 
   for (const { name, error, status, type } of cases) {
     it(`${name} answers ${status} with a non-empty message`, () => {
-      expect(error.getErrorCode()).toBe(status);
-      expect(error.getErrorType()).toBe(type);
-      expect(error.getErrorMessage().length).toBeGreaterThan(0);
+      expect(error.status).toBe(status);
+      expect(error.type).toBe(type);
+      expect(error.message.length).toBeGreaterThan(0);
       // A supplied message wins over the default.
       const custom = new (error.constructor as new (message?: string) => typeof error)('custom text');
-      expect(custom.getErrorMessage()).toBe('custom text');
+      expect(custom.message).toBe('custom text');
     });
   }
 
   it('marks only the errors worth retrying as retryable', () => {
-    expect(new BadGatewayError('x', true).retryable).toBe(true);
+    const retryableGateway = new BadGatewayError('x');
+    retryableGateway.retryable = true;
+    expect(retryableGateway.retryable).toBe(true);
     expect(new BadGatewayError('x').retryable).toBe(false);
     expect(new ConflictError().retryable).toBe(false);
   });

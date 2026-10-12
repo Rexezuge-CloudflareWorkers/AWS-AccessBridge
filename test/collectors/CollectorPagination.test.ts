@@ -4,7 +4,7 @@ import { S3Collector } from '@aws-access-bridge/backend-services/aws/collectors/
 import { LambdaCollector } from '@aws-access-bridge/backend-services/aws/collectors/LambdaCollector';
 import { RdsCollector } from '@aws-access-bridge/backend-services/aws/collectors/RdsCollector';
 import { DynamoDbCollector } from '@aws-access-bridge/backend-services/aws/collectors/DynamoDbCollector';
-import { AwsCollectionError } from '@aws-access-bridge/backend-errors';
+import { AwsCollectionError } from '@aws-access-bridge/backend-services/aws/collectors/AwsCollectionError';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 const KEYS: AccessKeys = { accessKeyId: 'AKID', secretAccessKey: 'SECRET', sessionToken: 'TOKEN' };

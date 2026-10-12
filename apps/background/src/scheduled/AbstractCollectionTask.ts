@@ -1,7 +1,8 @@
 import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
 
-import { log, TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { IScheduledTask } from './IScheduledTask';
 import type { IEnv, TaskRunSummary } from './IScheduledTask';

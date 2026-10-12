@@ -68,5 +68,4 @@ Update the guide whose reader needs the change, in the same change — never thi
 encryption → `packages/backend-data`. Services and the composition root → `packages/backend-services`.
 Env vars and bindings → `docs/agents/runtime`. Tests and thresholds → `docs/agents/testing`.
 Commands, layers, gates → `docs/agents/repo`. A top-level feature gets a
-`docs/agents/features/*/AGENTS.md`. `shared`, `backend-errors`, `backend-runtime` and
-`provider-clients` have no scoped guide; document their use in the closest consumer's guide.
+`docs/agents/features/*/AGENTS.md`. `shared`, `backend-runtime` and `provider-clients` have no scoped guide; document their use in the closest consumer's guide. Generic errors, D1 access/retry, runtime DI, and common utilities come from the `@rexezuge/*` SDK packages. Keep AWS schemas/models, redacting logging, configuration, and domain behavior in this consumer.

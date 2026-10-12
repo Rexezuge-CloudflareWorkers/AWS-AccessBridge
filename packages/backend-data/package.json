@@ -19,8 +19,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-access-bridge/backend-errors": "workspace:*",
-    "@aws-access-bridge/shared": "workspace:*"
+    "@aws-access-bridge/shared": "workspace:*",
+    "@rexezuge/d1": "1.5.1",
+    "@rexezuge/errors": "1.5.1",
+    "@rexezuge/shared": "1.5.1"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

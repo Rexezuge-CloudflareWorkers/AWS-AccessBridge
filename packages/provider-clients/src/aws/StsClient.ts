@@ -1,10 +1,10 @@
 import type { AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
-import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError, UnauthorizedError } from '@rexezuge/errors';
 import { ASSUME_ROLE_UTIL_ERROR_STS_CALL, ASSUME_ROLE_UTIL_ERROR_STS_RESPONSE_PARSE } from '@aws-access-bridge/shared/constants';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 interface CallerIdentity {
   arn: string;
   accountId: string;

@@ -1,6 +1,6 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { awsQueryRequest, parseXmlTag } from '@aws-access-bridge/provider-clients/aws';
-import { matchAll } from '@aws-access-bridge/shared/utils';
+import { matchAll } from '@aws-access-bridge/shared/utils/RegexUtil';
 import { BaseAwsCollector } from './BaseAwsCollector';
 import type { ResourceDiscoveryItem } from './IAwsResourceCollector';
 

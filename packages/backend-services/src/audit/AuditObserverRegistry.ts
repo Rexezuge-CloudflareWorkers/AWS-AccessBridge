@@ -3,7 +3,7 @@ import type { AuditEvent } from './AuditEventBuilder';
 import type { IAuditObserver } from './AuditObserver';
 import { AuditLogObserver } from './AuditObserver';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 /**
  * Injectable observer registry (Otter `IntegrationObserverRegistry`
  * precedent). `AuditService` keeps its `Promise.allSettled` fan-out but

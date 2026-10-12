@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AbstractEntrypointWorker } from '@aws-access-bridge/backend-runtime/base';
+import { AbstractEntrypointWorker } from '@rexezuge/runtime/base/AbstractEntrypointWorker';
 
 function createEnv(): CloudflareEnv {
   return {} as CloudflareEnv;

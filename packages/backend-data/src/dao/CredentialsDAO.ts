@@ -1,11 +1,11 @@
-import { ForbiddenError, InternalServerError, NotFoundError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, InternalServerError, NotFoundError } from '@rexezuge/errors';
 import { Credential, CredentialChain, CredentialInternal } from '@aws-access-bridge/shared/model';
-import { decryptDataField, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import { decryptDataField, encryptData } from '../crypto/aes-gcm';
+import type { D1Queryable } from '../utils';
 import { EncryptedDAO } from './BaseDAO';
 
 import { assertD1Success } from '../utils/D1Utils';
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 /**
  * Pick the IV to decrypt a credential field with.
  *
@@ -125,12 +125,7 @@ class CredentialsDAO extends EncryptedDAO {
     const encryptedAccessKeyId = await encryptData(accessKeyId, key);
     const encryptedSecretAccessKey = await encryptData(secretAccessKey, key);
     const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, key) : null;
-    const result: D1Result = await this.database
-      .prepare(
-        // An upsert that names its columns, not INSERT OR REPLACE: REPLACE deletes the
-        // row and inserts a new one, which blanks `assumed_by` and fires the
-        // `ON DELETE CASCADE` on `credential_cache_config`.
-        `INSERT INTO credentials (
+    const result = await this.run(`INSERT INTO credentials (
            principal_arn, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token,
            salt, salt_secret_access_key, salt_session_token
          )
@@ -141,35 +136,19 @@ class CredentialsDAO extends EncryptedDAO {
            encrypted_session_token = excluded.encrypted_session_token,
            salt = excluded.salt,
            salt_secret_access_key = excluded.salt_secret_access_key,
-           salt_session_token = excluded.salt_session_token`,
-      )
-      .bind(
-        principalArn,
-        encryptedAccessKeyId.encrypted,
-        encryptedSecretAccessKey.encrypted,
-        encryptedSessionToken?.encrypted || null,
-        encryptedAccessKeyId.iv,
-        encryptedSecretAccessKey.iv,
-        encryptedSessionToken?.iv || null,
-      )
-      .run();
+           salt_session_token = excluded.salt_session_token`, [principalArn, encryptedAccessKeyId.encrypted, encryptedSecretAccessKey.encrypted, encryptedSessionToken?.encrypted || null, encryptedAccessKeyId.iv, encryptedSecretAccessKey.iv, encryptedSessionToken?.iv || null]);
     assertD1Success(result, `store credential`);
   }
 
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        `INSERT INTO credentials (principal_arn, assumed_by)
+    const result = await this.run(`INSERT INTO credentials (principal_arn, assumed_by)
          VALUES (?, ?)
-         ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by`,
-      )
-      .bind(principalArn, assumedBy)
-      .run();
+         ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by`, [principalArn, assumedBy]);
     assertD1Success(result, `store credential relationship`);
   }
 
   public async removeCredential(principalArn: string): Promise<void> {
-    const result: D1Result = await this.database.prepare(`DELETE FROM credentials WHERE principal_arn = ?`).bind(principalArn).run();
+    const result = await this.run(`DELETE FROM credentials WHERE principal_arn = ?`, [principalArn]);
     assertD1Success(result, `remove credential`);
   }
 }

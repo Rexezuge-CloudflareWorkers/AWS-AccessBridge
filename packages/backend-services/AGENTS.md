@@ -182,20 +182,21 @@ In `AssumeRoleService`, the local named `userId` is the STS `RoleSessionName` (f
 
 ## Related packages
 
-- `shared/` — constants (canonical `StsMessages` / `HmacMessages`), models (dual camelCase /
-  snake_case `Type` / `TypeInternal` pairs), schemas, and utils: `TimestampUtil` (current-time reads
-  take an optional `Clock`, defaulting to `SystemClock`), `Clock` / `SystemClock` / `FixedClock`,
-  `Logger`, `UUIDUtil`, `RequestOriginUtil`, `LocaleUtil`, `MoneyUtil`, and
-  `RegexUtil.matchAll`. There is no backend locale bundle — `shared/src/i18n/` and its twelve empty
-  tables were deleted, so `getBackendStrings('de').locale` used to answer `'en'` while a test
-  asserted that wrong answer as correct.
-- `backend-errors/` — `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`,
-  `MethodNotAllowedError`, `ConflictError`, `RateLimitedError`, `BadGatewayError`,
-  `InternalServerError` (+ the `DefaultInternalServerError` singleton every 5xx is answered with),
-  `DatabaseError` (+`retryable`), `AwsCollectionError`, and the `IServiceError` taxonomy they
-  implement. **401 is reserved for the session.** The SPA keys its login redirect on 401 alone, so a
-  missing grant answers 403 and a failing AWS endpoint answers 502 — neither is something signing in
-  again can fix.
+- SDK `@rexezuge/shared` — generic utilities such as `TimestampUtil`, `Clock`, `UUIDUtil`,
+  `TokenHashUtil`, and `LocaleUtil`. Consumer `packages/shared/` retains AWS-specific constants,
+  models (dual camelCase / snake_case `Type` / `TypeInternal` pairs), schemas, redacting `Logger`,
+  `RequestOriginUtil`, `MoneyUtil`, and `RegexUtil.matchAll`. There is no backend locale bundle —
+  `shared/src/i18n/` and its twelve empty tables were deleted, so `getBackendStrings('de').locale`
+  used to answer `'en'` while a test asserted that wrong answer as correct.
+- SDK `@rexezuge/errors` — generic `ServiceError` types including `BadRequestError`,
+  `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `MethodNotAllowedError`, `ConflictError`,
+  `RateLimitedError`, `BadGatewayError`, `InternalServerError`, `DatabaseError`, and the
+  `DefaultInternalServerError` singleton used for sanitized 5xx responses. **401 is reserved for
+  the session.** The SPA keys its login redirect on 401 alone, so a missing grant answers 403 and a
+  failing AWS endpoint answers 502 — neither is something signing in again can fix.
+- `backend-services/src/aws/collectors/AwsCollectionError.ts` — the consumer-specific
+  `AwsCollectionError`, which preserves upstream status for collector policy while using SDK
+  `ServiceError` as its HTTP error contract.
 - `backend-runtime/` — `ConfigurationDefaults`, `ConfigurationManager` (namespaced getters) and
   `EnvParser`; the `di/` `Container`; abstract worker bases; DO naming constants and `Pagination`;
   the checked-in `env.d.ts` binding source of truth.

@@ -1,4 +1,4 @@
-import { BadGatewayError } from '@aws-access-bridge/backend-errors';
+import { BadGatewayError } from '@rexezuge/errors';
 
 /**
  * Default ceiling on one signed AWS call, body included.
@@ -31,7 +31,7 @@ const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
  *
  * Expiry becomes `BadGatewayError` (502, retryable) rather than the platform's
  * `DOMException`, which carries no service name and is not part of the
- * `IServiceError` taxonomy every response mapper understands. A caller-supplied
+ * `ServiceError` taxonomy every response mapper understands. A caller-supplied
  * `signal` that aborts first is rethrown unchanged — that is the caller's own
  * decision, not an upstream fault.
  *
@@ -65,7 +65,9 @@ async function fetchWithTimeout(
   let expire: (() => void) | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
     expire = (): void => {
-      reject(new BadGatewayError(`The request to ${target} timed out after ${timeoutMs}ms.`, true));
+      const failure = new BadGatewayError(`The request to ${target} timed out after ${timeoutMs}ms.`);
+      failure.retryable = true;
+      reject(failure);
     };
   });
   const timer: ReturnType<typeof setTimeout> = setTimeout(() => expire?.(), timeoutMs);
@@ -89,7 +91,9 @@ async function fetchWithTimeout(
       throw error;
     }
     if (timeout.aborted && !callerSignal?.aborted) {
-      throw new BadGatewayError(`The request to ${target} timed out after ${timeoutMs}ms.`, true);
+      const failure = new BadGatewayError(`The request to ${target} timed out after ${timeoutMs}ms.`);
+      failure.retryable = true;
+      throw failure;
     }
     throw error;
   } finally {

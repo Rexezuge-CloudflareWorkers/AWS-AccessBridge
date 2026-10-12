@@ -1,6 +1,6 @@
 import { UserEmailDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
-import { isMissingSchemaError } from '@aws-access-bridge/backend-data/utils';
-import { BadRequestError, ConflictError } from '@aws-access-bridge/backend-errors';
+import { isMissingSchemaError } from '@rexezuge/d1';
+import { BadRequestError, ConflictError } from '@rexezuge/errors';
 import type { AccountIdentity } from './UserIdentityService';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/;

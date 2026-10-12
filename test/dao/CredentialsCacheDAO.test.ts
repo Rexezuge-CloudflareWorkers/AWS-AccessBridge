@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import { encryptData, generateAESGCMKey } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
+import { TimestampUtil } from '@rexezuge/shared';
 import { KV_NAMESPACE_CREDENTIAL_CACHE, KV_NAMESPACE_DELIMITER } from '@aws-access-bridge/backend-data/constants/kv';
 
 const PRINCIPAL_ARN = 'arn:aws:iam::123456789012:role/Cached';

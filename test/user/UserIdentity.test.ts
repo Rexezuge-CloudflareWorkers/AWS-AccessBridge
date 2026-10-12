@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import { UserIdentityService, idOf } from '@aws-access-bridge/backend-services/identity';
 import type { AccountIdentity, UserIdentityEnv } from '@aws-access-bridge/backend-services/identity';
-import { BadRequestError, ConflictError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ConflictError } from '@rexezuge/errors';
 import type { UserEmailRow } from '@aws-access-bridge/backend-data/dao';
 import type { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
 import type { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';

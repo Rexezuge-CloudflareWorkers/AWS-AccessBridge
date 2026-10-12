@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CollectorRegistry, createCollectorRegistry, resolveCollector } from '@aws-access-bridge/backend-services/aws/collectors';
 import { InjectableCollectorRegistry } from '@aws-access-bridge/backend-services/aws/collectors/InjectableCollectorRegistry';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import type { IAwsResourceCollector } from '@aws-access-bridge/backend-services/aws/collectors';
 
 function stubCollector(resourceType: string): IAwsResourceCollector {

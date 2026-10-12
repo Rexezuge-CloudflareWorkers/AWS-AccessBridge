@@ -1,39 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import {
-  BadRequestError,
-  UnauthorizedError,
-  ForbiddenError,
-  InternalServerError,
-  DatabaseError,
-  DefaultInternalServerError,
-  IServiceError,
-} from '@aws-access-bridge/backend-errors';
+import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError, DatabaseError, DefaultInternalServerError, ServiceError } from '@rexezuge/errors';
 
 describe('Service Errors', () => {
   describe('BadRequestError', () => {
     it('has error code 400', () => {
       const error = new BadRequestError();
-      expect(error.getErrorCode()).toBe(400);
+      expect(error.status).toBe(400);
     });
 
     it('has error type BadRequest', () => {
       const error = new BadRequestError();
-      expect(error.getErrorType()).toBe('BadRequest');
+      expect(error.type).toBe('BadRequest');
     });
 
     it('uses default message when none provided', () => {
       const error = new BadRequestError();
-      expect(error.getErrorMessage()).toBe('The request could not be understood by the server due to malformed syntax.');
+      expect(error.message).toBe('The request could not be understood or was missing required parameters.');
     });
 
     it('uses custom message when provided', () => {
       const error = new BadRequestError('custom error');
-      expect(error.getErrorMessage()).toBe('custom error');
+      expect(error.message).toBe('custom error');
     });
 
-    it('extends IServiceError', () => {
+    it('extends ServiceError', () => {
       const error = new BadRequestError();
-      expect(error).toBeInstanceOf(IServiceError);
+      expect(error).toBeInstanceOf(ServiceError);
     });
 
     it('extends Error', () => {
@@ -45,83 +37,83 @@ describe('Service Errors', () => {
 
   describe('UnauthorizedError', () => {
     it('has error code 401', () => {
-      expect(new UnauthorizedError().getErrorCode()).toBe(401);
+      expect(new UnauthorizedError().status).toBe(401);
     });
 
     it('has error type Unauthorized', () => {
-      expect(new UnauthorizedError().getErrorType()).toBe('Unauthorized');
+      expect(new UnauthorizedError().type).toBe('Unauthorized');
     });
 
     it('uses default message when none provided', () => {
-      expect(new UnauthorizedError().getErrorMessage()).toBe('Authentication is required and has failed or has not yet been provided.');
+      expect(new UnauthorizedError().message).toBe('Authentication is required and has failed or has not yet been provided.');
     });
 
     it('uses custom message', () => {
-      expect(new UnauthorizedError('denied').getErrorMessage()).toBe('denied');
+      expect(new UnauthorizedError('denied').message).toBe('denied');
     });
   });
 
   describe('ForbiddenError', () => {
     it('has error code 403', () => {
-      expect(new ForbiddenError().getErrorCode()).toBe(403);
+      expect(new ForbiddenError().status).toBe(403);
     });
 
     it('has error type Forbidden', () => {
-      expect(new ForbiddenError().getErrorType()).toBe('Forbidden');
+      expect(new ForbiddenError().type).toBe('Forbidden');
     });
 
     it('uses default message when none provided', () => {
-      expect(new ForbiddenError().getErrorMessage()).toBe('You do not have permission to access this resource.');
+      expect(new ForbiddenError().message).toBe('You do not have permission to perform this action.');
     });
 
     it('uses custom message', () => {
-      expect(new ForbiddenError('nope').getErrorMessage()).toBe('nope');
+      expect(new ForbiddenError('nope').message).toBe('nope');
     });
   });
 
   describe('InternalServerError', () => {
     it('has error code 500', () => {
-      expect(new InternalServerError().getErrorCode()).toBe(500);
+      expect(new InternalServerError().status).toBe(500);
     });
 
     it('has error type InternalServerError', () => {
-      expect(new InternalServerError().getErrorType()).toBe('InternalServerError');
+      expect(new InternalServerError().type).toBe('InternalServerError');
     });
 
     it('uses default message when none provided', () => {
-      expect(new InternalServerError().getErrorMessage()).toBe(
+      expect(new InternalServerError().message).toBe(
         'The server encountered an internal error and was unable to complete your request.',
       );
     });
 
     it('uses custom message', () => {
-      expect(new InternalServerError('crash').getErrorMessage()).toBe('crash');
+      expect(new InternalServerError('crash').message).toBe('crash');
     });
   });
 
   describe('DatabaseError', () => {
     it('has error code 500 (inherits from InternalServerError)', () => {
-      expect(new DatabaseError().getErrorCode()).toBe(500);
+      expect(new DatabaseError().status).toBe(500);
     });
 
     it('has error type DatabaseError', () => {
-      expect(new DatabaseError().getErrorType()).toBe('DatabaseError');
+      expect(new DatabaseError().type).toBe('DatabaseError');
     });
 
     it('uses default message when none provided', () => {
-      expect(new DatabaseError().getErrorMessage()).toContain('unexpected problem while accessing the database');
+      expect(new DatabaseError().message).toContain('unexpected problem while accessing the database');
     });
 
     it('uses custom message', () => {
-      expect(new DatabaseError('db down').getErrorMessage()).toBe('db down');
+      expect(new DatabaseError('db down').message).toBe('db down');
     });
 
     it('extends InternalServerError', () => {
       expect(new DatabaseError()).toBeInstanceOf(InternalServerError);
     });
 
-    it('extends IServiceError', () => {
-      expect(new DatabaseError()).toBeInstanceOf(IServiceError);
+    it('extends ServiceError', () => {
+      expect(new DatabaseError()).toBeInstanceOf(ServiceError);
     });
   });
 
@@ -131,13 +123,13 @@ describe('Service Errors', () => {
     });
 
     it('has the default message', () => {
-      expect(DefaultInternalServerError.getErrorMessage()).toBe(
+      expect(DefaultInternalServerError.message).toBe(
         'The server encountered an internal error and was unable to complete your request.',
       );
     });
 
     it('has error code 500', () => {
-      expect(DefaultInternalServerError.getErrorCode()).toBe(500);
+      expect(DefaultInternalServerError.status).toBe(500);
     });
   });
 });

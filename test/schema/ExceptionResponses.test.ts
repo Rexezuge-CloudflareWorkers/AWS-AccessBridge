@@ -36,7 +36,7 @@ describe('exception response builders', () => {
 
   /**
    * The type is the stable machine-readable half of the contract; the SPA matches
-   * on it via `IServiceError.getErrorType()` and a caller reads it from `/docs`.
+   * on it via `ServiceError.type` and a caller reads it from `/docs`.
    */
   it('labels each status with the matching error type', () => {
     expect(badRequestResponse('d').content['application/json'].schema.properties.Exception.properties.Type.example).toBe('BadRequestError');

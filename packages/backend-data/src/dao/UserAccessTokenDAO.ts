@@ -1,6 +1,6 @@
 import type { UserAccessTokenInternal } from '@aws-access-bridge/shared/model';
 import { UserAccessTokenMetadata } from '@aws-access-bridge/shared/model/UserAccessToken';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
 import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
@@ -15,12 +15,7 @@ class UserAccessTokenDAO extends BaseDAO {
     userId: string | null = null,
   ): Promise<void> {
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      )
-      .bind(tokenId, userEmail, tokenHash, name, createdAt, expiresAt, userId)
-      .run();
+    const result = await this.run('INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [tokenId, userEmail, tokenHash, name, createdAt, expiresAt, userId]);
     assertD1Success(result, `create access token`);
   }
 
@@ -159,10 +154,7 @@ class UserAccessTokenDAO extends BaseDAO {
 
   public async updateLastUsedByTokenHash(tokenHash: string): Promise<void> {
     const lastUsedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare('UPDATE user_access_tokens SET last_used_at = ? WHERE token_hash = ?')
-      .bind(lastUsedAt, tokenHash)
-      .run();
+    const result = await this.run('UPDATE user_access_tokens SET last_used_at = ? WHERE token_hash = ?', [lastUsedAt, tokenHash]);
     assertD1Success(result, `update last used`);
   }
 
@@ -184,10 +176,7 @@ class UserAccessTokenDAO extends BaseDAO {
     const ownership: string =
       userId === null ? `user_access_tokens.user_id IS NULL AND user_access_tokens.user_email = ?` : ownerClause('user_access_tokens');
     const bindings: unknown[] = userId === null ? [tokenId, anchorEmail] : [tokenId, userId, anchorEmail];
-    const result: D1Result = await this.database
-      .prepare(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`)
-      .bind(...bindings)
-      .run();
+    const result = await this.run(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`, [...bindings]);
     assertD1Success(result, `delete access token`);
   }
 }

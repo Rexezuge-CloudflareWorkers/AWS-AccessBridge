@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createRequestScope, getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError } from '@rexezuge/errors';
 import type { ServiceEnv } from '@aws-access-bridge/backend-services/composition/ServiceEnv';
-import type { Token } from '@aws-access-bridge/backend-runtime/di';
+import type { Token } from '@rexezuge/runtime/di/Container';
 import { serviceEnv } from '../helpers/service-env';
 
 /**

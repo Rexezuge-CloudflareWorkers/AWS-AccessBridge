@@ -3,7 +3,7 @@ import { TokenService } from '@aws-access-bridge/backend-services/auth';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
-import { UnauthorizedError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { UnauthorizedError, InternalServerError } from '@rexezuge/errors';
 import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');

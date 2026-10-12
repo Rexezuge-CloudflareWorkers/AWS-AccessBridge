@@ -1,7 +1,7 @@
 import { AwsAccountsDAO, RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { AccessKeys, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { AWS_ACCOUNT_ID_ERROR_MESSAGE, isAwsAccountId } from '@aws-access-bridge/shared/utils/aws';
 import { ROLE_DISCOVERY_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import { CredentialChainService } from '../credential';

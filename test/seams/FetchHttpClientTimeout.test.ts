@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { BadGatewayError } from '@aws-access-bridge/backend-errors';
+import { BadGatewayError } from '@rexezuge/errors';
 import { FetchHttpClient } from '@aws-access-bridge/backend-services/http';
 
 /**

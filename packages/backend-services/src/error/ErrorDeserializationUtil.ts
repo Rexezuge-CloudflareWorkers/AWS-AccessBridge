@@ -1,18 +1,8 @@
-import {
-  BadRequestError,
-  BadGatewayError,
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  InternalServerError,
-  UnauthorizedError,
-  IServiceError,
-  DatabaseError,
-} from '@aws-access-bridge/backend-errors';
-import type { ErrorResponse } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, BadGatewayError, ConflictError, ForbiddenError, NotFoundError, InternalServerError, UnauthorizedError, ServiceError, DatabaseError } from '@rexezuge/errors';
+import type { ErrorResponse } from '@rexezuge/errors';
 
 class ErrorDeserializationUtil {
-  public static async deserializeError(response: Response): Promise<IServiceError> {
+  public static async deserializeError(response: Response): Promise<ServiceError> {
     try {
       const errorData: ErrorResponse = await response.json();
       const errorType: string = errorData.Exception?.Type || 'InternalServerError';

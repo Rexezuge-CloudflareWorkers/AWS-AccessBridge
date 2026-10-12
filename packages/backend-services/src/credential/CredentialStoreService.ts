@@ -1,7 +1,7 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
-import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, InternalServerError } from '@rexezuge/errors';
 import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { StsService, type CallerIdentity } from '../aws/sts';
 import type { ServiceEnv } from '../composition/ServiceEnv';

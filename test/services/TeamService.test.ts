@@ -3,7 +3,7 @@ import { TeamService } from '@aws-access-bridge/backend-services/team/TeamServic
 import { AwsAccountsDAO, TeamAccountsDAO, TeamMembersDAO, TeamsDAO } from '@aws-access-bridge/backend-data/dao';
 import { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
 import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadataDAO';
-import { BadRequestError, NotFoundError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/TeamsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/TeamMembersDAO');

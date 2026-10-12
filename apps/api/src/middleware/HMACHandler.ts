@@ -1,17 +1,12 @@
 import { Context, Next } from 'hono';
-import {
-  HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
-  HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
-  HMAC_HANDLER_ERROR_REQUEST_REPLAYED,
-  HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
-} from '@aws-access-bridge/shared/constants';
+import { HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS, HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW, HMAC_HANDLER_ERROR_REQUEST_REPLAYED, HMAC_HANDLER_ERROR_SIGNATURE_INVALID } from '@aws-access-bridge/shared/constants';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { INTERNAL_HEADER_PREFIX, INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
 import { verifyHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
 import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuard';
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
-import type { Clock } from '@aws-access-bridge/shared/utils';
+import { UnauthorizedError } from '@rexezuge/errors';
+import { TimestampUtil } from '@rexezuge/shared';
+import type { Clock } from '@rexezuge/shared';
 
 class HMACHandler {
   /**

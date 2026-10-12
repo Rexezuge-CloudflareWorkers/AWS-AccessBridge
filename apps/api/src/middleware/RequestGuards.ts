@@ -1,5 +1,5 @@
 import { CSRF_ERROR_CROSS_SITE_FETCH, CSRF_ERROR_UNSUPPORTED_CONTENT_TYPE } from '@aws-access-bridge/shared/constants';
-import { RateLimitedError } from '@aws-access-bridge/backend-errors';
+import { RateLimitedError } from '@rexezuge/errors';
 import { Context, Next } from 'hono';
 
 /**
@@ -47,7 +47,7 @@ async function rateLimitHandler(c: PlainContext, next: Next): Promise<Response |
   const key: string = c.req.header('cf-connecting-ip')?.trim() || 'unknown';
   const { success }: { success: boolean } = await limiter.limit({ key });
   if (!success) {
-    return c.json({ Exception: { Type: 'RateLimited', Message: new RateLimitedError().getErrorMessage() } }, 429);
+    return c.json({ Exception: { Type: 'RateLimited', Message: new RateLimitedError().message } }, 429);
   }
   await next();
 }

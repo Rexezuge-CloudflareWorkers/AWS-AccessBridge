@@ -1,3 +1,5 @@
+import { decryptSecret, encryptSecret } from '@rexezuge/d1';
+
 /**
  * AES-GCM helpers for credential encryption.
  *
@@ -9,8 +11,6 @@
  * AES-GCM authenticates its ciphertext, so trying keys in preference order is
  * safe — a wrong key fails the tag check rather than returning garbage.
  */
-const IV_LENGTH_BYTES = 12;
-
 export async function generateAESGCMKey(): Promise<string> {
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
   const exported = await crypto.subtle.exportKey('raw', key);
@@ -27,33 +27,12 @@ export async function generateAESGCMKey(): Promise<string> {
  * with each ciphertext, as returned here.
  */
 export async function encryptData(data: string, keyBase64: string): Promise<{ encrypted: string; iv: string }> {
-  const key = await importKey(keyBase64, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
-  const encoded = new TextEncoder().encode(data);
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return {
-    encrypted: toBase64(new Uint8Array(encrypted)),
-    iv: toBase64(iv),
-  };
-}
-
-async function importKey(keyBase64: string, usages: KeyUsage[]): Promise<CryptoKey> {
-  const keyBuffer = fromBase64(keyBase64);
-  return crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, usages);
-}
-
-function fromBase64(value: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(atob(value), (c) => c.codePointAt(0) ?? 0);
-}
-
-function toBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCodePoint(...bytes));
+  const envelope = await encryptSecret(data, keyBase64);
+  return { encrypted: envelope.ciphertext, iv: envelope.iv };
 }
 
 export async function decryptData(encryptedBase64: string, ivBase64: string, keyBase64: string): Promise<string> {
-  const key = await importKey(keyBase64, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivBase64) }, key, fromBase64(encryptedBase64));
-  return new TextDecoder().decode(decrypted);
+  return decryptSecret({ ciphertext: encryptedBase64, iv: ivBase64 }, keyBase64);
 }
 
 /**

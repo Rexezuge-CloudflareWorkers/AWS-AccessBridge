@@ -2,7 +2,7 @@ import { AssumableRolesDAO, CostDataDAO, DataCollectionConfigDAO, SpendAlertDAO 
 import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
 import type { CostData, SpendAlert } from '@aws-access-bridge/shared/model';
-import { BadRequestError, ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError } from '@rexezuge/errors';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';

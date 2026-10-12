@@ -1,4 +1,4 @@
-import { ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError } from '@rexezuge/errors';
 import type { AssumableAccountsMap } from '@aws-access-bridge/shared/model';
 import { mapRowsToAssumableMap } from './AssumableRolesMapper';
 import type { AssumableRoleRow } from './AssumableRolesMapper';
@@ -168,13 +168,8 @@ class AssumableRolesDAO extends BaseDAO {
    * after an address change is still a no-op rather than a second grant.
    */
   public async grantUserAccessToRole(owner: AssumableRoleOwner, awsAccountId: string, roleName: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        `INSERT OR IGNORE INTO assumable_roles (user_email, user_id, aws_account_id, role_name)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .bind(owner.anchorEmail, owner.userId, awsAccountId, roleName)
-      .run();
+    const result = await this.run(`INSERT OR IGNORE INTO assumable_roles (user_email, user_id, aws_account_id, role_name)
+         VALUES (?, ?, ?, ?)`, [owner.anchorEmail, owner.userId, awsAccountId, roleName]);
     assertD1Success(result, `grant user access to role`);
   }
 
@@ -185,13 +180,8 @@ class AssumableRolesDAO extends BaseDAO {
    * @param roleName The name of the role to revoke access from.
    */
   public async revokeUserAccessToRole(owner: AssumableRoleOwner, awsAccountId: string, roleName: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        `DELETE FROM assumable_roles
-         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`,
-      )
-      .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
-      .run();
+    const result = await this.run(`DELETE FROM assumable_roles
+         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`, [owner.userId, owner.anchorEmail, awsAccountId, roleName]);
     assertD1Success(result, `revoke user access to role`);
   }
 
@@ -202,14 +192,9 @@ class AssumableRolesDAO extends BaseDAO {
    * @param roleName The name of the role to hide.
    */
   public async hideRole(owner: AssumableRoleOwner, awsAccountId: string, roleName: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        `UPDATE assumable_roles
+    const result = await this.run(`UPDATE assumable_roles
          SET hidden = TRUE
-         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`,
-      )
-      .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
-      .run();
+         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`, [owner.userId, owner.anchorEmail, awsAccountId, roleName]);
     assertD1Success(result, `hide role`);
   }
 
@@ -220,14 +205,9 @@ class AssumableRolesDAO extends BaseDAO {
    * @param roleName The name of the role to unhide.
    */
   public async unhideRole(owner: AssumableRoleOwner, awsAccountId: string, roleName: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare(
-        `UPDATE assumable_roles
+    const result = await this.run(`UPDATE assumable_roles
          SET hidden = FALSE
-         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`,
-      )
-      .bind(owner.userId, owner.anchorEmail, awsAccountId, roleName)
-      .run();
+         WHERE ${ownerClause('assumable_roles')} AND aws_account_id = ? AND role_name = ?`, [owner.userId, owner.anchorEmail, awsAccountId, roleName]);
     assertD1Success(result, `unhide role`);
   }
 

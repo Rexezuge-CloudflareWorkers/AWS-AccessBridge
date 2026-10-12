@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error/ErrorDeserializationUtil';
-import { BadRequestError, ForbiddenError, UnauthorizedError, InternalServerError, DatabaseError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, UnauthorizedError, InternalServerError, DatabaseError } from '@rexezuge/errors';
 
 describe('ErrorDeserializationUtil', () => {
   describe('deserializeError', () => {
@@ -8,28 +8,28 @@ describe('ErrorDeserializationUtil', () => {
       const response = Response.json({ Exception: { Type: 'BadRequest', Message: 'bad input' } }, { status: 400 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(BadRequestError);
-      expect(error.getErrorMessage()).toBe('bad input');
+      expect(error.message).toBe('bad input');
     });
 
     it('deserializes Unauthorized error', async () => {
       const response = Response.json({ Exception: { Type: 'Unauthorized', Message: 'no auth' } }, { status: 401 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(UnauthorizedError);
-      expect(error.getErrorMessage()).toBe('no auth');
+      expect(error.message).toBe('no auth');
     });
 
     it('deserializes Forbidden error', async () => {
       const response = Response.json({ Exception: { Type: 'Forbidden', Message: 'denied' } }, { status: 403 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(ForbiddenError);
-      expect(error.getErrorMessage()).toBe('denied');
+      expect(error.message).toBe('denied');
     });
 
     it('deserializes DatabaseError', async () => {
       const response = Response.json({ Exception: { Type: 'DatabaseError', Message: 'db fail' } }, { status: 500 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(DatabaseError);
-      expect(error.getErrorMessage()).toBe('db fail');
+      expect(error.message).toBe('db fail');
     });
 
     it('deserializes InternalServerError', async () => {
@@ -38,35 +38,35 @@ describe('ErrorDeserializationUtil', () => {
       });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
-      expect(error.getErrorMessage()).toBe('server error');
+      expect(error.message).toBe('server error');
     });
 
     it('defaults to InternalServerError for unknown type', async () => {
       const response = Response.json({ Exception: { Type: 'SomethingElse', Message: 'unknown' } }, { status: 500 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
-      expect(error.getErrorMessage()).toBe('unknown');
+      expect(error.message).toBe('unknown');
     });
 
     it('defaults to InternalServerError with default message when Exception is empty', async () => {
       const response = Response.json({ Exception: {} }, { status: 500 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
-      expect(error.getErrorMessage()).toBe('Unknown error occurred');
+      expect(error.message).toBe('Unknown error occurred');
     });
 
     it('defaults to InternalServerError when response is not valid JSON', async () => {
       const response = new Response('not json', { status: 500, statusText: 'Internal Server Error' });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
-      expect(error.getErrorMessage()).toBe('HTTP 500: Internal Server Error');
+      expect(error.message).toBe('HTTP 500: Internal Server Error');
     });
 
     it('handles missing Exception field gracefully', async () => {
       const response = Response.json({}, { status: 500 });
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
-      expect(error.getErrorMessage()).toBe('Unknown error occurred');
+      expect(error.message).toBe('Unknown error occurred');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Container } from '@aws-access-bridge/backend-runtime/di';
+import { Container } from '@rexezuge/runtime/di/Container';
 
 /**
  * The container is a factory + per-scope singleton map, and `get` is the whole

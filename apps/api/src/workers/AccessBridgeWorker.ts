@@ -1,62 +1,12 @@
 import { AbstractEntrypointWorker } from '@aws-access-bridge/backend-runtime/base';
 import { fromHono, HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
-import {
-  FavoriteAccountRoute,
-  UnfavoriteAccountRoute,
-  StoreCredentialRoute,
-  GenerateConsoleUrlRoute,
-  AssumeRoleRoute,
-  FederateRoute,
-  ListAssumablesRoute,
-  SearchAccountsRoute,
-  GetCurrentUserRoute,
-  UpdateCurrentUserRoute,
-  GrantAccessRoute,
-  RevokeAccessRoute,
-  SetAccountNicknameRoute,
-  RemoveAccountNicknameRoute,
-  StoreCredentialRelationshipRoute,
-  RemoveCredentialRelationshipRoute,
-  HideRoleRoute,
-  UnhideRoleRoute,
-  SetRoleConfigRoute,
-  DeleteRoleConfigRoute,
-  CreateTokenRoute,
-  ListTokensRoute,
-  DeleteTokenRoute,
-  ValidateCredentialsRoute,
-  TestCredentialChainRoute,
-  ListAccountRolesRoute,
-  ListAuditLogsRoute,
-  GetCostSummaryRoute,
-  GetAccountCostRoute,
-  GetCostTrendsRoute,
-  CreateSpendAlertRoute,
-  DeleteSpendAlertRoute,
-  EnableDataCollectionRoute,
-  DisableDataCollectionRoute,
-  ListResourcesRoute,
-  GetResourceSummaryRoute,
-  CreateTeamRoute,
-  DeleteTeamRoute,
-  ListTeamsRoute,
-  UpdateTeamNameRoute,
-  AddTeamMemberRoute,
-  RemoveTeamMemberRoute,
-  ListTeamMembersRoute,
-  UpdateTeamMemberRoleRoute,
-  AddTeamAccountRoute,
-  RemoveTeamAccountRoute,
-  ListTeamAccountsRoute,
-  CleanupOrphanedDataRoute,
-  ListTaskRunsRoute,
-} from '@/endpoints';
+import { FavoriteAccountRoute, UnfavoriteAccountRoute, StoreCredentialRoute, GenerateConsoleUrlRoute, AssumeRoleRoute, FederateRoute, ListAssumablesRoute, SearchAccountsRoute, GetCurrentUserRoute, UpdateCurrentUserRoute, GrantAccessRoute, RevokeAccessRoute, SetAccountNicknameRoute, RemoveAccountNicknameRoute, StoreCredentialRelationshipRoute, RemoveCredentialRelationshipRoute, HideRoleRoute, UnhideRoleRoute, SetRoleConfigRoute, DeleteRoleConfigRoute, CreateTokenRoute, ListTokensRoute, DeleteTokenRoute, ValidateCredentialsRoute, TestCredentialChainRoute, ListAccountRolesRoute, ListAuditLogsRoute, GetCostSummaryRoute, GetAccountCostRoute, GetCostTrendsRoute, CreateSpendAlertRoute, DeleteSpendAlertRoute, EnableDataCollectionRoute, DisableDataCollectionRoute, ListResourcesRoute, GetResourceSummaryRoute, CreateTeamRoute, DeleteTeamRoute, ListTeamsRoute, UpdateTeamNameRoute, AddTeamMemberRoute, RemoveTeamMemberRoute, ListTeamMembersRoute, UpdateTeamMemberRoleRoute, AddTeamAccountRoute, RemoveTeamAccountRoute, ListTeamAccountsRoute, CleanupOrphanedDataRoute, ListTaskRunsRoute } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { DURABLE_OBJECT_NAMESPACE_GLOBAL, DURABLE_OBJECT_CRON_TASKS_RUN_URL } from '@aws-access-bridge/backend-runtime/constants/do';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
   Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };

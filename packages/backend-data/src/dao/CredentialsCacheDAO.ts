@@ -1,7 +1,7 @@
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import type { CredentialCache } from '@aws-access-bridge/shared/model/CredentialCache';
-import { decryptDataTolerant, encryptData } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
+import { decryptDataTolerant, encryptData } from '../crypto/aes-gcm';
+import { TimestampUtil } from '@rexezuge/shared';
 import { KV_MINIMUM_TIVE_TO_LIVE_SECONDS, KV_NAMESPACE_CREDENTIAL_CACHE } from '@aws-access-bridge/backend-data/constants/kv';
 import { IKeyValueDAO } from './IKeyValueDAO';
 

@@ -1,10 +1,11 @@
-import { AwsCollectionError } from '@aws-access-bridge/backend-errors';
+import { AwsCollectionError } from './AwsCollectionError';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import type { AwsClientFactory, AwsSignedClient } from '../../http';
 import { defaultAwsClientFactory } from '../sts';
 import type { CollectorSweepResult, IAwsResourceCollector, ResourceDiscoveryItem } from './IAwsResourceCollector';
 
-import { log, toErrorMessage } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
+import { toErrorMessage } from '@aws-access-bridge/shared/utils/ErrorMessage';
 /**
  * Region recorded for a global service's resources, so they are distinguishable
  * from a regional resource in `us-east-1`.
@@ -152,7 +153,7 @@ abstract class BaseAwsCollector implements IAwsResourceCollector {
       return await response.json();
     } catch (error: unknown) {
       // A malformed body is a failure, not an empty result: letting the
-      // `SyntaxError` escape would bypass the `IServiceError` taxonomy and the
+      // `SyntaxError` escape would bypass the `ServiceError` taxonomy and the
       // caller would prune the type it just failed to read.
       throw new AwsCollectionError(
         `${this.resourceType} collection returned a malformed JSON body from ${service}.${region}: ${toErrorMessage(error)}`,

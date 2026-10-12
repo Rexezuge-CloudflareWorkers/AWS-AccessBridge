@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console/ConsoleService';
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError } from '@rexezuge/errors';
 import { StubHttpClient } from '@aws-access-bridge/backend-services/http';
 
 describe('ConsoleService.buildIssuerUrl', () => {
@@ -54,7 +54,7 @@ describe('ConsoleService.getSigninToken', () => {
   });
 
   // A bare `JSON.parse` threw a raw `SyntaxError`, which bypassed the
-  // `IServiceError` taxonomy every caller maps status codes through.
+  // `ServiceError` taxonomy every caller maps status codes through.
   it('raises InternalServerError, not SyntaxError, for a malformed body', async () => {
     const http = new StubHttpClient().setHandler(() => new Response('<html>oops</html>', { status: 200 }));
     const thrown = await new ConsoleService(http)

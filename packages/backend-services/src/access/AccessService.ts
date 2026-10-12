@@ -1,6 +1,6 @@
 import { AssumableRolesDAO, AwsAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { assertD1Success, executeD1WithRetry } from '@aws-access-bridge/backend-data/utils';
-import { isD1ErrorRetryable } from '@aws-access-bridge/backend-data/utils';
-import { createD1SessionEnv } from '@aws-access-bridge/backend-data/utils';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { assertD1Success, executeD1WithRetry } from '@aws-access-bridge/backend-data/utils/D1Utils';
+import { isD1ErrorRetryable } from '@rexezuge/d1';
+import { createD1SessionEnv } from '@aws-access-bridge/backend-data/utils/D1SessionUtil';
+import { DatabaseError } from '@rexezuge/errors';
 
 describe('isD1ErrorRetryable', () => {
   it('matches retryable signals', () => {
@@ -17,8 +17,8 @@ describe('isD1ErrorRetryable', () => {
     }
   });
 
-  it('prefers non-retryable when both match', () => {
-    expect(isD1ErrorRetryable('constraint failed during busy transaction')).toBe(false);
+  it('prefers retryable signals when both match', () => {
+    expect(isD1ErrorRetryable('constraint failed during busy transaction')).toBe(true);
   });
 });
 

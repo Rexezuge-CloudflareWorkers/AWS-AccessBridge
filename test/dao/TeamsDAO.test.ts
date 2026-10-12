@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TeamsDAO } from '@aws-access-bridge/backend-data/dao/TeamsDAO';
 import { TeamMembersDAO } from '@aws-access-bridge/backend-data/dao/TeamMembersDAO';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 
 function createMockDb() {
   const mockStmt = {

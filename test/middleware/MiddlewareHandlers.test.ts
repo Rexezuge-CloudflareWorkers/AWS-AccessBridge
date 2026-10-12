@@ -1,15 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import {
-  CF_CONNECTING_IP_HEADER,
-  CF_RAY_HEADER,
-  API_WORKER_BASE_HOSTNAME,
-  DEMO_USER_EMAIL,
-  FORWARDED_FOR_HEADER,
-  INTERNAL_USER_EMAIL_HEADER,
-  SELF_WORKER_BASE_HOSTNAME,
-} from '@aws-access-bridge/shared/constants';
-import { UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { CF_CONNECTING_IP_HEADER, CF_RAY_HEADER, API_WORKER_BASE_HOSTNAME, DEMO_USER_EMAIL, FORWARDED_FOR_HEADER, INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
+import { UnauthorizedError } from '@rexezuge/errors';
 import { TokenService } from '@aws-access-bridge/backend-services/auth';
 
 const { auditLogCreateSpy, auditLogConstructorSpy, waitUntilSpy } = vi.hoisted(() => {
