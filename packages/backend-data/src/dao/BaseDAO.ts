@@ -3,7 +3,9 @@ import { assertSqlIdentifier, BaseDAO as SdkBaseDAO } from '@rexezuge/d1';
 import type { D1Result } from '@rexezuge/d1';
 import type { D1Queryable } from '../utils';
 
-/** AWS account DAOs add one domain-specific orphan cleanup helper to the SDK base. */
+/**
+ * AWS account DAOs add one domain-specific orphan cleanup helper to the SDK base.
+ */
 abstract class BaseDAO extends SdkBaseDAO {
   protected declare readonly database: D1Queryable;
 

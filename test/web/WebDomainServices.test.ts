@@ -85,7 +85,7 @@ describe('costService + resourceService + authService', () => {
     // indistinguishable from an account with no resources: the inventory
     // rendered its empty state and the failure was never surfaced.
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response('err', { status: 500 })));
-    await expect(loadResourceSummary()).rejects.toThrow(/500/);
+    await expect(loadResourceSummary()).rejects.toMatchObject({ status: 500 });
 
     const item = { awsAccountId: '1', region: 'us-east-1', resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', metadata: {} };
     expect(getConsoleDestination(item)?.path).toContain('i-1');

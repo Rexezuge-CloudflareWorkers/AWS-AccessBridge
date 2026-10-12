@@ -107,6 +107,9 @@ importers:
       '@rexezuge/errors':
         specifier: 1.5.1
         version: 1.5.1
+      '@rexezuge/runtime':
+        specifier: 1.5.1
+        version: 1.5.1
       '@rexezuge/shared':
         specifier: 1.5.1
         version: 1.5.1
@@ -163,9 +166,15 @@ importers:
       '@aws-access-bridge/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@rexezuge/web':
+        specifier: 1.5.1
+        version: 1.5.1(lucide-react@1.55.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       i18next:
         specifier: ^26.4.2
         version: 26.4.2(typescript@6.0.3)
+      lucide-react:
+        specifier: ^1.49.0
+        version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: ^19.2.8
         version: 19.3.0
@@ -225,9 +234,12 @@ importers:
 
   packages/backend-runtime:
     dependencies:
-      '@aws-access-bridge/shared':
-        specifier: workspace:*
-        version: link:../shared
+      '@rexezuge/runtime':
+        specifier: 1.5.1
+        version: 1.5.1
+      '@rexezuge/shared':
+        specifier: 1.5.1
+        version: 1.5.1
     devDependencies:
       '@types/node':
         specifier: 26.6.4
@@ -1374,6 +1386,13 @@ packages:
   '@rexezuge/shared@1.5.1':
     resolution: {integrity: sha512-1pn+my0EpumdESn5dvhdvy6s0EtBjulpv5No+E9bG+qXYw+mE5R8CobcXKTI6XVX7hdj52/TtaRivIjzSI8B5w==}
 
+  '@rexezuge/web@1.5.1':
+    resolution: {integrity: sha512-8S8poUluXghfI5El5wBca4OlFJi3CCRzcFc+SgqjWeYvryNaqvulxenM9CAUMQ1UUQ1NrECRdhUwi/bBfToOOg==}
+    peerDependencies:
+      lucide-react: ^1.49.0
+      react: ^19.3.0
+      react-dom: ^19.3.0
+
   '@rolldown/binding-android-arm-eabi@1.2.12':
     resolution: {integrity: sha512-dB/a1214qKfHMXCpgqR4OZT+jS4kTyEXbQGJPqzobt5EwH5rX080pxE37alt3RzvR1bf1Yz/yGqRfrYAxuPw0A==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -2434,6 +2453,15 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-react@1.55.0:
+    resolution: {integrity: sha512-bSozQHiI3/8q7JvgoqVRGOYUi7fYT3siAZwmZsljjsOH2Husp/2ODdFf/leD+ZC/2yKfn7r8oh6yeoR3ITR5vA==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -3735,6 +3763,14 @@ snapshots:
 
   '@rexezuge/shared@1.5.1': {}
 
+  '@rexezuge/web@1.5.1(lucide-react@1.55.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@rexezuge/errors': 1.5.1
+      '@rexezuge/shared': 1.5.1
+      lucide-react: 1.55.0(@types/react@19.3.0)(react@19.3.0)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
   '@rolldown/binding-android-arm-eabi@1.2.12':
     optional: true
 
@@ -4729,6 +4765,12 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.55.0(@types/react@19.3.0)(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+    optionalDependencies:
+      '@types/react': 19.3.0
 
   lz-string@1.5.0: {}
 

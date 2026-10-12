@@ -8,7 +8,7 @@ import type { ShowMessage } from './useToast';
 
 interface UseSpaLanguageInput {
   user: CurrentUser | null;
-  setUser: (user: CurrentUser) => void;
+  reloadUser: () => void;
   showMessage?: ShowMessage;
 }
 
@@ -19,7 +19,7 @@ interface UseSpaLanguageInput {
  * `<html lang>` sync, and the blocking manual-change flow.
  * Ported from Mail-Otter `useSpaLanguage` for Otter parity.
  */
-function useSpaLanguage({ user, setUser, showMessage }: UseSpaLanguageInput) {
+function useSpaLanguage({ user, reloadUser, showMessage }: UseSpaLanguageInput) {
   const [language, setLanguage] = useState<string>(() => detectInitialLanguage());
   const [languageStatus, setLanguageStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [languagePending, setLanguagePending] = useState(false);
@@ -91,9 +91,7 @@ function useSpaLanguage({ user, setUser, showMessage }: UseSpaLanguageInput) {
         } catch {
           // Ignore storage errors.
         }
-        if (user) {
-          setUser({ ...user, preferredLanguage: normalized });
-        }
+        reloadUser();
         setLanguage(normalized);
         setLanguageStatus('ready');
       } catch {

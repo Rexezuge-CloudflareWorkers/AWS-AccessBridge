@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import FocusInput from '../ui/FocusInput';
-import Spinner from '../ui/Spinner';
-import { cardStyle, inputStyle, btnGreenStyle, btnSmallStyle } from '../ui/theme';
+import { FocusInput } from '@rexezuge/web';
+import { Spinner } from '@rexezuge/web';
+import { cardStyle, inputStyle, btnGreenStyle, btnSmallStyle } from '@rexezuge/web';
 
 interface TeamAccountsSectionProps {
   accounts: string[];

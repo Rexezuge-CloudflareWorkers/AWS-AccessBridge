@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useToast } from '@aws-access-bridge/web/hooks/useToast';
 import { useAuth } from '@aws-access-bridge/web/hooks/useAuth';
-import { ApiError } from '@aws-access-bridge/web/lib/api';
+import { UnauthorizedError } from '@rexezuge/errors';
 
 /**
  * The web hooks, tested against a real React renderer.
@@ -38,7 +38,7 @@ describe('useToast', () => {
   });
 
   it('dismisses the message after the timeout', () => {
-    const { result } = renderHook(() => useToast(1000));
+    const { result } = renderHook(() => useToast({ dismissAfterMs: 1000 }));
 
     act(() => {
       result.current.showMessage('error', 'Failed');
@@ -53,7 +53,7 @@ describe('useToast', () => {
   });
 
   it('honours a custom timeout', () => {
-    const { result } = renderHook(() => useToast(50));
+    const { result } = renderHook(() => useToast({ dismissAfterMs: 50 }));
 
     act(() => {
       result.current.showMessage('success', 'Quick');
@@ -74,7 +74,7 @@ describe('useToast', () => {
     // call, the first toast's timer fires 1000ms after the *first* show and
     // clears the *second* message early, so a rapid success-then-error sequence
     // would silently lose the error.
-    const { result } = renderHook(() => useToast(1000));
+    const { result } = renderHook(() => useToast({ dismissAfterMs: 1000 }));
 
     act(() => {
       result.current.showMessage('success', 'First');
@@ -100,7 +100,7 @@ describe('useToast', () => {
   });
 
   it('dismisses on demand', () => {
-    const { result } = renderHook(() => useToast(10_000));
+    const { result } = renderHook(() => useToast({ dismissAfterMs: 10_000 }));
 
     act(() => {
       result.current.showMessage('success', 'Saved');
@@ -114,7 +114,7 @@ describe('useToast', () => {
 
   it('clears the pending timer on a manual dismiss', () => {
     // Otherwise the abandoned timer would fire later and call setState again.
-    const { result } = renderHook(() => useToast(1000));
+    const { result } = renderHook(() => useToast({ dismissAfterMs: 1000 }));
 
     act(() => {
       result.current.showMessage('success', 'Saved');
@@ -137,7 +137,7 @@ describe('useToast', () => {
   it('leaves no timer running after unmount', () => {
     // React would warn about setting state on an unmounted component, and the
     // timer would keep the test's fake clock alive.
-    const { result, unmount } = renderHook(() => useToast(1000));
+    const { result, unmount } = renderHook(() => useToast({ dismissAfterMs: 1000 }));
 
     act(() => {
       result.current.showMessage('success', 'Saved');
@@ -269,45 +269,43 @@ describe('useAuth', () => {
     }
   });
 
-  it('lets the caller set the user without refetching', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(user)));
+  it('reloads the profile when requested', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(user))
+      .mockResolvedValueOnce(jsonResponse({ ...user, preferredLanguage: 'de' }));
+    vi.stubGlobal('fetch', fetchMock);
     const { result } = renderHook(() => useAuth());
     await waitFor(() => {
       expect(result.current.isAuthorized).toBe(true);
     });
 
-    const updated = { ...user, preferredLanguage: 'de' };
     act(() => {
-      result.current.setUser(updated);
+      result.current.reloadUser();
     });
 
-    expect(result.current.user).toEqual(updated);
-    // Only the profile object changes; identity flags are not re-derived here.
+    await waitFor(() => {
+      expect(result.current.user?.preferredLanguage).toBe('de');
+    });
     expect(result.current.userEmail).toBe('user@example.com');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not fetch again when the caller changes the user', async () => {
-    // `setUser` exists so a language change can update the profile without a
-    // round trip; a refetch here would discard the local edit.
+  it('does not refetch when rerendered', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(user));
     vi.stubGlobal('fetch', fetchMock);
     const { result, rerender } = renderHook(() => useAuth());
     await waitFor(() => {
       expect(result.current.isAuthorized).toBe(true);
     });
-
-    act(() => {
-      result.current.setUser({ ...user, preferredLanguage: 'fr' });
-    });
     rerender();
 
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it('classifies an ApiError exactly as the auth gate does', async () => {
+  it('classifies a ServiceError exactly as the auth gate does', async () => {
     // Guards the wiring: the hook must route through `classifyAuthFailure`, not
     // re-implement the 401 test.
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new ApiError(401, 'nope')));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new UnauthorizedError('nope')));
     const { result } = renderHook(() => useAuth());
 
     await waitFor(() => {

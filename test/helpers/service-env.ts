@@ -26,7 +26,7 @@ export function serviceEnv(overrides: Partial<ServiceEnv> = {}): ServiceEnv {
     AccessBridgeDB: {
       prepare: () => statement,
       batch: async () => [],
-    } as unknown as ServiceEnv['AccessBridgeDB'],
+    },
     ...overrides,
   };
 }

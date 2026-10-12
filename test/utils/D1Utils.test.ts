@@ -24,9 +24,9 @@ describe('isD1ErrorRetryable', () => {
 
 describe('assertD1Success', () => {
   it('passes through success and flags retryable failures', () => {
-    expect(() => assertD1Success({ success: true } as D1Result, 'op')).not.toThrow();
+    expect(() => assertD1Success({ success: true }, 'op')).not.toThrow();
     try {
-      assertD1Success({ success: false, error: 'database is locked' } as unknown as D1Result, 'write row');
+      assertD1Success({ success: false, error: 'database is locked' }, 'write row');
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(DatabaseError);

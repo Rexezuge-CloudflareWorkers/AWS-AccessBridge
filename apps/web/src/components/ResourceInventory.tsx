@@ -1,8 +1,8 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import Spinner from './ui/Spinner';
-import Pagination from './ui/Pagination';
+import { Spinner } from '@rexezuge/web';
+import { Pagination } from '@rexezuge/web';
 import ResourceRow from './ResourceRow';
 import ResourceSummaryCards from './ResourceSummaryCards';
 import { getConsoleDestination } from '../services/resourceService';
@@ -230,7 +230,7 @@ export default function ResourceInventory() {
         </div>
       )}
 
-      <Pagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} variant="compact" />
+      <Pagination page={page + 1} pageCount={totalPages} onChange={(p) => setPage(p - 1)} variant="compact" />
     </div>
   );
 }

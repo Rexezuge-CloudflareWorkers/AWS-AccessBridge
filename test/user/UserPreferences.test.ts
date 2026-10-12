@@ -4,6 +4,7 @@ import { UserMetadataDAO } from '@aws-access-bridge/backend-data/dao/UserMetadat
 import { GetCurrentUserRoute } from '@/endpoints/user/me/GET';
 import { UpdateCurrentUserRoute } from '@/endpoints/user/me/PUT';
 import { createRouteContext } from '../helpers/route-context';
+import { serviceEnv as createServiceEnv } from '../helpers/service-env';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
 // Migration 0032: account resolution consults the address registry before the
@@ -14,7 +15,7 @@ vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/UserEmailDAO');
 
 function serviceEnv() {
-  return { AccessBridgeDB: {} } as never;
+  return createServiceEnv();
 }
 
 describe('UserService preferred language', () => {

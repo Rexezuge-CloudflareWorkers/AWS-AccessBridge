@@ -1,4 +1,4 @@
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import type { D1Queryable } from '@rexezuge/d1';
 import type { AuditEvent } from './AuditEventBuilder';
 import type { IAuditObserver } from './AuditObserver';
 import { AuditLogObserver } from './AuditObserver';

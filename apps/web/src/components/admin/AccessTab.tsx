@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { grantAccess, revokeAccess } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 
@@ -70,10 +70,10 @@ export default function AccessTab({ showMessage }: { showMessage: ShowMessage })
           onChange={(e) => setAccessForm({ ...accessForm, userEmail: e.target.value })}
         />
         <div style={{ display: 'flex', gap: '16px' }}>
-          <LoadingButton onClick={handleGrantAccess} disabled={!isFormValid} variant="green">
+          <LoadingButton onClick={handleGrantAccess} disabled={!isFormValid} variant="primary">
             {t('admin.grantAccess', 'Grant Access')}
           </LoadingButton>
-          <LoadingButton onClick={handleRevokeAccess} disabled={!isFormValid} variant="red">
+          <LoadingButton onClick={handleRevokeAccess} disabled={!isFormValid} variant="danger">
             {t('admin.revokeAccess', 'Revoke Access')}
           </LoadingButton>
         </div>

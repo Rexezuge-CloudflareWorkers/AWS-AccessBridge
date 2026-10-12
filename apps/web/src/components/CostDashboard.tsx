@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import Spinner from './ui/Spinner';
+import { Spinner } from '@rexezuge/web';
 import { formatAmount, formatCurrency, formatMonthLabel } from '../lib/format';
 import { maxTrend, sortAccountsByCost, trendBarPercent } from '../lib/costTrends';
 import { useResource } from '../hooks/useResource';

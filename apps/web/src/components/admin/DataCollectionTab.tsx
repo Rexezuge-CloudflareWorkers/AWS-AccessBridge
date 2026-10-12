@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { disableDataCollection, enableDataCollection } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle, inputStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle, inputStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 
@@ -105,7 +105,7 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
               {t('admin.resourceCollectionLabel', 'Resource inventory collection')}
             </label>
           </div>
-          <LoadingButton onClick={handleEnableCollection} disabled={!isEnableValid} variant="green">
+          <LoadingButton onClick={handleEnableCollection} disabled={!isEnableValid} variant="primary">
             {t('admin.enableCollection', 'Enable Collection')}
           </LoadingButton>
         </form>
@@ -139,7 +139,7 @@ export default function DataCollectionTab({ showMessage }: { showMessage: ShowMe
               <option value="resource">{t('admin.resourceOption', 'Resource')}</option>
             </select>
           </div>
-          <LoadingButton onClick={handleDisableCollection} disabled={!isDisableValid} variant="red">
+          <LoadingButton onClick={handleDisableCollection} disabled={!isDisableValid} variant="danger">
             {t('admin.disableCollection', 'Disable Collection')}
           </LoadingButton>
         </form>

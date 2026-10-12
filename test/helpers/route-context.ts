@@ -11,6 +11,18 @@ interface RouteContextOptions {
 
 function createRouteContext<TEnv extends IEnv>(options?: RouteContextOptions): ActivityContext<TEnv> {
   const { body = {}, url = 'https://example.com/user/test', method = 'GET', email = 'user@example.com', env = {} } = options ?? {};
+  const statement = {
+    bind: () => statement,
+    first: async () => null,
+    run: async () => ({ success: true, results: [], meta: {} }),
+    all: async () => ({ success: true, results: [], meta: {} }),
+    raw: async () => [],
+  };
+  const database = {
+    prepare: () => statement,
+    batch: async () => [],
+    withSession: () => database,
+  };
   const raw =
     new Request(url, method === 'GET' || method === 'HEAD' ? { method } : { method, body: JSON.stringify(body) });
   return {
@@ -22,7 +34,7 @@ function createRouteContext<TEnv extends IEnv>(options?: RouteContextOptions): A
       header: () => undefined,
     },
     env: {
-      AccessBridgeDB: { withSession: vi.fn().mockReturnValue({ mockSession: true }) },
+      AccessBridgeDB: database,
       ...env,
     },
     get: vi.fn().mockReturnValue(email),

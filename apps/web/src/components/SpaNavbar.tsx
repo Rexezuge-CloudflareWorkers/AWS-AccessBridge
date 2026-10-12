@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import LanguageSelector from './LanguageSelector';
+import { LanguageSelector } from '@rexezuge/web';
 import type { View } from '../hooks/useRouter';
 
 interface SpaNavbarProps {
@@ -89,7 +89,13 @@ export default function SpaNavbar({
         </div>
       </div>
       <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
+        <LanguageSelector
+          value={language === 'unknown' ? null : language}
+          onChange={onLanguageChange}
+          disabled={languageDisabled}
+          label={t('nav.language', 'Language')}
+          unknownLabel={t('nav.unknownLanguage', 'Unknown')}
+        />
         {isSuperAdmin && (
           <span
             style={{

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { classifyAuthFailure } from '@aws-access-bridge/web/lib/authOutcome';
-import { ApiError } from '@aws-access-bridge/web/lib/api';
+import { BadGatewayError, ForbiddenError, InternalServerError, NotFoundError, UnauthorizedError } from '@rexezuge/errors';
 import { loadCurrentUser } from '@aws-access-bridge/web/services/authService';
 
 function json(body: unknown, status = 200): Response {
@@ -19,26 +19,26 @@ function json(body: unknown, status = 200): Response {
  */
 describe('classifyAuthFailure', () => {
   it('treats only a 401 as an expired session', () => {
-    expect(classifyAuthFailure(new ApiError(401, 'Missing token'))).toEqual({ kind: 'expired-session' });
+    expect(classifyAuthFailure(new UnauthorizedError('Missing token'))).toEqual({ kind: 'expired-session' });
   });
 
   it('does NOT treat a 403 as an expired session', () => {
     // Authenticated but not permitted is a real answer. Re-authenticating
     // cannot grant the permission, so a login prompt here is a dead end.
-    const outcome = classifyAuthFailure(new ApiError(403, 'Forbidden'));
+    const outcome = classifyAuthFailure(new ForbiddenError('Forbidden'));
     expect(outcome.kind).toBe('load-failed');
   });
 
   it.each([
-    ['a 500', new ApiError(500, 'Internal server error')],
-    ['a 502', new ApiError(502, 'Bad Gateway')],
-    ['a 404', new ApiError(404, 'Not Found')],
+    ['a 500', new InternalServerError('Internal server error')],
+    ['a 502', new BadGatewayError('Bad Gateway')],
+    ['a 404', new NotFoundError('Not Found')],
   ])('keeps %s distinguishable from an expired session', (_label, error) => {
     expect(classifyAuthFailure(error).kind).toBe('load-failed');
   });
 
   it('surfaces the backend message as the reason', () => {
-    const outcome = classifyAuthFailure(new ApiError(500, 'Database unavailable'));
+    const outcome = classifyAuthFailure(new InternalServerError('Database unavailable'));
     expect(outcome).toEqual({ kind: 'load-failed', reason: 'Database unavailable' });
   });
 
@@ -59,7 +59,7 @@ describe('classifyAuthFailure', () => {
   });
 
   it('always yields a reason on the load-failed path', () => {
-    for (const thrown of [new ApiError(500, 'x'), new Error('y'), 'z', undefined]) {
+    for (const thrown of [new InternalServerError('x'), new Error('y'), 'z', undefined]) {
       const outcome = classifyAuthFailure(thrown);
       expect(outcome.kind === 'load-failed' && outcome.reason.length > 0).toBe(true);
     }

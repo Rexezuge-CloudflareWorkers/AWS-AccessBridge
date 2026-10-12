@@ -8,7 +8,7 @@ import { useTeams } from '../hooks/useTeams';
 import TeamListSection from './teams/TeamListSection';
 import TeamMembersSection from './teams/TeamMembersSection';
 import TeamAccountsSection from './teams/TeamAccountsSection';
-import { cardStyle, inputStyle, btnBlueStyle } from './ui/theme';
+import { cardStyle, inputStyle, btnBlueStyle } from '@rexezuge/web';
 
 const styles = {
   card: cardStyle,

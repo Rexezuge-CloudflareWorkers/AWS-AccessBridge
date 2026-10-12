@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { removeAccountNickname, setAccountNickname } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 
@@ -64,10 +64,10 @@ export default function AccountsTab({ showMessage }: { showMessage: ShowMessage 
           onChange={(e) => setNicknameForm({ ...nicknameForm, nickname: e.target.value })}
         />
         <div style={{ display: 'flex', gap: '16px' }}>
-          <LoadingButton onClick={handleSetNickname} disabled={!isSetNicknameValid} variant="blue">
+          <LoadingButton onClick={handleSetNickname} disabled={!isSetNicknameValid} variant="primary">
             {t('admin.setNickname', 'Set Nickname')}
           </LoadingButton>
-          <LoadingButton onClick={handleRemoveNickname} disabled={!isRemoveNicknameValid} variant="red">
+          <LoadingButton onClick={handleRemoveNickname} disabled={!isRemoveNicknameValid} variant="danger">
             {t('admin.removeNickname', 'Remove Nickname')}
           </LoadingButton>
         </div>

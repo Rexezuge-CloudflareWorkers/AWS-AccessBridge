@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { deleteRoleConfig, setRoleConfig } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 import { parsePositiveNumber } from '../../lib/numbers';
@@ -122,10 +122,10 @@ export default function RoleConfigTab({ showMessage }: { showMessage: ShowMessag
           step="1"
         />
         <div style={{ display: 'flex', gap: '16px' }}>
-          <LoadingButton onClick={handleSetConfig} disabled={!isSetConfigValid} variant="blue">
+          <LoadingButton onClick={handleSetConfig} disabled={!isSetConfigValid} variant="primary">
             {t('admin.setConfiguration', 'Set Configuration')}
           </LoadingButton>
-          <LoadingButton onClick={handleDeleteConfig} disabled={!isDeleteConfigValid} variant="red">
+          <LoadingButton onClick={handleDeleteConfig} disabled={!isDeleteConfigValid} variant="danger">
             {t('admin.deleteConfiguration', 'Delete Configuration')}
           </LoadingButton>
         </div>

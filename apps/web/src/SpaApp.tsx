@@ -6,8 +6,8 @@ import CostDashboard from './components/CostDashboard';
 import ResourceInventory from './components/ResourceInventory';
 import SpaNavbar from './components/SpaNavbar';
 import Unauthorized from './components/Unauthorized';
-import Spinner from './components/ui/Spinner';
-import Pagination from './components/ui/Pagination';
+import { Spinner } from '@rexezuge/web';
+import { Pagination } from '@rexezuge/web';
 import { useAuth } from './hooks/useAuth';
 import { useRouter, type View } from './hooks/useRouter';
 import { useSpaLanguage } from './hooks/useSpaLanguage';
@@ -21,9 +21,9 @@ const DEFAULT_PAGE_SIZE = 10;
 
 export default function SpaApp() {
   const { t } = useTranslation();
-  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail, user, loadError, setUser } = useAuth();
+  const { isAuthorized, isSuperAdmin, isDemoMode, userEmail, user, loadError, reloadUser } = useAuth();
   const { message: toastMessage, showMessage, dismiss: dismissToast } = useToast();
-  const { language, languageStatus, languagePending, handleLanguageChange } = useSpaLanguage({ user, setUser, showMessage });
+  const { language, languageStatus, languagePending, handleLanguageChange } = useSpaLanguage({ user, reloadUser, showMessage });
   const { currentView, adminTab, navigateTo } = useRouter();
   const [showHidden, setShowHidden] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -219,9 +219,9 @@ export default function SpaApp() {
                           })}
                         </div>
                         <Pagination
-                          currentPage={currentPage}
-                          totalPages={totalPages(totalAccounts, pageSize)}
-                          onPageChange={setCurrentPage}
+                          page={currentPage}
+                          pageCount={totalPages(totalAccounts, pageSize)}
+                          onChange={setCurrentPage}
                           variant="full"
                         />
                       </>

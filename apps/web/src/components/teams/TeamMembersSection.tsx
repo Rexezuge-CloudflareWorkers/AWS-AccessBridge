@@ -6,9 +6,9 @@ import type { TeamMember } from '@aws-access-bridge/shared';
 import { formatUnixDate } from '../../lib/format';
 import { DEFAULT_TEAM_ROLE, isTeamRole } from '../../lib/teamRoles';
 import type { TeamRole } from '../../services/teamsService';
-import FocusInput from '../ui/FocusInput';
-import Spinner from '../ui/Spinner';
-import { cardStyle, inputStyle, tableCardStyle, thStyle, tdStyle, btnGreenStyle, btnSmallStyle } from '../ui/theme';
+import { FocusInput } from '@rexezuge/web';
+import { Spinner } from '@rexezuge/web';
+import { cardStyle, inputStyle, tableCardStyle, thStyle, tdStyle, btnGreenStyle, btnSmallStyle } from '@rexezuge/web';
 
 interface TeamMembersSectionProps {
   members: TeamMember[];
