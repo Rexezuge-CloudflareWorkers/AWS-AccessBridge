@@ -151,7 +151,7 @@ describe('CredentialChainService', () => {
   });
 
   it('throws when no encryption key is configured at all', async () => {
-    // The feature key is required; there is no fallback to read instead.
+    // The legacy master key is an optional *fallback*; the feature key is not.
     await expect(new CredentialChainService({ AccessBridgeDB: {} } as never).createCredentialsDAO()).rejects.toBeInstanceOf(
       InternalServerError,
     );
