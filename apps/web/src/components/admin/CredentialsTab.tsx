@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { removeCredentialRelationship, storeCredentialRelationship, storeCredentials } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 
@@ -97,7 +97,7 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
             value={credForm.sessionToken}
             onChange={(e) => setCredForm({ ...credForm, sessionToken: e.target.value })}
           />
-          <LoadingButton type="submit" onClick={handleAddCredentials} disabled={!isCredFormValid} variant="blue">
+          <LoadingButton type="submit" onClick={handleAddCredentials} disabled={!isCredFormValid} variant="primary">
             {t('admin.addCredentialsButton', 'Add Credentials')}
           </LoadingButton>
         </form>
@@ -123,10 +123,10 @@ export default function CredentialsTab({ showMessage }: { showMessage: ShowMessa
             required
           />
           <div style={{ display: 'flex', gap: '16px' }}>
-            <LoadingButton onClick={handleAddRelation} disabled={!isRelationFormValid} variant="green">
+            <LoadingButton onClick={handleAddRelation} disabled={!isRelationFormValid} variant="primary">
               {t('admin.addRelationship', 'Add Relationship')}
             </LoadingButton>
-            <LoadingButton onClick={handleRemoveRelation} disabled={!isRemoveRelationFormValid} variant="red">
+            <LoadingButton onClick={handleRemoveRelation} disabled={!isRemoveRelationFormValid} variant="danger">
               {t('admin.removeRelationship', 'Remove Relationship')}
             </LoadingButton>
           </div>

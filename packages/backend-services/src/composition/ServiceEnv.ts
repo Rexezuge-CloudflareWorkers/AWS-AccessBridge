@@ -1,4 +1,4 @@
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import type { D1Queryable } from '@rexezuge/d1';
 
 /**
  * Every environment member a backend service is allowed to read.

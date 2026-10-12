@@ -6,7 +6,7 @@ import AccessKeyModal from './AccessKeyModal';
 import AccountRoleRow from './AccountRoleRow';
 import type { HideDialogInfo } from './AccountRoleRow';
 import HideRoleConfirmDialog from './HideRoleConfirmDialog';
-import Spinner from './ui/Spinner';
+import { Spinner } from '@rexezuge/web';
 import { useResource } from '../hooks/useResource';
 import { useAccountMutations } from '../hooks/useAccountMutations';
 import { listAccounts } from '../services/accountService';

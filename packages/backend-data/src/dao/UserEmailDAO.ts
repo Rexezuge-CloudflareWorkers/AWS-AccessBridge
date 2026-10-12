@@ -59,7 +59,7 @@ class UserEmailDAO extends BaseDAO {
   }
 
   public async listByUserId(userId: string): Promise<UserEmailRow[]> {
-    const result: D1Result<UserEmailRow> = await this.database
+    const result = await this.database
       .prepare('SELECT * FROM user_emails WHERE user_id = ? ORDER BY is_verified DESC, created_at ASC')
       .bind(userId)
       .all<UserEmailRow>();

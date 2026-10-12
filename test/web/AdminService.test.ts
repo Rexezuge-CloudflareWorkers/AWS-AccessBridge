@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { UnauthorizedError } from '@rexezuge/errors';
 import {
   cleanupOrphaned,
   createSpendAlert,
@@ -240,10 +241,9 @@ describe('adminService', () => {
     expect(body.sessionToken).toBeUndefined();
   });
 
-  it('propagates ApiError so callers can distinguish 401 from 500', async () => {
-    const { ApiError } = await import('@aws-access-bridge/web/lib/api');
+  it('propagates the SDK UnauthorizedError so callers can distinguish 401 from 500', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Exception: { Type: 'Unauthorized', Message: 'nope' } }, 401));
-    await expect(setAccountNickname('123456789012', 'x')).rejects.toBeInstanceOf(ApiError);
+    await expect(setAccountNickname('123456789012', 'x')).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });
 

@@ -20,3 +20,4 @@ minimumReleaseAgeExclude:
   - '@rexezuge/errors@1.5.1'
   - '@rexezuge/runtime@1.5.1'
   - '@rexezuge/shared@1.5.1'
+  - '@rexezuge/web@1.5.1'

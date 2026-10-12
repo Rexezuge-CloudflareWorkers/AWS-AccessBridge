@@ -1,5 +1,5 @@
 import { UserEmailDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
-import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
+import type { D1Queryable } from '@rexezuge/d1';
 import { isMissingSchemaError } from '@rexezuge/d1';
 import { isD1ErrorRetryable } from '@rexezuge/d1';
 import { DatabaseError } from '@rexezuge/errors';

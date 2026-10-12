@@ -7,11 +7,11 @@ import { formatUnixTimestamp } from '../lib/format';
 import { useResource } from '../hooks/useResource';
 import { totalPages as countPages } from '../lib/pagination';
 import { httpStatusColor } from '../lib/presentation';
-import Spinner from './ui/Spinner';
-import Pagination from './ui/Pagination';
+import { Spinner } from '@rexezuge/web';
+import { Pagination } from '@rexezuge/web';
 import { queryAuditLogs } from '../services/auditService';
 import type { AuditLogEntry } from '../services/auditService';
-import { cardStyle, tableCardStyle, inputStyle, btnBlueStyle, thStyle, tdStyle } from './ui/theme';
+import { cardStyle, tableCardStyle, inputStyle, btnBlueStyle, thStyle, tdStyle } from '@rexezuge/web';
 
 interface AuditLogsTabProps {
   showMessage: ShowMessage;
@@ -261,7 +261,7 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
       )}
 
       {/* Pagination */}
-      <Pagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} variant="compact" />
+      <Pagination page={page + 1} pageCount={totalPages} onChange={(p) => setPage(p - 1)} variant="compact" />
     </div>
   );
 }

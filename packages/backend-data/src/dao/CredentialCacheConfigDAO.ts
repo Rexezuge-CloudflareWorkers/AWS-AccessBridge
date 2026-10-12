@@ -37,7 +37,7 @@ class CredentialCacheConfigDAO extends BaseDAO {
    */
   public async getPrincipalArnsNeedingUpdate(limit: number, olderThanTimestamp: number): Promise<string[]> {
     const batchSize: number = toSafeBatchSize(limit);
-    const results: D1Result<GetPrincipalsNeedingUpdateInternal> = await this.database
+    const results = await this.database
       .prepare('SELECT principal_arn FROM credential_cache_config WHERE last_cached_at < ? ORDER BY last_cached_at ASC LIMIT ?')
       .bind(olderThanTimestamp, batchSize)
       .all<GetPrincipalsNeedingUpdateInternal>();

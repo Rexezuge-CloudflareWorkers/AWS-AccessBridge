@@ -1,6 +1,5 @@
 import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED } from '../constants/d1';
-
-type D1Queryable = Pick<D1Database, 'prepare' | 'batch'>;
+export type { D1Queryable } from '@rexezuge/d1';
 
 type D1SessionEnv<TEnv extends { AccessBridgeDB: D1Database }> = Omit<TEnv, 'AccessBridgeDB'> & {
   AccessBridgeDB: D1DatabaseSession;
@@ -33,4 +32,4 @@ function createD1SessionEnv<TEnv extends { AccessBridgeDB: D1Database }>(env: TE
 }
 
 export { createD1SessionEnv };
-export type { D1Queryable, D1SessionEnv, SessionTarget };
+export type { D1SessionEnv, SessionTarget };

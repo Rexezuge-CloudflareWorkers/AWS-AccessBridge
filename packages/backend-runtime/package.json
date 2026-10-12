@@ -7,7 +7,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./base": "./src/base/index.ts",
-    "./base/*": "./src/base/*.ts",
     "./config": "./src/config/index.ts",
     "./config/*": "./src/config/*.ts",
     "./constants": "./src/constants/index.ts",
@@ -19,7 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-access-bridge/shared": "workspace:*"
+    "@rexezuge/runtime": "1.5.1",
+    "@rexezuge/shared": "1.5.1"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

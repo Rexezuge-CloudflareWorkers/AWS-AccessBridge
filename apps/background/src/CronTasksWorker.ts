@@ -1,4 +1,4 @@
-import { AbstractDurableObjectWorker } from '@aws-access-bridge/backend-runtime/base';
+import { AbstractDurableObjectWorker } from '@rexezuge/runtime';
 import { tasksForPhase } from '@aws-access-bridge/background/scheduled';
 
 import { log } from '@aws-access-bridge/shared/utils/Logger';

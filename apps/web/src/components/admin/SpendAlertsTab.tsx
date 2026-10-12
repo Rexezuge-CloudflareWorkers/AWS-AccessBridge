@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createSpendAlert, deleteSpendAlert } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import FocusInput from '../ui/FocusInput';
-import { cardStyle, inputStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { FocusInput } from '@rexezuge/web';
+import { cardStyle, inputStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 import { parsePositiveNumber } from '../../lib/numbers';
@@ -102,7 +102,7 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
               <option value="daily">{t('admin.dailyOption', 'Daily')}</option>
             </select>
           </div>
-          <LoadingButton onClick={handleCreateAlert} disabled={!isCreateValid} variant="green">
+          <LoadingButton onClick={handleCreateAlert} disabled={!isCreateValid} variant="primary">
             {t('admin.createAlertButton', 'Create Alert')}
           </LoadingButton>
         </form>
@@ -118,7 +118,7 @@ export default function SpendAlertsTab({ showMessage }: { showMessage: ShowMessa
             onChange={(e) => setDeleteAlertId(e.target.value)}
             required
           />
-          <LoadingButton onClick={handleDeleteAlert} disabled={!isDeleteValid} variant="red">
+          <LoadingButton onClick={handleDeleteAlert} disabled={!isDeleteValid} variant="danger">
             {t('admin.deleteAlertButton', 'Delete Alert')}
           </LoadingButton>
         </form>

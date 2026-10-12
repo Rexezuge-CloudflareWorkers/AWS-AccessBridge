@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useToast } from '@aws-access-bridge/web/hooks/useToast';
 import { useAuth } from '@aws-access-bridge/web/hooks/useAuth';
-import { ApiError } from '@aws-access-bridge/web/lib/api';
+import { UnauthorizedError } from '@rexezuge/errors';
 
 /**
  * The web hooks, tested against a real React renderer.
@@ -304,10 +304,10 @@ describe('useAuth', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it('classifies an ApiError exactly as the auth gate does', async () => {
+  it('classifies a ServiceError exactly as the auth gate does', async () => {
     // Guards the wiring: the hook must route through `classifyAuthFailure`, not
     // re-implement the 401 test.
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new ApiError(401, 'nope')));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new UnauthorizedError('nope')));
     const { result } = renderHook(() => useAuth());
 
     await waitFor(() => {

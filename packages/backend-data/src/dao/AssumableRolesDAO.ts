@@ -28,7 +28,7 @@ class AssumableRolesDAO extends BaseDAO {
    * @returns A list of role names the user is authorized to assume in the account.
    */
   public async getRolesByUserAndAccount(owner: AssumableRoleOwner, awsAccountId: string): Promise<Array<string>> {
-    const results: D1Result<GetRolesByUserAndAccountInternal> = await this.database
+    const results = await this.database
       .prepare(
         `SELECT role_name
          FROM assumable_roles
@@ -80,7 +80,7 @@ class AssumableRolesDAO extends BaseDAO {
    */
   public async getTotalAccountsCount(owner: AssumableRoleOwner, showHidden: boolean): Promise<number> {
     const hiddenFilter: string = hiddenFilterClause(showHidden);
-    const countResult: D1Result<GetTotalAccountsCountInternal> = await this.database
+    const countResult = await this.database
       .prepare(
         `SELECT COUNT(DISTINCT ar.aws_account_id) as total_accounts
          FROM assumable_roles ar
@@ -105,7 +105,7 @@ class AssumableRolesDAO extends BaseDAO {
     limit: number = 50,
     offset: number = 0,
   ): Promise<AssumableAccountsMap> {
-    const results: D1Result<AssumableRoleRow> = await this.database
+    const results = await this.database
       .prepare(buildListRolesQuery(showHidden))
       // Favourites join owner, then role owner, then the subquery's favourites
       // join owner, the subquery's role owner, then paging. See the note in
@@ -219,7 +219,7 @@ class AssumableRolesDAO extends BaseDAO {
    * @returns A map of matching AWS account IDs to objects containing roles and account nickname.
    */
   public async searchAccountsByQuery(owner: AssumableRoleOwner, query: string, showHidden: boolean = false): Promise<AssumableAccountsMap> {
-    const results: D1Result<AssumableRoleRow> = await this.database
+    const results = await this.database
       .prepare(buildSearchRolesQuery(showHidden))
       // LIKE metacharacters escaped: an unescaped `%` in the search box matched
       // every role instead of searching for a literal `%`.

@@ -96,7 +96,7 @@ describe('web domain services', () => {
     await expect(cleanupOrphaned()).resolves.toEqual({ deleted: 3 });
   });
 
-  it('propagates backend failures as ApiError', async () => {
+  it('propagates backend failures as the SDK ServiceError', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Exception: { Message: 'Denied' } }, 403));
     await expect(listTeams()).rejects.toThrow('Denied');
   });

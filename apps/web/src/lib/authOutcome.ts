@@ -26,7 +26,7 @@ type AuthOutcome = { kind: 'expired-session' } | { kind: 'load-failed'; reason: 
  * fine to a login page.
  *
  * `reason` is shown to the user, so it prefers the message the API already
- * produced (`ApiError` carries the `Exception.Message` the backend raised) over
+ * produced (the SDK `ServiceError` carries the backend's `Exception.Message`) over
  * a generic string, and never leaks anything the caller did not already surface.
  */
 function classifyAuthFailure(error: unknown): AuthOutcome {

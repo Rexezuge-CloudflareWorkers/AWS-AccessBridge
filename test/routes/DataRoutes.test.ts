@@ -22,7 +22,7 @@ vi.mock('@aws-access-bridge/backend-data/dao/UserMetadataDAO');
 // automock resolves undefined, which `UserIdentityService` reads as "no
 // registry row" and falls through to the anchor - the pre-0032 path these
 // route tests already assume.
-vi.mock('@aws-access-bridge/backend-data/dao/UserEmailDAO');
+vi.mock('@rexezuge/identity');
 
 function userEnv() {
   return {};

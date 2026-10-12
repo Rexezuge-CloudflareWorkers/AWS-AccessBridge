@@ -1,5 +1,30 @@
 @import 'tailwindcss';
 
+:root {
+  --color-accent: #2563eb;
+  --color-accent-dim: #1d4ed8;
+  --color-border: #374151;
+  --color-border-muted: #374151;
+  --color-surface-base: #111827;
+  --color-surface-1: #1e2433;
+  --color-surface-2: #252d3d;
+  --color-surface-3: #252d3d;
+  --color-surface-4: #374151;
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-success-bg: #14532d;
+  --color-success-text: #bbf7d0;
+  --color-error-bg: #7f1d1d;
+  --color-error-text: #fecaca;
+  --color-warning-bg: #78350f;
+  --color-warning-text: #fde68a;
+  --color-info-bg: #1e3a8a;
+  --color-info-text: #bfdbfe;
+  --color-neutral-bg: #374151;
+  --color-neutral-text: #e5e7eb;
+}
+
 @theme {
   --animate-fade-in: fade-in 0.2s ease-out both;
   --animate-fade-in-up: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;

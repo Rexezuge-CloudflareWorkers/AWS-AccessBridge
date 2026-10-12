@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useAccountMutations } from '@aws-access-bridge/web/hooks/useAccountMutations';
 import * as accountService from '@aws-access-bridge/web/services/accountService';
-import { ApiError } from '@aws-access-bridge/web/lib/api';
+import { UnauthorizedError } from '@rexezuge/errors';
 import type { ShowMessage } from '@aws-access-bridge/web/hooks/useToast';
 
 /**
@@ -270,7 +270,7 @@ describe('useAccountMutations', () => {
 
     it('reloads the page on a 401 instead of showing an error toast', async () => {
       // A dead session is not something a toast can fix.
-      mocked.assumeRoleKeys.mockRejectedValue(new ApiError(401, 'expired'));
+      mocked.assumeRoleKeys.mockRejectedValue(new UnauthorizedError('expired'));
       const { result } = hook();
 
       await act(async () => {

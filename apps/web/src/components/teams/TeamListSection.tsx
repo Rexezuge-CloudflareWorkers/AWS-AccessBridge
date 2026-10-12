@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import type { Team } from '@aws-access-bridge/shared';
 import { formatUnixDate } from '../../lib/format';
 import { DEFAULT_TEAM_ID } from '../../lib/constants';
-import FocusInput from '../ui/FocusInput';
-import Spinner from '../ui/Spinner';
-import { cardStyle, btnGreenStyle, btnSmallStyle } from '../ui/theme';
+import { FocusInput } from '@rexezuge/web';
+import { Spinner } from '@rexezuge/web';
+import { cardStyle, btnGreenStyle, btnSmallStyle } from '@rexezuge/web';
 
 interface TeamListSectionProps {
   teams: Team[];

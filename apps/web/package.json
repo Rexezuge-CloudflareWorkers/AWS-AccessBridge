@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rexezuge/web": "1.5.1",
     "@aws-access-bridge/shared": "workspace:*",
+    "lucide-react": "^1.49.0",
     "i18next": "^26.4.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

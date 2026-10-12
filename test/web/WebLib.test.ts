@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { formatShellExport } from '@aws-access-bridge/web/lib/shellExport';
-import { ApiError, apiRequest, isUnauthorized, readJson } from '@aws-access-bridge/web/lib/api';
+import { apiRequest, isUnauthorized } from '@aws-access-bridge/web/lib/api';
+import { ServiceError, UnauthorizedError } from '@rexezuge/errors';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
@@ -28,23 +29,19 @@ describe('lib/api', () => {
     await expect(apiRequest<{ teams: unknown[] }>('/user/admin/teams')).resolves.toEqual({ teams: [] });
   });
 
-  it('apiRequest maps 204/empty bodies to {}', async () => {
+  it('apiRequest maps 204/empty bodies to undefined', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }));
-    await expect(apiRequest('/x')).resolves.toEqual({});
+    await expect(apiRequest('/x')).resolves.toBeUndefined();
     vi.mocked(fetch).mockResolvedValue(new Response('', { status: 200 }));
-    await expect(apiRequest('/x')).resolves.toEqual({});
+    await expect(apiRequest('/x')).resolves.toBeUndefined();
   });
 
-  it('apiRequest throws ApiError with backend messages', async () => {
+  it('apiRequest throws ServiceError with backend messages', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ Exception: { Message: 'Denied' } }, 403));
     const error = await apiRequest('/x').catch((err: unknown) => err);
-    expect(error).toBeInstanceOf(ApiError);
-    expect((error as ApiError).status).toBe(403);
+    expect(error).toBeInstanceOf(ServiceError);
+    expect((error as ServiceError).status).toBe(403);
     expect(isUnauthorized(error)).toBe(false);
-    expect(isUnauthorized(new ApiError(401, 'nope'))).toBe(true);
-  });
-
-  it('readJson passes through parsed bodies', async () => {
-    await expect(readJson<{ a: number }>(jsonResponse({ a: 1 }))).resolves.toEqual({ a: 1 });
+    expect(isUnauthorized(new UnauthorizedError('nope'))).toBe(true);
   });
 });

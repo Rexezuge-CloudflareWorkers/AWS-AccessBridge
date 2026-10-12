@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cleanupOrphaned, type CleanupOrphanedResult } from '../../services/adminService';
-import LoadingButton from '../ui/LoadingButton';
-import { cardStyle } from '../ui/theme';
+import { LoadingButton } from '@rexezuge/web';
+import { cardStyle } from '@rexezuge/web';
 import type { ShowMessage } from '../../hooks/useToast';
 import { toErrorMessage } from '../../lib/errors';
 
@@ -113,7 +113,7 @@ export default function MaintenanceTab({ showMessage }: { showMessage: ShowMessa
           />
           {t('admin.purgeConfirm', 'I understand this will permanently delete orphaned rows.')}
         </label>
-        <LoadingButton onClick={handleRunCleanup} disabled={!confirmed} variant="red">
+        <LoadingButton onClick={handleRunCleanup} disabled={!confirmed} variant="danger">
           {t('admin.runCleanup', 'Run Cleanup')}
         </LoadingButton>
       </div>

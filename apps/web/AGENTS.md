@@ -10,19 +10,24 @@ banner.
 
 ## One request path
 
-`src/lib/api.ts` holds `apiRequest<T>`, the **only** request helper, and the `ApiError` /
-`throwForResponse` / `isUnauthorized` plumbing. The old `apiFetch` / `apiCall` compat layer is gone
-after every admin tab bypassed it in production — which is also how 9 of its 17 functions ended up
-with no caller and two contract mismatches hid inside it.
+`src/lib/api.ts` holds the same-origin `@rexezuge/web` client and `apiRequest<T>`, the **only**
+request helper. The SDK owns response parsing and normalizes failures to `ServiceError`; the app's
+`isUnauthorized` predicate distinguishes a 401 from authorization failures and server errors.
+The app-specific services keep endpoint paths and payload types.
 
-Two things to reach for instead of hand-rolling:
+Reach for a service in `src/services/`, never `fetch` inside a component or a hook. Service
+functions use `apiRequest` from the SDK-backed client.
 
-- `readJson<T>(response)` rather than `(await res.json()) as T` — the latter trips
-  `no-unnecessary-type-assertion`.
-- A service in `src/services/`, never `fetch` inside a component or a hook.
+`apiRequest<T>` raises a `ServiceError` (not `SyntaxError`) for a non-JSON 2xx body, so shared error
+handling remains consistent. This behavior comes from the SDK API client.
 
-`apiRequest<T>` raises `ApiError` (not `SyntaxError`) for a non-JSON 2xx body, so `isUnauthorized`
-and the `Unauthorized` screen still work.
+## Shared web primitives and hooks come from the SDK
+
+Use `@rexezuge/web` for converged controls (`Spinner`, `Pagination`, `FocusInput`, `LoadingButton`,
+`LanguageSelector`, `Unauthorized`) and hooks (`useCurrentUser`, `useNotice`). Keep app-only pages,
+feature widgets, translations, and the backend-authoritative language save flow local. Map app labels
+through component props; do not fork a shared control just to call i18next. `globals.css` supplies the
+SDK's shared color variables.
 
 ## Pure logic belongs in `lib/`, not in a component
 
