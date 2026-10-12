@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 
 describe('RoleConfigsDAO', () => {
   let mockDb: D1Database;

@@ -1,17 +1,11 @@
 import { OpenAPIRoute } from 'chanfana';
 import { Context } from 'hono';
 import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
-import {
-  DefaultInternalServerError,
-  DatabaseError,
-  InternalServerError,
-  BadGatewayError,
-  IServiceError,
-} from '@aws-access-bridge/backend-errors';
+import { DefaultInternalServerError, DatabaseError, InternalServerError, BadGatewayError, ServiceError } from '@rexezuge/errors';
 import { validateRequestInput } from '@/schema';
 import { getQueryParam, getRequestBaseUrl, isDemoModeEnv, withUnconstrainedD1Session } from './route-helpers';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IResponse, TEnv extends IEnv> extends OpenAPIRoute {
   async handle(c: ActivityContext<TEnv>) {
     try {
@@ -82,16 +76,16 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
   }
 
   protected toErrorResponse(error: unknown, c: ActivityContext<TEnv>) {
-    if (error instanceof IServiceError && error.getErrorCode() < 500) {
-      log.warn(`Responding with ${error.getErrorType()}:`, { error: error.stack });
-      return this.exceptionResponse(c, error, error.getErrorCode());
+    if (error instanceof ServiceError && error.status < 500) {
+      log.warn(`Responding with ${error.type}:`, { error: error.stack });
+      return this.exceptionResponse(c, error, error.status as ContentfulStatusCode);
     }
     if (error instanceof BadGatewayError) {
       // 502 is a typed answer, not a fault: the upstream (STS, the console
       // signin endpoint) failed, and the caller should know it is "someone
       // else is broken" rather than the request or the session.
       log.warn('Responding with BadGatewayError:', { error: error.stack });
-      return this.exceptionResponse(c, error, error.getErrorCode());
+      return this.exceptionResponse(c, error, error.status as ContentfulStatusCode);
     }
     if (error instanceof DatabaseError) {
       // DatabaseError messages embed the underlying D1/SQLite text (table and
@@ -100,23 +94,20 @@ abstract class IActivityAPIRoute<TRequest extends IRequest, TResponse extends IR
       // server-side fault.
       log.error('Caught database error during execution:', { error: error });
     }
-    if (!(error instanceof IServiceError) || error instanceof InternalServerError) {
+    if (!(error instanceof ServiceError) || error instanceof InternalServerError) {
       log.error('Caught service error during execution:', { error: error });
     }
     log.warn('Responding with DefaultInternalServerError:', { error: DefaultInternalServerError });
-    return this.exceptionResponse(c, DefaultInternalServerError, DefaultInternalServerError.getErrorCode());
+    return this.exceptionResponse(c, DefaultInternalServerError, DefaultInternalServerError.status as ContentfulStatusCode);
   }
 
   /**
    * The `{Exception: {Type, Message}}` envelope every error response shares.
    *
-   * `status` is a plain number rather than Hono's `StatusCode` because the two
-   * call sites pass `getErrorCode()`, which is `ContentfulStatusCode` — the
-   * declared type of which is narrower than the generic this route's context
-   * infers.
+   * SDK errors expose a numeric status; Hono expects its finite status union.
    */
-  private exceptionResponse(c: ActivityContext<TEnv>, error: IServiceError, status: ContentfulStatusCode) {
-    return c.json({ Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } }, status as never);
+  private exceptionResponse(c: ActivityContext<TEnv>, error: ServiceError, status: ContentfulStatusCode) {
+    return c.json(error.toErrorResponse().body, status as never);
   }
 }
 

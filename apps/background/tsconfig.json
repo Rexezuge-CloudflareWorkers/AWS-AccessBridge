@@ -18,8 +18,6 @@
       "@aws-access-bridge/background/*": ["./src/*"],
       "@aws-access-bridge/backend-data": ["../../packages/backend-data/src"],
       "@aws-access-bridge/backend-data/*": ["../../packages/backend-data/src/*"],
-      "@aws-access-bridge/backend-errors": ["../../packages/backend-errors/src"],
-      "@aws-access-bridge/backend-errors/*": ["../../packages/backend-errors/src/*"],
       "@aws-access-bridge/backend-runtime": ["../../packages/backend-runtime/src"],
       "@aws-access-bridge/backend-runtime/*": ["../../packages/backend-runtime/src/*"],
       "@aws-access-bridge/backend-services": ["../../packages/backend-services/src"],

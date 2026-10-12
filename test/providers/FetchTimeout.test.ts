@@ -1,11 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { BadGatewayError } from '@aws-access-bridge/backend-errors';
-import {
-  TimeoutAwsClient,
-  createAwsClientFactory,
-  DEFAULT_AWS_FETCH_TIMEOUT_MS,
-  fetchWithTimeout,
-} from '@aws-access-bridge/provider-clients/aws';
+import { BadGatewayError } from '@rexezuge/errors';
+import { TimeoutAwsClient, createAwsClientFactory, DEFAULT_AWS_FETCH_TIMEOUT_MS, fetchWithTimeout } from '@aws-access-bridge/provider-clients/aws';
 import { StsClient } from '@aws-access-bridge/provider-clients/aws/StsClient';
 import type { AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
 
@@ -33,7 +28,7 @@ describe('fetch timeout', () => {
     const client = new TimeoutAwsClient({ fetch: hangingFetch() }, 20);
     const failure: unknown = await client.fetch('https://sts.us-east-1.amazonaws.com/').catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(BadGatewayError);
-    expect((failure as BadGatewayError).getErrorCode()).toBe(502);
+    expect((failure as BadGatewayError).status).toBe(502);
     expect((failure as BadGatewayError).retryable).toBe(true);
     expect((failure as BadGatewayError).message).toContain('sts.us-east-1.amazonaws.com');
     expect((failure as BadGatewayError).message).toContain('20ms');

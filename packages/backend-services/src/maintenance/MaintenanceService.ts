@@ -1,19 +1,10 @@
 import { Pagination } from '@aws-access-bridge/backend-runtime/constants/Pagination';
-import {
-  AwsAccountsDAO,
-  BackgroundTaskRunDAO,
-  CostDataDAO,
-  DataCollectionConfigDAO,
-  ResourceInventoryDAO,
-  RoleConfigsDAO,
-  SpendAlertDAO,
-  TeamAccountsDAO,
-} from '@aws-access-bridge/backend-data/dao';
+import { AwsAccountsDAO, BackgroundTaskRunDAO, CostDataDAO, DataCollectionConfigDAO, ResourceInventoryDAO, RoleConfigsDAO, SpendAlertDAO, TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
 import type { BackgroundTaskRun } from '@aws-access-bridge/shared/model';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 type MaintenanceServiceEnv = ServiceEnv;
 
 interface OrphanCleanupCounts {

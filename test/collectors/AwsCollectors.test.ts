@@ -4,8 +4,8 @@ import { S3Collector } from '@aws-access-bridge/backend-services/aws/collectors/
 import { LambdaCollector } from '@aws-access-bridge/backend-services/aws/collectors/LambdaCollector';
 import { RdsCollector } from '@aws-access-bridge/backend-services/aws/collectors/RdsCollector';
 import { DynamoDbCollector } from '@aws-access-bridge/backend-services/aws/collectors/DynamoDbCollector';
-import { AwsCollectionError } from '@aws-access-bridge/backend-errors';
-import { matchAll } from '@aws-access-bridge/shared/utils';
+import { AwsCollectionError } from '@aws-access-bridge/backend-services/aws/collectors/AwsCollectionError';
+import { matchAll } from '@aws-access-bridge/shared/utils/RegexUtil';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 
 const KEYS: AccessKeys = { accessKeyId: 'AKID', secretAccessKey: 'SECRET', sessionToken: 'TOKEN' };
@@ -66,17 +66,14 @@ describe('BaseAwsCollector failure signalling', () => {
       [400, false],
     ] as const) {
       const { clientFactory } = factoryReturning(new Response('x', { status }));
-      await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toMatchObject({ status, retryable });
+      await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toMatchObject({ status: 500, upstreamStatus: status, retryable });
     }
   });
 
   it('reports the resource type and status so a caller can skip pruning precisely', async () => {
     const { clientFactory } = factoryReturning(new Response('x', { status: 404 }));
-    await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toMatchObject({
-      resourceType: 's3',
-      status: 404,
-      getErrorType: expect.any(Function),
-    });
+    const failure = new S3Collector(clientFactory as never).collect(KEYS);
+    await expect(failure).rejects.toMatchObject({ resourceType: 's3', status: 500, upstreamStatus: 404 });
   });
 
   it('throws rather than returning empty when a 200 body is malformed JSON', async () => {

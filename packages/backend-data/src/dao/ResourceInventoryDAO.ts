@@ -7,40 +7,15 @@ import type { AssumableRoleOwner } from './AssumableRolesDAO';
 
 class ResourceInventoryDAO extends BaseDAO {
   public async upsertResource(item: ResourceInventoryItem): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            item.awsAccountId,
-            item.region,
-            item.resourceType,
-            item.resourceId,
-            item.resourceName,
-            item.state,
-            JSON.stringify(item.metadata),
-            item.collectedAt,
-          )
-          .run(),
-      'upsert resource',
-    );
+    await this.run('INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [item.awsAccountId, item.region, item.resourceType, item.resourceId, item.resourceName, item.state, JSON.stringify(item.metadata), item.collectedAt]);
   }
 
   public async deleteStaleResources(awsAccountId: string, resourceType: string, olderThan: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?')
-          .bind(awsAccountId, resourceType, olderThan)
-          .run(),
-      'delete stale resources',
-    );
+    await this.run('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?', [awsAccountId, resourceType, olderThan]);
   }
 
   public async deleteOrphaned(): Promise<number> {
-    const result: D1Result = await this.deleteOrphanedRows('resource_inventory', ORPHANED_BY_ASSUMABLE_ROLES);
+    const result = await this.deleteOrphanedRows('resource_inventory', ORPHANED_BY_ASSUMABLE_ROLES);
     return result.meta?.changes ?? 0;
   }
 

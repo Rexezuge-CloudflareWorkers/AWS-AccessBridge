@@ -1,9 +1,9 @@
 import { AssumableRolesDAO, RoleConfigsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { AccessKeysWithExpiration, CredentialCache, CredentialChain, RoleConfig } from '@aws-access-bridge/shared/model';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { INTERMEDIATE_ROLE_SESSION_NAME, ROLE_SESSION_NAME_PREFIX } from '@aws-access-bridge/shared/constants';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
 import { ArnUtil } from '../ArnUtil';
 import { StsService } from '../sts';
 import { CredentialChainService } from '../../credential';

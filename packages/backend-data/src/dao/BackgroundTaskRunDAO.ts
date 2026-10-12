@@ -1,5 +1,5 @@
 import type { BackgroundTaskRun, BackgroundTaskRunInternal } from '@aws-access-bridge/shared/model';
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 import { BaseDAO } from './BaseDAO';
 
 import { assertD1Success } from '../utils/D1Utils';
@@ -24,14 +24,9 @@ class BackgroundTaskRunDAO extends BaseDAO {
   public async startRun(input: StartTaskRunInput): Promise<string> {
     const runId: string = UUIDUtil.getRandomUUID();
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        `INSERT INTO background_task_runs
+    const result = await this.run(`INSERT INTO background_task_runs
            (run_id, task_type, status, items_processed, items_failed, started_at, created_at)
-         VALUES (?, ?, 'running', 0, 0, ?, ?)`,
-      )
-      .bind(runId, input.taskType, now, now)
-      .run();
+         VALUES (?, ?, 'running', 0, 0, ?, ?)`, [runId, input.taskType, now, now]);
     assertD1Success(result, `start background task run`);
     return runId;
   }
@@ -39,44 +34,18 @@ class BackgroundTaskRunDAO extends BaseDAO {
   public async succeedRun(runId: string, input: CompleteTaskRunInput): Promise<void> {
     const status: string = input.itemsFailed > 0 ? 'partial_success' : 'success';
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        `UPDATE background_task_runs
+    const result = await this.run(`UPDATE background_task_runs
          SET status = ?, items_processed = ?, items_failed = ?, summary = ?, details = ?, completed_at = ?
-         WHERE run_id = ?`,
-      )
-      .bind(
-        status,
-        input.itemsProcessed,
-        input.itemsFailed,
-        input.summary ?? null,
-        input.details === undefined ? null : JSON.stringify(input.details),
-        now,
-        runId,
-      )
-      .run();
+         WHERE run_id = ?`, [status, input.itemsProcessed, input.itemsFailed, input.summary ?? null, input.details === undefined ? null : JSON.stringify(input.details), now, runId]);
     assertD1Success(result, `complete background task run`);
   }
 
   public async failRun(runId: string, errorMessage: string, partial?: Partial<CompleteTaskRunInput>): Promise<void> {
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        `UPDATE background_task_runs
+    const result = await this.run(`UPDATE background_task_runs
          SET status = 'error', error_message = ?, items_processed = ?, items_failed = ?,
              summary = ?, details = ?, completed_at = ?
-         WHERE run_id = ?`,
-      )
-      .bind(
-        errorMessage,
-        partial?.itemsProcessed ?? 0,
-        partial?.itemsFailed ?? 0,
-        partial?.summary ?? null,
-        partial?.details === undefined ? null : JSON.stringify(partial.details),
-        now,
-        runId,
-      )
-      .run();
+         WHERE run_id = ?`, [errorMessage, partial?.itemsProcessed ?? 0, partial?.itemsFailed ?? 0, partial?.summary ?? null, partial?.details === undefined ? null : JSON.stringify(partial.details), now, runId]);
     assertD1Success(result, `fail background task run`);
   }
 
@@ -108,10 +77,7 @@ class BackgroundTaskRunDAO extends BaseDAO {
   public async deleteOlderThanBatch(cutoffTimestamp: number, batchSize: number): Promise<number> {
     // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
     // boundary is a rowid subquery with its own LIMIT instead.
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM background_task_runs WHERE rowid IN (SELECT rowid FROM background_task_runs WHERE started_at < ? LIMIT ?)')
-      .bind(cutoffTimestamp, batchSize)
-      .run();
+    const result = await this.run('DELETE FROM background_task_runs WHERE rowid IN (SELECT rowid FROM background_task_runs WHERE started_at < ? LIMIT ?)', [cutoffTimestamp, batchSize]);
     assertD1Success(result, `delete old background task runs`);
     return result.meta?.changes ?? 0;
   }

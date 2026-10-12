@@ -1,4 +1,4 @@
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { DynamoDbCollector } from './DynamoDbCollector';
 import { Ec2Collector } from './Ec2Collector';
 import type { IAwsResourceCollector } from './IAwsResourceCollector';

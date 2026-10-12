@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 describe('ArnUtil', () => {
   describe('getAccountIdFromArn', () => {

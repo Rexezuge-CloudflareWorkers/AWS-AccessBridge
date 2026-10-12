@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LocaleUtil } from '@aws-access-bridge/shared/utils';
+import { LocaleUtil } from '@rexezuge/shared';
 import { normalizeLanguage, detectInitialLanguage } from '../../apps/web/src/i18n';
 import enTranslation from '../../apps/web/src/locales/en/translation.json';
 import deTranslation from '../../apps/web/src/locales/de/translation.json';

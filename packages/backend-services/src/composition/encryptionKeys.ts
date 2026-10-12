@@ -1,4 +1,4 @@
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import type { RequestScopeEnvShape } from './tokens';
 

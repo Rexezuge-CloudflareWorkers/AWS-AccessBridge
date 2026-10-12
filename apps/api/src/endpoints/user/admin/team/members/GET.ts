@@ -1,5 +1,5 @@
 
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { TeamMember } from '@aws-access-bridge/shared/model';

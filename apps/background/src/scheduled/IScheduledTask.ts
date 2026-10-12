@@ -1,6 +1,6 @@
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 interface TaskRunSummary {
   itemsProcessed: number;
   itemsFailed: number;

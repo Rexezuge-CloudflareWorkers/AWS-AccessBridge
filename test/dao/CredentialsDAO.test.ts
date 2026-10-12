@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
-import { DatabaseError, InternalServerError, NotFoundError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError, InternalServerError, NotFoundError } from '@rexezuge/errors';
 import { encryptData, generateAESGCMKey } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 /**

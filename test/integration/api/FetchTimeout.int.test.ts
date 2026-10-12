@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BadGatewayError } from '@aws-access-bridge/backend-errors';
+import { BadGatewayError } from '@rexezuge/errors';
 import { FetchHttpClient } from '@aws-access-bridge/backend-services/http';
 import { fetchWithTimeout } from '@aws-access-bridge/provider-clients/aws';
 

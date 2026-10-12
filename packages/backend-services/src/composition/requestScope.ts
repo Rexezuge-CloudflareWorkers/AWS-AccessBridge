@@ -1,5 +1,5 @@
-import { Container } from '@aws-access-bridge/backend-runtime/di';
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { Container } from '@rexezuge/runtime/di/Container';
+import { InternalServerError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createEncryptionKeys, keyChain } from './encryptionKeys';
 import { ReplayGuard } from '../auth/ReplayGuard';

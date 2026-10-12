@@ -10,9 +10,9 @@ Nothing here is a design decision — those live in the area guides. This is the
 
 | Layer | Projects                                  | May import                                                                                                                   |
 | ----- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 0     | `shared`, `backend-errors`                | nothing                                                                                                                      |
-| 1     | `backend-runtime` (incl. `di/`)           | layer 0                                                                                                                      |
-| 2     | `backend-data`, `provider-clients`        | layer 0                                                                                                                      |
+| 0     | SDK `@rexezuge/shared`, `@rexezuge/errors` | nothing                                                                                                                      |
+| 1     | `backend-runtime` (consumer config and worker adapters) | layer 0 + SDK runtime                                                                                   |
+| 2     | `backend-data`, `provider-clients`         | layer 0 + SDK D1                                                                                                             |
 | 3     | `backend-services` (incl. `composition/`) | layers 0–2, never `apps/*`                                                                                                   |
 | app   | `background`                              | layers 0–3, never `apps/api`                                                                                                 |
 | app   | `api`                                     | layers 0–3 + `background`; no `aws4fetch`, no `provider-clients`; `backend-data/dao` **types only** under `src/endpoints/**` |
@@ -23,7 +23,7 @@ There is no layer 4 by design: nothing sits between `backend-services` and the e
 
 ### The layer rules are enforced unevenly, and the gaps are worth knowing
 
-`no-restricted-imports` in `eslint.config.mjs` carries a block for `shared`, `backend-errors`, `backend-runtime`, `backend-data`, `provider-clients`, `backend-services`, `apps/api`, and `apps/api/src/endpoints/**`. **There is no block for `apps/background` or `apps/web`** — those two rows are convention, not enforcement, so a wrong import there fails nothing. If you add a package, add its block with it rather than after.
+`no-restricted-imports` in `eslint.config.mjs` carries a block for `shared`, `backend-runtime`, `backend-data`, `provider-clients`, `backend-services`, `apps/api`, and `apps/api/src/endpoints/**`. **There is no block for `apps/background` or `apps/web`** — those two rows are convention, not enforcement, so a wrong import there fails nothing. If you add a package, add its block with it rather than after.
 
 Two further asymmetries in the enforced set: `backend-runtime` and `backend-data` do **not** name `provider-clients` as restricted, so an upward import into it type-checks today. And the `apps/api/src/endpoints/**` DAO block sets `allowTypeImports: true`, which is the one permitted value import — type-only DAO imports for filters and models.
 

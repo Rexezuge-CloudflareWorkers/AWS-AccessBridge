@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
+import { TimestampUtil } from '@rexezuge/shared';
 
 describe('TimestampUtil', () => {
   beforeEach(() => {

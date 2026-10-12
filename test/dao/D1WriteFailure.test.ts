@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { AwsAccountsDAO } from '@aws-access-bridge/backend-data/dao/AwsAccountsDAO';
 import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsDAO';
 import { TeamAccountsDAO } from '@aws-access-bridge/backend-data/dao/TeamAccountsDAO';
@@ -164,7 +164,7 @@ describe('D1 writes check result.success', () => {
     ])('%s throws DatabaseError, not a bare Error', async (_name, call) => {
       const { stmt } = failingStatement();
       const thrown = await call(new TeamMembersDAO(dbWith(stmt) as never)).catch((error: unknown) => error);
-      // A bare `Error` bypasses the `IServiceError` taxonomy, so `toErrorResponse`
+      // A bare `Error` bypasses the `ServiceError` taxonomy, so `toErrorResponse`
       // answers it with a generic 500 and drops the database detail entirely.
       expect(thrown).toBeInstanceOf(DatabaseError);
     });

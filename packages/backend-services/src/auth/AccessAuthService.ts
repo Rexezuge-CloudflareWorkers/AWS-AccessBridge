@@ -1,11 +1,11 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import type { createRemoteJWKSet as CreateRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError, UnauthorizedError } from '@rexezuge/errors';
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 type AccessAuthEnv = ServiceEnv;
 
 // Minimal structural view of the Workers runtime ExecutionContext when

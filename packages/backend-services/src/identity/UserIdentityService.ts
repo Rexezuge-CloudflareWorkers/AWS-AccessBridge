@@ -1,8 +1,8 @@
 import { UserEmailDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { D1Queryable } from '@aws-access-bridge/backend-data/utils';
-import { isMissingSchemaError } from '@aws-access-bridge/backend-data/utils';
-import { isD1ErrorRetryable } from '@aws-access-bridge/backend-data/utils/D1ErrorClassifier';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { isMissingSchemaError } from '@rexezuge/d1';
+import { isD1ErrorRetryable } from '@rexezuge/d1';
+import { DatabaseError } from '@rexezuge/errors';
 import { AddressRegistryService } from './AddressRegistryService';
 
 interface UserIdentityEnv {

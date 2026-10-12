@@ -1,14 +1,9 @@
-import {
-  DEMO_USER_EMAIL,
-  DEFAULT_DEMO_MODE,
-  INTERNAL_HEADER_PREFIX,
-  INTERNAL_USER_EMAIL_HEADER,
-  SELF_WORKER_BASE_HOSTNAME,
-} from '@aws-access-bridge/shared/constants';
+import { DEMO_USER_EMAIL, DEFAULT_DEMO_MODE, INTERNAL_HEADER_PREFIX, INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
 import { Context, Next } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { HMACHandler } from './HMACHandler';
 import { csrfProtectionHandler, noStoreHandler, rateLimitHandler } from './RequestGuards';
-import { IServiceError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { ServiceError, UnauthorizedError } from '@rexezuge/errors';
 
 import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
 
@@ -17,7 +12,7 @@ import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuar
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 type RequestContext = Context<{
   Bindings: Env;
   // `AuthenticatedUserEmailAddress` is the address the request authenticated as.
@@ -37,10 +32,6 @@ type AuthenticatedEnv = Env & {
 /**
 The `{Exception: {Type, Message}}` envelope shared by every error response.
 */
-function exceptionBody(error: IServiceError): { Exception: { Type: string; Message: string } } {
-  return { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } };
-}
-
 async function validateInternalRequest(c: Context<{ Bindings: Env }>, next: Next): Promise<void> {
   // The scope exists even on the `*` middleware path (the WeakMap is keyed on
   // the Hono context), so the replay guard comes from the composition root like
@@ -187,7 +178,7 @@ async function publishAccountId(c: RequestContext, userEmail: string): Promise<v
 
 /**
  * Authenticate, publish the principal, and run the rest of the chain, translating
- * an `IServiceError` into its typed JSON response.
+ * an `ServiceError` into its typed JSON response.
  *
  * Shared by the `/user/*` and `/api/*` handlers, which differ only in *how* they
  * authenticate. The translation used to be copy-pasted across both, so a change
@@ -204,8 +195,9 @@ async function authenticateAndContinue(
     await publishAccountId(c, userEmail);
     await next();
   } catch (error: unknown) {
-    if (error instanceof IServiceError) {
-      return c.json(exceptionBody(error), error.getErrorCode());
+    if (error instanceof ServiceError) {
+      const response = error.toErrorResponse();
+      return c.json(response.body, response.status as ContentfulStatusCode);
     }
     throw error;
   }
@@ -262,7 +254,7 @@ class MiddlewareHandlers {
       try {
         return await fn(...args);
       } catch (error: unknown) {
-        if (error instanceof IServiceError) {
+        if (error instanceof ServiceError) {
           throw ErrorTranslationUtil.toHTTPException(error);
         }
         throw error;

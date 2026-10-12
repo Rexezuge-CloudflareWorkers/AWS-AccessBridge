@@ -1,7 +1,7 @@
 import { IActivityAPIRoute } from './IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from './IActivityAPIRoute';
 
-import { ForbiddenError, MethodNotAllowedError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError, MethodNotAllowedError } from '@rexezuge/errors';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 

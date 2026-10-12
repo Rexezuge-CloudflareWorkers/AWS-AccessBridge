@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AccessAuthService } from '@aws-access-bridge/backend-services/auth/AccessAuthService';
-import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError, UnauthorizedError } from '@rexezuge/errors';
 import { DEMO_USER_EMAIL } from '@aws-access-bridge/shared/constants';
 
 /**

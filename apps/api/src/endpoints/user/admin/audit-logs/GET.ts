@@ -8,7 +8,7 @@ import { Pagination } from '@aws-access-bridge/backend-runtime/constants';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 import { forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 class ListAuditLogsRoute extends IAdminActivityAPIRoute<ListAuditLogsRequest, ListAuditLogsResponse, ListAuditLogsEnv> {
   schema = {
     tags: ['Admin'],

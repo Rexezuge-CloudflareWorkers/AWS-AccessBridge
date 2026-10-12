@@ -1,4 +1,4 @@
-import { TimestampUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil } from '@rexezuge/shared';
 import { toSafeBatchSize } from './BatchSize';
 import { BaseDAO } from './BaseDAO';
 
@@ -12,18 +12,12 @@ class CredentialCacheConfigDAO extends BaseDAO {
    * on the primary key.
    */
   public async create(principalArn: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)')
-      .bind(principalArn)
-      .run();
+    const result = await this.run('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)', [principalArn]);
     assertD1Success(result, `create cache config`);
   }
 
   public async delete(principalArn: string): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('DELETE FROM credential_cache_config WHERE principal_arn = ?')
-      .bind(principalArn)
-      .run();
+    const result = await this.run('DELETE FROM credential_cache_config WHERE principal_arn = ?', [principalArn]);
     assertD1Success(result, `delete cache config`);
   }
 
@@ -31,10 +25,7 @@ class CredentialCacheConfigDAO extends BaseDAO {
     principalArn: string,
     timestamp: number = TimestampUtil.getCurrentUnixTimestampInSeconds(),
   ): Promise<void> {
-    const result: D1Result = await this.database
-      .prepare('UPDATE credential_cache_config SET last_cached_at = ? WHERE principal_arn = ?')
-      .bind(timestamp, principalArn)
-      .run();
+    const result = await this.run('UPDATE credential_cache_config SET last_cached_at = ? WHERE principal_arn = ?', [timestamp, principalArn]);
     assertD1Success(result, `update cache config`);
   }
 

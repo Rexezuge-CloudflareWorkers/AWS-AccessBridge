@@ -4,7 +4,7 @@ import { CredentialStoreService } from '@aws-access-bridge/backend-services/cred
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
-import { BadRequestError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError } from '@rexezuge/errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsCacheDAO');

@@ -1,4 +1,4 @@
-import { InternalServerError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError, UnauthorizedError } from '@rexezuge/errors';
 import { FetchHttpClient, type IHttpClient } from '../../http';
 
 class ConsoleService {
@@ -20,7 +20,7 @@ class ConsoleService {
     const response: Response = await this.http.fetch(url);
     if (response.ok) {
       // Guarded: a malformed body would otherwise throw a raw `SyntaxError`,
-      // bypassing the `IServiceError` taxonomy and the typed status mapping.
+      // bypassing the `ServiceError` taxonomy and the typed status mapping.
       let data: SigninResponse;
       try {
         data = (await response.json());

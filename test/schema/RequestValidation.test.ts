@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { getRequestInputSchema, validateRequestInput } from '@/schema';
 
 describe('Request input schemas', () => {

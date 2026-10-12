@@ -1,10 +1,10 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
 import { MoneyUtil } from '@aws-access-bridge/shared/utils/MoneyUtil';
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
+import { InternalServerError } from '@rexezuge/errors';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { defaultAwsClientFactory } from './AwsSignedFetcher';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 interface CostExplorerResult {
   accountId: string;
   periodStart: string;
@@ -185,7 +185,7 @@ class CostExplorerClient {
       return JSON.parse(responseText) as CostExplorerGetCostAndUsageResponse;
     } catch (error: unknown) {
       // A malformed body would otherwise throw a raw `SyntaxError`, bypassing the
-      // `IServiceError` taxonomy and the typed 4xx/5xx mapping the callers rely on.
+      // `ServiceError` taxonomy and the typed 4xx/5xx mapping the callers rely on.
       throw new InternalServerError(
         `Cost Explorer returned a malformed response body: ${error instanceof Error ? error.message : 'unknown error'}`,
       );

@@ -6,7 +6,7 @@ import { getRequestScope } from '@aws-access-bridge/backend-services/composition
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
 import { forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 class CleanupOrphanedDataRoute extends IAdminActivityAPIRoute<
   CleanupOrphanedDataRequest,
   CleanupOrphanedDataResponse,

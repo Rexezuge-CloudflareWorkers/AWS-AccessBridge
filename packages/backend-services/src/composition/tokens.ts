@@ -1,4 +1,4 @@
-import type { Token } from '@aws-access-bridge/backend-runtime/di';
+import type { Token } from '@rexezuge/runtime/di/Container';
 import type { ServiceEnv } from './ServiceEnv';
 import type { KeyChain } from './encryptionKeys';
 import type { AccessService } from '../access/AccessService';

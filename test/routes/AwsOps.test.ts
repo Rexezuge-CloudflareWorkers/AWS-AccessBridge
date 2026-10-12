@@ -10,7 +10,7 @@ import { RoleConfigsDAO } from '@aws-access-bridge/backend-data/dao/RoleConfigsD
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { ConsoleService } from '@aws-access-bridge/backend-services/aws/console';
 import { InternalRequestHelper } from '@aws-access-bridge/backend-services/aws/InternalRequestHelper';
-import { ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError } from '@rexezuge/errors';
 import { createRouteContext } from '../helpers/route-context';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AssumableRolesDAO');

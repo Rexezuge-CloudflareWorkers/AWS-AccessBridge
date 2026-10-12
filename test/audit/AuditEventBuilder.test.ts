@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AuditEventBuilder } from '@aws-access-bridge/backend-services/audit/AuditEventBuilder';
-import { FixedClock } from '@aws-access-bridge/shared/utils/Clock';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
+import { FixedClock } from '@rexezuge/shared/Clock';
+import { TimestampUtil } from '@rexezuge/shared';
 
 /**
  * `AuditEventBuilder` is the only place an audit row's shape is decided, and the

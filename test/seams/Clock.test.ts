@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SystemClock, FixedClock } from '@aws-access-bridge/shared/utils/Clock';
-import { TimestampUtil } from '@aws-access-bridge/shared/utils/TimestampUtil';
+import { SystemClock, FixedClock } from '@rexezuge/shared/Clock';
+import { TimestampUtil } from '@rexezuge/shared';
 
 describe('SystemClock', () => {
   it('reports the real current time', () => {

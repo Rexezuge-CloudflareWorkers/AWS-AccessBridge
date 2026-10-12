@@ -1,6 +1,6 @@
 import { INTERNAL_BASE_URL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
-import { InternalServerError } from '@aws-access-bridge/backend-errors';
-import { RequestOriginUtil } from '@aws-access-bridge/shared/utils';
+import { InternalServerError } from '@rexezuge/errors';
+import { RequestOriginUtil } from '@aws-access-bridge/shared/utils/RequestOriginUtil';
 
 const BaseUrlUtil = {
   getBaseUrl(request: Request, env?: unknown): string {

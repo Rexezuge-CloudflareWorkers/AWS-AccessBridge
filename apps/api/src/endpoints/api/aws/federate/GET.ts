@@ -1,18 +1,13 @@
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse, ExtendedResponse } from '@/endpoints/IActivityAPIRoute';
-import { BadRequestError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 import type { RoleConfig } from '@aws-access-bridge/shared/model';
 import { buildPrincipalArn } from '@aws-access-bridge/shared/utils/aws';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import {
-  badRequestResponse,
-  forbiddenResponse,
-  internalServerErrorResponse,
-  unauthorizedResponse,
-} from '@aws-access-bridge/shared/schema/exceptionResponses';
+import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
 class FederateRoute extends IActivityAPIRoute<FederateRequest, FederateResponse, FederateEnv> {
   schema = {
     tags: ['AWS'],

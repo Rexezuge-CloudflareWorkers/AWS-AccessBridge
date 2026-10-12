@@ -1,5 +1,5 @@
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
-import { BadRequestError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, InternalServerError } from '@rexezuge/errors';
 import type { AwsClientFactory } from './AwsSignedFetcher';
 import { awsQueryRequest, defaultAwsClientFactory, parseXmlTag } from './AwsSignedFetcher';
 

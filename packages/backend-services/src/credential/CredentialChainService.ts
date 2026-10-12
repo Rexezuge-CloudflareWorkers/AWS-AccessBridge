@@ -2,7 +2,7 @@ import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config'
 import { CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { AccessKeys, Credential, CredentialCache, CredentialChain } from '@aws-access-bridge/shared/model';
-import { BadRequestError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ForbiddenError, InternalServerError } from '@rexezuge/errors';
 import { CHAIN_TEST_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 import { StsService } from '../aws/sts';
 import { ChainTestWalker, LeafCredentialsWalker } from './CredentialChainWalker';
@@ -10,7 +10,7 @@ import type { ServiceEnv } from '../composition/ServiceEnv';
 import { resolveCredentialKeys } from '../composition/encryptionKeys';
 import type { CredentialKeyProvider } from '../composition/encryptionKeys';
 
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 type CredentialChainServiceEnv = ServiceEnv;
 
 /**

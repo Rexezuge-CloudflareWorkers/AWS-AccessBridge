@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
-import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError } from '@rexezuge/errors';
 import { HTTPException } from 'hono/http-exception';
 
 describe('ErrorTranslationUtil', () => {
@@ -43,7 +43,7 @@ describe('ErrorTranslationUtil', () => {
       const error = new BadRequestError();
       const exception: HTTPException = ErrorTranslationUtil.toHTTPException(error);
       const parsed = JSON.parse(exception.message);
-      expect(parsed.Exception.Message).toBe('The request could not be understood by the server due to malformed syntax.');
+      expect(parsed.Exception.Message).toBe('The request could not be understood or was missing required parameters.');
     });
   });
 });

@@ -19,7 +19,7 @@
 interface ExceptionSchemaOptions {
   /**
    * The `Type` value shown as the example, e.g. `BadRequestError`. Defaults to the
-   * `IServiceError.getErrorType()` value for the matching status.
+   * `ServiceError.type` value for the matching status.
    */
   type?: string;
   /**

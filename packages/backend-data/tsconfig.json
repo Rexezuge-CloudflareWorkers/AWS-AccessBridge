@@ -16,8 +16,6 @@
     "paths": {
       "@aws-access-bridge/backend-data": ["./src"],
       "@aws-access-bridge/backend-data/*": ["./src/*"],
-      "@aws-access-bridge/backend-errors": ["../backend-errors/src"],
-      "@aws-access-bridge/backend-errors/*": ["../backend-errors/src/*"],
       "@aws-access-bridge/shared": ["../shared/src"],
       "@aws-access-bridge/shared/*": ["../shared/src/*"]
     }

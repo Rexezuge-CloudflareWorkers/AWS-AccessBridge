@@ -91,6 +91,6 @@ describe('BackgroundTaskRunDAO', () => {
   it('throws DatabaseError when writes fail', async () => {
     vi.mocked(mockStmt.run).mockResolvedValue({ success: false, error: 'D1 down' });
     const dao = new BackgroundTaskRunDAO(mockDb);
-    await expect(dao.startRun({ taskType: 'x' })).rejects.toThrow('Failed to start background task run');
+    await expect(dao.startRun({ taskType: 'x' })).rejects.toThrow('Failed to run statement: D1 down');
   });
 });

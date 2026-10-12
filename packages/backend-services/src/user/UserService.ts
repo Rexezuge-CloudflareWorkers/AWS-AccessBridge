@@ -1,9 +1,9 @@
 import { AssumableRolesDAO, AwsAccountsDAO, UserFavoriteAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 import type { AssumableRoleOwner } from '@aws-access-bridge/backend-data/dao';
 
-import { ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { ForbiddenError } from '@rexezuge/errors';
 import type { AssumableAccountsMap, AssumableAccountsResponse } from '@aws-access-bridge/shared/model';
-import { LocaleUtil } from '@aws-access-bridge/shared/utils';
+import { LocaleUtil } from '@rexezuge/shared';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';
 import { resolveOwner } from '../identity/resolveOwner';

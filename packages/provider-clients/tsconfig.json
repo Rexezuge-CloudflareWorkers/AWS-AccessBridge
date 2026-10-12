@@ -14,8 +14,6 @@
     "strict": true,
     "skipLibCheck": true,
     "paths": {
-      "@aws-access-bridge/backend-errors": ["../backend-errors/src"],
-      "@aws-access-bridge/backend-errors/*": ["../backend-errors/src/*"],
       "@aws-access-bridge/provider-clients": ["./src"],
       "@aws-access-bridge/provider-clients/*": ["./src/*"],
       "@aws-access-bridge/shared": ["../shared/src"],

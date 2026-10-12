@@ -80,7 +80,7 @@ export default tseslint.config(
       'unicorn/prefer-module': 'off',
       // Top-level await not available in all Workers entry points
       'unicorn/prefer-top-level-await': 'off',
-      // Error subclassing via `new MyError()` is intentional in backend-errors
+      // Error subclassing via `new MyError()` is intentional in domain errors
       'unicorn/custom-error-definition': 'off',
       // Template literals throughout the codebase are fine as-is
       'unicorn/no-useless-undefined': 'off',
@@ -183,24 +183,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 0: backend-errors — zero @aws-access-bridge/* deps
-  {
-    files: ['packages/backend-errors/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/*'],
-              message: 'backend-errors must not import from other @aws-access-bridge packages — it is a zero-dependency base layer',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 1: backend-runtime — only shared and backend-errors
+  // Layer 1: backend-runtime — SDK runtime plus consumer shared utilities
   {
     files: ['packages/backend-runtime/**/*.{ts,js}'],
     rules: {
@@ -226,7 +209,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 2: backend-data — only shared and backend-errors
+  // Layer 2: backend-data — SDK D1, errors, and shared utilities
   {
     files: ['packages/backend-data/**/*.{ts,js}'],
     rules: {
@@ -252,7 +235,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 2: provider-clients — only shared and backend-errors (raw AWS, no DAOs/services)
+  // Layer 2: provider-clients — SDK errors and shared utilities (raw AWS, no DAOs/services)
   {
     files: ['packages/provider-clients/**/*.{ts,js}'],
     rules: {

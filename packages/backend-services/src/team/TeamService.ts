@@ -3,7 +3,7 @@ import type { TeamMemberOwner } from '@aws-access-bridge/backend-data/dao';
 import { AwsAccountsDAO, UserMetadataDAO } from '@aws-access-bridge/backend-data/dao';
 
 import type { Team, TeamMember } from '@aws-access-bridge/shared/model';
-import { BadRequestError, ConflictError, NotFoundError } from '@aws-access-bridge/backend-errors';
+import { BadRequestError, ConflictError, NotFoundError } from '@rexezuge/errors';
 import { DEFAULT_TEAM_ID } from '@aws-access-bridge/shared/constants';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { UserIdentityService } from '../identity/UserIdentityService';

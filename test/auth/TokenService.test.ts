@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TokenService } from '@aws-access-bridge/backend-services/auth/TokenService';
 import { UserAccessTokenDAO } from '@aws-access-bridge/backend-data/dao/UserAccessTokenDAO';
-import type {
-  AccountIdentity,
-  UserIdentityEnv,
-  UserIdentityService,
-} from '@aws-access-bridge/backend-services/identity/UserIdentityService';
-import { BadRequestError, DatabaseError, UnauthorizedError } from '@aws-access-bridge/backend-errors';
+import type { AccountIdentity, UserIdentityEnv, UserIdentityService } from '@aws-access-bridge/backend-services/identity/UserIdentityService';
+import { BadRequestError, DatabaseError, UnauthorizedError } from '@rexezuge/errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/UserAccessTokenDAO');
 

@@ -1,5 +1,5 @@
 import { DEFAULT_AWS_FETCH_TIMEOUT_MS, fetchWithTimeout } from '@aws-access-bridge/provider-clients/aws';
-import { toErrorMessage } from '@aws-access-bridge/shared/utils';
+import { toErrorMessage } from '@aws-access-bridge/shared/utils/ErrorMessage';
 import { HttpFetchError } from './HttpFetchError';
 
 interface IHttpClient {
@@ -11,7 +11,7 @@ interface IHttpClient {
  * Parse a JSON body, reporting a malformed one as an `HttpFetchError`.
  *
  * A bare `JSON.parse` here threw a raw `SyntaxError`, which bypassed the
- * `IServiceError` taxonomy every caller maps status codes through.
+ * `ServiceError` taxonomy every caller maps status codes through.
  */
 function parseJsonBody(text: string, url: string): unknown {
   if (!text) return {};

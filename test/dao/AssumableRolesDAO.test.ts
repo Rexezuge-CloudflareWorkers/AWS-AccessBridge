@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AssumableRolesDAO } from '@aws-access-bridge/backend-data/dao/AssumableRolesDAO';
-import { DatabaseError, ForbiddenError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError, ForbiddenError } from '@rexezuge/errors';
 
 // Migration 0032: user-keyed statements take the account id plus its frozen
 // anchor, rather than a bare address.

@@ -1,6 +1,6 @@
 import type { Team, TeamInternal } from '@aws-access-bridge/shared/model';
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
-import { assertD1Success } from '@aws-access-bridge/backend-data/utils';
+import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
+import { assertD1Success } from '../utils/D1Utils';
 import { BaseDAO } from './BaseDAO';
 
 class TeamsDAO extends BaseDAO {
@@ -11,14 +11,7 @@ class TeamsDAO extends BaseDAO {
     // `{success: false}` rather than throwing. Without this check a duplicate name
     // returned 200 with a teamId that resolves to no row, and every later member
     // or account write targeted a team that does not exist.
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)')
-          .bind(teamId, teamName, createdAt, createdBy)
-          .run(),
-      'create team',
-    );
+    await this.run('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)', [teamId, teamName, createdAt, createdBy]);
     return { teamId, teamName, createdAt, createdBy };
   }
 
@@ -37,7 +30,7 @@ class TeamsDAO extends BaseDAO {
     // could fail partway and leave a team with a partially destroyed member or
     // account set, while still reporting success (none checked `result.success`).
     // D1 rolls the whole batch back if any statement fails.
-    const results: D1Result[] = await this.database.batch([
+    const results = await this.batch([
       this.database.prepare('DELETE FROM team_accounts WHERE team_id = ?').bind(teamId),
       this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId),
       this.database.prepare('DELETE FROM teams WHERE team_id = ?').bind(teamId),
@@ -48,10 +41,7 @@ class TeamsDAO extends BaseDAO {
   }
 
   public async updateTeamName(teamId: string, newName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE teams SET team_name = ? WHERE team_id = ?').bind(newName, teamId).run(),
-      'rename team',
-    );
+    await this.run('UPDATE teams SET team_name = ? WHERE team_id = ?', [newName, teamId]);
   }
 }
 

@@ -1,4 +1,4 @@
-import { log } from '@aws-access-bridge/shared/utils';
+import { log } from '@aws-access-bridge/shared/utils/Logger';
 
 abstract class AbstractEntrypointWorker {
   protected printExecId(): string {

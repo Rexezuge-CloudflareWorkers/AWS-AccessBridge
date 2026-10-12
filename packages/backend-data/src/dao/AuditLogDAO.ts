@@ -1,5 +1,5 @@
 import type { AuditLog, AuditLogInternal } from '@aws-access-bridge/shared/model';
-import { TimestampUtil, UUIDUtil } from '@aws-access-bridge/shared/utils';
+import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 import { BaseDAO } from './BaseDAO';
 
 import { assertD1Success } from '../utils/D1Utils';
@@ -19,25 +19,7 @@ class AuditLogDAO extends BaseDAO {
     const { userEmail, action, method, path, statusCode, resource, detail, ipAddress, userAgent, userId = null } = input;
     const logId: string = UUIDUtil.getRandomUUID();
     const timestamp: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result: D1Result = await this.database
-      .prepare(
-        'INSERT INTO audit_logs (log_id, timestamp, user_email, user_id, action, resource, method, path, status_code, detail, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      )
-      .bind(
-        logId,
-        timestamp,
-        userEmail,
-        userId,
-        action,
-        resource || null,
-        method,
-        path,
-        statusCode,
-        detail || null,
-        ipAddress || null,
-        userAgent || null,
-      )
-      .run();
+    const result = await this.run('INSERT INTO audit_logs (log_id, timestamp, user_email, user_id, action, resource, method, path, status_code, detail, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [logId, timestamp, userEmail, userId, action, resource || null, method, path, statusCode, detail || null, ipAddress || null, userAgent || null]);
     assertD1Success(result, `create audit log`);
   }
 
@@ -111,14 +93,7 @@ class AuditLogDAO extends BaseDAO {
     // log "pruned 0" and exit as a success while the table grew unbounded.
     // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
     // boundary is a rowid subquery with its own LIMIT instead.
-    const result: D1Result = await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM audit_logs WHERE rowid IN (SELECT rowid FROM audit_logs WHERE timestamp < ? LIMIT ?)')
-          .bind(cutoffTimestamp, batchSize)
-          .run(),
-      'delete old audit logs',
-    );
+    const result = await this.run('DELETE FROM audit_logs WHERE rowid IN (SELECT rowid FROM audit_logs WHERE timestamp < ? LIMIT ?)', [cutoffTimestamp, batchSize]);
     return result.meta?.changes ?? 0;
   }
 }

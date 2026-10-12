@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserEmailDAO } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
 import type { UserEmailRow } from '@aws-access-bridge/backend-data/dao/UserEmailDAO';
-import { DatabaseError } from '@aws-access-bridge/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 
 /**
  * `UserEmailDAO` gates which address may authenticate an account, so its claim

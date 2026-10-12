@@ -174,8 +174,8 @@ describe('apiAuthentication', () => {
    * administrator to the Zero Trust login page for something re-authenticating
    * cannot fix.
    */
-  it('answers an IServiceError with its own status, not a blanket 500', async () => {
-    const { ForbiddenError, UnauthorizedError } = await import('@aws-access-bridge/backend-errors');
+  it('answers an ServiceError with its own status, not a blanket 500', async () => {
+    const { ForbiddenError, UnauthorizedError } = await import('@rexezuge/errors');
     for (const [error, status] of [
       [new UnauthorizedError('no token'), 401],
       [new ForbiddenError('not permitted'), 403],
@@ -185,7 +185,7 @@ describe('apiAuthentication', () => {
       // than from the stubbed token service.
       const { asContext, context, next } = makeContext({ headers: { Authorization: 'Bearer tok' } });
       await MiddlewareHandlers.apiAuthentication()(asContext, next);
-      expect(context.json).toHaveBeenCalledWith({ Exception: { Message: error.getErrorMessage(), Type: error.getErrorType() } }, status);
+      expect(context.json).toHaveBeenCalledWith({ Exception: { Message: error.message, Type: error.type } }, status);
     }
   });
 
