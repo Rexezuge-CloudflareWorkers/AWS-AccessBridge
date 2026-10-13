@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
-        specifier: 0.22.0
-        version: 0.22.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
+        specifier: 0.23.0
+        version: 0.23.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
       '@rexezuge/d1':
         specifier: 1.5.1
         version: 1.5.1
@@ -344,8 +344,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/shared
       '@cloudflare/vitest-pool-workers':
-        specifier: 0.22.0
-        version: 0.22.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
+        specifier: 0.23.0
+        version: 0.23.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
       '@rexezuge/d1':
         specifier: 1.5.1
         version: 1.5.1
@@ -469,6 +469,10 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  '@babel/runtime@7.29.10':
+    resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
+    engines: {node: '>=6.9.0'}
+
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
@@ -521,8 +525,8 @@ packages:
       workerd:
         optional: true
 
-  '@cloudflare/vitest-pool-workers@0.22.0':
-    resolution: {integrity: sha512-OJv/qikkOgxnKxJ5xrLS7zuOLZhc/6iziU+llqZm4tiQf2CJUYwlMuXN68VaWIQebORd1AUx4w6A0oy8XRbuaQ==}
+  '@cloudflare/vitest-pool-workers@0.23.0':
+    resolution: {integrity: sha512-4giZR3fuY9GcTx6Jb7gZX33SUOgeY7rQSm9qSdf9TPfI8i3fP+P1ZA8BM9rMOSoMtLpwo+Zw5zy3v2Ux7iAvNA==}
     deprecated: '@cloudflare/vitest-pool-workers has been renamed to @cloudflare/vitest-plugin. This package will not receive future updates.'
     peerDependencies:
       '@vitest/runner': ^4.1.0
@@ -3145,6 +3149,8 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.8
 
+  '@babel/runtime@7.29.10': {}
+
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -3202,7 +3208,7 @@ snapshots:
     optionalDependencies:
       workerd: 1.20261001.1
 
-  '@cloudflare/vitest-pool-workers@0.22.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)':
+  '@cloudflare/vitest-pool-workers@0.23.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)':
     dependencies:
       '@vitest/runner': 4.1.11
       '@vitest/snapshot': 4.1.11
@@ -3897,7 +3903,7 @@ snapshots:
   '@testing-library/dom@10.4.2':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.29.10
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
