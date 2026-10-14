@@ -118,7 +118,7 @@ describe('CronTasksWorker', () => {
   });
 
   it('returns accepted when a run is already active', async () => {
-    let resolveFirstTask: () => void = () => undefined;
+    let resolveFirstTask: () => void = () => {};
     taskSpies.credentialCacheRefresh.mockReturnValueOnce(
       new Promise<void>((resolve) => {
         resolveFirstTask = resolve;

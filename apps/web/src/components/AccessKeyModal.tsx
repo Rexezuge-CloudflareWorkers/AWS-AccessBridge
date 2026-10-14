@@ -102,8 +102,8 @@ export default function AccessKeyModal({ accessKeyId, secretAccessKey, sessionTo
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    globalThis.addEventListener('keydown', handleEsc);
-    return () => globalThis.removeEventListener('keydown', handleEsc);
+    addEventListener('keydown', handleEsc);
+    return () => removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
   if (typeof document === 'undefined') return null;

@@ -9,7 +9,16 @@ const backendServicesSrcPath = fileURLToPath(new URL('packages/backend-services/
 const providerClientsSrcPath = fileURLToPath(new URL('packages/provider-clients/src', import.meta.url));
 const sharedSrcPath = fileURLToPath(new URL('packages/shared/src', import.meta.url));
 const webSrcPath = fileURLToPath(new URL('apps/web/src', import.meta.url));
-const cloudflareWorkersMockPath = fileURLToPath(new URL('test/mocks/cloudflare-workers.ts', import.meta.url));
+// The kit's `cloudflare:workers` stand-in, which is the union of every class a
+// `@rexezuge/runtime` subclass may extend: `DurableObject`, `RpcTarget` and
+// `WorkflowEntrypoint`. This repo's own copy exported only the first, which was
+// enough until 1.7.1 made `AbstractWorkflowWorker` extend the real
+// `WorkflowEntrypoint` — after which the runtime barrel failed to evaluate with
+// "Class extends value undefined", taking down every suite that imported it for a
+// reason that had nothing to do with workflows.
+const cloudflareWorkersMockPath = fileURLToPath(
+  new URL(import.meta.resolve('@rexezuge/tooling/test/mocks/cloudflare-workers'), import.meta.url),
+);
 
 export default defineConfig({
   // The runtime package is built as ESM and its public root re-exports worker

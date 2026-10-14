@@ -7,11 +7,11 @@ import { ForbiddenError } from '@rexezuge/errors';
 import { TimestampUtil } from '@rexezuge/shared';
 import { log } from '@aws-access-bridge/shared/utils/Logger';
 import { CredentialChain, CredentialCache, AccessKeys, AccessKeysWithExpiration } from '@aws-access-bridge/shared/model';
-import { IScheduledTask } from './IScheduledTask';
-import type { IEnv, TaskRunSummary } from './IScheduledTask';
+import { CronTask } from './CronTask';
+import type { IEnv, TaskRunSummary } from './CronTask';
 import { CREDENTIAL_CACHE_REFRESH_ROLE_SESSION_NAME } from '@aws-access-bridge/shared/constants';
 
-class CredentialCacheRefreshTask extends IScheduledTask<CredentialCacheRefreshTaskEnv> {
+class CredentialCacheRefreshTask extends CronTask<CredentialCacheRefreshTaskEnv> {
   protected override getTaskType(): string {
     return 'credential-cache-refresh';
   }

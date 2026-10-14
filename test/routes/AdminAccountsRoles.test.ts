@@ -83,7 +83,9 @@ describe('admin roles discovery route', () => {
       sessionToken: 'tok',
       expiration: '2025-01-01T00:00:00Z',
     });
-    vi.mocked(IamService.prototype.listRoles).mockResolvedValue([{ roleName: 'Dev', arn: 'arn:aws:iam::123456789012:role/Dev', description: '' }]);
+    vi.mocked(IamService.prototype.listRoles).mockResolvedValue([
+      { roleName: 'Dev', arn: 'arn:aws:iam::123456789012:role/Dev', description: '' },
+    ]);
     const c = createRouteContext({
       method: 'POST',
       body: { principalArn: 'arn:aws:iam::123456789012:role/Dev' },

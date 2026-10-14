@@ -8,7 +8,7 @@ vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/AuditLogDAO');
 
 function createEvent(): ScheduledController {
-  return { cron: '*/10 * * * *', scheduledTime: 0, noRetry: () => undefined };
+  return { cron: '*/10 * * * *', scheduledTime: 0, noRetry: () => {} };
 }
 
 function env(overrides: Record<string, string> = {}): Env {
@@ -44,7 +44,10 @@ describe('pruning tasks', () => {
 
   it('keeps batching until a partial batch, summing the rows deleted', async () => {
     // A full batch means there may be more; only a short batch ends the loop.
-    vi.mocked(BackgroundTaskRunDAO.prototype.deleteOlderThanBatch).mockResolvedValueOnce(500).mockResolvedValueOnce(500).mockResolvedValueOnce(17);
+    vi.mocked(BackgroundTaskRunDAO.prototype.deleteOlderThanBatch)
+      .mockResolvedValueOnce(500)
+      .mockResolvedValueOnce(500)
+      .mockResolvedValueOnce(17);
     await new BackgroundTaskRunPruningTask().handle(createEvent(), env(), {} as ExecutionContext);
 
     expect(BackgroundTaskRunDAO.prototype.deleteOlderThanBatch).toHaveBeenCalledTimes(3);
@@ -61,7 +64,11 @@ describe('pruning tasks', () => {
   it('applies the configured retention window to the cutoff', async () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.deleteOlderThanBatch).mockResolvedValue(1);
     const now = Math.trunc(Date.now() / 1000);
-    await new BackgroundTaskRunPruningTask().handle(createEvent(), env({ BACKGROUND_TASK_RUN_RETENTION_DAYS: '7' }), {} as ExecutionContext);
+    await new BackgroundTaskRunPruningTask().handle(
+      createEvent(),
+      env({ BACKGROUND_TASK_RUN_RETENTION_DAYS: '7' }),
+      {} as ExecutionContext,
+    );
     const [cutoff] = vi.mocked(BackgroundTaskRunDAO.prototype.deleteOlderThanBatch).mock.calls[0];
     // 7 days of retention, within a generous window for test execution time.
     expect(cutoff).toBeGreaterThan(now - 8 * 86_400);

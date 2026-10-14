@@ -1,6 +1,5 @@
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 /**
  * One known address for an account.
  *
@@ -40,10 +39,12 @@ class UserEmailDAO extends BaseDAO {
     // revoke — could re-point a verified address at a new account, because
     // the `existing` read above and this write are not one statement. The
     // `meta.changes` check turns "lost the race" into `'already-claimed'`.
-    const result = await this.run(`INSERT INTO user_emails (email, user_id, is_verified, created_at) VALUES (?, ?, ?, ?)
+    const result = await this.run(
+      `INSERT INTO user_emails (email, user_id, is_verified, created_at) VALUES (?, ?, ?, ?)
          ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id, is_verified = excluded.is_verified
-         WHERE user_emails.is_verified = 0`, [email, input.userId, input.isVerified ? 1 : 0, input.now]);
-    assertD1Success(result, `register user email`);
+         WHERE user_emails.is_verified = 0`,
+      [email, input.userId, input.isVerified ? 1 : 0, input.now],
+    );
     return (result.meta?.changes ?? 0) === 0 ? 'already-claimed' : 'claimed';
   }
 
@@ -71,8 +72,7 @@ class UserEmailDAO extends BaseDAO {
    * address changes, so only the new address can authenticate it.
    */
   public async revokeAllVerified(userId: string, exceptEmail: string): Promise<void> {
-    const result = await this.run('UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?', [userId, exceptEmail.toLowerCase()]);
-    assertD1Success(result, `revoke verified user emails`);
+    await this.run('UPDATE user_emails SET is_verified = 0 WHERE user_id = ? AND email != ?', [userId, exceptEmail.toLowerCase()]);
   }
 }
 

@@ -42,7 +42,10 @@ export interface ShellProblem {
  * report a false problem on a shell that is perfectly correct.
  */
 export function referencedAssets(html: string): string[] {
-  const found = html.matchAll(/(?:src|href)="\/assets\/([^"]+)"/g).map((match) => match[1] as string).toArray();
+  const found = html
+    .matchAll(/(?:src|href)="\/assets\/([^"]+)"/g)
+    .map((match) => match[1] as string)
+    .toArray();
   return new Set(found).values().toArray();
 }
 

@@ -184,7 +184,9 @@ describe('resolveUserId', () => {
 
 describe('resolveAccountById', () => {
   it('resolves an id to its current address and frozen anchor', async () => {
-    const service = serviceWith({ byId: () => Promise.resolve(metadataRow({ current_email: 'new@example.com', user_email: 'alice@example.com' })) });
+    const service = serviceWith({
+      byId: () => Promise.resolve(metadataRow({ current_email: 'new@example.com', user_email: 'alice@example.com' })),
+    });
     await expect(service.resolveAccountById('usr_abc123')).resolves.toEqual({
       anchorEmail: 'alice@example.com',
       email: 'new@example.com',

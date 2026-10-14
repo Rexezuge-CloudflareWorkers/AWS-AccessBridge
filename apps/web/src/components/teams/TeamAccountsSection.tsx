@@ -76,7 +76,14 @@ export default function TeamAccountsSection({ accounts, isLoading, onAdd, onRemo
           {accounts.map((acct) => (
             <div
               key={acct}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#252d3d', borderRadius: '8px' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                background: '#252d3d',
+                borderRadius: '8px',
+              }}
             >
               <span className="font-mono" style={{ color: '#d1d5db' }}>
                 {acct}

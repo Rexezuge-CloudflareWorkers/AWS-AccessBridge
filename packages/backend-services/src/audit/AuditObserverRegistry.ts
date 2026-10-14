@@ -37,11 +37,13 @@ class AuditObserverRegistry {
    * for the caller to ignore: the audit trail is a governance control, so a
    * write that fails must leave a trace even though it cannot fail the request.
    */
-public async notifyAll(event: AuditEvent): Promise<void> {
+  public async notifyAll(event: AuditEvent): Promise<void> {
     const results = await Promise.allSettled(this.observers.map((observer) => observer.notify(event)));
     for (const result of results) {
       if (result.status === 'rejected') {
-        log.error('Audit observer failed to record an event:', { error: result.reason instanceof Error ? result.reason.message : result.reason });
+        log.error('Audit observer failed to record an event:', {
+          error: result.reason instanceof Error ? result.reason.message : result.reason,
+        });
       }
     }
   }

@@ -1,4 +1,5 @@
 import { Container } from '@rexezuge/runtime/di/Container';
+import { setLogLevel } from '@rexezuge/runtime';
 import { InternalServerError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createEncryptionKeys, keyChain } from './encryptionKeys';
@@ -122,6 +123,32 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
 }
 
 /**
+ * Raise the log level for the whole isolate, once, from the environment.
+ *
+ * `@rexezuge/runtime`'s `createLogger` resolves its level per emit from three
+ * sources, in order: an injected `env`, then `process.env`, then whatever
+ * `setLogLevel` installed. Workers have no `process.env`, so the third is the only
+ * one a module-scope logger can reach — and the redaction-aware logger this
+ * repository binds to it is constructed at module scope, long before any request
+ * scope exists to hand it an `env`.
+ *
+ * So the composition root installs it. Without this the level is always `info` in
+ * production and `debug` diagnostics are unreachable, which is the state the
+ * logger this replaces was written to avoid: a `DEBUG` filter nobody controls
+ * swallows diagnostics, but a filter one variable controls does not.
+ *
+ * An unrecognised value clears the installation rather than throwing — a typo in
+ * configuration should not cost a worker its cold start.
+ */
+function installLogLevel(env: unknown): void {
+  // `unknown` rather than `string`: the binding surface types a var as whatever
+  // JSON holds, and the kit's `setLogLevel` already handles a non-string by
+  // clearing the installation instead of throwing.
+  const level = (env as { LOG_LEVEL?: unknown } | null)?.LOG_LEVEL;
+  setLogLevel(typeof level === 'string' ? level : undefined);
+}
+
+/**
  * Scope caches, one per keying strategy. Both are `WeakMap`s, so nothing is
  * retained beyond the lifetime of the key.
  */
@@ -156,7 +183,9 @@ function getRequestScope<TEnv extends RequestScopeEnvShape>(source: TEnv | { env
   if (cached) {
     return cached;
   }
-  const scope: Container = createRequestScope(isContext ? (source as { env: TEnv }).env : (source as TEnv));
+  const scopeEnv: TEnv = isContext ? (source as { env: TEnv }).env : (source as TEnv);
+  installLogLevel(scopeEnv);
+  const scope: Container = createRequestScope(scopeEnv);
   cache.set(key, scope);
   return scope;
 }

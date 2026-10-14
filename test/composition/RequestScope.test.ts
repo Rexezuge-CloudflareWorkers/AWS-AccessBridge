@@ -177,7 +177,7 @@ describe('getRequestScope', () => {
     // Two "handlers" of the same request: one sees the raw env, the other a
     // session-wrapped spread copy, exactly as the middleware and routes did.
     const first = { env };
-    const second = { env: { ...env, AccessBridgeDB: { prepare: () => undefined } as unknown as ServiceEnv['AccessBridgeDB'] } };
+    const second = { env: { ...env, AccessBridgeDB: { prepare: () => {} } as unknown as ServiceEnv['AccessBridgeDB'] } };
 
     const scope = getRequestScope(first);
     expect(getRequestScope(second)).not.toBe(scope);

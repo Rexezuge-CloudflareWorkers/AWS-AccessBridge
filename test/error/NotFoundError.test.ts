@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ConflictError, ServiceError, NotFoundError } from '@rexezuge/errors';
 import { ErrorDeserializationUtil } from '@aws-access-bridge/backend-services/error/ErrorDeserializationUtil';
-import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
+import { toErrorResponse } from '@rexezuge/http';
 
 describe('NotFoundError', () => {
   it('is a 404 that is not retryable and extends the taxonomy', () => {
@@ -18,10 +18,10 @@ describe('NotFoundError', () => {
     expect(new NotFoundError().message).toBe('The requested resource was not found.');
   });
 
-  it('translates to a 404 HTTPException through the generic mapping', () => {
-    const exception = ErrorTranslationUtil.toHTTPException(new NotFoundError('no such team'));
-    expect(exception.status).toBe(404);
-    expect(JSON.parse(exception.message)).toEqual({ Exception: { Type: 'NotFound', Message: 'no such team' } });
+  it('answers 404 through the shared mapper', async () => {
+    const response = toErrorResponse(new NotFoundError('no such team'), (body: unknown, status: number) => Response.json(body, { status }));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ Exception: { Type: 'NotFound', Message: 'no such team' } });
   });
 
   it.each([

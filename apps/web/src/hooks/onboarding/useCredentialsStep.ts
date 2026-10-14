@@ -23,16 +23,12 @@ function useCredentialsStep({ showMessage, actions }: StepDeps) {
 
   const handleValidateCredentials = async (): Promise<void> => {
     const { accessKeyId, secretAccessKey, sessionToken } = credentials;
-    await actions.run(
-      WIZARD_BUSY.VALIDATE,
-      () => validateCredentials(accessKeyId, secretAccessKey, sessionToken || undefined),
-      {
-        errorFallback: t('onboarding.validationFailed', 'Validation failed'),
-        onSuccess: (result) => setCredentials((previous) => ({ ...previous, validationResult: result, credentialValidated: true })),
-        onError: () => setCredentials((previous) => ({ ...previous, validationResult: null, credentialValidated: false })),
-        successMessage: (result) => t('onboarding.credentialsValid', 'Credentials valid. Identity: {{identity}}', { identity: result.arn }),
-      },
-    );
+    await actions.run(WIZARD_BUSY.VALIDATE, () => validateCredentials(accessKeyId, secretAccessKey, sessionToken || undefined), {
+      errorFallback: t('onboarding.validationFailed', 'Validation failed'),
+      onSuccess: (result) => setCredentials((previous) => ({ ...previous, validationResult: result, credentialValidated: true })),
+      onError: () => setCredentials((previous) => ({ ...previous, validationResult: null, credentialValidated: false })),
+      successMessage: (result) => t('onboarding.credentialsValid', 'Credentials valid. Identity: {{identity}}', { identity: result.arn }),
+    });
   };
 
   const handleStoreCredentials = async (): Promise<void> => {

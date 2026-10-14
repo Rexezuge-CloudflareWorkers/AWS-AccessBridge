@@ -1,4 +1,3 @@
-
 /**
  * Structured logging with mandatory redaction.
  *
@@ -20,9 +19,20 @@
  *
  * Redaction is deliberately conservative — a redacted value is `[REDACTED]`
  * regardless of its length, so no information about a secret's size survives.
+ *
+ * ### What belongs to the kit and what belongs here
+ *
+ * The **emit** machinery is `@rexezuge/runtime`'s: level resolution, the namespace
+ * prefix, the argument list. It is now handed a `LogSink`, so the policy applied to
+ * the bytes stays here while the mechanism does not — the same split the kit uses
+ * for `BilledRowsForTable` and `TaskRunRecorder`. The deny-list is **not** in the
+ * kit on purpose: which key names mean "secret" is a property of this repository's
+ * data model, and a kit that guesses across nine repos' vocabularies would redact
+ * diagnostic fields and train everyone to ignore the markers.
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+import { consoleSink, createLogger as createKitLogger } from '@rexezuge/runtime';
+import type { LogLevel, LogSink } from '@rexezuge/runtime';
 
 interface LogFields {
   [key: string]: unknown;
@@ -177,25 +187,22 @@ interface Logger {
 }
 
 /**
- * The console-backed sink.
+ * The redaction sink the kit's emit path is given.
  *
- * One JSON object per line rather than `console.error(message, fields)`, because
- * the Workers log tail renders a trailing object poorly and the structured form is
- * what makes a field groupable. `console` is used directly rather than a level
- * filter: Cloudflare's own logging already samples, and a local `DEBUG` filter here
- * would silently swallow diagnostics in production where nobody is filtering.
+ * One JSON object per line rather than `console.error(message, fields)`, because the
+ * Workers log tail renders a trailing object poorly and the structured form is what
+ * makes a field groupable. The level and the namespace prefix are the kit's, and
+ * `consoleSink` is what writes them — this only renders the **message and its
+ * fields** into that one line, in the order the log tail is read.
+ *
+ * The arguments arrive as `[message, fields]`, already redacted by the logger that
+ * handed them over, so the sink's own job is formatting and nothing more.
  */
-function consoleSink(level: LogLevel, message: string, fields: LogFields): void {
-  const line: string = `[${level.toUpperCase()}] ${message}${Object.keys(fields).length > 0 ? ` ${formatFields(fields)}` : ''}`;
-  if (level === 'error') {
-    console.error(line);
-    return;
-  }
-  if (level === 'warn') {
-    console.warn(line);
-    return;
-  }
-  console.log(line);
+function redactingSink(level: LogLevel, message: string, args: readonly unknown[]): void {
+  const [text, bag] = args as [string | undefined, LogFields | undefined];
+  const fields: LogFields = bag ?? {};
+  const formatted = Object.keys(fields).length > 0 ? ` ${formatFields(fields)}` : '';
+  consoleSink(level, `${text ?? message}${formatted}`, []);
 }
 
 /**
@@ -204,17 +211,27 @@ function consoleSink(level: LogLevel, message: string, fields: LogFields): void 
  * The bound context is merged *under* per-call fields so a call site can override a
  * context key — otherwise `logger.error('...', { error })` could be silently
  * relabelled by a context entry of the same name.
+ *
+ * `sink` is the kit's own `LogSink` port, and it exists so a suite can assert what
+ * would have been written without a console spy standing in for the log tail. It
+ * defaults to {@link redactingSink}, which is the only sink production ever uses.
  */
-function createLogger(context: LogFields = {}, sink: typeof consoleSink = consoleSink): Logger {
-  const log = (level: LogLevel) =>
+function createLogger(context: LogFields = {}, sink: LogSink = redactingSink): Logger {
+  // The kit's logger, given this repository's redaction as its sink. Level
+  // resolution and the prefix are the kit's; the deny-list is ours.
+  const emit = createKitLogger(undefined, undefined, undefined, sink);
+  const at =
+    (level: LogLevel) =>
     (message: string, fields: LogFields = {}): void => {
-      sink(level, redactMessage(message), redactFields({ ...context, ...fields }));
+      // Both halves are scrubbed before the sink sees them, so nothing that
+      // reaches the line has passed through un-redacted in any form.
+      emit[level](redactMessage(message), redactFields({ ...context, ...fields }));
     };
   return {
-    debug: log('debug'),
-    error: log('error'),
-    info: log('info'),
-    warn: log('warn'),
+    debug: at('debug'),
+    error: at('error'),
+    info: at('info'),
+    warn: at('warn'),
   };
 }
 
@@ -228,4 +245,4 @@ function createLogger(context: LogFields = {}, sink: typeof consoleSink = consol
 const log: Logger = createLogger();
 
 export { createLogger, isSecretKey, log, redactFields, redactMessage, redactValue, REDACTED };
-export type { LogFields, Logger, LogLevel };
+export type { LogFields, Logger };

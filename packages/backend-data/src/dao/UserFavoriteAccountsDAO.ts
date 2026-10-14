@@ -1,7 +1,6 @@
 import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 class UserFavoriteAccountsDAO extends BaseDAO {
   /**
    * Mark an account favourited.
@@ -13,15 +12,16 @@ class UserFavoriteAccountsDAO extends BaseDAO {
    * anchor, because that column is the foreign key the schema cannot repoint.
    */
   public async favoriteAccount(anchorEmail: string, awsAccountId: string, userId: string | null = null): Promise<void> {
-    const result = await this.run(`INSERT OR IGNORE INTO user_favorite_accounts (user_email, user_id, aws_account_id)
-         VALUES (?, ?, ?)`, [anchorEmail, userId, awsAccountId]);
-    assertD1Success(result, `favorite account`);
+    await this.run(
+      `INSERT OR IGNORE INTO user_favorite_accounts (user_email, user_id, aws_account_id)
+         VALUES (?, ?, ?)`,
+      [anchorEmail, userId, awsAccountId],
+    );
   }
 
   public async unfavoriteAccount(userEmail: string, awsAccountId: string, userId: string | null = null): Promise<void> {
     const { clause, bindings } = UserFavoriteAccountsDAO.ownerPredicate(userId, userEmail);
-    const result = await this.run(`DELETE FROM user_favorite_accounts WHERE ${clause} AND aws_account_id = ?`, [...bindings, awsAccountId]);
-    assertD1Success(result, `unfavorite account`);
+    await this.run(`DELETE FROM user_favorite_accounts WHERE ${clause} AND aws_account_id = ?`, [...bindings, awsAccountId]);
   }
 
   /**

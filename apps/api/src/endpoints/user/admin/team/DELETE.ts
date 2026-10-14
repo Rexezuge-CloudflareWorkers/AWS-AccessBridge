@@ -1,11 +1,15 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class DeleteTeamRoute extends IAdminActivityAPIRoute<DeleteTeamRequest, DeleteTeamResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -67,8 +71,11 @@ class DeleteTeamRoute extends IAdminActivityAPIRoute<DeleteTeamRequest, DeleteTe
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: DeleteTeamRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<DeleteTeamResponse> {
+  protected async handleAdminRequest(
+    request: DeleteTeamRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<DeleteTeamResponse> {
     await getRequestScope(cxt).get(Tokens.TeamService).deleteTeam(request.teamId);
     return { success: true, message: 'Team deleted.' };
   }

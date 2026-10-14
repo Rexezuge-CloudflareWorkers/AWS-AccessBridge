@@ -28,13 +28,10 @@ import {
   checkBaseLocale,
   checkBundle,
   checkCallSite,
-  checkTagListsAgree,
-  checkTags,
   checkUnusedKeys,
   dynamicKeyFinding,
   flatten,
   hasDynamicCall,
-  readDeclaredTags,
   translationCalls,
   type Finding,
 } from './locale-checks';
@@ -42,8 +39,6 @@ import {
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOCALES_DIR = path.join(ROOT, 'apps', 'web', 'src', 'locales');
 const WEB_SRC = path.join(ROOT, 'apps', 'web', 'src');
-const WEB_I18N = path.join(WEB_SRC, 'i18n.ts');
-const SHARED_LOCALE_UTIL = path.join(ROOT, 'packages', 'shared', 'src', 'utils', 'LocaleUtil.ts');
 
 /**
  * Collects failures rather than exiting on the first, so one run reports them all.
@@ -136,27 +131,35 @@ for (const tag of onDisk) {
   );
 }
 
-// The declared tag lists are read from source text, not imported:
-// `apps/web/src/i18n.ts` calls `import.meta.glob`, which only exists after Vite's
-// transform, so the module cannot be loaded outside a bundler.
-const declared: Record<string, string[]> = {};
-for (const [label, file] of [
-  ['SUPPORTED_LANGUAGES', WEB_I18N],
-  ['SUPPORTED_LOCALES', SHARED_LOCALE_UTIL],
-] as const) {
-  try {
-    const tags = readDeclaredTags(readFileSync(file, 'utf8'), path.relative(ROOT, file));
-    declared[label] = tags;
-    if (label === 'SUPPORTED_LANGUAGES') {
-      failures.push(...checkTags(tags, onDisk));
-    }
-  } catch (error) {
-    declared[label] = [];
-    failures.push({ kind: 'malformed', subject: label, detail: error instanceof Error ? error.message : String(error) });
-  }
-}
-
-failures.push(...checkTagListsAgree(declared.SUPPORTED_LANGUAGES ?? [], declared.SUPPORTED_LOCALES ?? []));
+/**
+ * There is no declared-tag check here, and there is deliberately no substitute.
+ *
+ * It used to read `SUPPORTED_LANGUAGES` out of `apps/web/src/i18n.ts` and
+ * `SUPPORTED_LOCALES` out of `packages/shared/utils/LocaleUtil.ts`, compare the
+ * two against each other, and compare both against the bundle directories. Three
+ * independent statements of one fact, with two checks keeping them honest.
+ *
+ * There is now **one**. The SPA derives `SUPPORTED_LANGUAGES` from the kit's
+ * `SUPPORTED_LOCALES`, so the two cannot disagree, and a check guarding a
+ * disagreement that is no longer expressible reports nothing while looking like
+ * a gate. A bundle directory the kit's table does not name is simply never
+ * offered by the selector, which is inert rather than broken — so the
+ * declared-but-absent direction, the one that used to throw at runtime when a
+ * language was chosen, cannot be reached either.
+ *
+ * What replaced it is stronger than a check: a disagreement is now a type error,
+ * because there is only one list to write.
+ *
+ * ### Not adopted: `@rexezuge/tooling`'s `validate-locales`
+ *
+ * The kit ships this script, converged from four copies, and it should replace
+ * this file. It cannot yet: its entrypoint guard compares `import.meta.url`
+ * against `process.argv[1]`, which never matches under pnpm, so it exits 0
+ * having printed nothing. Swapping it in would have replaced a gate that fails
+ * loudly with one that passes silently — including on a tree this script was
+ * failing at the time. Fixed in the kit and waiting on a release; when it lands,
+ * delete `scripts/i18n/` and point the npm script at the kit's.
+ */
 
 // --- Call sites against the base bundle ---
 //

@@ -23,9 +23,11 @@ class ConsoleService {
       // bypassing the `ServiceError` taxonomy and the typed status mapping.
       let data: SigninResponse;
       try {
-        data = (await response.json());
+        data = await response.json();
       } catch (error: unknown) {
-        throw new InternalServerError(`AWS returned a malformed signin token response: ${error instanceof Error ? error.message : 'unknown error'}`);
+        throw new InternalServerError(
+          `AWS returned a malformed signin token response: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
       }
       if (!data?.SigninToken) {
         throw new InternalServerError('AWS returned a signin token response with no SigninToken.');
@@ -50,13 +52,13 @@ class ConsoleService {
   }
 
   /**
- * The console URL to land on, with the region applied when one is configured.
- *
- * `destinationPath` is concatenated, not fed to `new URL(path, base)`: AWS
- * console paths are not relative references, so the base's origin and any
- * existing query would be discarded or reinterpreted.
- */
-public buildDestination(destinationPath?: string, destinationRegion?: string): string {
+   * The console URL to land on, with the region applied when one is configured.
+   *
+   * `destinationPath` is concatenated, not fed to `new URL(path, base)`: AWS
+   * console paths are not relative references, so the base's origin and any
+   * existing query would be discarded or reinterpreted.
+   */
+  public buildDestination(destinationPath?: string, destinationRegion?: string): string {
     let destination: string = destinationPath ? `https://console.aws.amazon.com/${destinationPath}` : 'https://console.aws.amazon.com/';
     if (destinationRegion) {
       const url: URL = new URL(destination);
@@ -67,14 +69,14 @@ public buildDestination(destinationPath?: string, destinationRegion?: string): s
   }
 
   /**
- * The federation `Issuer`, which AWS echoes back into the console URL.
- *
- * Built with `URLSearchParams` because `roleName` is only constrained to a
- * non-empty 128-character string — it comes from the `role` query parameter on
- * `/user/aws/federate`. Interpolated raw, a `&` or `#` in it injected extra
- * parameters into the issuer AWS is asked to trust.
- */
-public buildIssuerUrl(baseUrl: string, awsAccountId?: string, roleName?: string): string {
+   * The federation `Issuer`, which AWS echoes back into the console URL.
+   *
+   * Built with `URLSearchParams` because `roleName` is only constrained to a
+   * non-empty 128-character string — it comes from the `role` query parameter on
+   * `/user/aws/federate`. Interpolated raw, a `&` or `#` in it injected extra
+   * parameters into the issuer AWS is asked to trust.
+   */
+  public buildIssuerUrl(baseUrl: string, awsAccountId?: string, roleName?: string): string {
     if (!awsAccountId || !roleName) {
       return baseUrl;
     }

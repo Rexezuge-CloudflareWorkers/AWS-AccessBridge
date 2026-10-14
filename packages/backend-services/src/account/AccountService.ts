@@ -111,5 +111,6 @@ class AccountService {
     const roles = await this.iam.listRoles(credential);
     return { roles };
   }
-}export { AccountService };
+}
+export { AccountService };
 export type { AccountServiceEnv };

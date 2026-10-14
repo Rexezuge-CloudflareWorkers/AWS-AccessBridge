@@ -93,9 +93,7 @@ describe('RetryingAwsClient', () => {
     // is deterministic: `jitter` returns `max / 2`, turning the exponential
     // window into an observable 50ms then 100ms.
     const delays: number[] = [];
-    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) }, 3, 100, (max: number) =>
-      Math.floor(max / 2),
-    );
+    const client = new RetryingAwsClient({ fetch: vi.fn().mockResolvedValue(throttle()) }, 3, 100, (max: number) => Math.floor(max / 2));
     const spy = vi.spyOn(globalThis, 'setTimeout');
     spy.mockImplementation(((handler: () => void, ms?: number) => {
       delays.push(ms ?? 0);
@@ -103,7 +101,7 @@ describe('RetryingAwsClient', () => {
       return 0 as unknown as NodeJS.Timeout;
     }) as never);
 
-    await client.fetch('https://example.com').catch(() => undefined);
+    await client.fetch('https://example.com').catch(() => {});
     spy.mockRestore();
     // base 100ms at attempt 0 → 100; at attempt 1 → 200; halved by the jitter.
     expect(delays).toEqual([50, 100]);
@@ -120,7 +118,7 @@ describe('RetryingAwsClient', () => {
       return 0 as unknown as NodeJS.Timeout;
     }) as never);
 
-    await client.fetch('https://example.com').catch(() => undefined);
+    await client.fetch('https://example.com').catch(() => {});
     spy.mockRestore();
     for (const [index, delay] of delays.entries()) {
       expect(delay).toBeGreaterThanOrEqual(0);
@@ -244,10 +242,14 @@ describe('StsService retries throttled calls', () => {
       .mockResolvedValueOnce(new Response('Throttling', { status: 429 }))
       .mockResolvedValueOnce(new Response(ASSUME_XML, { status: 200 }));
 
-    const pending = new StsService((() => ({ fetch }))).assumeRole('arn:aws:iam::123456789012:role/Dev', {
-      accessKeyId: 'AKIA',
-      secretAccessKey: 'secret',
-    }, 'session');
+    const pending = new StsService(() => ({ fetch })).assumeRole(
+      'arn:aws:iam::123456789012:role/Dev',
+      {
+        accessKeyId: 'AKIA',
+        secretAccessKey: 'secret',
+      },
+      'session',
+    );
     await vi.advanceTimersByTimeAsync(500);
 
     await expect(pending).resolves.toMatchObject({ accessKeyId: 'ASIA' });
@@ -257,7 +259,7 @@ describe('StsService retries throttled calls', () => {
   it('surfaces a persistent AccessDenied rather than retrying it', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
     await expect(
-      new StsService((() => ({ fetch }))).assumeRole(
+      new StsService(() => ({ fetch })).assumeRole(
         'arn:aws:iam::123456789012:role/Dev',
         { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
         'session',

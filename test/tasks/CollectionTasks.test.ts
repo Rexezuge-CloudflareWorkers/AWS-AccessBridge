@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { CollectionTaskEnv } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
 import { CostDataCollectionTask } from '@aws-access-bridge/background/scheduled/CostDataCollectionTask';
 import { ResourceInventoryCollectionTask } from '@aws-access-bridge/background/scheduled/ResourceInventoryCollectionTask';
 import { CredentialCacheRefreshTask } from '@aws-access-bridge/background/scheduled/CredentialCacheRefreshTask';
@@ -95,7 +96,7 @@ vi.mock('@aws-access-bridge/backend-services/composition', async (importOriginal
 });
 
 function createEvent(): ScheduledController {
-  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => undefined };
+  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => {} };
 }
 
 /**
@@ -105,14 +106,19 @@ function createEvent(): ScheduledController {
  */
 const INVENTORY_REGIONS = ['us-east-1', 'eu-west-1'];
 
-function taskEnv() {
+// Typed as `CollectionTaskEnv` rather than the ambient `Env`: the template takes
+// `TEnv`, and this builder already casts the whole object, so naming the surface
+// it stands in for costs nothing and removes ten call-site casts. Both concrete
+// tasks extend `CollectionTaskEnv` only by **optional** vars, so a value of this
+// type satisfies either.
+function taskEnv(): CollectionTaskEnv {
   return {
     AccessBridgeDB: {},
     AccessBridgeKV: {},
     CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     INVENTORY_REGIONS: INVENTORY_REGIONS.join(','),
-  } as unknown as Env;
+  } as unknown as CollectionTaskEnv;
 }
 
 // `principalArns[0]` is the target role and the last entry is the base IAM user,

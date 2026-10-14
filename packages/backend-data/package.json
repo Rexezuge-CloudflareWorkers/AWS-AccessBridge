@@ -20,9 +20,10 @@
   },
   "dependencies": {
     "@aws-access-bridge/shared": "workspace:*",
-    "@rexezuge/d1": "1.5.1",
-    "@rexezuge/errors": "1.5.1",
-    "@rexezuge/shared": "1.5.1"
+    "@rexezuge/d1": "1.8.0",
+    "@rexezuge/errors": "1.8.0",
+    "@rexezuge/identity": "1.8.0",
+    "@rexezuge/shared": "1.8.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

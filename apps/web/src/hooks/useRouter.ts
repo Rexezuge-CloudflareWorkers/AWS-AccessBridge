@@ -12,26 +12,26 @@ import { pathForView, routeForPathname, type View } from '../lib/routes';
  * `history` write, and the popstate listener.
  */
 function useRouter() {
-  const [currentView, setCurrentView] = useState<View>(() => routeForPathname(globalThis.location.pathname).view);
-  const [adminTab, setAdminTab] = useState<string | undefined>(() => routeForPathname(globalThis.location.pathname).adminTab);
+  const [currentView, setCurrentView] = useState<View>(() => routeForPathname(location.pathname).view);
+  const [adminTab, setAdminTab] = useState<string | undefined>(() => routeForPathname(location.pathname).adminTab);
 
   const navigateTo = useCallback((view: View, tab?: string) => {
     setCurrentView(view);
     setAdminTab(view === 'admin' ? tab : undefined);
     const path: string = pathForView(view, tab);
-    if (globalThis.location.pathname !== path) {
+    if (location.pathname !== path) {
       history.pushState(null, '', path);
     }
   }, []);
 
   useEffect(() => {
     const onPopState = () => {
-      const route = routeForPathname(globalThis.location.pathname);
+      const route = routeForPathname(location.pathname);
       setCurrentView(route.view);
       setAdminTab(route.adminTab);
     };
-    globalThis.addEventListener('popstate', onPopState);
-    return () => globalThis.removeEventListener('popstate', onPopState);
+    addEventListener('popstate', onPopState);
+    return () => removeEventListener('popstate', onPopState);
   }, []);
 
   return { currentView, adminTab, navigateTo };

@@ -20,5 +20,4 @@ class IamService {
 
 export { IamService };
 
-
-export {type DiscoveredRole} from '@aws-access-bridge/provider-clients/aws';
+export { type DiscoveredRole } from '@aws-access-bridge/provider-clients/aws';

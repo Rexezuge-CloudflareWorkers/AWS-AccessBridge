@@ -26,5 +26,4 @@ class CostExplorerService {
 
 export { CostExplorerService };
 
-
-export {type CostExplorerResult} from '@aws-access-bridge/provider-clients/aws';
+export { type CostExplorerResult } from '@aws-access-bridge/provider-clients/aws';

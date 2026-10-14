@@ -12,7 +12,7 @@ type D1SessionEnv<TEnv extends { AccessBridgeDB: D1Database }> = Omit<TEnv, 'Acc
  * would reject a valid call.
  */
 // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
-type SessionTarget = D1SessionBookmark | D1SessionConstraint  ;
+type SessionTarget = D1SessionBookmark | D1SessionConstraint;
 
 /**
  * Replace `env.AccessBridgeDB` with a session bound to the first replica.
@@ -26,9 +26,14 @@ type SessionTarget = D1SessionBookmark | D1SessionConstraint  ;
  * Passes `env` through unchanged when the binding has no `withSession`, so a test
  * double or a legacy binding degrades instead of throwing mid-request.
  */
-function createD1SessionEnv<TEnv extends { AccessBridgeDB: D1Database }>(env: TEnv, constraint: SessionTarget = D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED): TEnv {
+function createD1SessionEnv<TEnv extends { AccessBridgeDB: D1Database }>(
+  env: TEnv,
+  constraint: SessionTarget = D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED,
+): TEnv {
   const database = env.AccessBridgeDB as { withSession?: (target: SessionTarget) => D1DatabaseSession };
-  return typeof database.withSession === 'function' ? ({ ...(env as object), AccessBridgeDB: database.withSession(constraint) } as unknown as TEnv) : env;
+  return typeof database.withSession === 'function'
+    ? ({ ...(env as object), AccessBridgeDB: database.withSession(constraint) } as unknown as TEnv)
+    : env;
 }
 
 export { createD1SessionEnv };

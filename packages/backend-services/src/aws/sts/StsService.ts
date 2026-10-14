@@ -35,7 +35,11 @@ class StsService {
   }
 }
 
-export { StsService,  };
+export { StsService };
 
-
-export {type AwsClientOptions, defaultAwsClientFactory, type AwsClientFactory, type CallerIdentity} from '@aws-access-bridge/provider-clients/aws';
+export {
+  type AwsClientOptions,
+  defaultAwsClientFactory,
+  type AwsClientFactory,
+  type CallerIdentity,
+} from '@aws-access-bridge/provider-clients/aws';

@@ -60,7 +60,7 @@ describe('settleAll', () => {
   });
 
   it('handles an empty collection', async () => {
-    expect(await settleAll([], async () => undefined)).toBe(0);
+    expect(await settleAll([], async () => {})).toBe(0);
   });
 });
 

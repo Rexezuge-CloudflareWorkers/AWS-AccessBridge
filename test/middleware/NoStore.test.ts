@@ -33,10 +33,10 @@ function createApp(): { app: { fetch: (request: Request, env: unknown, ctx: unkn
           env,
           executionCtx: ctx,
           header: (name: string, value: string) => {
-          headers.push({ name, value });
-        },
+            headers.push({ name, value });
+          },
         } as never,
-        async () => undefined,
+        async () => {},
       );
     },
   };
@@ -81,7 +81,11 @@ describe('MiddlewareHandlers.noStore', () => {
     expect(headers).toContainEqual({ name, value });
   });
 
-  it('sets the headers after the route has produced a response', async () => {
+  it('sets every header after the route has produced a response', async () => {
+    // Ordering is the property under test, not the count: the middleware runs at
+    // the outermost point of the chain and must not touch the response before
+    // `next()` has produced one. Asserting a count would pin the kit's header set
+    // into this test, so a baseline added upstream reads as a failure here.
     const order: string[] = [];
     await MiddlewareHandlers.noStore()(
       {
@@ -90,9 +94,12 @@ describe('MiddlewareHandlers.noStore', () => {
         },
       } as never,
       async () => {
-      order.push('next');
-    });
-    expect(order).toEqual(['next', 'header', 'header']);
+        order.push('next');
+      },
+    );
+    expect(order[0]).toBe('next');
+    expect(order.length).toBeGreaterThan(2);
+    expect(order.slice(1).every((entry) => entry === 'header')).toBe(true);
   });
 
   it('still sets the headers when a later handler returns without calling next', async () => {
@@ -106,9 +113,15 @@ describe('MiddlewareHandlers.noStore', () => {
           headers.push({ name, value });
         },
       } as never,
-      async () => undefined,
+      async () => {},
     );
-    expect(headers.map((entry) => entry.name)).toEqual(['Cache-Control', 'Pragma']);
+    // Presence rather than order: the baseline security headers are applied
+    // first and the no-cache pair last, and only the latter is this middleware's
+    // own contribution.
+    const names = headers.map((entry) => entry.name);
+    expect(names).toContain('Cache-Control');
+    expect(names).toContain('Pragma');
+    expect(names.indexOf('Cache-Control')).toBeGreaterThan(names.indexOf('X-Content-Type-Options'));
   });
 });
 

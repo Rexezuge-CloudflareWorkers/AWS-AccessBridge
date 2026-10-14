@@ -3,7 +3,6 @@ import { TimestampUtil } from '@rexezuge/shared';
 import { BaseDAO } from './BaseDAO';
 import { ownerClause } from './AssumableRolesQueries';
 
-import { assertD1Success } from '../utils/D1Utils';
 /**
  * Who a user-keyed `team_members` statement is about.
  *
@@ -36,14 +35,19 @@ class TeamMembersDAO extends BaseDAO {
    */
   public async addMember(teamId: string, owner: TeamMemberOwner, role: string = 'member'): Promise<number> {
     const joinedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run('INSERT OR IGNORE INTO team_members (team_id, user_email, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)', [teamId, owner.anchorEmail, owner.userId, role, joinedAt]);
-    assertD1Success(result, `add team member`);
+    const result = await this.run(
+      'INSERT OR IGNORE INTO team_members (team_id, user_email, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)',
+      [teamId, owner.anchorEmail, owner.userId, role, joinedAt],
+    );
     return result.meta?.changes ?? 0;
   }
 
   public async removeMember(teamId: string, owner: TeamMemberOwner): Promise<number> {
-    const result = await this.run(`DELETE FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`, [teamId, owner.userId, owner.anchorEmail]);
-    assertD1Success(result, `remove team member`);
+    const result = await this.run(`DELETE FROM team_members WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`, [
+      teamId,
+      owner.userId,
+      owner.anchorEmail,
+    ]);
     return result.meta?.changes ?? 0;
   }
 
@@ -89,8 +93,12 @@ class TeamMembersDAO extends BaseDAO {
   }
 
   public async updateMemberRole(teamId: string, owner: TeamMemberOwner, newRole: string): Promise<number> {
-    const result = await this.run(`UPDATE team_members SET role = ? WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`, [newRole, teamId, owner.userId, owner.anchorEmail]);
-    assertD1Success(result, `update team member role`);
+    const result = await this.run(`UPDATE team_members SET role = ? WHERE team_id = ? AND ${TeamMembersDAO.ownerClause('team_members')}`, [
+      newRole,
+      teamId,
+      owner.userId,
+      owner.anchorEmail,
+    ]);
     return result.meta?.changes ?? 0;
   }
 

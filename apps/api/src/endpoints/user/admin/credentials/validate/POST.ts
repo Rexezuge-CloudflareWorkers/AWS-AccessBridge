@@ -1,10 +1,14 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
   ValidateCredentialsRequest,
   ValidateCredentialsResponse,
@@ -99,11 +103,9 @@ class ValidateCredentialsRoute extends IAdminActivityAPIRoute<
     _env: ValidateCredentialsEnv,
     _cxt: ActivityContext<ValidateCredentialsEnv>,
   ): Promise<ValidateCredentialsResponse> {
-    const identity = await getRequestScope(_cxt).get(Tokens.CredentialStoreService).validateCredentials(
-      request.accessKeyId,
-      request.secretAccessKey,
-      request.sessionToken,
-    );
+    const identity = await getRequestScope(_cxt)
+      .get(Tokens.CredentialStoreService)
+      .validateCredentials(request.accessKeyId, request.secretAccessKey, request.sessionToken);
 
     return {
       valid: true,

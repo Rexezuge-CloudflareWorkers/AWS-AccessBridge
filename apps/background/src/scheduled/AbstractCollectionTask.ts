@@ -2,10 +2,11 @@ import { DataCollectionConfigDAO } from '@aws-access-bridge/backend-data/dao';
 import { ArnUtil } from '@aws-access-bridge/backend-services/aws/ArnUtil';
 
 import { TimestampUtil } from '@rexezuge/shared';
+import { isD1DailyLimitError } from '@rexezuge/d1';
 import { log } from '@aws-access-bridge/shared/utils/Logger';
 import type { AccessKeys } from '@aws-access-bridge/shared/model';
-import { IScheduledTask } from './IScheduledTask';
-import type { IEnv, TaskRunSummary } from './IScheduledTask';
+import { CronTask } from './CronTask';
+import type { IEnv, TaskRunSummary } from './CronTask';
 import { createRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
@@ -33,7 +34,17 @@ interface CollectionTaskEnv extends IEnv {
  * rotation the cron would keep encrypting with the old key while the API worker,
  * on a fresh scope per request, had moved on.
  */
-abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IScheduledTask<TEnv> {
+/**
+ * How many database statements one account's collection is expected to cost.
+ *
+ * A ceiling, for the same reason the billing table is: the exact figure depends
+ * on which regions answered and how many resources each returned, and the failure
+ * mode of under-counting is an invocation the platform terminates with no error
+ * anywhere — the rows are right, the suite is green, and the cron silently stops.
+ */
+const STATEMENTS_PER_ACCOUNT = 12;
+
+abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends CronTask<TEnv> {
   protected abstract collectionType(): 'cost' | 'resource';
   protected abstract maxAccountsPerCollection(): number;
   protected abstract collectionIntervalHours(env: TEnv): number;
@@ -43,7 +54,10 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
   protected override async handleScheduledTask(_event: ScheduledController, env: TEnv, _ctx: ExecutionContext): Promise<TaskRunSummary> {
     const intervalHours = this.collectionIntervalHours(env);
     const cutoffTime: number = TimestampUtil.getCurrentUnixTimestampInSeconds() - intervalHours * 3600;
-    const configDAO = new DataCollectionConfigDAO(env.AccessBridgeDB);
+    // Metered, unlike the request-path DAOs: this is the one loop in the
+    // repository whose statement count is a function of how many accounts happen
+    // to be due, so it is the one that can outgrow an invocation.
+    const configDAO = new DataCollectionConfigDAO(env.AccessBridgeDB, this.meter);
     const principalArns: string[] = await configDAO.getPrincipalArnsNeedingCollection(
       this.collectionType(),
       this.maxAccountsPerCollection(),
@@ -53,6 +67,16 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
     if (principalArns.length === 0) {
       return { itemsProcessed: 0, itemsFailed: 0, summary: 'No accounts due for collection' };
     }
+
+    // Refuse the whole batch up front rather than being terminated partway through
+    // it. A run that dies on the platform's ceiling has already collected for some
+    // accounts and stamped their attempt times, so the next cron skips them and the
+    // remainder waits a full interval — a partial sweep that reads as a complete
+    // one. The remaining accounts stay due, so this costs a delay rather than data.
+    this.assertSubrequestBudget(principalArns.length * STATEMENTS_PER_ACCOUNT, `${this.collectionType()} collection`);
+    log.warn(
+      `[${this.collectionType()}] ${principalArns.length} accounts due; refusing if the invocation cannot afford ${principalArns.length * STATEMENTS_PER_ACCOUNT} statements.`,
+    );
 
     const credentialChain = createRequestScope(env).get(Tokens.CredentialChainService);
     let succeededItems = 0;
@@ -82,6 +106,25 @@ abstract class AbstractCollectionTask<TEnv extends CollectionTaskEnv> extends IS
           );
         }
       } catch (error: unknown) {
+        // A spent daily write allowance is not a failure to retry — it cannot
+        // change for hours, so retrying re-runs the whole failure path at the
+        // alarm's rate and reports a transient fault for a scheduled pause. It is
+        // the one error class here that is an *answer* rather than a symptom, so
+        // it is asked about first and reported as what it is: the run stops with
+        // the reason, and the accounts stay due for the next cron after the
+        // reset rather than having their attempt times burned through it.
+        const dailyLimit = isD1DailyLimitError(error);
+        if (dailyLimit) {
+          log.error(
+            `[${this.collectionType()}] D1 daily write allowance exhausted; pausing until ${new Date(dailyLimit.resetsAt).toISOString()}. ${principalArns.length - failedAccounts - 1} account(s) remain due.`,
+          );
+          return {
+            itemsProcessed: succeededItems,
+            itemsFailed: failedAccounts,
+            summary: `Paused: D1 daily write allowance exhausted until ${new Date(dailyLimit.resetsAt).toISOString()}`,
+            details: { reason: 'd1-daily-limit', resetsAt: dailyLimit.resetsAt },
+          };
+        }
         failedAccounts += 1;
         log.error(`Failed to collect ${this.collectionType()} data for ${principalArn}:`, { error: error });
         try {

@@ -18,8 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rexezuge/runtime": "1.5.1",
-    "@rexezuge/shared": "1.5.1"
+    "@rexezuge/runtime": "1.8.0",
+    "@rexezuge/shared": "1.8.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

@@ -16,7 +16,12 @@ function stubCollector(resourceType: string): IAwsResourceCollector {
 describe('CollectorRegistry', () => {
   it('resolves all five default collectors', () => {
     const all = CollectorRegistry.getAll();
-    expect(all.keys().toArray().toSorted((left, right) => left.localeCompare(right))).toEqual(['dynamodb', 'ec2', 'lambda', 'rds', 's3']);
+    expect(
+      all
+        .keys()
+        .toArray()
+        .toSorted((left, right) => left.localeCompare(right)),
+    ).toEqual(['dynamodb', 'ec2', 'lambda', 'rds', 's3']);
     expect(CollectorRegistry.get('ec2').resourceType).toBe('ec2');
   });
 
@@ -36,7 +41,13 @@ describe('CollectorRegistry', () => {
 describe('InjectableCollectorRegistry', () => {
   it('withDefaults mirrors the static registry', () => {
     const registry = InjectableCollectorRegistry.withDefaults();
-    expect(registry.getAll().keys().toArray().toSorted((left, right) => left.localeCompare(right))).toEqual(['dynamodb', 'ec2', 'lambda', 'rds', 's3']);
+    expect(
+      registry
+        .getAll()
+        .keys()
+        .toArray()
+        .toSorted((left, right) => left.localeCompare(right)),
+    ).toEqual(['dynamodb', 'ec2', 'lambda', 'rds', 's3']);
     expect(registry.get('s3').resourceType).toBe('s3');
   });
 

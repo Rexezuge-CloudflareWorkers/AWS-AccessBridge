@@ -4,7 +4,10 @@ import { BaseDAO } from './BaseDAO';
 
 class DataCollectionConfigDAO extends BaseDAO {
   public async create(principalArn: string, collectionType: string): Promise<void> {
-    await this.run('INSERT OR IGNORE INTO data_collection_config (principal_arn, collection_type, last_collected_at, enabled) VALUES (?, ?, 0, 1)', [principalArn, collectionType]);
+    await this.run(
+      'INSERT OR IGNORE INTO data_collection_config (principal_arn, collection_type, last_collected_at, enabled) VALUES (?, ?, 0, 1)',
+      [principalArn, collectionType],
+    );
   }
 
   public async delete(principalArn: string, collectionType: string): Promise<void> {
@@ -14,10 +17,7 @@ class DataCollectionConfigDAO extends BaseDAO {
   public async deleteOrphaned(): Promise<number> {
     // Keyed on the principal rather than an account: a collection config whose
     // credentials row is gone can never be resolved again, so it is an orphan.
-    const result = await this.deleteOrphanedRows(
-      'data_collection_config',
-      'principal_arn NOT IN (SELECT principal_arn FROM credentials)',
-    );
+    const result = await this.deleteOrphanedRows('data_collection_config', 'principal_arn NOT IN (SELECT principal_arn FROM credentials)');
     return result.meta?.changes ?? 0;
   }
 
@@ -54,7 +54,11 @@ class DataCollectionConfigDAO extends BaseDAO {
   }
 
   public async updateLastCollectedTime(principalArn: string, collectionType: string): Promise<void> {
-    await this.run('UPDATE data_collection_config SET last_collected_at = ? WHERE principal_arn = ? AND collection_type = ?', [TimestampUtil.getCurrentUnixTimestampInSeconds(), principalArn, collectionType]);
+    await this.run('UPDATE data_collection_config SET last_collected_at = ? WHERE principal_arn = ? AND collection_type = ?', [
+      TimestampUtil.getCurrentUnixTimestampInSeconds(),
+      principalArn,
+      collectionType,
+    ]);
   }
 
   /**
@@ -63,7 +67,11 @@ class DataCollectionConfigDAO extends BaseDAO {
    * collection with data.
    */
   public async updateLastAttemptTime(principalArn: string, collectionType: string): Promise<void> {
-    await this.run('UPDATE data_collection_config SET last_attempt_at = ? WHERE principal_arn = ? AND collection_type = ?', [TimestampUtil.getCurrentUnixTimestampInSeconds(), principalArn, collectionType]);
+    await this.run('UPDATE data_collection_config SET last_attempt_at = ? WHERE principal_arn = ? AND collection_type = ?', [
+      TimestampUtil.getCurrentUnixTimestampInSeconds(),
+      principalArn,
+      collectionType,
+    ]);
   }
 }
 

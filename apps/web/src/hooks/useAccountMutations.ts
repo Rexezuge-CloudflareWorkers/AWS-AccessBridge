@@ -103,7 +103,7 @@ function useAccountMutations(showMessage: ShowMessage, showHidden: boolean): Use
       setModalData(await assumeRoleKeys(accountId, role));
     } catch (error) {
       if (isUnauthorized(error)) {
-        globalThis.location.reload();
+        location.reload();
         return;
       }
       reportFailure(error);
@@ -116,7 +116,7 @@ function useAccountMutations(showMessage: ShowMessage, showHidden: boolean): Use
     const loadingKey = `${accountId}-${role}`;
     setLoadingConsole(loadingKey);
     try {
-      globalThis.window.open(buildFederateUrl(accountId, role), '_blank', 'noopener,noreferrer');
+      window.open(buildFederateUrl(accountId, role), '_blank', 'noopener,noreferrer');
     } catch (error) {
       // Popup blockers reject rather than throw, so this is a reachable path and
       // otherwise the click would look like it did nothing.

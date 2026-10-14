@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { BadGatewayError, BadRequestError, ConflictError, ForbiddenError, InternalServerError, MethodNotAllowedError, NotFoundError, RateLimitedError, UnauthorizedError } from '@rexezuge/errors';
+import {
+  BadGatewayError,
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  InternalServerError,
+  MethodNotAllowedError,
+  NotFoundError,
+  RateLimitedError,
+  UnauthorizedError,
+} from '@rexezuge/errors';
 import { AwsCollectionError } from '@aws-access-bridge/backend-services/aws/collectors/AwsCollectionError';
 import { AbstractDurableObjectWorker } from '@rexezuge/runtime/base/AbstractDurableObjectWorker';
 
@@ -64,7 +74,11 @@ describe('AbstractDurableObjectWorker', () => {
   class TestWorker extends AbstractDurableObjectWorker {
     protected currentRun: Promise<void> | undefined;
 
-    constructor(state: DurableObjectState, env: unknown, private readonly behaviour: () => Promise<Response>) {
+    constructor(
+      state: DurableObjectState,
+      env: unknown,
+      private readonly behaviour: () => Promise<Response>,
+    ) {
       super(state, env as never);
     }
 

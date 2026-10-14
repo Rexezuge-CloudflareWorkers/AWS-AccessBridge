@@ -135,7 +135,10 @@ describe('D1 writes check result.success', () => {
     it.each([
       ['create', (dao: DataCollectionConfigDAO) => dao.create('arn:aws:iam::123456789012:role/Dev', 'cost')],
       ['delete', (dao: DataCollectionConfigDAO) => dao.delete('arn:aws:iam::123456789012:role/Dev', 'cost')],
-      ['updateLastCollectedTime', (dao: DataCollectionConfigDAO) => dao.updateLastCollectedTime('arn:aws:iam::123456789012:role/Dev', 'cost')],
+      [
+        'updateLastCollectedTime',
+        (dao: DataCollectionConfigDAO) => dao.updateLastCollectedTime('arn:aws:iam::123456789012:role/Dev', 'cost'),
+      ],
       ['deleteOrphaned', (dao: DataCollectionConfigDAO) => dao.deleteOrphaned()],
     ])('%s throws DatabaseError', async (_name, call) => {
       const { stmt } = failingStatement();
@@ -185,9 +188,9 @@ describe('D1 writes check result.success', () => {
       // A real 256-bit key: `storeCredential` encrypts before it writes, and a
       // malformed key would fail there instead of at the statement under test.
       const key = btoa(String.fromCodePoint(...new Uint8Array(32)));
-      await expect(new CredentialsDAO(dbWith(stmt) as never, [key], 3).storeCredential('arn:aws:iam::123456789012:role/Dev', 'AKIA', 'secret')).rejects.toBeInstanceOf(
-        DatabaseError,
-      );
+      await expect(
+        new CredentialsDAO(dbWith(stmt) as never, [key], 3).storeCredential('arn:aws:iam::123456789012:role/Dev', 'AKIA', 'secret'),
+      ).rejects.toBeInstanceOf(DatabaseError);
     });
   });
 

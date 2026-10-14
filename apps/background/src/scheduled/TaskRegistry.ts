@@ -3,13 +3,13 @@ import { BackgroundTaskRunPruningTask } from './BackgroundTaskRunPruningTask';
 import { CostDataCollectionTask } from './CostDataCollectionTask';
 import { CredentialCacheRefreshTask } from './CredentialCacheRefreshTask';
 import { ResourceInventoryCollectionTask } from './ResourceInventoryCollectionTask';
-import type { IEnv, IScheduledTask } from './IScheduledTask';
+import type { CronTask, IEnv } from './CronTask';
 
 type CronPhase = 1 | 2;
 
 interface TaskDefinition {
   phase: CronPhase;
-  make: () => IScheduledTask<IEnv>;
+  make: () => CronTask<IEnv>;
   // The two collection sweeps are the long-running tasks: they walk regions
   // and principals and are the ones most likely to be wedged by a hung
   // network call inside the DO request. `CronTasksWorker` routes exactly those
@@ -27,7 +27,7 @@ const CRON_TASK_DEFINITIONS: readonly TaskDefinition[] = [
   { phase: 2, collection: true, make: () => new ResourceInventoryCollectionTask() },
 ];
 
-function tasksForPhase(phase: CronPhase, options: { collections?: boolean } = {}): IScheduledTask<IEnv>[] {
+function tasksForPhase(phase: CronPhase, options: { collections?: boolean } = {}): CronTask<IEnv>[] {
   return CRON_TASK_DEFINITIONS.filter((d) => d.phase === phase && (options.collections !== false || !d.collection)).map((d) => d.make());
 }
 

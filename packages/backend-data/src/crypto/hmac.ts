@@ -55,7 +55,10 @@ export async function verifyHMACSignature(
   // Decoding is inside the guard so a malformed (non-base64) attacker-supplied
   // signature is rejected rather than throwing.
   try {
-    return timingSafeEqual(Uint8Array.from(atob(signature), (c) => c.codePointAt(0) ?? 0), Uint8Array.from(atob(expectedSignature), (c) => c.codePointAt(0) ?? 0));
+    return timingSafeEqual(
+      Uint8Array.from(atob(signature), (c) => c.codePointAt(0) ?? 0),
+      Uint8Array.from(atob(expectedSignature), (c) => c.codePointAt(0) ?? 0),
+    );
   } catch {
     return false;
   }

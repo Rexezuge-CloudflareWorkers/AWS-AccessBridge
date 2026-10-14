@@ -1,7 +1,7 @@
 import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { AbstractPruningTask } from './AbstractPruningTask';
-import type { IEnv } from './IScheduledTask';
+import type { IEnv } from './CronTask';
 
 class AuditLogCleanupTask extends AbstractPruningTask<AuditLogCleanupTaskEnv> {
   protected override getTaskType(): string {

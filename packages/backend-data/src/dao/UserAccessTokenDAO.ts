@@ -4,7 +4,6 @@ import { TimestampUtil } from '@rexezuge/shared';
 import { ownerClause } from './AssumableRolesQueries';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 class UserAccessTokenDAO extends BaseDAO {
   public async create(
     tokenId: string,
@@ -15,8 +14,10 @@ class UserAccessTokenDAO extends BaseDAO {
     userId: string | null = null,
   ): Promise<void> {
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run('INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [tokenId, userEmail, tokenHash, name, createdAt, expiresAt, userId]);
-    assertD1Success(result, `create access token`);
+    await this.run(
+      'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, created_at, expires_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [tokenId, userEmail, tokenHash, name, createdAt, expiresAt, userId],
+    );
   }
 
   public async getById(tokenId: string, activeOnly: boolean): Promise<UserAccessTokenMetadata | undefined> {
@@ -154,8 +155,7 @@ class UserAccessTokenDAO extends BaseDAO {
 
   public async updateLastUsedByTokenHash(tokenHash: string): Promise<void> {
     const lastUsedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run('UPDATE user_access_tokens SET last_used_at = ? WHERE token_hash = ?', [lastUsedAt, tokenHash]);
-    assertD1Success(result, `update last used`);
+    await this.run('UPDATE user_access_tokens SET last_used_at = ? WHERE token_hash = ?', [lastUsedAt, tokenHash]);
   }
 
   /**
@@ -176,8 +176,7 @@ class UserAccessTokenDAO extends BaseDAO {
     const ownership: string =
       userId === null ? `user_access_tokens.user_id IS NULL AND user_access_tokens.user_email = ?` : ownerClause('user_access_tokens');
     const bindings: unknown[] = userId === null ? [tokenId, anchorEmail] : [tokenId, userId, anchorEmail];
-    const result = await this.run(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`, [...bindings]);
-    assertD1Success(result, `delete access token`);
+    await this.run(`DELETE FROM user_access_tokens WHERE token_id = ? AND ${ownership}`, [...bindings]);
   }
 }
 

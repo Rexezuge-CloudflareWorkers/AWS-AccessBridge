@@ -289,7 +289,7 @@ describe('useTeams', () => {
     // A pending request that resolves after unmount must be discarded. React
     // logs a warning when it is not, which is the signal this asserts on —
     // `useToast`'s suite covers the timer half with fake timers.
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const pending = deferred<TeamMember[]>();
     mocked.listTeamMembers.mockReturnValueOnce(pending.promise);
 

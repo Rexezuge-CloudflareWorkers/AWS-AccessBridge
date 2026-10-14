@@ -1,10 +1,8 @@
 import { DatabaseError } from '@rexezuge/errors';
 import type { UserMetadataInternal } from '@aws-access-bridge/shared/model';
 import { isMissingSchemaError } from '@rexezuge/d1';
-import type { D1Result as SdkD1Result } from '@rexezuge/d1';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 /**
  * A row of `user_metadata`, including the identity columns added by migration
  * 0032. `user_email` is the frozen anchor and `current_email` the mutable
@@ -38,16 +36,18 @@ class UserMetadataDAO extends BaseDAO {
    */
   public async ensureUserEmailExists(userEmail: string): Promise<void> {
     const id: string = UserMetadataDAO.newId();
-    let result: SdkD1Result;
     try {
-      result = await this.run('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email) VALUES (?, ?, ?)', [userEmail, id, userEmail.toLowerCase()]);
+      await this.run('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email) VALUES (?, ?, ?)', [
+        userEmail,
+        id,
+        userEmail.toLowerCase(),
+      ]);
     } catch (error) {
       // Pre-0032 database: the identity columns do not exist yet, and the
       // address alone is still a complete identity there.
       if (!isMissingSchemaError(error)) throw error;
-      result = await this.run('INSERT OR IGNORE INTO user_metadata (user_email) VALUES (?)', [userEmail]);
+      await this.run('INSERT OR IGNORE INTO user_metadata (user_email) VALUES (?)', [userEmail]);
     }
-    assertD1Success(result, `ensure user email exists`);
   }
 
   /**
@@ -86,8 +86,7 @@ class UserMetadataDAO extends BaseDAO {
   }
 
   public async setCurrentEmail(userId: string, currentEmail: string): Promise<void> {
-    const result = await this.run('UPDATE user_metadata SET current_email = ? WHERE id = ?', [currentEmail.toLowerCase(), userId]);
-    assertD1Success(result, `set current email`);
+    await this.run('UPDATE user_metadata SET current_email = ? WHERE id = ?', [currentEmail.toLowerCase(), userId]);
   }
 
   public async isSuperAdmin(userEmail: string): Promise<boolean> {
@@ -108,8 +107,7 @@ class UserMetadataDAO extends BaseDAO {
   }
 
   public async updatePreferredLanguage(userEmail: string, preferredLanguage: string | null): Promise<void> {
-    const result = await this.run('UPDATE user_metadata SET preferred_language = ? WHERE user_email = ?', [preferredLanguage, userEmail]);
-    assertD1Success(result, `update preferred language`);
+    await this.run('UPDATE user_metadata SET preferred_language = ? WHERE user_email = ?', [preferredLanguage, userEmail]);
   }
 
   public async getOrCreateFederationUsername(userEmail: string): Promise<string> {
@@ -135,7 +133,10 @@ class UserMetadataDAO extends BaseDAO {
     // handing the user a different STS RoleSessionName on every assume-role and
     // defeating CloudTrail correlation. ON CONFLICT keeps concurrent callers on
     // the single stored value rather than racing to overwrite it.
-    const insertResult = await this.run('UPDATE user_metadata SET federation_username = COALESCE(federation_username, ?) WHERE user_email = ?', [federationUsername, userEmail]);
+    const insertResult = await this.run(
+      'UPDATE user_metadata SET federation_username = COALESCE(federation_username, ?) WHERE user_email = ?',
+      [federationUsername, userEmail],
+    );
     if (!insertResult.success) {
       throw new DatabaseError(`Failed to store federation username: ${insertResult.error}`);
     }

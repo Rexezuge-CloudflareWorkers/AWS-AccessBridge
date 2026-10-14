@@ -66,7 +66,11 @@ describe('BaseAwsCollector failure signalling', () => {
       [400, false],
     ] as const) {
       const { clientFactory } = factoryReturning(new Response('x', { status }));
-      await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toMatchObject({ status: 500, upstreamStatus: status, retryable });
+      await expect(new S3Collector(clientFactory as never).collect(KEYS)).rejects.toMatchObject({
+        status: 500,
+        upstreamStatus: status,
+        retryable,
+      });
     }
   });
 
@@ -84,7 +88,8 @@ describe('BaseAwsCollector failure signalling', () => {
 
 describe('S3Collector', () => {
   it('parses bucket names and reports them as global', async () => {
-    const xml = '<ListAllMyBucketsResult><Buckets><Bucket><Name>alpha</Name></Bucket><Bucket><Name>beta</Name></Bucket></Buckets></ListAllMyBucketsResult>';
+    const xml =
+      '<ListAllMyBucketsResult><Buckets><Bucket><Name>alpha</Name></Bucket><Bucket><Name>beta</Name></Bucket></Buckets></ListAllMyBucketsResult>';
     const { clientFactory } = factoryReturning(ok(xml, 'application/xml'));
     const items = await new S3Collector(clientFactory as never).collect(KEYS);
     expect(items).toEqual([
@@ -133,13 +138,23 @@ describe('Ec2Collector', () => {
   it('defaults to us-east-1 and reports unknown when the state is missing', async () => {
     const { clientFactory } = factoryReturning(ok('<item><instanceId>i-9</instanceId></item>', 'application/xml'));
     const items = await new Ec2Collector(clientFactory as never).collect(KEYS);
-    expect(items).toEqual([{ resourceType: 'ec2', resourceId: 'i-9', resourceName: 'i-9', state: 'unknown', region: 'us-east-1', metadata: {} }]);
+    expect(items).toEqual([
+      { resourceType: 'ec2', resourceId: 'i-9', resourceName: 'i-9', state: 'unknown', region: 'us-east-1', metadata: {} },
+    ]);
   });
 });
 
 describe('LambdaCollector', () => {
   it('maps function arn, name, state and size metadata', async () => {
-    const { clientFactory, fetch } = factoryReturning(ok(JSON.stringify({ Functions: [{ FunctionArn: 'arn:aws:lambda:::function:a', FunctionName: 'a', State: 'Active', Runtime: 'nodejs20', MemorySize: 256 }] })));
+    const { clientFactory, fetch } = factoryReturning(
+      ok(
+        JSON.stringify({
+          Functions: [
+            { FunctionArn: 'arn:aws:lambda:::function:a', FunctionName: 'a', State: 'Active', Runtime: 'nodejs20', MemorySize: 256 },
+          ],
+        }),
+      ),
+    );
     const items = await new LambdaCollector(clientFactory as never).collect(KEYS, 'eu-west-1');
     expect(items).toEqual([
       {
@@ -157,7 +172,14 @@ describe('LambdaCollector', () => {
   it('tolerates missing optional fields and an empty function list', async () => {
     const { clientFactory } = factoryReturning(ok(JSON.stringify({ Functions: [{ FunctionName: 'bare' }] })));
     await expect(new LambdaCollector(clientFactory as never).collect(KEYS)).resolves.toEqual([
-      { resourceType: 'lambda', resourceId: 'bare', resourceName: 'bare', state: 'Active', region: 'us-east-1', metadata: { runtime: '', memorySize: '' } },
+      {
+        resourceType: 'lambda',
+        resourceId: 'bare',
+        resourceName: 'bare',
+        state: 'Active',
+        region: 'us-east-1',
+        metadata: { runtime: '', memorySize: '' },
+      },
     ]);
 
     const empty = factoryReturning(ok(JSON.stringify({})));
@@ -177,7 +199,14 @@ describe('RdsCollector', () => {
     const { clientFactory, fetch } = factoryReturning(ok(xml, 'application/xml'));
     const items = await new RdsCollector(clientFactory as never).collect(KEYS, 'eu-west-1');
     expect(items).toEqual([
-      { resourceType: 'rds', resourceId: 'db-1', resourceName: 'db-1', state: 'available', region: 'eu-west-1', metadata: { engine: 'postgres' } },
+      {
+        resourceType: 'rds',
+        resourceId: 'db-1',
+        resourceName: 'db-1',
+        state: 'available',
+        region: 'eu-west-1',
+        metadata: { engine: 'postgres' },
+      },
       { resourceType: 'rds', resourceId: 'db-2', resourceName: 'db-2', state: 'stopped', region: 'eu-west-1', metadata: { engine: '' } },
     ]);
     expect(fetch).toHaveBeenCalledWith('https://rds.eu-west-1.amazonaws.com/', {
@@ -197,8 +226,22 @@ describe('DynamoDbCollector', () => {
     const { clientFactory, fetch } = factoryReturning(ok(JSON.stringify({ TableNames: ['orders', 'events'] })));
     const items = await new DynamoDbCollector(clientFactory as never).collect(KEYS, 'eu-west-1');
     expect(items).toEqual([
-      { resourceType: 'dynamodb', resourceId: 'eu-west-1:orders', resourceName: 'orders', state: 'active', region: 'eu-west-1', metadata: {} },
-      { resourceType: 'dynamodb', resourceId: 'eu-west-1:events', resourceName: 'events', state: 'active', region: 'eu-west-1', metadata: {} },
+      {
+        resourceType: 'dynamodb',
+        resourceId: 'eu-west-1:orders',
+        resourceName: 'orders',
+        state: 'active',
+        region: 'eu-west-1',
+        metadata: {},
+      },
+      {
+        resourceType: 'dynamodb',
+        resourceId: 'eu-west-1:events',
+        resourceName: 'events',
+        state: 'active',
+        region: 'eu-west-1',
+        metadata: {},
+      },
     ]);
     // The DynamoDB JSON protocol needs a POST with a target header; a GET would
     // not be a valid ListTables call.

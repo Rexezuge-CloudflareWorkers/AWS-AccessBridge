@@ -1,347 +1,110 @@
-import globals from 'globals';
-import tseslint from 'typescript-eslint';
-import unicorn from 'eslint-plugin-unicorn';
-import sonarjs from 'eslint-plugin-sonarjs';
 import reactHooks from 'eslint-plugin-react-hooks';
-import pluginRegexp from 'eslint-plugin-regexp';
-import eslintConfigPrettier from 'eslint-config-prettier';
-import prettier from 'eslint-plugin-prettier';
+import { defineRepoLintConfig } from '@rexezuge/tooling/eslint';
 
-export default tseslint.config(
-  {
-    ignores: [
-      'eslint.config.mjs',
-      'worker-configuration.d.ts',
-      'app/dist/**',
-      'apps/web/dist/**',
-      'src/generated/**',
-      'apps/api/src/generated/**',
-      'coverage/**',
-      'coverage-integration/**',
-      'node_modules/**',
+/**
+ * The family's converged lint configuration.
+ *
+ * This file used to be 347 lines of hand-written layer rules, and it was the
+ * source the kit's factory was distilled from — so keeping a copy of it here
+ * meant the two drifted the moment either side changed. What is left is what is
+ * genuinely this repository's: which layers it has, and the two boundaries the
+ * canonical table does not name.
+ */
+export default [
+  ...defineRepoLintConfig({
+    scope: '@aws-access-bridge',
+
+    /**
+     * Only the five layers the canonical table describes in this shape.
+     *
+     * The default set carries entries for `apps/api`, `apps/background` and
+     * `apps/web` as well. They are excluded deliberately, and this is the whole
+     * reason: `apps/api` appears **four** times in the canonical table, and a
+     * boundary rule resolves to one entry per directory rather than accumulating
+     * across them. Naming `apps/api` here would therefore install only its last
+     * row — which bans a Git service package this repository does not have —
+     * and drop the DAO boundary and the `provider-clients` ban on the floor.
+     *
+     * The two boundaries `apps/api` needs are supplied by `extraLayers` below,
+     * merged into a single entry for the same reason.
+     *
+     * `apps/web` is excluded for a different reason: the canonical entry bans the
+     * whole namespace, and thirteen files under `apps/web/src` import
+     * `@aws-access-bridge/shared` for their types and pure helpers.
+     *
+     * So the layer table this repository actually enforces is the five package
+     * layers below plus `extraLayers`, and that is stated here rather than left to
+     * be discovered by an import that stopped being flagged.
+     */
+    projectDirs: [
+      'packages/shared',
+      'packages/backend-runtime',
+      'packages/backend-data',
+      'packages/provider-clients',
+      'packages/backend-services',
     ],
-  },
 
-  // Base: globals for all JS/TS source files
-  {
-    files: ['**/*.{js,mjs,cjs,ts,mts,cts,tsx,jsx}'],
-    languageOptions: {
-      globals: globals.node,
-    },
-  },
+    tsconfigRootDir: import.meta.dirname,
 
-  // TypeScript: type-aware recommended rules, scoped to TS files only
-  {
-    files: ['**/*.{ts,mts,cts,tsx}'],
-    extends: tseslint.configs.recommendedTypeChecked,
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+    /**
+     * Un-ignore `scripts/**`, which the factory ignores.
+     *
+     * The kit's set is a superset of this repository's, so nothing is *lost* by
+     * adopting it — except this. The factory treats `scripts/**` as build-time
+     * tooling that need not typecheck strictly, which is a reasonable default for
+     * a kit and the wrong one here: `scripts/migrations/verify-migrations.ts` is
+     * written in TypeScript *specifically so the script is covered by the repo's
+     * lint and typecheck rules*, and it is the gate that decides whether a
+     * migration may be edited at all. Silently dropping it from lint would leave a
+     * load-bearing script unchecked by everything except `tsc`.
+     *
+     * A negated pattern is the only way back: a global ignore cannot be undone by
+     * a later config object, so the entry has to be added to the same list.
+     */
+    extraIgnores: ['!scripts/**'],
+
+    /**
+     * The two `apps/api` boundaries, as one entry.
+     *
+     * `apps/api` must not reach the provider clients or `aws4fetch` directly, and
+     * route classes must not import DAOs at all — type-only imports included,
+     * except that a filter or model may be typed against a DAO shape.
+     *
+     * They are one entry because two entries for one directory would install only
+     * the second, and because `allowTypeImports` is a property of a **group**, not
+     * of a layer: allowing it for the DAO while denying it for `provider-clients`
+     * is exactly what per-group options express and what merging the layers would
+     * have lost.
+     *
+     * The DAO ban is scoped to `@aws-access-bridge/backend-data/dao` rather than
+     * the whole `backend-data` package, which is what the canonical entry uses:
+     * `HMACHandler` imports `backend-data/crypto/hmac` and `route-helpers`
+     * imports `backend-data/utils/D1SessionUtil`, both outside `endpoints/` and
+     * both legitimately — neither is a DAO.
+     */
+    extraLayers: [
+      {
+        dir: 'apps/api',
+        ban: ['aws4fetch', '@aws-access-bridge/provider-clients', '@aws-access-bridge/backend-data/dao'],
+        allowTypeImports: true,
+        message:
+          'apps/api must not import aws4fetch, provider-clients or a DAO directly — add a method to the owning backend-services domain service and call it through the request scope. Type-only imports are allowed.',
       },
-    },
-  },
+    ],
+  }),
 
-  // --- typescript-eslint overrides ---
-  {
-    files: ['**/*.{ts,mts,cts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-      // Allow `void expr` for intentional fire-and-forget in Workers
-      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
-      // Allow explicit `any` in limited cases already existing in the codebase
-      '@typescript-eslint/no-explicit-any': 'warn',
-      // Relax unsafe rules to warn — too noisy at the `any` boundary of external APIs
-      '@typescript-eslint/no-unsafe-assignment': 'warn',
-      '@typescript-eslint/no-unsafe-member-access': 'warn',
-      '@typescript-eslint/no-unsafe-call': 'warn',
-      '@typescript-eslint/no-unsafe-return': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-      // JSX event handlers and hook callback objects commonly use async functions where void is expected
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false, properties: false } }],
-    },
-  },
-
-  // --- Unicorn: modern JS/TS quality rules ---
-  unicorn.configs['flat/recommended'],
-  {
-    rules: {
-      // Codebase uses ctx, req, res, env, err, util, db, dao, etc. — too invasive to rename
-      'unicorn/prevent-abbreviations': 'off',
-      // D1/DAO layer returns null; disabling this avoids mass rewrites
-      'unicorn/no-null': 'off',
-      // Monorepo uses CommonJS-compatible module style in some configs
-      'unicorn/prefer-module': 'off',
-      // Top-level await not available in all Workers entry points
-      'unicorn/prefer-top-level-await': 'off',
-      // Error subclassing via `new MyError()` is intentional in domain errors
-      'unicorn/custom-error-definition': 'off',
-      // Template literals throughout the codebase are fine as-is
-      'unicorn/no-useless-undefined': 'off',
-      // Allow process.exit in build/script files
-      'unicorn/no-process-exit': 'off',
-      // Array reduce is used intentionally in analytics/data transformation
-      'unicorn/no-array-reduce': 'off',
-      // Allow Number() — parseInt/parseFloat are used in some cases intentionally
-      'unicorn/prefer-number-properties': ['error', { checkInfinity: false }],
-      // Allow nested ternaries in JSX (React render patterns)
-      'unicorn/no-nested-ternary': 'off',
-      // Allow Array.from — codebase uses it for iterables
-      'unicorn/prefer-spread': 'off',
-      // Entire codebase uses PascalCase for TS files; kebab-case would require mass renames
-      'unicorn/filename-case': 'off',
-      // Established names (AccessBridgeWorker, BaseUrlUtil, etc.) should not be force-renamed
-      'unicorn/name-replacements': 'off',
-      // Zod schema builder chains and other deep method chains are intentional
-      'unicorn/max-nested-calls': 'off',
-      // import.meta.dirname is not available in all test environments
-      'unicorn/prefer-import-meta-properties': 'off',
-      // Codebase uses `err` as catch parameter name throughout; too invasive to rename
-      'unicorn/catch-error-name': 'off',
-      // Established boolean param names (retryable, enabled, etc.) should not be force-prefixed
-      'unicorn/consistent-boolean-name': 'off',
-      // Uint8Array#toBase64 / fromBase64 are not guaranteed in all Workers runtime versions
-      'unicorn/prefer-uint8array-base64': 'off',
-      // Class member ordering would require extensive restructuring of existing classes
-      'unicorn/consistent-class-member-order': 'off',
-      // AWS API response fields use verb prefixes by convention
-      'unicorn/no-non-function-verb-prefix': 'off',
-      // forEach is used intentionally throughout the codebase in service and utility layers
-      'unicorn/no-for-each': 'off',
-      // .then() chains in DAO and service layers are often intentional — warn, don't block
-      'unicorn/prefer-await': 'warn',
-      // Callback references (e.g. .map(Number)) are sometimes intentional
-      'unicorn/no-array-callback-reference': 'warn',
-      // toSorted() is ES2023 and may not be in all tsconfig lib targets
-      'unicorn/no-array-sort': 'warn',
-    },
-  },
-
-  // --- SonarJS: code smell and bug detection ---
-  sonarjs.configs.recommended,
-  {
-    rules: {
-      // Raise duplicate-string threshold to avoid flagging intentional repeated literals like account IDs
-      'sonarjs/no-duplicate-string': ['warn', { threshold: 5 }],
-      // Cognitive complexity — warn rather than error to allow gradual improvement
-      'sonarjs/cognitive-complexity': ['warn', 20],
-      // False positives: connection method names and field names like 'password_hash'
-      'sonarjs/no-hardcoded-passwords': 'off',
-      // Third-party deprecations (e.g. Zod v4 migration) are warnings, not errors
-      'sonarjs/deprecation': 'warn',
-      // Nested ternaries in complex data-mapping code — warn rather than block
-      'sonarjs/no-nested-conditional': 'warn',
-      // React component props are commonly not marked Readonly<>; enforce gradually
-      'sonarjs/prefer-read-only-props': 'warn',
-      // Static readonly properties require invasive refactoring of established utility classes
-      'sonarjs/public-static-readonly': 'warn',
-      // Nested template literals are used intentionally in SQL queries and prompt construction
-      'sonarjs/no-nested-template-literals': 'warn',
-    },
-  },
-
-  // --- React Hooks: rules of hooks for the SPA ---
+  /**
+   * The kit deliberately leaves `react-hooks` to the consumer.
+   *
+   * It is the one plugin whose rules are about a *framework* rather than about
+   * code quality, and shipping a preset for it in a package that has to work for
+   * a non-React repo would mean either a peer dependency every consumer must
+   * satisfy or a config entry that throws when the plugin is absent. The factory
+   * names the omission in its own header; these four lines are the answer.
+   */
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs['recommended-latest'].rules,
   },
-
-  // --- Regexp: static analysis for regular expressions ---
-  pluginRegexp.configs['flat/recommended'],
-
-  // --- Prettier: report formatting drift as lint warnings; disable conflicting stylistic rules ---
-  eslintConfigPrettier,
-  {
-    plugins: { prettier },
-    rules: {
-      'prettier/prettier': 'warn',
-    },
-  },
-
-  // --- Import direction guardrails ---
-  // Layer 0: shared — zero @aws-access-bridge/* deps
-  {
-    files: ['packages/shared/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/*'],
-              message: 'shared must not import from other @aws-access-bridge packages — it is a zero-dependency base layer',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 1: backend-runtime — SDK runtime plus consumer shared utilities
-  {
-    files: ['packages/backend-runtime/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/backend-data', '@aws-access-bridge/backend-data/*'],
-              message: 'backend-runtime must not import from backend-data (higher layer)',
-            },
-            {
-              group: ['@aws-access-bridge/backend-services', '@aws-access-bridge/backend-services/*'],
-              message: 'backend-runtime must not import from backend-services (higher layer)',
-            },
-            { group: ['@aws-access-bridge/api', '@aws-access-bridge/api/*'], message: 'backend-runtime must not import from apps/api' },
-            {
-              group: ['@aws-access-bridge/background', '@aws-access-bridge/background/*'],
-              message: 'backend-runtime must not import from apps/background',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 2: backend-data — SDK D1, errors, and shared utilities
-  {
-    files: ['packages/backend-data/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/backend-runtime', '@aws-access-bridge/backend-runtime/*'],
-              message: 'backend-data must not import from backend-runtime',
-            },
-            {
-              group: ['@aws-access-bridge/backend-services', '@aws-access-bridge/backend-services/*'],
-              message: 'backend-data must not import from backend-services (higher layer)',
-            },
-            { group: ['@aws-access-bridge/api', '@aws-access-bridge/api/*'], message: 'backend-data must not import from apps/api' },
-            {
-              group: ['@aws-access-bridge/background', '@aws-access-bridge/background/*'],
-              message: 'backend-data must not import from apps/background',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 2: provider-clients — SDK errors and shared utilities (raw AWS, no DAOs/services)
-  {
-    files: ['packages/provider-clients/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/backend-data', '@aws-access-bridge/backend-data/*'],
-              message: 'provider-clients must not import DAOs from backend-data',
-            },
-            {
-              group: ['@aws-access-bridge/backend-runtime', '@aws-access-bridge/backend-runtime/*'],
-              message: 'provider-clients must not import from backend-runtime',
-            },
-            {
-              group: ['@aws-access-bridge/backend-services', '@aws-access-bridge/backend-services/*'],
-              message: 'provider-clients must not import from backend-services (higher layer)',
-            },
-            { group: ['@aws-access-bridge/api', '@aws-access-bridge/api/*'], message: 'provider-clients must not import from apps/api' },
-            {
-              group: ['@aws-access-bridge/background', '@aws-access-bridge/background/*'],
-              message: 'provider-clients must not import from apps/background',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 3: backend-services — cannot import apps
-  {
-    files: ['packages/backend-services/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            { group: ['@aws-access-bridge/api', '@aws-access-bridge/api/*'], message: 'backend-services must not import from apps/api' },
-            {
-              group: ['@aws-access-bridge/background', '@aws-access-bridge/background/*'],
-              message: 'backend-services must not import from apps/background',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 5: apps/api — route AWS SDK usage through backend-services, not directly
-  {
-    files: ['apps/api/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['aws4fetch'],
-              message: 'apps/api must not import aws4fetch directly; use @aws-access-bridge/backend-services instead',
-            },
-            {
-              group: ['@aws-access-bridge/provider-clients', '@aws-access-bridge/provider-clients/*'],
-              message: 'apps/api must not import provider-clients directly; use @aws-access-bridge/backend-services instead',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 5: apps/api routes — compose backend-services, never DAOs directly
-  // (type-only DAO imports for filters/models and D1 constants in the base route stay allowed)
-  {
-    files: ['apps/api/src/endpoints/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@aws-access-bridge/backend-data/dao', '@aws-access-bridge/backend-data/dao/*'],
-              allowTypeImports: true,
-              message:
-                'route classes must not import DAOs directly; add a method to the owning @aws-access-bridge/backend-services domain service and call it via its factory',
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // --- Test file overrides (must be last to override plugin rules) ---
-  {
-    files: ['test/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
-    rules: {
-      // Unbound method is a common false positive in Vitest/Jest mock assertions like expect(fn).toHaveBeenCalledWith(...)
-      '@typescript-eslint/unbound-method': 'off',
-      // Test helpers and stubs routinely use async functions without await
-      '@typescript-eslint/require-await': 'off',
-      // Redundant type constituents appear in typed mock stubs
-      '@typescript-eslint/no-redundant-type-constituents': 'off',
-      // Promise.withResolvers() and function-scoping refactors are cosmetic in tests
-      'unicorn/prefer-promise-with-resolvers': 'off',
-      'unicorn/consistent-function-scoping': 'off',
-      // sonarjs/assertions-in-tests fires false positives when test helpers handle assertions indirectly
-      'sonarjs/assertions-in-tests': 'off',
-      // sonarjs/no-extra-arguments fires incorrectly on Vitest mock overloads
-      'sonarjs/no-extra-arguments': 'off',
-    },
-  },
-);
+];

@@ -7,17 +7,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-access-bridge/background": "workspace:*",
     "@aws-access-bridge/backend-data": "workspace:*",
     "@aws-access-bridge/backend-runtime": "workspace:*",
     "@aws-access-bridge/backend-services": "workspace:*",
+    "@aws-access-bridge/background": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
+    "@rexezuge/errors": "1.8.0",
+    "@rexezuge/http": "1.8.0",
+    "@rexezuge/runtime": "1.8.0",
+    "@rexezuge/shared": "1.8.0",
     "chanfana": "^3.4.0",
     "hono": "^4.13.12",
-    "zod": "^4.6.5",
-    "@rexezuge/errors": "1.5.1",
-    "@rexezuge/runtime": "1.5.1",
-    "@rexezuge/shared": "1.5.1"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

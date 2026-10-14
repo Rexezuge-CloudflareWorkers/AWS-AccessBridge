@@ -2,6 +2,8 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloud
 
 import { CostDataCollectionTask } from './scheduled/CostDataCollectionTask';
 import { ResourceInventoryCollectionTask } from './scheduled/ResourceInventoryCollectionTask';
+import type { CollectionTaskEnv } from './scheduled/AbstractCollectionTask';
+import type { CronTask } from './scheduled/CronTask';
 
 /**
  * The durable collection pipeline.
@@ -21,10 +23,17 @@ interface CollectionWorkflowParams {
   scheduledTime?: number;
 }
 
-const COLLECTION_STEPS = [
+/**
+ * The two long collection sweeps, and the durable-object-free path they run under.
+ *
+ * Typed to the shared `CollectionTaskEnv` rather than to either concrete task,
+ * because `step.do` calls `make().handle(...)` on a union of the two and an
+ * inferred signature would demand the *intersection* of their env types.
+ */
+const COLLECTION_STEPS: readonly { name: string; make: () => CronTask<CollectionTaskEnv> }[] = [
   { name: 'cost-data-collection', make: (): CostDataCollectionTask => new CostDataCollectionTask() },
   { name: 'resource-inventory-collection', make: (): ResourceInventoryCollectionTask => new ResourceInventoryCollectionTask() },
-] as const;
+];
 
 class CollectionWorkflow extends WorkflowEntrypoint<Env, CollectionWorkflowParams> {
   async run(event: WorkflowEvent<CollectionWorkflowParams>, step: WorkflowStep): Promise<Record<string, null>> {
@@ -43,7 +52,14 @@ class CollectionWorkflow extends WorkflowEntrypoint<Env, CollectionWorkflowParam
         name,
         { timeout: '10 minutes', retries: { limit: 1, delay: '15 seconds' } },
         async (): Promise<null> => {
-          await make().handle(controller, env, ctx);
+          // `Env` does not satisfy `CollectionTaskEnv` for one reason only: the
+          // collection env declares an index signature, and an interface never
+          // gains an implicit one. Every binding it names is declared on the
+          // generated `Env`, so this narrows nothing and asserts nothing — it
+          // converts between two descriptions of the same object. The `unknown`
+          // hop is what says so to the checker, which otherwise has no reason to
+          // believe two descriptions of one object are compatible.
+          await make().handle(controller, env as unknown as CollectionTaskEnv, ctx);
           return null;
         },
       );

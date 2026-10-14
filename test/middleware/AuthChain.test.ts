@@ -57,7 +57,7 @@ function makeContext(options: {
       DEV_AUTH_EMAIL: options.devAuthEmail,
       ENVIRONMENT: 'production',
     },
-    executionCtx: { waitUntil: vi.fn((p: Promise<unknown>) => p.catch(() => undefined)) },
+    executionCtx: { waitUntil: vi.fn((p: Promise<unknown>) => p.catch(() => {})) },
     header: vi.fn((name: string) => {
       responseHeaders.set(name, name);
       return name;
@@ -111,16 +111,23 @@ describe('noStore', () => {
     // The reason this middleware is registered first: one registered behind an
     // auth handler would never run on the failure path.
     const { asContext, context, nextCalls } = makeContext({});
-    await MiddlewareHandlers.noStore()(asContext, (async () => undefined));
+    await MiddlewareHandlers.noStore()(asContext, async () => {});
     expect(nextCalls()).toBe(0);
     expect(context.header).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0');
   });
 
-  it('sets both headers even when one is already present', async () => {
+  it('applies the baseline security headers alongside the no-cache pair', async () => {
     const { asContext, context, next } = makeContext({});
     await MiddlewareHandlers.noStore()(asContext, next);
     // Belt and braces for the 302 whose Location carries a console token.
-    expect(context.header).toHaveBeenCalledTimes(2);
+    expect(context.header).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0');
+    expect(context.header).toHaveBeenCalledWith('Pragma', 'no-cache');
+    // The kit's baseline. `X-Content-Type-Options` is the one worth naming here:
+    // every JSON envelope in this repository embeds a message the caller partly
+    // controls, so without it a rendering mistake upstream of the API is a
+    // content-type-confusion primitive.
+    expect(context.header).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+    expect(context.header).toHaveBeenCalledWith('X-Frame-Options', 'DENY');
   });
 });
 
@@ -145,12 +152,16 @@ describe('apiAuthentication', () => {
   });
 
   it('ignores a DEMO_MODE request header', async () => {
-    const { asContext, context, next } = makeContext({ headers: { 'DEMO_MODE': 'true' } });
+    const { asContext, context, next } = makeContext({ headers: { DEMO_MODE: 'true' } });
     // Answered 401 rather than becoming the demo user: a request header must not
     // be able to arm the bypass.
     await MiddlewareHandlers.apiAuthentication()(asContext, next);
     expect(context.set).not.toHaveBeenCalledWith('AuthenticatedUserEmailAddress', sharedConstants.DEMO_USER_EMAIL);
-    expect(context.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Unauthorized' }) }), 401);
+    expect(context.json).toHaveBeenCalledWith(
+      expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Unauthorized' }) }),
+      401,
+      {},
+    );
   });
 
   it('answers 401 for a request with no Authorization header', async () => {
@@ -159,13 +170,18 @@ describe('apiAuthentication', () => {
     expect(context.json).toHaveBeenCalledWith(
       { Exception: { Message: 'No personal access token provided in request headers.', Type: 'Unauthorized' } },
       401,
+      {},
     );
   });
 
   it('answers 401 for a non-Bearer Authorization scheme', async () => {
     const { asContext, context, next } = makeContext({ headers: { Authorization: 'Basic dXNlcjpwYXNz' } });
     await MiddlewareHandlers.apiAuthentication()(asContext, next);
-    expect(context.json).toHaveBeenCalledWith(expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Unauthorized' }) }), 401);
+    expect(context.json).toHaveBeenCalledWith(
+      expect.objectContaining({ Exception: expect.objectContaining({ Type: 'Unauthorized' }) }),
+      401,
+      {},
+    );
   });
 
   /**
@@ -185,16 +201,32 @@ describe('apiAuthentication', () => {
       // than from the stubbed token service.
       const { asContext, context, next } = makeContext({ headers: { Authorization: 'Bearer tok' } });
       await MiddlewareHandlers.apiAuthentication()(asContext, next);
-      expect(context.json).toHaveBeenCalledWith({ Exception: { Message: error.message, Type: error.type } }, status);
+      expect(context.json).toHaveBeenCalledWith({ Exception: { Message: error.message, Type: error.type } }, status, {});
     }
   });
 
-  it('rethrows a non-service error rather than answering it', async () => {
+  it('answers a non-service error as a 500 rather than letting it escape the boundary', async () => {
+    // The copy this replaced rethrew anything that was not a `ServiceError`, so a
+    // bare `TypeError` reached the client as a framework error page — a stack
+    // trace and an internal path, in a body the SPA's decoder does not recognise,
+    // so it rendered as "server error" with the real cause invisible. The mapper
+    // normalizes instead, and masks the message because a 5xx never publishes
+    // its own text.
     services.authenticateWithPAT = () => Promise.reject(new TypeError('bug'));
-    const { asContext, next } = makeContext({ headers: { Authorization: 'Bearer tok' } });
-    // A programming error must reach the runtime's error handling, not be
-    // laundered into a typed JSON response.
-    await expect(MiddlewareHandlers.apiAuthentication()(asContext, next)).rejects.toBeInstanceOf(TypeError);
+    const { asContext, context, next } = makeContext({ headers: { Authorization: 'Bearer tok' } });
+
+    await MiddlewareHandlers.apiAuthentication()(asContext, next);
+
+    // The mapper answers through `c.json`, so the status and envelope are read off
+    // the call the context recorded rather than off a `Response` — this double's
+    // `json` is a spy, not a renderer.
+    expect(context.json).toHaveBeenCalledWith(expect.anything(), 500, {});
+    const [body] = vi.mocked(context.json).mock.calls.at(-1) ?? [];
+    const envelope = body as { Exception: { Type: string; Message: string } };
+    expect(envelope.Exception.Type).toBeTruthy();
+    // A 5xx never publishes its own message: a raw `TypeError` carries a stack
+    // and an internal path.
+    expect(envelope.Exception.Message).not.toContain('bug');
   });
 
   it('publishes the account id alongside the address when one resolves', async () => {
@@ -210,7 +242,7 @@ describe('apiAuthentication', () => {
    */
   it('continues when the account id cannot be resolved', async () => {
     services.resolveUserId = () => Promise.reject(new Error('no metadata table'));
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { asContext, context, next } = makeContext({ demoMode: 'true' });
     await expect(MiddlewareHandlers.apiAuthentication()(asContext, next)).resolves.toBeUndefined();
     expect(context.set).toHaveBeenCalledWith('AuthenticatedUserEmailAddress', sharedConstants.DEMO_USER_EMAIL);
@@ -238,13 +270,7 @@ describe('activityAudit', () => {
     context.res.status = 201;
     await MiddlewareHandlers.activityAudit()(asContext, next);
 
-    expect(buildRequestEvent).toHaveBeenCalledWith(
-      context.req.raw,
-      'user@example.com',
-      201,
-      context.env,
-      null,
-    );
+    expect(buildRequestEvent).toHaveBeenCalledWith(context.req.raw, 'user@example.com', 201, context.env, null);
   });
 
   it('records the status carried by a thrown HTTP error', async () => {
@@ -254,7 +280,9 @@ describe('activityAudit', () => {
 
     const { asContext } = makeContext({});
     const boom = Object.assign(new Error('nope'), { status: 404 });
-    const thrower = (async () => { throw boom; }) as never;
+    const thrower = (async () => {
+      throw boom;
+    }) as never;
     await expect(MiddlewareHandlers.activityAudit()(asContext, thrower)).rejects.toBeTruthy();
     expect(record).toHaveBeenCalled();
   });
@@ -267,7 +295,7 @@ describe('activityAudit', () => {
   it('does not let an audit write failure escape', async () => {
     services.buildRequestEvent = () => ({ action: 'x' });
     services.record = () => Promise.reject(new Error('audit write failed'));
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { asContext, next } = makeContext({});
     await expect(MiddlewareHandlers.activityAudit()(asContext, next)).resolves.toBeUndefined();
@@ -278,7 +306,7 @@ describe('activityAudit', () => {
     services.buildRequestEvent = () => {
       throw new Error('cannot build');
     };
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { asContext, next } = makeContext({});
     // The request still succeeds: auditing is not allowed to fail the request.

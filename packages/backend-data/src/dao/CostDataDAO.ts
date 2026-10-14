@@ -7,7 +7,18 @@ import type { AssumableRoleOwner } from './AssumableRolesDAO';
 
 class CostDataDAO extends BaseDAO {
   public async upsertCostData(data: CostData): Promise<void> {
-    await this.run('INSERT OR REPLACE INTO cost_data (aws_account_id, period_start, period_end, total_cost, currency, service_breakdown, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [data.awsAccountId, data.periodStart, data.periodEnd, data.totalCost, data.currency, JSON.stringify(data.serviceBreakdown), TimestampUtil.getCurrentUnixTimestampInSeconds()]);
+    await this.run(
+      'INSERT OR REPLACE INTO cost_data (aws_account_id, period_start, period_end, total_cost, currency, service_breakdown, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        data.awsAccountId,
+        data.periodStart,
+        data.periodEnd,
+        data.totalCost,
+        data.currency,
+        JSON.stringify(data.serviceBreakdown),
+        TimestampUtil.getCurrentUnixTimestampInSeconds(),
+      ],
+    );
   }
 
   public async getCostDataByAccount(awsAccountId: string, startDate: string, endDate: string): Promise<CostData[]> {

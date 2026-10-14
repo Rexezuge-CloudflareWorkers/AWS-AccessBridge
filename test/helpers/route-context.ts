@@ -23,15 +23,14 @@ function createRouteContext<TEnv extends IEnv>(options?: RouteContextOptions): A
     batch: async () => [],
     withSession: () => database,
   };
-  const raw =
-    new Request(url, method === 'GET' || method === 'HEAD' ? { method } : { method, body: JSON.stringify(body) });
+  const raw = new Request(url, method === 'GET' || method === 'HEAD' ? { method } : { method, body: JSON.stringify(body) });
   return {
     req: {
       json: async () => body,
       raw,
       method,
       url,
-      header: () => undefined,
+      header: () => {},
     },
     env: {
       AccessBridgeDB: database,

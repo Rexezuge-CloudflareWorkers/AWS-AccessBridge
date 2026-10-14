@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HMACHandler } from '@/middleware/HMACHandler';
-import { HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS, HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW, HMAC_HANDLER_ERROR_REQUEST_REPLAYED, HMAC_HANDLER_ERROR_SIGNATURE_INVALID } from '@aws-access-bridge/shared/constants';
+import {
+  HMAC_HANDLER_ERROR_MISSING_AUTHENTICATION_HEADERS,
+  HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
+  HMAC_HANDLER_ERROR_REQUEST_REPLAYED,
+  HMAC_HANDLER_ERROR_SIGNATURE_INVALID,
+} from '@aws-access-bridge/shared/constants';
 import { INTERNAL_SIGNATURE_HEADER, INTERNAL_TIMESTAMP_HEADER } from '@aws-access-bridge/shared/constants';
 import { UnauthorizedError } from '@rexezuge/errors';
 import { generateHMACSignature, hashBody } from '@aws-access-bridge/backend-data/crypto/hmac';
@@ -106,7 +111,9 @@ describe('HMACHandler constants and validation logic', () => {
     it('throws time-window error for stale timestamps', async () => {
       const next = vi.fn();
       const c = (await signedContext({ timestamp: (NOW - 60_000).toString() })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(
+        HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
+      );
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -116,7 +123,9 @@ describe('HMACHandler constants and validation logic', () => {
       // skew and have its signatures accepted indefinitely.
       const next = vi.fn();
       const c = (await signedContext({ timestamp: (NOW + 60_000).toString() })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(
+        HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
+      );
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -132,7 +141,9 @@ describe('HMACHandler constants and validation logic', () => {
     it('rejects one millisecond past the window edge', async () => {
       const next = vi.fn();
       const c = (await signedContext({ timestamp: (NOW - WINDOW_MS - 1).toString() })) as never;
-      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW);
+      await expect(HMACHandler.validateInternalRequest(c, next, new FixedClock(NOW))).rejects.toThrow(
+        HMAC_HANDLER_ERROR_REQUEST_OUTSIDE_TIME_WINDOW,
+      );
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -158,14 +169,7 @@ describe('HMACHandler constants and validation logic', () => {
         'x-internal-user-email': 'user@example.com',
         [INTERNAL_TIMESTAMP_HEADER]: timestamp,
       };
-      const signature = await generateHMACSignature(
-        SECRET,
-        signedHeaders,
-        timestamp,
-        await hashBody(body),
-        '/api/aws/assume-role',
-        'POST',
-      );
+      const signature = await generateHMACSignature(SECRET, signedHeaders, timestamp, await hashBody(body), '/api/aws/assume-role', 'POST');
       const headers = { ...signedHeaders, [INTERNAL_SIGNATURE_HEADER]: signature };
       const raw = new Request('https://self.invalid/api/aws/assume-role', { method: 'POST', headers, body });
       return {
@@ -187,9 +191,9 @@ describe('HMACHandler constants and validation logic', () => {
       await HMACHandler.validateInternalRequest((await signedContext()) as never, next, new FixedClock(NOW), guard);
       expect(next).toHaveBeenCalledOnce();
 
-      await expect(
-        HMACHandler.validateInternalRequest((await signedContext()) as never, next, new FixedClock(NOW), guard),
-      ).rejects.toThrow(HMAC_HANDLER_ERROR_REQUEST_REPLAYED);
+      await expect(HMACHandler.validateInternalRequest((await signedContext()) as never, next, new FixedClock(NOW), guard)).rejects.toThrow(
+        HMAC_HANDLER_ERROR_REQUEST_REPLAYED,
+      );
       // The replay must not have reached the handler a second time.
       expect(next).toHaveBeenCalledOnce();
     });
@@ -209,12 +213,16 @@ describe('HMACHandler constants and validation logic', () => {
       expect(store.size).toBe(0);
 
       // The genuine request therefore still works.
-      await expect(HMACHandler.validateInternalRequest((await signedContext()) as never, vi.fn(), new FixedClock(NOW), guard)).resolves.toBeUndefined();
+      await expect(
+        HMACHandler.validateInternalRequest((await signedContext()) as never, vi.fn(), new FixedClock(NOW), guard),
+      ).resolves.toBeUndefined();
     });
 
     it('still verifies when no guard is supplied', async () => {
       const next = vi.fn();
-      await expect(HMACHandler.validateInternalRequest((await signedContext()) as never, next, new FixedClock(NOW))).resolves.toBeUndefined();
+      await expect(
+        HMACHandler.validateInternalRequest((await signedContext()) as never, next, new FixedClock(NOW)),
+      ).resolves.toBeUndefined();
       expect(next).toHaveBeenCalledOnce();
     });
   });

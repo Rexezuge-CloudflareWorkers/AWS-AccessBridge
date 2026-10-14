@@ -22,10 +22,7 @@ const EXCLUDE_DIRS = new Set(['node_modules', 'dist', '.wrangler', 'coverage', '
 // god files. The suffix set is built from the extensions rather than enumerated,
 // so a new test extension cannot silently escape.
 const TEST_SUFFIX = ['test', 'spec'];
-const EXCLUDE_SUFFIX = [
-  ...TEST_SUFFIX.flatMap((kind) => ['.ts', '.tsx', '.js', '.jsx', '.mjs'].map((ext) => `.${kind}${ext}`)),
-  '.d.ts',
-];
+const EXCLUDE_SUFFIX = [...TEST_SUFFIX.flatMap((kind) => ['.ts', '.tsx', '.js', '.jsx', '.mjs'].map((ext) => `.${kind}${ext}`)), '.d.ts'];
 
 /**
 Paths relative to ROOT, so the patterns below can match on directory too.

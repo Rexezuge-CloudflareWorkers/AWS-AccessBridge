@@ -28,12 +28,7 @@ class S3Collector extends BaseAwsCollector {
         if (token) {
           query.set('continuation-token', token);
         }
-        const xmlText: string = await this.fetchText(
-          `https://s3.amazonaws.com/?${query.toString()}`,
-          's3',
-          'us-east-1',
-          accessKeys,
-        );
+        const xmlText: string = await this.fetchText(`https://s3.amazonaws.com/?${query.toString()}`, 's3', 'us-east-1', accessKeys);
         return { page: xmlText, nextToken: parseXmlTag(xmlText, 'NextContinuationToken') };
       },
       (page: string): string | undefined => parseXmlTag(page, 'NextContinuationToken'),

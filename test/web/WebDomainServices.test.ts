@@ -22,9 +22,7 @@ describe('accountService', () => {
     // stringify a `URL` through its default `toString` and a `Request` as `[object Object]`.
     // Narrowing to the string form the assertion below actually needs says which it is.
     vi.mocked(fetch).mockImplementation((url) =>
-      Promise.resolve(
-        jsonResponse(typeof url === 'string' && url.includes('search') ? { '1': { roles: [] } } : { totalAccounts: 0 }),
-      ),
+      Promise.resolve(jsonResponse(typeof url === 'string' && url.includes('search') ? { '1': { roles: [] } } : { totalAccounts: 0 })),
     );
     await expect(listAccounts({ showHidden: false, searchTerm: 'dev', pageSize: 10, currentPage: 1 })).resolves.toMatchObject({ total: 1 });
     await expect(listAccounts({ showHidden: true, searchTerm: '', pageSize: 10, currentPage: 2 })).resolves.toMatchObject({ total: 0 });
@@ -87,7 +85,15 @@ describe('costService + resourceService + authService', () => {
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response('err', { status: 500 })));
     await expect(loadResourceSummary()).rejects.toMatchObject({ status: 500 });
 
-    const item = { awsAccountId: '1', region: 'us-east-1', resourceType: 'ec2', resourceId: 'i-1', resourceName: 'web', state: 'running', metadata: {} };
+    const item = {
+      awsAccountId: '1',
+      region: 'us-east-1',
+      resourceType: 'ec2',
+      resourceId: 'i-1',
+      resourceName: 'web',
+      state: 'running',
+      metadata: {},
+    };
     expect(getConsoleDestination(item)?.path).toContain('i-1');
     expect(getConsoleDestination({ ...item, resourceType: 's3', region: 'global' })).toMatchObject({ region: undefined });
     expect(getConsoleDestination({ ...item, resourceType: 'dynamodb', resourceId: 'us-east-1:table' })?.path).toContain('table');

@@ -30,10 +30,7 @@ export default function WizardProgress({ step }: { step: number }) {
             >
               {i < step ? '✓' : i + 1}
             </div>
-            <span
-              className="text-sm font-medium"
-              style={{ color: i === step ? 'white' : i < step ? '#4ade80' : '#6b7280' }}
-            >
+            <span className="text-sm font-medium" style={{ color: i === step ? 'white' : i < step ? '#4ade80' : '#6b7280' }}>
               {t(`onboarding.step${STEPS[i]}`, STEPS[i])}
             </span>
           </div>

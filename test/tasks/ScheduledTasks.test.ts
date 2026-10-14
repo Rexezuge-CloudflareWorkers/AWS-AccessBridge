@@ -2,17 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuditLogDAO } from '@aws-access-bridge/backend-data/dao/AuditLogDAO';
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
 import { AuditLogCleanupTask } from '@aws-access-bridge/background/scheduled/AuditLogCleanupTask';
-import { IScheduledTask } from '@aws-access-bridge/background/scheduled/IScheduledTask';
-import type { IEnv, TaskRunSummary } from '@aws-access-bridge/background/scheduled/IScheduledTask';
+import { CronTask } from '@aws-access-bridge/background/scheduled/CronTask';
+import type { IEnv } from '@aws-access-bridge/background/scheduled/CronTask';
+import type { TaskRunSummary } from '@rexezuge/runtime';
 
 vi.mock('@aws-access-bridge/backend-data/dao/AuditLogDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO');
 
 function createEvent(): ScheduledController {
-  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => undefined };
+  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => {} };
 }
 
-class TrackedTask extends IScheduledTask<IEnv> {
+/**
+ * Named rather than inlined: the template takes `TEnv`, and five call sites would
+ * otherwise each carry the same cast.
+ */
+function runEnv(): IEnv {
+  return { AccessBridgeDB: {} } as unknown as IEnv;
+}
+
+class TrackedTask extends CronTask<IEnv> {
   public calls = 0;
 
   protected override getTaskType(): string {
@@ -25,13 +34,13 @@ class TrackedTask extends IScheduledTask<IEnv> {
   }
 }
 
-class UntrackedTask extends IScheduledTask<IEnv> {
+class UntrackedTask extends CronTask<IEnv> {
   protected async handleScheduledTask(): Promise<TaskRunSummary> {
     return { itemsProcessed: 0, itemsFailed: 0 };
   }
 }
 
-describe('IScheduledTask run tracking', () => {
+describe('CronTask run tracking', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -40,7 +49,7 @@ describe('IScheduledTask run tracking', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-1');
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
     const task = new TrackedTask();
-    await task.handle(createEvent(), { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env, {} as unknown as ExecutionContext);
+    await task.handle(createEvent(), runEnv(), {} as unknown as ExecutionContext);
     expect(task.calls).toBe(1);
     expect(BackgroundTaskRunDAO.prototype.startRun).toHaveBeenCalledWith({ taskType: 'test-task' });
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith('run-1', {
@@ -50,10 +59,10 @@ describe('IScheduledTask run tracking', () => {
     });
   });
 
-  it('records failure when the task throws, then rethrows', async () => {
+  it('records the failure, then rethrows so the caller sees the cron failed', async () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-9');
     vi.mocked(BackgroundTaskRunDAO.prototype.failRun).mockResolvedValue(undefined);
-    class FailingTask extends IScheduledTask<IEnv> {
+    class FailingTask extends CronTask<IEnv> {
       protected override getTaskType(): string {
         return 'failing-task';
       }
@@ -62,25 +71,23 @@ describe('IScheduledTask run tracking', () => {
         throw new Error('kaput');
       }
     }
-    await expect(
-      new FailingTask().handle(
-        createEvent(),
-        { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env,
-        {} as unknown as ExecutionContext,
-      ),
-    ).rejects.toThrow('kaput');
-    expect(BackgroundTaskRunDAO.prototype.failRun).toHaveBeenCalledWith('run-9', 'Error: kaput');
+    // The original error reaches the caller, not a summary of it. The template
+    // writes `failRun` **before** it re-raises, so the run row already says why by
+    // the time `CronTasksWorker` sees the rejection — which is what makes the
+    // cron answer `failed` instead of `completed`.
+    await expect(new FailingTask().handle(createEvent(), runEnv(), {} as unknown as ExecutionContext)).rejects.toThrow('kaput');
+    expect(BackgroundTaskRunDAO.prototype.failRun).toHaveBeenCalledWith('run-9', 'kaput', undefined);
   });
 
   it('skips tracking for tasks without a task type', async () => {
-    await new UntrackedTask().handle(createEvent(), {} as unknown as Env, {} as unknown as ExecutionContext);
+    await new UntrackedTask().handle(createEvent(), runEnv(), {} as unknown as ExecutionContext);
     expect(BackgroundTaskRunDAO.prototype.startRun).not.toHaveBeenCalled();
   });
 
   it('still runs the task when the run record cannot start', async () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockRejectedValue(new Error('D1 down'));
     const task = new TrackedTask();
-    await task.handle(createEvent(), { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env, {} as unknown as ExecutionContext);
+    await task.handle(createEvent(), runEnv(), {} as unknown as ExecutionContext);
     expect(task.calls).toBe(1);
     expect(BackgroundTaskRunDAO.prototype.succeedRun).not.toHaveBeenCalled();
   });
@@ -96,7 +103,7 @@ describe('AuditLogCleanupTask pruning', () => {
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-2');
     vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
     const task = new AuditLogCleanupTask();
-    await task.handle(createEvent(), { AccessBridgeDB: {} as unknown as D1Database } as unknown as Env, {} as unknown as ExecutionContext);
+    await task.handle(createEvent(), runEnv(), {} as unknown as ExecutionContext);
     expect(AuditLogDAO.prototype.deleteOlderThanBatch).toHaveBeenCalledTimes(2);
     expect(AuditLogDAO.prototype.deleteOlderThanBatch).toHaveBeenCalledWith(expect.any(Number), 500);
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith('run-2', {

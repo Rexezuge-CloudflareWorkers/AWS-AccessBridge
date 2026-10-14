@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { BadGatewayError } from '@rexezuge/errors';
-import { TimeoutAwsClient, createAwsClientFactory, DEFAULT_AWS_FETCH_TIMEOUT_MS, fetchWithTimeout } from '@aws-access-bridge/provider-clients/aws';
+import {
+  TimeoutAwsClient,
+  createAwsClientFactory,
+  DEFAULT_AWS_FETCH_TIMEOUT_MS,
+  fetchWithTimeout,
+} from '@aws-access-bridge/provider-clients/aws';
 import { StsClient } from '@aws-access-bridge/provider-clients/aws/StsClient';
 import type { AwsSignedClient } from '@aws-access-bridge/provider-clients/aws';
 

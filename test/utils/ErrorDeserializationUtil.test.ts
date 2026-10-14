@@ -33,9 +33,12 @@ describe('ErrorDeserializationUtil', () => {
     });
 
     it('deserializes InternalServerError', async () => {
-      const response = Response.json({ Exception: { Type: 'InternalServerError', Message: 'server error' } }, {
-        status: 500,
-      });
+      const response = Response.json(
+        { Exception: { Type: 'InternalServerError', Message: 'server error' } },
+        {
+          status: 500,
+        },
+      );
       const error = await ErrorDeserializationUtil.deserializeError(response);
       expect(error).toBeInstanceOf(InternalServerError);
       expect(error.message).toBe('server error');

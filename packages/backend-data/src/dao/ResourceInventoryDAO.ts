@@ -6,12 +6,44 @@ import { ownerClause } from './AssumableRolesQueries';
 import type { AssumableRoleOwner } from './AssumableRolesDAO';
 
 class ResourceInventoryDAO extends BaseDAO {
+  /**
+   * The single largest write in the repository.
+   *
+   * Every collection sweep writes one row per discovered resource, per account, per
+   * region — so this is where `changes` and *cost* diverge most. D1 bills the write
+   * as the table row plus every index entry it rewrote, and this table carries
+   * three indexes, so a caller reading only `changes` believes it has roughly a
+   * quarter of the headroom it actually has against the daily write allowance.
+   *
+   * `runTracked` is used even though nothing here reads the result, because the
+   * accounting happens in the DAO base: a write whose cost nobody records is a
+   * write nobody can budget, and the symptom arrives as the platform refusing the
+   * day's writes with no application error behind it.
+   */
   public async upsertResource(item: ResourceInventoryItem): Promise<void> {
-    await this.run('INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [item.awsAccountId, item.region, item.resourceType, item.resourceId, item.resourceName, item.state, JSON.stringify(item.metadata), item.collectedAt]);
+    await this.runTracked(
+      this.tracked(
+        'INSERT OR REPLACE INTO resource_inventory (aws_account_id, region, resource_type, resource_id, resource_name, state, metadata, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          item.awsAccountId,
+          item.region,
+          item.resourceType,
+          item.resourceId,
+          item.resourceName,
+          item.state,
+          JSON.stringify(item.metadata),
+          item.collectedAt,
+        ],
+      ),
+    );
   }
 
   public async deleteStaleResources(awsAccountId: string, resourceType: string, olderThan: number): Promise<void> {
-    await this.run('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?', [awsAccountId, resourceType, olderThan]);
+    await this.run('DELETE FROM resource_inventory WHERE aws_account_id = ? AND resource_type = ? AND collected_at < ?', [
+      awsAccountId,
+      resourceType,
+      olderThan,
+    ]);
   }
 
   public async deleteOrphaned(): Promise<number> {

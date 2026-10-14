@@ -29,7 +29,10 @@ class RoleConfigsDAO extends BaseDAO {
     destinationRegion?: string,
     roleSessionDurationSeconds?: number,
   ): Promise<void> {
-    await this.run('INSERT OR REPLACE INTO role_configs (aws_account_id, role_name, destination_path, destination_region, role_session_duration_seconds) VALUES (?, ?, ?, ?, ?)', [awsAccountId, roleName, destinationPath || null, destinationRegion || null, roleSessionDurationSeconds ?? null]);
+    await this.run(
+      'INSERT OR REPLACE INTO role_configs (aws_account_id, role_name, destination_path, destination_region, role_session_duration_seconds) VALUES (?, ?, ?, ?, ?)',
+      [awsAccountId, roleName, destinationPath || null, destinationRegion || null, roleSessionDurationSeconds ?? null],
+    );
   }
 
   public async deleteRoleConfig(awsAccountId: string, roleName: string): Promise<void> {

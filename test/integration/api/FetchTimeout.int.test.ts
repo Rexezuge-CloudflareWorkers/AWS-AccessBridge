@@ -42,12 +42,9 @@ describe('fetchWithTimeout under the Workers runtime', () => {
   });
 
   it('rejects a fetch that never settles at all', async () => {
-    const failure: unknown = await fetchWithTimeout(
-      () => new Promise<Response>(() => undefined),
-      {},
-      'sts.eu-west-1.amazonaws.com',
-      25,
-    ).catch((error: unknown) => error);
+    const failure: unknown = await fetchWithTimeout(() => new Promise<Response>(() => {}), {}, 'sts.eu-west-1.amazonaws.com', 25).catch(
+      (error: unknown) => error,
+    );
 
     expect(failure).toBeInstanceOf(BadGatewayError);
     expect((failure as BadGatewayError).message).toContain('sts.eu-west-1.amazonaws.com');

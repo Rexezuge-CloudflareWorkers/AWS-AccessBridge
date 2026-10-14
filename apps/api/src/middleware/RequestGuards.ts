@@ -1,6 +1,8 @@
 import { CSRF_ERROR_CROSS_SITE_FETCH, CSRF_ERROR_UNSUPPORTED_CONTENT_TYPE } from '@aws-access-bridge/shared/constants';
 import { RateLimitedError } from '@rexezuge/errors';
+import { clientIp, securityHeaders, sensitivePaths } from '@rexezuge/http';
 import { Context, Next } from 'hono';
+import { asHeaderContext } from './kitContext';
 
 /**
  * The three middleware that guard a request *before* anything authenticates it.
@@ -44,7 +46,10 @@ async function rateLimitHandler(c: PlainContext, next: Next): Promise<Response |
     await next();
     return;
   }
-  const key: string = c.req.header('cf-connecting-ip')?.trim() || 'unknown';
+  // `clientIp` is the kit's one-header read, adopted so the "which header is the
+  // client address" decision lives in one place in the family rather than in
+  // every repo's limiter.
+  const key: string = clientIp((name) => c.req.header(name));
   const { success }: { success: boolean } = await limiter.limit({ key });
   if (!success) {
     return c.json({ Exception: { Type: 'RateLimited', Message: new RateLimitedError().message } }, 429);
@@ -53,7 +58,7 @@ async function rateLimitHandler(c: PlainContext, next: Next): Promise<Response |
 }
 
 /**
- * Mark every response uncacheable.
+ * Mark every response uncacheable, and apply the baseline security headers.
  *
  * Registered FIRST on both surfaces, wrapping the rest of the chain. It awaits
  * `next()` and then sets the header, so it must sit outside any handler that can
@@ -63,9 +68,27 @@ async function rateLimitHandler(c: PlainContext, next: Next): Promise<Response |
  * `/user/*` and `/api/*` answers carry AWS `SecretAccessKey`/`SessionToken`, a
  * 15-minute pre-authenticated console URL, and account and audit data — none of
  * which should survive in a shared cache or the browser's back/forward cache.
+ *
+ * The baseline headers are `@rexezuge/http`'s `securityHeaders`, which this
+ * repository had none of. The content-security policy is what stops a value
+ * reflected into an error message from becoming script: every JSON envelope here
+ * embeds a message the caller partly controls (an ARN echoed back in a 400, a
+ * locale tag in a 422), so without a CSP a rendering mistake in one of them is a
+ * stored-XSS primitive.
+ *
+ * `sensitivePaths` names the two surfaces that carry credentials, and the kit
+ * takes that predicate as a **required** argument rather than defaulting it —
+ * a list nobody thought about should not silently mean "nothing is private".
  */
 async function noStoreHandler(c: PlainContext, next: Next): Promise<void> {
   await next();
+  // The kit's **middleware** form rather than `applySecurityHeaders` directly,
+  // because it wraps the header pass in its own try/catch and headers must never
+  // fail a request. `c.res` is only materialised once a handler has produced a
+  // response, so a chain where the route returns without calling `next()` leaves
+  // it undefined — and a security header that throws on the way to setting one
+  // would take the response down with it.
+  await securityHeaders(sensitivePaths('/api', '/user'))(asHeaderContext(c), async () => {});
   c.header('Cache-Control', 'no-store, max-age=0');
   // Belt and braces for the redirect: a 302 whose `Location` carries a console
   // token is itself the sensitive artefact.
