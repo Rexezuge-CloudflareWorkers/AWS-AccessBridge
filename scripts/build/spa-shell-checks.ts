@@ -30,7 +30,17 @@ export const SPA_HTML_MARKER = 'export const SPA_HTML: string = ';
  */
 export interface ShellProblem {
   readonly code:
-    'missing' | 'unexported' | 'stub' | 'malformed' | 'too-small' | 'no-assets' | 'missing-asset' | 'dist-missing' | 'disagreement';
+    | 'missing'
+    | 'unexported'
+    | 'stub'
+    | 'malformed'
+    | 'too-small'
+    | 'no-assets'
+    | 'missing-asset'
+    | 'dist-missing'
+    | 'disagreement'
+    | 'missing-css'
+    | 'missing-tailwind-utility';
   readonly detail: string;
 }
 
@@ -202,4 +212,61 @@ export function checkShell(shellSource: string | null, distIndex: string | null,
   }
 
   return problems;
+}
+
+/**
+ * The Tailwind utilities the SPA cannot ship without. Each one is emitted only by
+ * a kit primitive that the scanner must reach through the `@source` directive in
+ * `globals.css` — `animate-spin` by `Spinner`, `animate-backdrop-in`/`inset-0` by
+ * `ModalShell`, `sr-only`/`-translate-x-1/2`/`max-w-[calc(100vw-2rem)]` by
+ * `NoticeBar`, `focus-visible:ring-2` by `Button`. None of them is used app-locally,
+ * so their absence means the kit's styling never made it into the bundle.
+ *
+ * Compared after stripping every backslash, so the Tailwind-escape form
+ * (`.bg-\[var\(--color-accent\)\]`) and the plain source token (`bg-[var(--color-accent)]`)
+ * agree.
+ */
+export const KIT_REQUIRED_CSS_TOKENS: readonly string[] = [
+  'animate-spin',
+  'animate-backdrop-in',
+  'inset-0',
+  'sr-only',
+  '-translate-x-1/2',
+  'max-w-[calc(100vw-2rem)]',
+  'focus-visible:ring-2',
+  'bg-[var(--color-accent)]',
+];
+
+/**
+ * The problems with the built CSS bundle.
+ *
+ * `css` is the bundle text, or `null` when no bundle exists. A missing bundle is a
+ * build that did not run; a bundle missing one of the kit tokens means `globals.css`
+ * lost its `@source` line, so only half the kit is styled.
+ */
+export function checkCss(css: string | null): ShellProblem[] {
+  if (css === null) {
+    return [
+      {
+        code: 'missing-css',
+        detail: 'No CSS bundle found in apps/web/dist/assets — run `pnpm run build`.',
+      },
+    ];
+  }
+  const normalized = css.replace(/\\/g, '');
+  const missing = KIT_REQUIRED_CSS_TOKENS.filter((token) => !normalized.includes(token.replace(/\\/g, '')));
+  if (missing.length === 0) {
+    return [];
+  }
+  return [
+    {
+      code: 'missing-tailwind-utility',
+      detail:
+        'The built CSS is missing the kit primitive utilities ' +
+        missing.map((token) => `\`${token}\``).join(', ') +
+        ' — these only compile when `apps/web/src/globals.css` declares ' +
+        '`@source "../node_modules/@rexezuge/web/dist/*.js";`. Without it every shared control ships without styling. ' +
+        'Run `pnpm run build` after restoring the line.',
+    },
+  ];
 }
