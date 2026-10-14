@@ -31,8 +31,13 @@
  * diagnostic fields and train everyone to ignore the markers.
  */
 
-import { consoleSink, createLogger as createKitLogger } from '@rexezuge/runtime';
-import type { LogLevel, LogSink } from '@rexezuge/runtime';
+// Deep path, never the `@rexezuge/runtime` barrel: the barrel re-exports the
+// worker bases (`AbstractDurableObjectWorker`, …), which import
+// `cloudflare:workers`. Through the barrel, every consumer of this module —
+// including the `apps/web` Vite bundle and the plain-Node `test/floci`
+// global setup — inherits a Workers-only import it cannot resolve.
+import { consoleSink, createLogger as createKitLogger } from '@rexezuge/runtime/logger';
+import type { LogLevel, LogSink } from '@rexezuge/runtime/logger';
 
 interface LogFields {
   [key: string]: unknown;

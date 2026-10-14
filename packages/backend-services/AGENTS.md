@@ -171,7 +171,10 @@ or pasted under a harmless key is still caught. Errors reduce to their message, 
 bag degrades to a note rather than overflowing while reporting a failure.
 
 The **emit** machinery is now the kit's: `@rexezuge/runtime`'s `createLogger`, given this repository's
-deny-list as its `LogSink`. Level resolution, the namespace prefix and the one-line rendering are
+deny-list as its `LogSink`. It is imported from the deep path `@rexezuge/runtime/logger`, never the
+kit barrel — the barrel re-exports the worker bases, which import `cloudflare:workers`, and that
+one specifier is what broke the `apps/web` Vite build and the plain-Node `test/floci` global setup
+at the same time. Level resolution, the namespace prefix and the one-line rendering are
 `consoleSink`'s; the deny-list is ours, because which key names mean "secret" is a property of this
 repository's data model and a kit that guessed across nine repos' vocabularies would redact diagnostic
 fields and train everyone to ignore the markers.

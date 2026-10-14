@@ -1,5 +1,5 @@
 import { Container } from '@rexezuge/runtime/di/Container';
-import { setLogLevel } from '@rexezuge/runtime';
+import { setLogLevel } from '@rexezuge/runtime/logger';
 import { InternalServerError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { createEncryptionKeys, keyChain } from './encryptionKeys';
