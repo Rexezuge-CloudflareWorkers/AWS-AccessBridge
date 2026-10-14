@@ -28,7 +28,15 @@ Use `@rexezuge/web` for converged controls (`Spinner`, `Pagination`, `FocusInput
 `useCopyToClipboard`). Keep app-only pages, feature widgets, translations, and the
 backend-authoritative language save flow local. Map app labels through component props; do not fork a
 shared control just to call i18next. `globals.css` supplies the SDK's shared color variables — all 22
-of them, which is why adopting a class-based control needs no stylesheet change.
+of them — **but the variables are necessary, not sufficient.** The kit's controls are Tailwind-class
+based (`bg-[var(--color-accent)]`, `animate-spin`, `focus-visible:ring-2`, `inset-0`, ...) and
+Tailwind v4 scans only the Vite project root, which excludes `node_modules`. A control adopted from
+`@rexezuge/web` is therefore silent — its markup renders, its classes do not — unless `globals.css`
+names the kit as a Tailwind source:
+
+    @source "../node_modules/@rexezuge/web/dist/*.js";
+
+That line is load-bearing; deleting it unstyles every kit primitive in the SPA. `scripts/build/verify-spa-shell.ts` (run by the `spa-shell` CI job, after the web build) fails the build if any kit class is absent from the generated CSS.
 
 There is **no `components/ui/` directory** and there never was; an earlier version of this guide named
 one, and a reader looking for a file to edit found nothing. `AccessKeyModal` and `Unauthorized` are

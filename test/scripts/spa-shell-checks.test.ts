@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkShell, MIN_HTML_BYTES, readEmbeddedHtml, referencedAssets, SPA_HTML_MARKER } from '../../scripts/build/spa-shell-checks';
+import { checkShell, checkCss, KIT_REQUIRED_CSS_TOKENS, MIN_HTML_BYTES, readEmbeddedHtml, referencedAssets, SPA_HTML_MARKER } from '../../scripts/build/spa-shell-checks';
 
 /**
  * The shell checks, as rules.
@@ -143,4 +143,24 @@ describe('checkShell', () => {
     const problems = checkShell(`${SPA_HTML_MARKER}'';`, null, has([]));
     expect(problems.map((problem) => problem.code)).toEqual(['stub']);
   });
+});
+
+describe('checkCss', () => {
+  it('passes on the full set of kit-console tokens', () => {
+    const css = KIT_REQUIRED_CSS_TOKENS.join(' ');
+    expect(checkCss(css)).toHaveLength(0);
+  });
+
+  it('reports the missing token names', () => {
+    const css = KIT_REQUIRED_CSS_TOKENS.slice(1).join(' ');
+    const problems = checkCss(css);
+    expect(problems.map((problem) => problem.code)).toEqual(['missing-tailwind-utility']);
+    expect(problems[0]?.detail).toContain('animate-spin');
+    expect(problems[0]?.detail).toContain('@source');
+  });
+
+  it('names a missing bundle `missing-css`', () => {
+    expect(checkCss(null).map((problem) => problem.code)).toEqual(['missing-css']);
+  });
+
 });

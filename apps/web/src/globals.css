@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Scan the kit's class-based primitives (Button, ModalShell, NoticeBar, Spinner,
+   Unauthorized, etc.). They live in node_modules, which @tailwindcss/vite excludes,
+   so without this directive their Tailwind utilities are never generated. */
+@source "../node_modules/@rexezuge/web/dist/*.js";
+
 :root {
   --color-accent: #2563eb;
   --color-accent-dim: #1d4ed8;

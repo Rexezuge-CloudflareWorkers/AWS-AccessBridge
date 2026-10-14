@@ -37,10 +37,10 @@
  * only does I/O and reporting. `tsx` rather than `node` because of the extensionless
  * sibling import, as every other entrypoint here is.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkShell } from './spa-shell-checks';
+import { checkShell, checkCss } from './spa-shell-checks';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHELL_PATH = path.join(ROOT, 'apps/api/src/generated/spa-shell.ts');
@@ -55,7 +55,27 @@ function readIfPresent(file: string): string | null {
   }
 }
 
+function readCssBundle(dir: string): string | null {
+  try {
+    const cssFiles = readdirSync(dir).filter((file) => file.endsWith('.css'));
+    if (cssFiles.length !== 1) return null;
+    const cssFile = cssFiles[0];
+    if (cssFile === undefined) return null;
+    return readFileSync(path.join(dir, cssFile), 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 const problems = checkShell(readIfPresent(SHELL_PATH), readIfPresent(DIST_INDEX), (asset) => existsSync(path.join(DIST_ASSETS, asset)));
+
+// The web build also emits a CSS bundle in `dist/assets`. The SPA shell check
+// cannot see CSS class names (they are hashed in at build time, not bundled into the
+// shell), so verify them here from the on-disk bundle rather than from the served HTML.
+const cssBundle = readCssBundle(DIST_ASSETS);
+for (const problem of checkCss(cssBundle)) {
+  problems.push(problem);
+}
 
 if (problems.length > 0) {
   console.error('SPA shell check failed:');
