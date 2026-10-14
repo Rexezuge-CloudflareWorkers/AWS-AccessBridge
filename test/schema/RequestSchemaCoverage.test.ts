@@ -97,9 +97,7 @@ describe('request schema coverage', () => {
 
   it('covers every validated route with either a schema or the input-free list', () => {
     const covered: Set<string> = new Set([...Object.keys(RequestInputSchemas), ...INPUT_FREE_ROUTES, ...NON_ENDPOINT_ROUTES]);
-    const uncovered: string[] = routes
-      .map((route) => routeKey(route.method, route.path))
-      .filter((key) => !covered.has(key));
+    const uncovered: string[] = routes.map((route) => routeKey(route.method, route.path)).filter((key) => !covered.has(key));
     expect(uncovered).toEqual([]);
   });
 

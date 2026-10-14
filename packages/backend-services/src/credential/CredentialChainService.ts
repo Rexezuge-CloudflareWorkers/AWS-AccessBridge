@@ -110,8 +110,8 @@ class CredentialChainService {
       if (credential.assumedBy) {
         assumedBy = credential.assumedBy;
       }
-    // No depth term here either; see the throw above. Bounding the walk by a counter
-    // in the condition is what let the increment and the boundary check disagree.
+      // No depth term here either; see the throw above. Bounding the walk by a counter
+      // in the condition is what let the increment and the boundary check disagree.
     } while (credential.assumedBy && credential.assumedBy.length > 0);
     if (credential.accessKeyId && credential.secretAccessKey) {
       if (trustChain.length > 1) {

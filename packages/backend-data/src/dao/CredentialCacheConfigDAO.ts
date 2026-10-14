@@ -2,7 +2,6 @@ import { TimestampUtil } from '@rexezuge/shared';
 import { toSafeBatchSize } from './BatchSize';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 class CredentialCacheConfigDAO extends BaseDAO {
   /**
    * Idempotently register a principal for scheduled cache refresh.
@@ -12,21 +11,18 @@ class CredentialCacheConfigDAO extends BaseDAO {
    * on the primary key.
    */
   public async create(principalArn: string): Promise<void> {
-    const result = await this.run('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)', [principalArn]);
-    assertD1Success(result, `create cache config`);
+    await this.run('INSERT OR IGNORE INTO credential_cache_config (principal_arn) VALUES (?)', [principalArn]);
   }
 
   public async delete(principalArn: string): Promise<void> {
-    const result = await this.run('DELETE FROM credential_cache_config WHERE principal_arn = ?', [principalArn]);
-    assertD1Success(result, `delete cache config`);
+    await this.run('DELETE FROM credential_cache_config WHERE principal_arn = ?', [principalArn]);
   }
 
   public async updateLastCachedTime(
     principalArn: string,
     timestamp: number = TimestampUtil.getCurrentUnixTimestampInSeconds(),
   ): Promise<void> {
-    const result = await this.run('UPDATE credential_cache_config SET last_cached_at = ? WHERE principal_arn = ?', [timestamp, principalArn]);
-    assertD1Success(result, `update cache config`);
+    await this.run('UPDATE credential_cache_config SET last_cached_at = ? WHERE principal_arn = ?', [timestamp, principalArn]);
   }
 
   /**

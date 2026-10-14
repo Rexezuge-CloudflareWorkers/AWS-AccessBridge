@@ -24,7 +24,11 @@ describe('AuditEventBuilder', () => {
   });
 
   function complete(): AuditEventBuilder {
-    return AuditEventBuilder.create().userEmail('user@example.com').action('ASSUME_ROLE').request('POST', '/user/aws/assume-role').status(200);
+    return AuditEventBuilder.create()
+      .userEmail('user@example.com')
+      .action('ASSUME_ROLE')
+      .request('POST', '/user/aws/assume-role')
+      .status(200);
   }
 
   it('builds a complete event', () => {
@@ -89,7 +93,15 @@ describe('AuditEventBuilder', () => {
     // together, so the public API **cannot** produce an event carrying a method with no
     // path. Omitting `path` is reachable only by breaking the signature, so the case
     // this row covers is currently only reachable by a type error.
-    ['path', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').request('GET', undefined as unknown as string).status(200)],
+    [
+      'path',
+      (): AuditEventBuilder =>
+        AuditEventBuilder.create()
+          .userEmail('u@e.com')
+          .action('A')
+          .request('GET', undefined as unknown as string)
+          .status(200),
+    ],
     ['statusCode', (): AuditEventBuilder => AuditEventBuilder.create().userEmail('u@e.com').action('A').request('GET', '/x')],
   ])('refuses to build without %s', (_field, build) => {
     // A partial audit row is worse than none: it would look like a real entry

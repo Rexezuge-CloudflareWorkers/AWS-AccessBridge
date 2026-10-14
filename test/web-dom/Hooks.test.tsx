@@ -180,7 +180,7 @@ describe('useAuth', () => {
   });
 
   it('starts unauthorized-pending, so the app can show a spinner', () => {
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => undefined)));
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
     const { result } = renderHook(() => useAuth());
 
     // `null` is distinct from `false`: it means "not decided yet", and SpaApp
@@ -270,7 +270,8 @@ describe('useAuth', () => {
   });
 
   it('reloads the profile when requested', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(jsonResponse(user))
       .mockResolvedValueOnce(jsonResponse({ ...user, preferredLanguage: 'de' }));
     vi.stubGlobal('fetch', fetchMock);

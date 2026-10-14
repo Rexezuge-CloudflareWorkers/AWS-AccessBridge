@@ -6,7 +6,7 @@ function createEnv(): CloudflareEnv {
 }
 
 function createExecutionContext(): ExecutionContext {
-  return { waitUntil: () => undefined, passThroughOnException: () => undefined } as unknown as ExecutionContext;
+  return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
 }
 
 class RecordingWorker extends AbstractEntrypointWorker {
@@ -38,14 +38,21 @@ describe('AbstractEntrypointWorker', () => {
    * `triggers.crons` can reach. There is no longer a trigger path: every request
    * is an ordinary one.
    */
-  it.each(['/__scheduled', '/__scheduled/extra', '/__scheduled?cron=*%2F10+*+*+*+*'])('routes %s to onRequest rather than the scheduler', async (path) => {
-    const worker = new RecordingWorker();
-    const response = await worker.fetch(new Request(`https://worker.example.com${path}`, { method: 'POST' }), createEnv(), createExecutionContext());
-    expect(await response.text()).toBe('handled');
-    expect(worker.requestCalls).toHaveLength(1);
-    // The scheduler is reachable only through `scheduled()`, never `fetch()`.
-    expect(worker.scheduledCalls).toHaveLength(0);
-  });
+  it.each(['/__scheduled', '/__scheduled/extra', '/__scheduled?cron=*%2F10+*+*+*+*'])(
+    'routes %s to onRequest rather than the scheduler',
+    async (path) => {
+      const worker = new RecordingWorker();
+      const response = await worker.fetch(
+        new Request(`https://worker.example.com${path}`, { method: 'POST' }),
+        createEnv(),
+        createExecutionContext(),
+      );
+      expect(await response.text()).toBe('handled');
+      expect(worker.requestCalls).toHaveLength(1);
+      // The scheduler is reachable only through `scheduled()`, never `fetch()`.
+      expect(worker.scheduledCalls).toHaveLength(0);
+    },
+  );
 
   it('turns an unhandled onRequest error into a 500 instead of throwing', async () => {
     class BoomWorker extends AbstractEntrypointWorker {
@@ -64,7 +71,7 @@ describe('AbstractEntrypointWorker', () => {
 
   it('runs the scheduled pipeline from scheduled(), passing the event through', async () => {
     const worker = new RecordingWorker();
-    await worker.scheduled({ cron: '*/10 * * * *', scheduledTime: 42, noRetry: () => undefined }, createEnv(), createExecutionContext());
+    await worker.scheduled({ cron: '*/10 * * * *', scheduledTime: 42, noRetry: () => {} }, createEnv(), createExecutionContext());
     expect(worker.scheduledCalls).toEqual([{ cron: '*/10 * * * *', scheduledTime: 42 }]);
   });
 
@@ -78,7 +85,7 @@ describe('AbstractEntrypointWorker', () => {
       }
     }
     await expect(
-      new FailingScheduleWorker().scheduled({ cron: '', scheduledTime: 0, noRetry: () => undefined }, createEnv(), createExecutionContext()),
+      new FailingScheduleWorker().scheduled({ cron: '', scheduledTime: 0, noRetry: () => {} }, createEnv(), createExecutionContext()),
     ).resolves.toBeUndefined();
   });
 });

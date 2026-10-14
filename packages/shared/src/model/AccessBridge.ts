@@ -4,5 +4,3 @@ export interface AccessKeysResponse {
   sessionToken: string;
   expiration: string;
 }
-
-

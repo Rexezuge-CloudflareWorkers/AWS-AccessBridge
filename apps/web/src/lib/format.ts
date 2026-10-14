@@ -55,4 +55,3 @@ export function formatAmount(amount: number, currency: string | null, lng: strin
     return `${currency} ${compact ? Math.round(amount) : amount.toFixed(2)}`;
   }
 }
-

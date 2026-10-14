@@ -104,14 +104,20 @@ describe('buildFederateUrl', () => {
   });
 
   it('adds a destination region', () => {
-    const url = new URL(buildFederateUrl('123456789012', 'Dev', { destinationPath: '/ec2/instances', destinationRegion: 'eu-west-1' }), 'https://app.invalid');
+    const url = new URL(
+      buildFederateUrl('123456789012', 'Dev', { destinationPath: '/ec2/instances', destinationRegion: 'eu-west-1' }),
+      'https://app.invalid',
+    );
     expect(url.searchParams.get('destinationRegion')).toBe('eu-west-1');
   });
 
   it('omits absent destination parameters entirely', () => {
     // The old hand-rolled builder always set `destinationPath` and only
     // conditionally set the region; an empty value must not appear as `""`.
-    const url = new URL(buildFederateUrl('123456789012', 'Dev', { destinationPath: undefined, destinationRegion: undefined }), 'https://app.invalid');
+    const url = new URL(
+      buildFederateUrl('123456789012', 'Dev', { destinationPath: undefined, destinationRegion: undefined }),
+      'https://app.invalid',
+    );
     expect(url.searchParams.has('destinationPath')).toBe(false);
     expect(url.searchParams.has('destinationRegion')).toBe(false);
   });
@@ -121,7 +127,12 @@ describe('buildFederateUrl', () => {
     // old template-literal form only encoded `role`, not `awsAccountId`.
     const url = new URL(buildFederateUrl('123456789012', 'Dev&role=admin'), 'https://app.invalid');
     expect(url.searchParams.get('role')).toBe('Dev&role=admin');
-    expect(url.searchParams.keys().toArray().toSorted((left, right) => left.localeCompare(right))).toEqual(['awsAccountId', 'role']);
+    expect(
+      url.searchParams
+        .keys()
+        .toArray()
+        .toSorted((left, right) => left.localeCompare(right)),
+    ).toEqual(['awsAccountId', 'role']);
   });
 
   it('escapes a hash in a destination path', () => {

@@ -70,7 +70,31 @@ Plain `pnpm` is canonical — no `source ~/.customrc`, no `volta run` prefix. `p
 
 **`validate:migrations` is read-only and fails on an edit.** D1 records applied migrations by _filename_, so a file that has run is skipped silently by every later `wrangler d1 migrations apply`: the deploy succeeds, fresh databases pick up the edited statements, production keeps the schema it had. `migrations/migrations.lock.json` records a SHA-256 per file, with everything at or before the squashed baseline exempt. See [`../runtime/AGENTS.md`](../runtime/AGENTS.md).
 
-**`validate:locales`** compares the twelve web bundles for key parity, placeholder parity, and non-empty values _including in `en`_, and cross-checks the declared tag lists against the `locales/` directories in both directions. Locale catalogs are data: a key missing from eleven bundles still typechecks and still builds.
+**`validate:locales`** compares the twelve web bundles for key parity, placeholder parity, and non-empty values _including in `en`_, checks every `t()` call site resolves with a default that matches `en`, and reports dynamic keys it cannot check. Locale catalogs are data: a key missing from eleven bundles still typechecks and still builds.
+
+It no longer cross-checks declared tag lists, because there are no longer three lists to disagree — the SPA derives `SUPPORTED_LANGUAGES` from the kit's `SUPPORTED_LOCALES`, so a disagreement is a type error rather than a runtime failure. A check guarding a disagreement that cannot be expressed reports nothing while looking like a gate.
+
+**It is not `@rexezuge/tooling`'s `validate-locales`, which would replace 725 lines of `scripts/i18n/`.** That script's entrypoint guard compares `import.meta.url` against `process.argv[1]`, which never matches under pnpm, so it exits 0 having printed nothing. Swapping it in would replace a gate that fails loudly with one that passes silently — including on a tree this script was failing at the time. Fixed in the kit and awaiting a release; the note lives in `scripts/i18n/validate_locales.ts` so the next person does not rediscover it. **Verify a locale gate that is new to you before trusting it: inject a key into one bundle and confirm it fails.**
+
+## `@rexezuge/tooling`: what is adopted, and what is deliberately not
+
+The kit's tooling is adopted where it is a superset. Four scripts are kept local, each for a
+specific reason, and recording them here is what stops the next adoption pass from re-litigating
+them from scratch.
+
+| Kept                                | Why                                                                                                                                                                                                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/i18n/validate_locales.ts`  | The kit's version is a silent no-op gate until the entrypoint fix releases. See above.                                                                                                                                                                               |
+| `scripts/migrations/verify-*`       | The kit's `verify-migrations` and `migrations-lock` use a different lock format. This repo's lock predates it, and re-recording hashes would make `validate:migrations` a different gate than the one in CI.                                                                                     |
+| `scripts/check-god-files.mjs`       | No kit equivalent at the 300/400 threshold this repo uses, and no kit equivalent for the coverage-floor check either.                                                                                                                                              |
+| `ensure-spa-shell-stub` / `verify-spa-shell` | The kit's invariant is inverted: it asserts the shell stub is **absent** in development and present in a build, where this repo's is that a build replaced the stub. Adopting it would let a `dist/` left over from a previous build pass for a fresh one.                           |
+| `apps/web/vite.config.ts`           | No terser pass-through in the kit's factory, and the build settings here (chunk splitting, the Workers `browser` target) are tuned to this bundle.                                                                                                                         |
+
+`eslint.config.mjs`, `vitest.config.mts` and `test/integration/vitest.config.mts` _are_ on the factories. `eslint` needed one adjustment:
+the factory ignores `scripts/**`, which is the wrong default here — `verify-migrations.ts` is
+TypeScript *so that* it is linted, and it is the gate that decides whether a migration may be edited.
+`extraIgnores: ['!scripts/**']` un-ignores it; a global ignore cannot be undone by a later config
+object, so the negated pattern has to go in the same list.
 
 ## What is generated, and what is not
 

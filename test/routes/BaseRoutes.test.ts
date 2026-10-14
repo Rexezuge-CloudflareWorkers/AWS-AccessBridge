@@ -52,7 +52,7 @@ function createContext(): ActivityContext<IEnv> {
       raw: new Request('https://example.com/user/test'),
       method: 'GET',
       url: 'https://example.com/user/test',
-      header: () => undefined,
+      header: () => {},
     },
     env: {
       AccessBridgeDB: { withSession: vi.fn().mockReturnValue({ mockSession: true }) },
@@ -94,9 +94,17 @@ describe('IActivityAPIRoute', () => {
     // column names, constraint names, statement offsets), so a 5xx must fall
     // through to the same generic body as any other server-side fault.
     const c = createContext();
-    await new FailRoute(new DatabaseError('D1_ERROR: SELECT * FROM credentials: SQLITE_ERROR: no such column: secret at offset 42')).handle(c);
-    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: expect.any(String), Message: expect.not.stringContaining('SQLITE_ERROR') } }, 500);
-    expect(c.json).toHaveBeenCalledWith({ Exception: { Type: expect.any(String), Message: expect.not.stringContaining('credentials') } }, 500);
+    await new FailRoute(new DatabaseError('D1_ERROR: SELECT * FROM credentials: SQLITE_ERROR: no such column: secret at offset 42')).handle(
+      c,
+    );
+    expect(c.json).toHaveBeenCalledWith(
+      { Exception: { Type: expect.any(String), Message: expect.not.stringContaining('SQLITE_ERROR') } },
+      500,
+    );
+    expect(c.json).toHaveBeenCalledWith(
+      { Exception: { Type: expect.any(String), Message: expect.not.stringContaining('credentials') } },
+      500,
+    );
   });
 
   it('still surfaces client errors with their own message', async () => {

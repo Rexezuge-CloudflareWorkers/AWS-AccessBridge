@@ -131,7 +131,10 @@ describe('checkShell', () => {
     // All three are "the build is not what you think it is", and an operator fixing one
     // and re-running should not have to discover the next by iteration.
     const problems = checkShell(shellSource(REAL_HTML), null, has([]));
-    expect(problems.map((problem) => problem.code).toSorted((left, right) => left.localeCompare(right))).toEqual(['dist-missing', 'missing-asset']);
+    expect(problems.map((problem) => problem.code).toSorted((left, right) => left.localeCompare(right))).toEqual([
+      'dist-missing',
+      'missing-asset',
+    ]);
   });
 
   it('does not check assets against a shell it could not decode', () => {

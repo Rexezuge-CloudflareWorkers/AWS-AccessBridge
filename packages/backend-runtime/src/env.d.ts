@@ -35,6 +35,20 @@ declare global {
     PRINCIPAL_TRUST_CHAIN_LIMIT?: string;
     AUDIT_LOG_RETENTION_DAYS?: string;
     DEMO_MODE?: string;
+    /**
+     * `debug` | `info` | `warn` | `error`, defaulting to `info`.
+     *
+     * Installed once per isolate by the composition root
+     * (`backend-services/composition/requestScope`), because the logger that
+     * redacts is constructed at module scope and so cannot be handed a request's
+     * `env` to read the level from. An unrecognised value clears the setting
+     * rather than throwing — a typo must not cost a worker its cold start.
+     *
+     * Declared here, and therefore in `wrangler.template.jsonc` beside it, so
+     * setting it is a compile error rather than a silent no-op. That gap is the
+     * one this exists to close: the variable used to be honoured by nothing at all.
+     */
+    LOG_LEVEL?: string;
   }
 }
 

@@ -1,4 +1,3 @@
-
 import type { AuditLogQueryFilters } from '@aws-access-bridge/backend-data/dao';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';

@@ -1,4 +1,3 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';

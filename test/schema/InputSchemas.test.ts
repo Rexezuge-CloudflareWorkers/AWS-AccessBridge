@@ -295,7 +295,9 @@ describe('credential bodies', () => {
    */
   it('accepts a key pair with or without a session token', () => {
     expect(acceptsBody('POST', '/user/admin/credentials/validate', { accessKeyId: 'AKIA', secretAccessKey: 'shh' })).toBe(true);
-    expect(acceptsBody('POST', '/user/admin/credentials/validate', { accessKeyId: 'AKIA', secretAccessKey: 'shh', sessionToken: 'tok' })).toBe(true);
+    expect(
+      acceptsBody('POST', '/user/admin/credentials/validate', { accessKeyId: 'AKIA', secretAccessKey: 'shh', sessionToken: 'tok' }),
+    ).toBe(true);
     expect(acceptsBody('POST', '/user/admin/credentials/validate', { accessKeyId: 'AKIA' })).toBe(false);
   });
 
@@ -338,12 +340,29 @@ describe('collection config', () => {
    * service had no caller.
    */
   it('takes a list on enable and a single type on disable', () => {
-    expect(acceptsBody('POST', '/user/admin/collection/config', { collectionTypes: ['cost', 'resource'], principalArn: 'arn:aws:iam::123456789012:role/Dev' })).toBe(true);
-    expect(acceptsBody('POST', '/user/admin/collection/config', { collectionType: 'cost', principalArn: 'arn:aws:iam::123456789012:role/Dev' })).toBe(false);
-    expect(acceptsBody('DELETE', '/user/admin/collection/config', { collectionType: 'cost', principalArn: 'arn:aws:iam::123456789012:role/Dev' })).toBe(true);
+    expect(
+      acceptsBody('POST', '/user/admin/collection/config', {
+        collectionTypes: ['cost', 'resource'],
+        principalArn: 'arn:aws:iam::123456789012:role/Dev',
+      }),
+    ).toBe(true);
+    expect(
+      acceptsBody('POST', '/user/admin/collection/config', { collectionType: 'cost', principalArn: 'arn:aws:iam::123456789012:role/Dev' }),
+    ).toBe(false);
+    expect(
+      acceptsBody('DELETE', '/user/admin/collection/config', {
+        collectionType: 'cost',
+        principalArn: 'arn:aws:iam::123456789012:role/Dev',
+      }),
+    ).toBe(true);
   });
 
   it('rejects an unknown collection type', () => {
-    expect(acceptsBody('POST', '/user/admin/collection/config', { collectionTypes: ['everything'], principalArn: 'arn:aws:iam::123456789012:role/Dev' })).toBe(false);
+    expect(
+      acceptsBody('POST', '/user/admin/collection/config', {
+        collectionTypes: ['everything'],
+        principalArn: 'arn:aws:iam::123456789012:role/Dev',
+      }),
+    ).toBe(false);
   });
 });

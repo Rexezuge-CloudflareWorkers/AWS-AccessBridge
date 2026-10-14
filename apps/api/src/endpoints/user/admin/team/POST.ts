@@ -1,11 +1,15 @@
-
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { ActivityContext, IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import type { Team } from '@aws-access-bridge/shared/model';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTeamResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -88,7 +92,9 @@ class CreateTeamRoute extends IAdminActivityAPIRoute<CreateTeamRequest, CreateTe
     env: IAdminEnv,
     cxt: ActivityContext<IAdminEnv>,
   ): Promise<CreateTeamResponse> {
-    const team = await getRequestScope(cxt).get(Tokens.TeamService).createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
+    const team = await getRequestScope(cxt)
+      .get(Tokens.TeamService)
+      .createTeam(request.teamName, this.getAuthenticatedUserEmailAddress(cxt));
     return { success: true, team };
   }
 }

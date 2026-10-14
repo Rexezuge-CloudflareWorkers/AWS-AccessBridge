@@ -96,11 +96,7 @@ export default function ResourceRow({ resource, accountRoles, selectedRole, isFi
             onClick={() => onOpen(resource)}
             disabled={!canOpen}
             className="text-xs font-medium"
-            title={
-              canOpen
-                ? t('resources.openConsole', 'Open in AWS Console')
-                : t('resources.selectRoleFirst', 'Select a role first')
-            }
+            title={canOpen ? t('resources.openConsole', 'Open in AWS Console') : t('resources.selectRoleFirst', 'Select a role first')}
             style={{
               padding: '8px 12px',
               background: canOpen ? '#2563eb' : '#374151',

@@ -4,7 +4,6 @@ import { decryptDataField, encryptData } from '../crypto/aes-gcm';
 import type { D1Queryable } from '../utils';
 import { EncryptedDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 import { log } from '@aws-access-bridge/shared/utils/Logger';
 /**
  * Pick the IV to decrypt a credential field with.
@@ -125,7 +124,8 @@ class CredentialsDAO extends EncryptedDAO {
     const encryptedAccessKeyId = await encryptData(accessKeyId, key);
     const encryptedSecretAccessKey = await encryptData(secretAccessKey, key);
     const encryptedSessionToken = sessionToken ? await encryptData(sessionToken, key) : null;
-    const result = await this.run(`INSERT INTO credentials (
+    await this.run(
+      `INSERT INTO credentials (
            principal_arn, encrypted_access_key_id, encrypted_secret_access_key, encrypted_session_token,
            salt, salt_secret_access_key, salt_session_token
          )
@@ -136,20 +136,30 @@ class CredentialsDAO extends EncryptedDAO {
            encrypted_session_token = excluded.encrypted_session_token,
            salt = excluded.salt,
            salt_secret_access_key = excluded.salt_secret_access_key,
-           salt_session_token = excluded.salt_session_token`, [principalArn, encryptedAccessKeyId.encrypted, encryptedSecretAccessKey.encrypted, encryptedSessionToken?.encrypted || null, encryptedAccessKeyId.iv, encryptedSecretAccessKey.iv, encryptedSessionToken?.iv || null]);
-    assertD1Success(result, `store credential`);
+           salt_session_token = excluded.salt_session_token`,
+      [
+        principalArn,
+        encryptedAccessKeyId.encrypted,
+        encryptedSecretAccessKey.encrypted,
+        encryptedSessionToken?.encrypted || null,
+        encryptedAccessKeyId.iv,
+        encryptedSecretAccessKey.iv,
+        encryptedSessionToken?.iv || null,
+      ],
+    );
   }
 
   public async storeCredentialRelationship(principalArn: string, assumedBy: string): Promise<void> {
-    const result = await this.run(`INSERT INTO credentials (principal_arn, assumed_by)
+    await this.run(
+      `INSERT INTO credentials (principal_arn, assumed_by)
          VALUES (?, ?)
-         ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by`, [principalArn, assumedBy]);
-    assertD1Success(result, `store credential relationship`);
+         ON CONFLICT(principal_arn) DO UPDATE SET assumed_by = excluded.assumed_by`,
+      [principalArn, assumedBy],
+    );
   }
 
   public async removeCredential(principalArn: string): Promise<void> {
-    const result = await this.run(`DELETE FROM credentials WHERE principal_arn = ?`, [principalArn]);
-    assertD1Success(result, `remove credential`);
+    await this.run(`DELETE FROM credentials WHERE principal_arn = ?`, [principalArn]);
   }
 }
 

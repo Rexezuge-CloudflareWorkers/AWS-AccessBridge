@@ -54,9 +54,7 @@ function useRolesStep({ actions }: StepDeps, assumedByArn: string) {
       async () => {
         const saved = await saveRoleRelationships(selectedRoles, discoveredRoles, assumedByArn);
         if (!saved.ok) {
-          throw new Error(
-            t('onboarding.rolesSaveFailed', '{{count}} role relationship(s) failed to save.', { count: saved.failures }),
-          );
+          throw new Error(t('onboarding.rolesSaveFailed', '{{count}} role relationship(s) failed to save.', { count: saved.failures }));
         }
       },
       { errorFallback: t('onboarding.rolesSaveFailed', '{{count}} role relationship(s) failed to save.', { count: 0 }) },

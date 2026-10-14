@@ -26,7 +26,9 @@ function useUsersStep({ showMessage, actions }: StepDeps, selectedRoles: Readonl
         const { failures } = await grantSelectedRoles(emails, new Set(selectedRoles), awsAccountId);
         // A partial failure is a failure: some users are still without access.
         if (failures > 0) {
-          throw new Error(t('onboarding.accessGrantFailed', '{{count}} access grant(s) failed. Check logs for details.', { count: failures }));
+          throw new Error(
+            t('onboarding.accessGrantFailed', '{{count}} access grant(s) failed. Check logs for details.', { count: failures }),
+          );
         }
       },
       {

@@ -1,11 +1,15 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class UpdateTeamNameRoute extends IAdminActivityAPIRoute<UpdateTeamNameRequest, UpdateTeamNameResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -73,8 +77,11 @@ class UpdateTeamNameRoute extends IAdminActivityAPIRoute<UpdateTeamNameRequest, 
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: UpdateTeamNameRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<UpdateTeamNameResponse> {
+  protected async handleAdminRequest(
+    request: UpdateTeamNameRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<UpdateTeamNameResponse> {
     await getRequestScope(cxt).get(Tokens.TeamService).updateTeamName(request.teamId, request.teamName);
     return { success: true, message: 'Team name updated.' };
   }

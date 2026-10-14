@@ -1,10 +1,10 @@
 import { TimestampUtil } from '@rexezuge/shared';
 import { log } from '@aws-access-bridge/shared/utils/Logger';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { IScheduledTask } from './IScheduledTask';
-import type { IEnv, TaskRunSummary } from './IScheduledTask';
+import { CronTask } from './CronTask';
+import type { IEnv, TaskRunSummary } from './CronTask';
 
-abstract class AbstractPruningTask<TEnv extends IEnv> extends IScheduledTask<TEnv> {
+abstract class AbstractPruningTask<TEnv extends IEnv> extends CronTask<TEnv> {
   protected abstract getRetentionDays(env: TEnv): number;
 
   protected abstract pruneBatch(db: D1Database, cutoffTimestamp: number, batchSize: number): Promise<number>;

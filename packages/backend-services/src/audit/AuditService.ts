@@ -18,9 +18,7 @@ class AuditService {
     observers?: IAuditObserver[],
   ) {
     this.registry =
-      observers === undefined
-        ? AuditObserverRegistry.withDefaults(env.AccessBridgeDB)
-        : AuditObserverRegistry.withObservers(observers);
+      observers === undefined ? AuditObserverRegistry.withDefaults(env.AccessBridgeDB) : AuditObserverRegistry.withObservers(observers);
   }
 
   public static resolveAction(method: string, path: string): string {
@@ -44,17 +42,14 @@ class AuditService {
    * it, and `activityAudit` runs this detached via `waitUntil`. Failures are
    * logged inside `AuditObserverRegistry.notifyAll`.
    */
-public async record(event: AuditEvent): Promise<void> {
+  public async record(event: AuditEvent): Promise<void> {
     await this.registry.notifyAll(event);
   }
 
-  public async queryLogs(
-    filters: AuditLogQueryFilters,
-    limit?: number,
-    offset?: number,
-  ): Promise<{ logs: AuditLog[]; total: number }> {
+  public async queryLogs(filters: AuditLogQueryFilters, limit?: number, offset?: number): Promise<{ logs: AuditLog[]; total: number }> {
     const dao: AuditLogDAO = new AuditLogDAO(this.env.AccessBridgeDB);
     return dao.query(filters, Pagination.limit(limit), Pagination.offset(offset));
   }
-}export { AuditService };
+}
+export { AuditService };
 export type { AuditServiceEnv };

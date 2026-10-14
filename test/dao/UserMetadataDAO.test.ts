@@ -102,17 +102,23 @@ describe('UserMetadataDAO', () => {
     it('generates and persists a federation username when the row has none', async () => {
       // First read: no username yet. Then the INSERT, then the re-read that the
       // method actually returns from.
-      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'STORED' });
+      vi.mocked(mockStmt.first)
+        .mockResolvedValueOnce({ federation_username: null })
+        .mockResolvedValueOnce({ federation_username: 'STORED' });
       vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await expect(dao.getOrCreateFederationUsername('user@example.com')).resolves.toBe('STORED');
       // The row is provisioned first: without it the UPDATE below would match
       // nothing, so the generated name would be returned but never stored and the
       // STS RoleSessionName would change on every assume-role.
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email)'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR IGNORE INTO user_metadata (user_email, id, current_email)'),
+      );
       // `COALESCE` so a concurrent writer's value is never overwritten.
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('SET federation_username = COALESCE(federation_username, ?)'));
-      const updateBind = vi.mocked(mockStmt.bind).mock.calls.find((call) => (call)[1] === 'user@example.com' && /^[0-9A-F]{32}$/.test(String((call)[0]))) as unknown as [string, string];
+      const updateBind = vi
+        .mocked(mockStmt.bind)
+        .mock.calls.find((call) => call[1] === 'user@example.com' && /^[0-9A-F]{32}$/.test(String(call[0]))) as unknown as [string, string];
       // The generated candidate is uppercase hex without dashes (32 chars).
       expect(updateBind[0]).toMatch(/^[0-9A-F]{32}$/);
     });
@@ -123,7 +129,9 @@ describe('UserMetadataDAO', () => {
       // that left a permanently unresolvable account — and D1 does not enforce
       // foreign keys by default, so an `assumable_roles` row can exist with no
       // metadata row and this path becomes the first writer.
-      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'STORED' });
+      vi.mocked(mockStmt.first)
+        .mockResolvedValueOnce({ federation_username: null })
+        .mockResolvedValueOnce({ federation_username: 'STORED' });
       vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await dao.getOrCreateFederationUsername('new@example.com');
@@ -136,7 +144,9 @@ describe('UserMetadataDAO', () => {
     });
 
     it('returns the stored username on a concurrent insert instead of the losing candidate', async () => {
-      vi.mocked(mockStmt.first).mockResolvedValueOnce({ federation_username: null }).mockResolvedValueOnce({ federation_username: 'WINNER' });
+      vi.mocked(mockStmt.first)
+        .mockResolvedValueOnce({ federation_username: null })
+        .mockResolvedValueOnce({ federation_username: 'WINNER' });
       vi.mocked(mockStmt.run).mockResolvedValue({ success: true } as D1Result);
       const dao = new UserMetadataDAO(mockDb);
       await expect(dao.getOrCreateFederationUsername('user@example.com')).resolves.toBe('WINNER');

@@ -28,7 +28,11 @@ class FederationService {
     destinationRegion?: string,
   ): Promise<string> {
     const credentials = await this.assumeRole.assumeRoleForUser(userEmail, principalArn);
-    const signinToken: string = await this.console.getSigninToken(credentials.accessKeyId, credentials.secretAccessKey, credentials.sessionToken);
+    const signinToken: string = await this.console.getSigninToken(
+      credentials.accessKeyId,
+      credentials.secretAccessKey,
+      credentials.sessionToken,
+    );
     const issuer: string = this.console.buildIssuerUrl(baseUrl, awsAccountId, roleName);
     const destination: string = this.console.buildDestination(destinationPath, destinationRegion);
     return this.console.getLoginUrl(signinToken, issuer, destination);

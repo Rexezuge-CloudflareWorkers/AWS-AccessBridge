@@ -2,7 +2,6 @@ import type { BackgroundTaskRun, BackgroundTaskRunInternal } from '@aws-access-b
 import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 interface StartTaskRunInput {
   taskType: string;
 }
@@ -24,29 +23,78 @@ class BackgroundTaskRunDAO extends BaseDAO {
   public async startRun(input: StartTaskRunInput): Promise<string> {
     const runId: string = UUIDUtil.getRandomUUID();
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run(`INSERT INTO background_task_runs
+    await this.run(
+      `INSERT INTO background_task_runs
            (run_id, task_type, status, items_processed, items_failed, started_at, created_at)
-         VALUES (?, ?, 'running', 0, 0, ?, ?)`, [runId, input.taskType, now, now]);
-    assertD1Success(result, `start background task run`);
+         VALUES (?, ?, 'running', 0, 0, ?, ?)`,
+      [runId, input.taskType, now, now],
+    );
     return runId;
   }
 
   public async succeedRun(runId: string, input: CompleteTaskRunInput): Promise<void> {
     const status: string = input.itemsFailed > 0 ? 'partial_success' : 'success';
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run(`UPDATE background_task_runs
+    await this.run(
+      `UPDATE background_task_runs
          SET status = ?, items_processed = ?, items_failed = ?, summary = ?, details = ?, completed_at = ?
-         WHERE run_id = ?`, [status, input.itemsProcessed, input.itemsFailed, input.summary ?? null, input.details === undefined ? null : JSON.stringify(input.details), now, runId]);
-    assertD1Success(result, `complete background task run`);
+         WHERE run_id = ?`,
+      [
+        status,
+        input.itemsProcessed,
+        input.itemsFailed,
+        input.summary ?? null,
+        input.details === undefined ? null : JSON.stringify(input.details),
+        now,
+        runId,
+      ],
+    );
   }
 
   public async failRun(runId: string, errorMessage: string, partial?: Partial<CompleteTaskRunInput>): Promise<void> {
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run(`UPDATE background_task_runs
+    await this.run(
+      `UPDATE background_task_runs
          SET status = 'error', error_message = ?, items_processed = ?, items_failed = ?,
              summary = ?, details = ?, completed_at = ?
-         WHERE run_id = ?`, [errorMessage, partial?.itemsProcessed ?? 0, partial?.itemsFailed ?? 0, partial?.summary ?? null, partial?.details === undefined ? null : JSON.stringify(partial.details), now, runId]);
-    assertD1Success(result, `fail background task run`);
+         WHERE run_id = ?`,
+      [
+        errorMessage,
+        partial?.itemsProcessed ?? 0,
+        partial?.itemsFailed ?? 0,
+        partial?.summary ?? null,
+        partial?.details === undefined ? null : JSON.stringify(partial.details),
+        now,
+        runId,
+      ],
+    );
+  }
+
+  /**
+   * A run that did no work and was not a failure — a task that found nothing to
+   * collect, or a per-application guard that decided the application was not due.
+   *
+   * `skipped` has been a declared status on this table since the model was
+   * written and the task-runs endpoint has always advertised it in its filter
+   * description, but nothing wrote it: every run ended `success`, `error` or
+   * `partial_success`. So an operator asking "did the nightly job have anything
+   * to do last night?" read "success", which is a claim about work done rather
+   * than about work found, and could not tell the two apart. The SDK's
+   * `TaskRunRecorder` port declares `skipRun`, which is what turned a declared
+   * status into a written one.
+   *
+   * `error_message` carries the reason so the reason is not lost to a bare
+   * status; it is nullable in the schema precisely because most statuses have
+   * none, not because this one does.
+   */
+  public async skipRun(runId: string, reason?: string): Promise<void> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await this.run(
+      `UPDATE background_task_runs
+       SET status = 'skipped', error_message = ?, completed_at = ?
+       WHERE run_id = ?`,
+      [reason ?? null, now, runId],
+    );
   }
 
   public async listRuns(options?: ListTaskRunsOptions): Promise<BackgroundTaskRun[]> {
@@ -77,8 +125,10 @@ class BackgroundTaskRunDAO extends BaseDAO {
   public async deleteOlderThanBatch(cutoffTimestamp: number, batchSize: number): Promise<number> {
     // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
     // boundary is a rowid subquery with its own LIMIT instead.
-    const result = await this.run('DELETE FROM background_task_runs WHERE rowid IN (SELECT rowid FROM background_task_runs WHERE started_at < ? LIMIT ?)', [cutoffTimestamp, batchSize]);
-    assertD1Success(result, `delete old background task runs`);
+    const result = await this.run(
+      'DELETE FROM background_task_runs WHERE rowid IN (SELECT rowid FROM background_task_runs WHERE started_at < ? LIMIT ?)',
+      [cutoffTimestamp, batchSize],
+    );
     return result.meta?.changes ?? 0;
   }
 

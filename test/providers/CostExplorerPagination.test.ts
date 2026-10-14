@@ -120,11 +120,15 @@ describe('CostExplorerClient pagination', () => {
 
   it('still throws on a non-OK page rather than returning a short breakdown', async () => {
     const { clientFactory } = pagedClient(page('2025-01-01', { EC2: '10' }, 'tok-1'), new Response('throttled', { status: 429 }));
-    await expect(new CostExplorerClient(clientFactory as never).getCostAndUsage(KEYS, '2025-01-01', '2025-01-31')).rejects.toThrow(/Cost Explorer/);
+    await expect(new CostExplorerClient(clientFactory as never).getCostAndUsage(KEYS, '2025-01-01', '2025-01-31')).rejects.toThrow(
+      /Cost Explorer/,
+    );
   });
 
   it('throws on a malformed body, keeping the typed error taxonomy', async () => {
     const { clientFactory } = pagedClient(new Response('not json', { status: 200 }));
-    await expect(new CostExplorerClient(clientFactory as never).getCostAndUsage(KEYS, '2025-01-01', '2025-01-31')).rejects.toThrow(/malformed/);
+    await expect(new CostExplorerClient(clientFactory as never).getCostAndUsage(KEYS, '2025-01-01', '2025-01-31')).rejects.toThrow(
+      /malformed/,
+    );
   });
 });

@@ -47,7 +47,11 @@ export async function decryptData(encryptedBase64: string, ivBase64: string, key
  * A row is upgraded onto the current key the next time it is written, the same
  * self-healing shape migration `0031` uses for IVs.
  */
-export async function decryptDataWithKeys(encryptedBase64: string | undefined, ivBase64: string | undefined, keys: readonly string[]): Promise<string> {
+export async function decryptDataWithKeys(
+  encryptedBase64: string | undefined,
+  ivBase64: string | undefined,
+  keys: readonly string[],
+): Promise<string> {
   if (!encryptedBase64 || !ivBase64) {
     throw new Error('Cannot decrypt: the ciphertext or its IV is missing.');
   }
@@ -59,7 +63,9 @@ export async function decryptDataWithKeys(encryptedBase64: string | undefined, i
       lastError = error;
     }
   }
-  throw new Error(`No key in the chain (${keys.length} tried) could authenticate this ciphertext: ${lastError instanceof Error ? lastError.message : 'unknown error'}`);
+  throw new Error(
+    `No key in the chain (${keys.length} tried) could authenticate this ciphertext: ${lastError instanceof Error ? lastError.message : 'unknown error'}`,
+  );
 }
 
 /**
@@ -72,7 +78,11 @@ export async function decryptDataWithKeys(encryptedBase64: string | undefined, i
  * is therefore a normal answer, while an envelope no key can authenticate is real
  * corruption or an unrotated key and must be loud.
  */
-export async function decryptDataField(encryptedBase64: string | undefined, ivBase64: string | undefined, keys: readonly string[]): Promise<string | undefined> {
+export async function decryptDataField(
+  encryptedBase64: string | undefined,
+  ivBase64: string | undefined,
+  keys: readonly string[],
+): Promise<string | undefined> {
   return !encryptedBase64 || !ivBase64 ? undefined : decryptDataWithKeys(encryptedBase64, ivBase64, keys);
 }
 

@@ -73,8 +73,10 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
           collectedTypes.add(collector.resourceType);
         } else {
           incompleteTypes.push(collector.resourceType);
-          log.warn(`${collector.resourceType} collection incomplete for ${principalArn}: ${sweep.succeededRegions.length}/${expectedRegionCount} region(s) read; ` +
-              `leaving its previously recorded resources untouched. Failures: ${sweep.failedRegions.map((failure) => `${failure.region} (${failure.reason})`).join('; ')}`);
+          log.warn(
+            `${collector.resourceType} collection incomplete for ${principalArn}: ${sweep.succeededRegions.length}/${expectedRegionCount} region(s) read; ` +
+              `leaving its previously recorded resources untouched. Failures: ${sweep.failedRegions.map((failure) => `${failure.region} (${failure.reason})`).join('; ')}`,
+          );
         }
       } catch (error: unknown) {
         incompleteTypes.push(collector.resourceType);
@@ -101,9 +103,11 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
       await resourceDAO.deleteStaleResources(accountId, resourceType, collectedAt);
     }
 
-    log.info(`Resource inventory collected for ${principalArn}: ${allItems.length} resources across ${collectedTypes.size}/${collectors.size} type(s) ` +
+    log.info(
+      `Resource inventory collected for ${principalArn}: ${allItems.length} resources across ${collectedTypes.size}/${collectors.size} type(s) ` +
         `over ${regions.length} configured region(s)` +
-        (incompleteTypes.length > 0 ? `; incomplete: ${incompleteTypes.join(', ')}` : ''));
+        (incompleteTypes.length > 0 ? `; incomplete: ${incompleteTypes.join(', ')}` : ''),
+    );
     return allItems.length;
   }
 }

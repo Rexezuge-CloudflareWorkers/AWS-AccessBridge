@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { CollectionTaskEnv } from '@aws-access-bridge/background/scheduled/AbstractCollectionTask';
 import { CostDataCollectionTask } from '@aws-access-bridge/background/scheduled/CostDataCollectionTask';
 import { ResourceInventoryCollectionTask } from '@aws-access-bridge/background/scheduled/ResourceInventoryCollectionTask';
 import { CredentialCacheRefreshTask } from '@aws-access-bridge/background/scheduled/CredentialCacheRefreshTask';
@@ -95,7 +96,7 @@ vi.mock('@aws-access-bridge/backend-services/composition', async (importOriginal
 });
 
 function createEvent(): ScheduledController {
-  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => undefined };
+  return { cron: '*/10 * * * *', scheduledTime: 123, noRetry: () => {} };
 }
 
 /**
@@ -105,14 +106,19 @@ function createEvent(): ScheduledController {
  */
 const INVENTORY_REGIONS = ['us-east-1', 'eu-west-1'];
 
-function taskEnv() {
+// Typed as `CollectionTaskEnv` rather than the ambient `Env`: the template takes
+// `TEnv`, and this builder already casts the whole object, so naming the surface
+// it stands in for costs nothing and removes ten call-site casts. Both concrete
+// tasks extend `CollectionTaskEnv` only by **optional** vars, so a value of this
+// type satisfies either.
+function taskEnv(): CollectionTaskEnv {
   return {
     AccessBridgeDB: {},
     AccessBridgeKV: {},
     CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
     INVENTORY_REGIONS: INVENTORY_REGIONS.join(','),
-  } as unknown as Env;
+  } as unknown as CollectionTaskEnv;
 }
 
 // `principalArns[0]` is the target role and the last entry is the base IAM user,
@@ -225,6 +231,44 @@ describe('CostDataCollectionTask', () => {
     expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
       'run-2',
       expect.objectContaining({ itemsProcessed: 0, itemsFailed: 1 }),
+    );
+  });
+
+  it('pauses the sweep on a D1 daily-allowance refusal instead of retrying it', async () => {
+    // The refusal that cannot change for hours. Retrying it re-runs the whole
+    // failure path at the alarm's rate and reports a transient fault for what is
+    // really a scheduled pause — so the run stops, says what is spent and when it
+    // comes back, and leaves the remaining accounts due rather than burning
+    // their attempt times through the reset.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+      'arn:aws:iam::210987654321:role/Prod',
+      'arn:aws:iam::111111111111:role/Stage',
+    ]);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-daily');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockRejectedValue(
+      new Error('D1_ERROR: exceeded D1 free tier daily row write limit'),
+    );
+
+    await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    // Stopped at the first refusal rather than walking the batch: the accounts
+    // after it stay due for the next cron.
+    expect(CostExplorerService.prototype.getCostAndUsage).toHaveBeenCalledTimes(1);
+    // Recorded as a pause, not as a failure: the refusal is not an account that
+    // failed to collect, and counting it as one is what would drive the operator
+    // to look at an account when the cause was the platform's allowance.
+    expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
+      'run-daily',
+      expect.objectContaining({
+        itemsProcessed: 0,
+        itemsFailed: 0,
+        summary: expect.stringContaining('Paused: D1 daily write allowance exhausted until '),
+        details: { reason: 'd1-daily-limit', resetsAt: expect.any(Number) },
+      }),
     );
   });
 

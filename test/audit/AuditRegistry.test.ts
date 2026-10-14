@@ -44,8 +44,10 @@ describe('AuditObserverRegistry', () => {
     // Regression: `notifyAll` used to *return* the `allSettled` results and
     // `AuditService.record` discarded them, so every rejected `AuditLogDAO.create`
     // disappeared with no log at all — a governance control failing silently.
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await AuditObserverRegistry.withObservers([{ notify: vi.fn().mockRejectedValue(new Error('D1 is busy')) }]).notifyAll({ action: 'X' } as never);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await AuditObserverRegistry.withObservers([{ notify: vi.fn().mockRejectedValue(new Error('D1 is busy')) }]).notifyAll({
+      action: 'X',
+    } as never);
     expect(logged.mock.calls.flat().join(' ')).toContain('D1 is busy');
   });
 });

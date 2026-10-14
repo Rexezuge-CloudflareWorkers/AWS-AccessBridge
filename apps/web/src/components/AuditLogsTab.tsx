@@ -7,7 +7,7 @@ import { formatUnixTimestamp } from '../lib/format';
 import { useResource } from '../hooks/useResource';
 import { totalPages as countPages } from '../lib/pagination';
 import { httpStatusColor } from '../lib/presentation';
-import { Spinner } from '@rexezuge/web';
+import { EmptyState, Spinner } from '@rexezuge/web';
 import { Pagination } from '@rexezuge/web';
 import { queryAuditLogs } from '../services/auditService';
 import type { AuditLogEntry } from '../services/auditService';
@@ -142,7 +142,9 @@ export default function AuditLogsTab({ showMessage: _showMessage }: AuditLogsTab
 
       {/* Empty state */}
       {!isLoading && !error && logs.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#6b7280' }}>{t('audit.emptyTitle', 'No audit logs found.')}</div>
+        <div style={{ color: '#6b7280' }}>
+          <EmptyState message={<span style={{ fontSize: '14px' }}>{t('audit.emptyTitle', 'No audit logs found.')}</span>} />
+        </div>
       )}
 
       {/* Table */}

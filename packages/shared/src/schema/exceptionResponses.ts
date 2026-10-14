@@ -5,7 +5,7 @@
  * could be made in one and missed in another:
  *
  * - `IActivityAPIRoute.toErrorResponse` — the route-level producer, via `c.json`.
- * - `ErrorTranslationUtil.toHTTPException` — the middleware-level producer, via a
+ * - `@rexezuge/http`'s `toErrorResponse` — the middleware-level producer, via a
  *   Hono `HTTPException` carrying a `JSON.stringify`-ed body.
  * - `ErrorDeserializationUtil.deserializeError` — the consumer, in reverse.
  *

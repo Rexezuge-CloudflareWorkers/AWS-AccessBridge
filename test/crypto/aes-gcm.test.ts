@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateAESGCMKey, encryptData, decryptData, decryptDataWithKeys, decryptDataTolerant } from '@aws-access-bridge/backend-data/crypto/aes-gcm';
+import {
+  generateAESGCMKey,
+  encryptData,
+  decryptData,
+  decryptDataWithKeys,
+  decryptDataTolerant,
+} from '@aws-access-bridge/backend-data/crypto/aes-gcm';
 
 describe('AES-GCM Crypto', () => {
   describe('generateAESGCMKey', () => {
@@ -55,7 +61,11 @@ describe('AES-GCM Crypto', () => {
       // keystream identical, so XORing two ciphertexts revealed the XOR of two
       // plaintexts and the GHASH auth subkey became recoverable.
       const key = await generateAESGCMKey();
-      const fields = await Promise.all([encryptData('AKIAIOSFODNN7EXAMPLE', key), encryptData('wJalrXUtnFEMI', key), encryptData('token', key)]);
+      const fields = await Promise.all([
+        encryptData('AKIAIOSFODNN7EXAMPLE', key),
+        encryptData('wJalrXUtnFEMI', key),
+        encryptData('token', key),
+      ]);
       const ivs = fields.map((f) => f.iv);
       expect(new Set(ivs).size).toBe(3);
       await Promise.all(fields.map(async (f) => expect(await decryptData(f.encrypted, f.iv, key)).toBeTypeOf('string')));

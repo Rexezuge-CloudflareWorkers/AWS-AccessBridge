@@ -128,5 +128,6 @@ class AssumeRoleService {
     }
     return newCredentials;
   }
-}export { AssumeRoleService };
+}
+export { AssumeRoleService };
 export type { AssumeRoleServiceEnv };

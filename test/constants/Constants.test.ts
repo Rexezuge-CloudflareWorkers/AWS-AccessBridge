@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED,
-} from '@aws-access-bridge/backend-data/constants/d1';
+import { D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED } from '@aws-access-bridge/backend-data/constants/d1';
 import {
   KV_NAMESPACE_DELIMITER,
   KV_NAMESPACE_CREDENTIAL_CACHE,
@@ -136,8 +134,7 @@ describe('Constants', () => {
   });
 
   describe('D1 SessionConstraints', () => {
-    it('has correct first-primary constraint', () => {
-    });
+    it('has correct first-primary constraint', () => {});
 
     it('has correct first-unconstrained constraint', () => {
       expect(D1_SESSION_CONSTRAINT_FIRST_UNCONSTRAINED).toBe('first-unconstrained');

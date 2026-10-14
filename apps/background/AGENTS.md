@@ -51,11 +51,40 @@ visible in a log tail rather than inferred from missing data.
 
 | Base                     | Abstract members                                                                                            | Extended by                                                                                                                   |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `IScheduledTask`         | `handleScheduledTask`                                                                                       | every task; also writes `background_task_runs` for any task overriding `getTaskType()`; every task returns a `TaskRunSummary` |
+| `CronTask`               | `handleScheduledTask`                                                                                       | every task; also writes `background_task_runs` for any task overriding `getTaskType()`; every task returns a `TaskRunSummary` |
 | `AbstractPruningTask`    | `getRetentionDays`, `pruneBatch`                                                                            | `AuditLogCleanupTask`, `BackgroundTaskRunPruningTask`                                                                         |
 | `AbstractCollectionTask` | `collectionType`, `maxAccountsPerCollection`, `collectionIntervalHours`, `sessionName`, `collectForAccount` | `CostDataCollectionTask`, `ResourceInventoryCollectionTask`                                                                   |
 
-`IScheduledTask.createTaskRunDAO` is a Factory-Method seam so a test can substitute the run recorder.
+`CronTask` is a thin subclass of `@rexezuge/runtime`'s `AbstractScheduledTask` — it does three
+things and no more.
+
+### It re-throws, because the template does
+
+The template records `failRun` **and re-raises the original error**. That ordering is the whole point:
+the run row already says why by the time `CronTasksWorker` sees the rejection, so the cron answers
+`{status: 'failed'}` instead of `completed`. The local copy that existed before 1.8.0 wrapped the
+error as `"<Task> failed — see the task-run record"` and asserted on that wording; the template re-raises
+the error itself, and `test/tasks/ScheduledTasks.test.ts` now asserts `rejects.toThrow('kaput')` — the
+original message, not a summary of it.
+
+### It owns a `SubrequestCounter` per invocation
+
+A fresh counter per `handle` call, not per task instance: a task constructed but never run should not
+carry a stale tally, and the count should describe the invocation rather than the object. It is
+reachable as `this.meter` for the DAOs a task builds. Passing it matters — D1 counts its own statements
+against the per-invocation ceiling, and a DAO that spends one without telling anybody makes every
+number that budgets work wrong. See [`packages/backend-data/AGENTS.md`](../../packages/backend-data/AGENTS.md).
+
+`CronTask.assertSubrequestBudget(operations, what)` refuses a whole sweep that cannot fit, naming what
+was refused rather than delegating to the kit's request-shaped phrasing ("send fewer items at once"),
+because a cron sweep's accounts stay due — the honest answer is *which sweep ran out and how many it
+left*. `AbstractCollectionTask` calls it with `principalArns.length * STATEMENTS_PER_ACCOUNT`.
+
+### `createRunRecorder` is the Factory-Method seam
+
+A test substitutes the run recorder here. The base asks for one only when `getTaskType()` has opted
+in, and takes no argument, so `CronTask` builds it from the `env` the current `handle` call stashed —
+a task that does not report never constructs a recorder and so has nothing to look up.
 
 `AbstractCollectionTask` stamps `last_attempt_at` on every attempt (success, empty result,
 failure) and advances `last_collected_at` only when `collectForAccount` reported data — so a

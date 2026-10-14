@@ -61,4 +61,3 @@ function inlineFaviconInto(html: string, svg: string): string {
 }
 
 export { toFaviconDataUri, inlineFaviconInto };
-

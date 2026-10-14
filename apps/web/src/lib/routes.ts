@@ -40,8 +40,7 @@ const VIEW_TO_PATH: Record<View, string> = {
  */
 const ADMIN_PREFIXES = ['/admin', '/user/admin', '/user/app/admin'];
 
-const isAdminPath = (path: string): boolean =>
-  ADMIN_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+const isAdminPath = (path: string): boolean => ADMIN_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
 /**
  * Maps a pathname to a view, and to an admin sub-tab when the path is under the

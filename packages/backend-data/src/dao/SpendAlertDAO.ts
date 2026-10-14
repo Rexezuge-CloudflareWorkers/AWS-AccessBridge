@@ -7,7 +7,10 @@ class SpendAlertDAO extends BaseDAO {
   public async createAlert(awsAccountId: string, thresholdAmount: number, periodType: string, createdBy: string): Promise<SpendAlert> {
     const alertId: string = UUIDUtil.getRandomUUID();
     const createdAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    await this.run('INSERT INTO spend_alerts (alert_id, aws_account_id, threshold_amount, currency, period_type, created_by, created_at, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, 1)', [alertId, awsAccountId, thresholdAmount, 'USD', periodType, createdBy, createdAt]);
+    await this.run(
+      'INSERT INTO spend_alerts (alert_id, aws_account_id, threshold_amount, currency, period_type, created_by, created_at, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+      [alertId, awsAccountId, thresholdAmount, 'USD', periodType, createdBy, createdAt],
+    );
 
     return { alertId, awsAccountId, thresholdAmount, currency: 'USD', periodType, createdBy, createdAt, enabled: true };
   }

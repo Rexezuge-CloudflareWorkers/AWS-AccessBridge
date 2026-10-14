@@ -1,13 +1,19 @@
-import { DEMO_USER_EMAIL, DEFAULT_DEMO_MODE, INTERNAL_HEADER_PREFIX, INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
+import {
+  DEMO_USER_EMAIL,
+  DEFAULT_DEMO_MODE,
+  INTERNAL_HEADER_PREFIX,
+  INTERNAL_USER_EMAIL_HEADER,
+  SELF_WORKER_BASE_HOSTNAME,
+} from '@aws-access-bridge/shared/constants';
 import { Context, Next } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { HMACHandler } from './HMACHandler';
 import { csrfProtectionHandler, noStoreHandler, rateLimitHandler } from './RequestGuards';
-import { ServiceError, UnauthorizedError } from '@rexezuge/errors';
+import { asJsonResponder } from './kitContext';
+import { UnauthorizedError } from '@rexezuge/errors';
+import { toErrorResponse } from '@rexezuge/http';
 
 import type { AccessIdentityContext } from '@aws-access-bridge/backend-services/auth';
 
-import { ErrorTranslationUtil } from '@aws-access-bridge/backend-services/error/ErrorTranslationUtil';
 import { ReplayGuard } from '@aws-access-bridge/backend-services/auth/ReplayGuard';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
@@ -195,11 +201,12 @@ async function authenticateAndContinue(
     await publishAccountId(c, userEmail);
     await next();
   } catch (error: unknown) {
-    if (error instanceof ServiceError) {
-      const response = error.toErrorResponse();
-      return c.json(response.body, response.status as ContentfulStatusCode);
-    }
-    throw error;
+    // Same mapper as the boundary below, so an authentication failure and a
+    // handler failure cannot end up in two different envelopes. `toErrorResponse`
+    // normalizes what is not already a `ServiceError`, which the `instanceof`
+    // check this replaces did not — that path let a raw throw reach the client as
+    // a framework error page the SPA cannot decode.
+    return toErrorResponse(error, asJsonResponder(c));
   }
 }
 
@@ -218,14 +225,14 @@ class MiddlewareHandlers {
 
   public static hmacValidation() {
     // eslint-disable-next-line unicorn/consistent-function-scoping -- middleware factory must return a closure capturing `this`
-    return async (c: Context<{ Bindings: Env }>, next: Next): Promise<void> => {
+    return async (c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> => {
       const url: URL = new URL(c.req.url);
       const hasInternalHeaders: boolean = hasInternalHeadersFor(c.req.raw.headers);
       if (hasInternalHeaders || url.hostname === SELF_WORKER_BASE_HOSTNAME) {
-        await this.withErrorTranslation(validateInternalRequest)(c, next);
-      } else {
-        await next();
+        return this.withErrorTranslation(validateInternalRequest, c, next);
       }
+      await next();
+      return undefined;
     };
   }
 
@@ -249,17 +256,35 @@ class MiddlewareHandlers {
     return apiAuthenticationHandler;
   }
 
-  private static withErrorTranslation<T extends unknown[], R>(fn: (...args: T) => Promise<R>): (...args: T) => Promise<R> {
-    return async (...args: T): Promise<R> => {
-      try {
-        return await fn(...args);
-      } catch (error: unknown) {
-        if (error instanceof ServiceError) {
-          throw ErrorTranslationUtil.toHTTPException(error);
-        }
-        throw error;
-      }
-    };
+  /**
+   * Run a middleware and answer anything it throws in this repository's envelope.
+   *
+   * `toErrorResponse` also **normalizes**, which the translation this replaces
+   * did not: a bare `TypeError` from a DAO used to propagate past the `instanceof
+   * ServiceError` check and reach the client as a framework error page — a stack
+   * trace and an internal path, in a body the SPA's decoder does not recognise, so
+   * it renders as "server error" with the real cause invisible. Now an unknown
+   * throw becomes a 500 in the same `{Exception:{…}}` dialect, with its message
+   * masked because `expose` is false for anything that is not a `ServiceError`
+   * carrying one.
+   *
+   * It **returns** the response rather than throwing an `HTTPException`, which is
+   * the shape the kit uses so the same mapper works from a bare-`Request`
+   * dispatcher. Hono accepts a middleware returning a `Response` as a terminal
+   * answer, so nothing downstream has to know the difference.
+   */
+  private static async withErrorTranslation<E extends Record<string, unknown>>(
+    fn: (c: Context<E>, next: Next) => Promise<void>,
+    c: Context<E>,
+    next: Next,
+  ): Promise<Response | void> {
+    try {
+      await fn(c, next);
+      return undefined;
+    } catch (error: unknown) {
+      log.error('Unhandled error at the request boundary', { error });
+      return toErrorResponse(error, asJsonResponder(c));
+    }
   }
 }
 

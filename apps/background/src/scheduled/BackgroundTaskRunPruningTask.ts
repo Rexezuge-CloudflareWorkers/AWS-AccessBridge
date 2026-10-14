@@ -1,7 +1,7 @@
 import { BackgroundTaskRunDAO } from '@aws-access-bridge/backend-data/dao/BackgroundTaskRunDAO';
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
 import { AbstractPruningTask } from './AbstractPruningTask';
-import type { IEnv } from './IScheduledTask';
+import type { IEnv } from './CronTask';
 
 class BackgroundTaskRunPruningTask extends AbstractPruningTask<BackgroundTaskRunPruningTaskEnv> {
   protected override getTaskType(): string {

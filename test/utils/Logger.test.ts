@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createLogger, isSecretKey, REDACTED, redactFields, redactMessage, redactValue } from '@aws-access-bridge/shared/utils/Logger';
+import { resetLogLevelForTests, resolveLogLevel, setLogLevel } from '@rexezuge/runtime';
+import type { LogLevel } from '@rexezuge/runtime';
+
+/**
+One captured emit, as the kit's `LogSink` port received it.
+*/
+interface Captured {
+  level: LogLevel;
+  /**
+  The namespace prefix the kit prepended — empty here, as no namespace is bound.
+  */
+  message: string;
+  /**
+  The redacted message the logger passed through.
+  */
+  message_: unknown;
+  fields: Record<string, unknown>;
+}
 
 /**
  * Redaction is the reason this module exists, so it is tested as a security
@@ -97,7 +115,9 @@ describe('redactValue', () => {
   });
 
   it('leaves ordinary text alone', () => {
-    expect(redactValue('Failed to refresh arn:aws:iam::123456789012:role/Dev')).toBe('Failed to refresh arn:aws:iam::123456789012:role/Dev');
+    expect(redactValue('Failed to refresh arn:aws:iam::123456789012:role/Dev')).toBe(
+      'Failed to refresh arn:aws:iam::123456789012:role/Dev',
+    );
   });
 
   it('leaves non-string scalars alone', () => {
@@ -120,52 +140,101 @@ describe('redactMessage', () => {
 });
 
 describe('createLogger', () => {
-  function capture(): { calls: Array<[string, string, unknown]>; sink: ReturnType<typeof createLogger> } {
-    const calls: Array<[string, string, unknown]> = [];
-    const sink = (level: string, message: string, fields: Record<string, unknown>): void => {
-      calls.push([level, message, fields]);
+  /**
+   * Capture at the kit's `LogSink` port rather than spying on `console`.
+   *
+   * The port is where the kit hands over the level, the prefixed message and the
+   * arguments, so a suite asserts exactly what would have been written without
+   * standing a console spy in for the log tail — and it gets the same seam
+   * production does, so a change to the emit path is exercised here rather than
+   * only in production.
+   */
+  function capture(): { calls: Captured[]; logger: ReturnType<typeof createLogger> } {
+    const calls: Captured[] = [];
+    return {
+      calls,
+      logger: createLogger({}, (level, message, args) => {
+        calls.push({ level, message, message_: args[0], fields: args[1] as Record<string, unknown> });
+      }),
     };
-    return { calls, sink: createLogger({}, sink) };
   }
 
-  it('emits one call per level', () => {
-    const { calls, sink } = capture();
-    sink.debug('d');
-    sink.info('i');
-    sink.warn('w');
-    sink.error('e');
-    expect(calls.map(([level]) => level)).toEqual(['debug', 'info', 'warn', 'error']);
+  it('emits at or above the floor, and debug is reachable by raising it', () => {
+    // The level decision is the kit's, and it is the change this convergence
+    // makes: the copy this replaces deliberately emitted `debug` unconditionally,
+    // on the grounds that a filter nobody controls swallows diagnostics. The
+    // answer to that is not "no filter" but "a filter that can be turned up" —
+    // `LOG_LEVEL=debug` is wired at the composition root, so the diagnostic is one
+    // variable away rather than absent.
+    const { calls, logger } = capture();
+    logger.debug('d');
+    logger.info('i');
+    logger.warn('w');
+    logger.error('e');
+    expect(calls.map((call) => call.level)).toEqual(['info', 'warn', 'error']);
+
+    resetLogLevelForTests();
+    setLogLevel('debug');
+    try {
+      logger.debug('now visible');
+      expect(calls.map((call) => call.level)).toEqual(['info', 'warn', 'error', 'debug']);
+    } finally {
+      resetLogLevelForTests();
+    }
   });
 
-  it('redacts at the sink, so a call site that forgets still cannot leak', () => {
+  it('ignores an unrecognised LOG_LEVEL rather than throwing at a cold start', () => {
+    // A typo in configuration must not cost a worker its cold start.
+    resetLogLevelForTests();
+    setLogLevel('verbose');
+    expect(resolveLogLevel()).toBe('info');
+    resetLogLevelForTests();
+  });
+
+  it('redacts before the sink, so a call site that forgets still cannot leak', () => {
     // This is the property that makes the control worth having: the guarantee is
-    // enforced once, at the boundary, rather than relying on 47 call sites.
-    const { calls, sink } = capture();
-    sink.error('boom', { secretAccessKey: 'wJalrXUtnFEMI', principalArn: 'arn:aws:iam::1:role/Dev' });
-    expect(calls[0][2]).toEqual({ principalArn: 'arn:aws:iam::1:role/Dev', secretAccessKey: REDACTED });
+    // enforced once, on the way into the sink, rather than relying on every call
+    // site. Both halves are scrubbed — the key name and the value shape.
+    const { calls, logger } = capture();
+    logger.error('boom', { secretAccessKey: 'wJalrXUtnFEMI', principalArn: 'arn:aws:iam::1:role/Dev' });
+    expect(calls[0].fields).toEqual({ principalArn: 'arn:aws:iam::1:role/Dev', secretAccessKey: REDACTED });
+    expect(calls[0].message_).toBe('boom');
+  });
+
+  it('scrubs a secret interpolated into the message itself', () => {
+    // The other half of the leak surface: call sites interpolate freely, so the
+    // text needs the same treatment as the field bag.
+    const { calls, logger } = capture();
+    logger.error('refresh failed for AKIAIOSFODNN7EXAMPLE');
+    expect(calls[0].message_).toContain(REDACTED);
+    expect(calls[0].message_).not.toContain('AKIAIOSFODNN7EXAMPLE');
   });
 
   it('binds context fields and lets a call site override them', () => {
-    const calls: Array<[string, string, unknown]> = [];
-    const sink = (level: string, message: string, fields: Record<string, unknown>): void => {
-      calls.push([level, message, fields]);
-    };
-    const scoped = createLogger({ subsystem: 'collector', region: 'us-east-1' }, sink);
+    const calls: Captured[] = [];
+    const scoped = createLogger({ subsystem: 'collector', region: 'us-east-1' }, (level, message, args) => {
+      calls.push({ level, message, message_: args[0], fields: args[1] as Record<string, unknown> });
+    });
     scoped.warn('partial');
     scoped.warn('overridden', { region: 'eu-west-1' });
-    expect(calls[0][2]).toEqual({ region: 'us-east-1', subsystem: 'collector' });
+    expect(calls[0].fields).toEqual({ region: 'us-east-1', subsystem: 'collector' });
     // Per-call wins, or a context key could silently relabel a diagnostic.
-    expect(calls[1][2]).toEqual({ region: 'eu-west-1', subsystem: 'collector' });
+    expect(calls[1].fields).toEqual({ region: 'eu-west-1', subsystem: 'collector' });
   });
 
   it('tolerates a circular field bag rather than throwing while reporting a failure', () => {
+    // A logger that throws while reporting a failure is worse than one that degrades.
     const circular: Record<string, unknown> = { principalArn: 'arn:aws:iam::1:role/Dev' };
     circular.self = circular;
-    const { calls, sink } = capture();
-    // A logger that throws while reporting a failure is worse than one that degrades.
+    const { calls, logger } = capture();
     expect(() => {
-      sink.error('boom', circular);
+      logger.error('boom', circular);
     }).not.toThrow();
     expect(calls).toHaveLength(1);
+    // The cycle is broken rather than followed: the revisit is summarised rather
+    // than recursed into, so the structure terminates before the serialiser's own
+    // guard is reached.
+    const fields = calls[0].fields as { self: { self: { note: string } } };
+    expect(fields.self.self.note).toBe('[CIRCULAR]');
   });
 });

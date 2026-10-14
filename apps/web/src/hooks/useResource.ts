@@ -131,7 +131,7 @@ function useResource<T>(fetcher: (() => Promise<T>) | null, options: UseResource
           if (!guard.isCurrent(request)) return;
           setRefreshingFor(null);
           if (optionsRef.current.reloadOnUnauthorized && isUnauthorized(error)) {
-            globalThis.location.reload();
+            location.reload();
             return;
           }
           const message = toErrorMessage(error, optionsRef.current.errorFallback);

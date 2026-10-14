@@ -1,4 +1,14 @@
-import { BadRequestError, BadGatewayError, ConflictError, ForbiddenError, NotFoundError, InternalServerError, UnauthorizedError, ServiceError, DatabaseError } from '@rexezuge/errors';
+import {
+  BadRequestError,
+  BadGatewayError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  InternalServerError,
+  UnauthorizedError,
+  ServiceError,
+  DatabaseError,
+} from '@rexezuge/errors';
 import type { ErrorResponse } from '@rexezuge/errors';
 
 class ErrorDeserializationUtil {

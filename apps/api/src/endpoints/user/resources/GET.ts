@@ -1,4 +1,3 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import type { ResourceInventoryItem } from '@aws-access-bridge/shared/model';
@@ -116,13 +115,15 @@ class ListResourcesRoute extends IActivityAPIRoute<ListResourcesRequest, ListRes
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
     const url: URL = new URL(cxt.req.url);
 
-    return getRequestScope(cxt).get(Tokens.ResourceService).searchResources(userEmail, {
-      search: url.searchParams.get('search') || undefined,
-      type: url.searchParams.get('type') || undefined,
-      limit: parseInt(url.searchParams.get('limit') || '50'),
-      offset: parseInt(url.searchParams.get('offset') || '0'),
-      accountId: url.searchParams.get('accountId') || undefined,
-    });
+    return getRequestScope(cxt)
+      .get(Tokens.ResourceService)
+      .searchResources(userEmail, {
+        search: url.searchParams.get('search') || undefined,
+        type: url.searchParams.get('type') || undefined,
+        limit: parseInt(url.searchParams.get('limit') || '50'),
+        offset: parseInt(url.searchParams.get('offset') || '0'),
+        accountId: url.searchParams.get('accountId') || undefined,
+      });
   }
 }
 

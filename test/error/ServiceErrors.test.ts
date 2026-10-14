@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { BadRequestError, UnauthorizedError, ForbiddenError, InternalServerError, DatabaseError, DefaultInternalServerError, ServiceError } from '@rexezuge/errors';
+import {
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  InternalServerError,
+  DatabaseError,
+  DefaultInternalServerError,
+  ServiceError,
+} from '@rexezuge/errors';
 
 describe('Service Errors', () => {
   describe('BadRequestError', () => {
@@ -81,9 +89,7 @@ describe('Service Errors', () => {
     });
 
     it('uses default message when none provided', () => {
-      expect(new InternalServerError().message).toBe(
-        'The server encountered an internal error and was unable to complete your request.',
-      );
+      expect(new InternalServerError().message).toBe('The server encountered an internal error and was unable to complete your request.');
     });
 
     it('uses custom message', () => {
@@ -123,9 +129,7 @@ describe('Service Errors', () => {
     });
 
     it('has the default message', () => {
-      expect(DefaultInternalServerError.message).toBe(
-        'The server encountered an internal error and was unable to complete your request.',
-      );
+      expect(DefaultInternalServerError.message).toBe('The server encountered an internal error and was unable to complete your request.');
     });
 
     it('has error code 500', () => {

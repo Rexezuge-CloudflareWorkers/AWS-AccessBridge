@@ -22,9 +22,10 @@ function instanceXml(id: string): string {
  * Resolves the region from the signed request's hostname, so a sweep can be
  * asserted region by region without hard-coding each endpoint.
  */
-function clientFactoryRespondingTo(
-  respond: (url: string) => Response | Error,
-): { clientFactory: ReturnType<typeof vi.fn>; seenRegions: string[] } {
+function clientFactoryRespondingTo(respond: (url: string) => Response | Error): {
+  clientFactory: ReturnType<typeof vi.fn>;
+  seenRegions: string[];
+} {
   const seenRegions: string[] = [];
   const fetch = vi.fn((url: string) => {
     seenRegions.push(regionFromUrl(url));
@@ -85,7 +86,9 @@ describe('multi-region sweep', () => {
 
   it('never throws for a regional failure', async () => {
     const { clientFactory } = clientFactoryRespondingTo(() => new Error('network down'));
-    await expect(new Ec2Collector(clientFactory as never).collectAllRegions(KEYS, REGIONS)).resolves.toMatchObject({ failedRegions: expect.any(Array) });
+    await expect(new Ec2Collector(clientFactory as never).collectAllRegions(KEYS, REGIONS)).resolves.toMatchObject({
+      failedRegions: expect.any(Array),
+    });
   });
 
   /**
@@ -95,7 +98,10 @@ describe('multi-region sweep', () => {
    */
   it('sweeps a global collector exactly once, ignoring the region list', async () => {
     const { clientFactory, seenRegions } = clientFactoryRespondingTo(
-      () => new Response('<ListAllMyBucketsResult><Buckets><Bucket><Name>b</Name></Bucket></Buckets></ListAllMyBucketsResult>', { status: 200 }),
+      () =>
+        new Response('<ListAllMyBucketsResult><Buckets><Bucket><Name>b</Name></Bucket></Buckets></ListAllMyBucketsResult>', {
+          status: 200,
+        }),
     );
 
     const sweep = await new S3Collector(clientFactory as never).collectAllRegions(KEYS, REGIONS);
@@ -124,7 +130,10 @@ describe('inventory region configuration', () => {
   });
 
   it('honours an explicit list', () => {
-    expect(ConfigurationManager.resource.getInventoryRegions({ INVENTORY_REGIONS: 'us-east-1,eu-west-1' })).toEqual(['us-east-1', 'eu-west-1']);
+    expect(ConfigurationManager.resource.getInventoryRegions({ INVENTORY_REGIONS: 'us-east-1,eu-west-1' })).toEqual([
+      'us-east-1',
+      'eu-west-1',
+    ]);
   });
 
   /**

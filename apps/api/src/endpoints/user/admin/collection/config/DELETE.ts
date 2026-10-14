@@ -1,11 +1,15 @@
-
 import type { ActivityContext } from '@/endpoints/IAdminActivityAPIRoute';
 import { IAdminActivityAPIRoute } from '@/endpoints/IAdminActivityAPIRoute';
 import type { IAdminEnv, IRequest, IResponse } from '@/endpoints/IAdminActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
 import { Tokens } from '@aws-access-bridge/backend-services/composition';
 
-import { badRequestResponse, forbiddenResponse, internalServerErrorResponse, unauthorizedResponse } from '@aws-access-bridge/shared/schema/exceptionResponses';
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  unauthorizedResponse,
+} from '@aws-access-bridge/shared/schema/exceptionResponses';
 class DisableDataCollectionRoute extends IAdminActivityAPIRoute<DisableDataCollectionRequest, DisableDataCollectionResponse, IAdminEnv> {
   schema = {
     tags: ['Admin'],
@@ -76,8 +80,11 @@ class DisableDataCollectionRoute extends IAdminActivityAPIRoute<DisableDataColle
     security: [{ CloudflareAccess: [] }],
   };
 
-  protected async handleAdminRequest(request: DisableDataCollectionRequest, env: IAdminEnv,
-    cxt: ActivityContext<IAdminEnv>): Promise<DisableDataCollectionResponse> {
+  protected async handleAdminRequest(
+    request: DisableDataCollectionRequest,
+    env: IAdminEnv,
+    cxt: ActivityContext<IAdminEnv>,
+  ): Promise<DisableDataCollectionResponse> {
     await getRequestScope(cxt).get(Tokens.CostService).disableCollection(request.principalArn, request.collectionType);
     return { success: true, message: 'Data collection disabled.' };
   }

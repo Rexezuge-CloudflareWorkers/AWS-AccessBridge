@@ -2,7 +2,6 @@ import type { AuditLog, AuditLogInternal } from '@aws-access-bridge/shared/model
 import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 import { BaseDAO } from './BaseDAO';
 
-import { assertD1Success } from '../utils/D1Utils';
 class AuditLogDAO extends BaseDAO {
   public async create(input: {
     userEmail: string;
@@ -19,8 +18,23 @@ class AuditLogDAO extends BaseDAO {
     const { userEmail, action, method, path, statusCode, resource, detail, ipAddress, userAgent, userId = null } = input;
     const logId: string = UUIDUtil.getRandomUUID();
     const timestamp: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const result = await this.run('INSERT INTO audit_logs (log_id, timestamp, user_email, user_id, action, resource, method, path, status_code, detail, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [logId, timestamp, userEmail, userId, action, resource || null, method, path, statusCode, detail || null, ipAddress || null, userAgent || null]);
-    assertD1Success(result, `create audit log`);
+    await this.run(
+      'INSERT INTO audit_logs (log_id, timestamp, user_email, user_id, action, resource, method, path, status_code, detail, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        logId,
+        timestamp,
+        userEmail,
+        userId,
+        action,
+        resource || null,
+        method,
+        path,
+        statusCode,
+        detail || null,
+        ipAddress || null,
+        userAgent || null,
+      ],
+    );
   }
 
   public async query(filters: AuditLogQueryFilters, limit: number, offset: number): Promise<{ logs: AuditLog[]; total: number }> {
@@ -88,12 +102,18 @@ class AuditLogDAO extends BaseDAO {
   }
 
   public async deleteOlderThanBatch(cutoffTimestamp: number, batchSize: number): Promise<number> {
-    // Checked: `AbstractPruningTask` reads the returned count to decide whether
-    // to loop, so a `{success: false}` result resolving as 0 rows made retention
-    // log "pruned 0" and exit as a success while the table grew unbounded.
+    // The returned count matters: `AbstractPruningTask` reads it to decide whether
+    // to loop, so a write that resolved as 0 rows made retention log "pruned 0"
+    // and exit as a success while the table grew unbounded. `run` raises on
+    // `{success: false}`, so a count of 0 here means "nothing old enough" — the
+    // one honest reading.
+    //
     // `DELETE ... LIMIT` is not supported on D1's SQLite build, so the batch
     // boundary is a rowid subquery with its own LIMIT instead.
-    const result = await this.run('DELETE FROM audit_logs WHERE rowid IN (SELECT rowid FROM audit_logs WHERE timestamp < ? LIMIT ?)', [cutoffTimestamp, batchSize]);
+    const result = await this.run('DELETE FROM audit_logs WHERE rowid IN (SELECT rowid FROM audit_logs WHERE timestamp < ? LIMIT ?)', [
+      cutoffTimestamp,
+      batchSize,
+    ]);
     return result.meta?.changes ?? 0;
   }
 }

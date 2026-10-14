@@ -4,8 +4,8 @@ interface CostSummary {
   accounts: Record<string, { totalCost: number; currency: string }>;
   grandTotal: number;
   /**
- * Null when the accounts do not all report the same currency.
- */
+   * Null when the accounts do not all report the same currency.
+   */
   currency: string | null;
 }
 

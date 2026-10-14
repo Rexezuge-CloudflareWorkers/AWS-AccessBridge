@@ -8,7 +8,10 @@ function json(body: unknown, status = 200): Response {
 
 describe('apiRequest', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(json({ ok: true }))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => Promise.resolve(json({ ok: true }))),
+    );
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -36,12 +39,16 @@ describe('apiRequest', () => {
   });
 
   it('throws a ServiceError carrying the backend Exception message', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(json({ Exception: { Type: 'BadRequest', Message: 'q is required' } }, 400)));
+    vi.mocked(fetch).mockImplementationOnce(() =>
+      Promise.resolve(json({ Exception: { Type: 'BadRequest', Message: 'q is required' } }, 400)),
+    );
     await expect(apiRequest('/x')).rejects.toMatchObject({ status: 400, message: expect.stringContaining('q is required') });
   });
 
   it('falls back to status text when the error body is not JSON', async () => {
-    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response('<html>gateway</html>', { status: 502, statusText: 'Bad Gateway' })));
+    vi.mocked(fetch).mockImplementationOnce(() =>
+      Promise.resolve(new Response('<html>gateway</html>', { status: 502, statusText: 'Bad Gateway' })),
+    );
     await expect(apiRequest('/x')).rejects.toBeInstanceOf(ServiceError);
   });
 

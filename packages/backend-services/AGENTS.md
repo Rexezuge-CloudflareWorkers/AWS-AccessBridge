@@ -40,6 +40,13 @@ every caller resolved — so it is gone rather than deprecated.
 `composition/` is the only place a service is built. `createRequestScope(env)` returns a fresh
 `Container`; `getRequestScope(cxtOrEnv)` returns the cached scope for that unit of work.
 
+**The scope also installs `LOG_LEVEL`.** `getRequestScope` calls `setLogLevel(env.LOG_LEVEL)` on the
+way through, because the redaction-aware logger is constructed at module scope and so cannot be handed
+a request's `env` to read the level from. An unrecognised value clears the setting rather than
+throwing — a typo in configuration should not cost a worker its cold start. `LOG_LEVEL` is declared
+in `backend-runtime/src/env.d.ts` and set in `wrangler.template.jsonc` beside the other vars, so
+declaring it is a compile error rather than a silent no-op.
+
 **Request handlers must pass the Hono context; cron and Durable Object tasks pass `env` and call
 `createRequestScope` themselves.** Keying on `env` looks right — Workers hand one object to every
 handler in a request — but `route-helpers.withUnconstrainedD1Session` spreads `c.env` into a _new_
@@ -163,10 +170,30 @@ value _shapes_ (`AKIA`/`ASIA` key ids, JWTs, hex digests), so a secret interpola
 or pasted under a harmless key is still caught. Errors reduce to their message, and a circular field
 bag degrades to a note rather than overflowing while reporting a failure.
 
+The **emit** machinery is now the kit's: `@rexezuge/runtime`'s `createLogger`, given this repository's
+deny-list as its `LogSink`. It is imported from the deep path `@rexezuge/runtime/logger`, never the
+kit barrel — the barrel re-exports the worker bases, which import `cloudflare:workers`, and that
+one specifier is what broke the `apps/web` Vite build and the plain-Node `test/floci` global setup
+at the same time. Level resolution, the namespace prefix and the one-line rendering are
+`consoleSink`'s; the deny-list is ours, because which key names mean "secret" is a property of this
+repository's data model and a kit that guessed across nine repos' vocabularies would redact diagnostic
+fields and train everyone to ignore the markers.
+
+**Redaction is applied on the way *into* the sink**, in `createLogger`, not inside it — so a test that
+substitutes its own sink to assert on the bytes still sees redacted fields, and a sink added later
+cannot become the place the leak gets through.
+
+### There is now a level filter, and it is `LOG_LEVEL`
+
+The previous logger emitted `debug` unconditionally, deliberately: a local `DEBUG` filter nobody
+controls swallows production diagnostics, which is the same class of defect as an unpriced table. The
+answer was never "no filter" — it was "a filter one variable controls". `LOG_LEVEL` is declared in
+`env.d.ts` and set in `wrangler.template.jsonc`, and `getRequestScope` installs it with
+`setLogLevel`. An unrecognised value clears the setting rather than throwing, because a typo in
+configuration should not cost a worker its cold start. Raise it to `debug` while diagnosing the cron.
+
 Prefer `log.info` / `log.warn` / `log.error` from `@aws-access-bridge/shared/utils` over a bare
-`console.*`: there is no local `DEBUG` filter on purpose (Cloudflare already samples, and a local
-filter would silently swallow production diagnostics), and nothing changes wrangler's JSON logging,
-which alters billing-visible behaviour.
+`console.*`. Nothing changes wrangler's JSON logging, which alters billing-visible behaviour.
 
 ## Pure statics stay static
 
@@ -198,7 +225,10 @@ In `AssumeRoleService`, the local named `userId` is the STS `RoleSessionName` (f
   `AwsCollectionError`, which preserves upstream status for collector policy while using SDK
   `ServiceError` as its HTTP error contract.
 - `backend-runtime/` — `ConfigurationDefaults`, `ConfigurationManager` (namespaced getters) and
-  `EnvParser`; the `di/` `Container`; abstract worker bases; DO naming constants and `Pagination`;
-  the checked-in `env.d.ts` binding source of truth.
+  `EnvParser`; abstract worker bases; DO naming constants and `Pagination`; the checked-in
+  `env.d.ts` binding source of truth.
+- `@rexezuge/runtime` — the `Container` comes from the subpath `@rexezuge/runtime/di/Container`, not
+  from `backend-runtime`. This package's own `di/` directory does not exist; a guide that names one
+  sends the next reader looking for a file to edit when what they need is a kit API.
 - `provider-clients/` — the raw AWS layer: `AwsSignedFetcher` plus `StsClient` /
   `CostExplorerClient` / `IamClient`. The services above are thin domain delegates over these.

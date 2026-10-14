@@ -86,3 +86,53 @@ SELECT user_email FROM user_metadata WHERE current_email IS NULL;
 
 They still authenticate via their anchor. Merge them deliberately before any
 address change (`scripts/ops/change-email.ts` refuses an account with no `id`).
+
+## `@rexezuge/identity` is NOT adopted, and the reason is the schema
+
+The kit owns a converged identity: `UserDAO`, `UserEmailDAO`, `accountLookup`,
+`UserIdentityService` and its own migration set. This repository carries the same
+four shapes itself and is not yet on the kit's — and the gap is not the code, it is
+the table.
+
+The kit's `UserDAO` reads a **`users`** table. This repository has no `users`
+table: the identity anchor lives in **`user_metadata`** (`user_email`,
+`current_email`, `id`, `is_superadmin`, from migration `0032`), and `user_emails`
+is the address registry under the name both implementations agree on. So adopting
+the kit's DAOs is not a swap, it is a data migration, and SQLite makes it a
+**three-release arc**:
+
+1. **Expand** — `0035_kit_users_expand.sql` creates `users`, and every writer
+   dual-writes. Readers still read `user_metadata`.
+2. **Adopt** — `UserIdentityService` and `AddressRegistryService` read `users`.
+   `accountLookup` takes over from `resolveOwner`.
+3. **Contract** — drop `user_metadata`'s identity columns and the dual-write.
+
+It cannot be one migration. SQLite cannot `ALTER` a primary key, cannot change a
+`REFERENCES` clause, and D1 honours neither `foreign_keys=off` nor
+`legacy_alter_table` — so the new table has to exist alongside the old one for at
+least one deploy between any two states. A single-release version of this would
+either lose the anchor or abort halfway with the schema in a state no later
+migration expects.
+
+**Until that arc lands, `@rexezuge/identity` is not a dependency.** It was
+declared while the adoption was being scoped and removed once it was clear nothing
+imported it: an unused dependency installs a package that suggests an adoption
+that never happened, and the next reader has to check whether some file uses it
+before they can trust the manifest.
+
+### What the kit's fixes mean for the local copies
+
+The kit carries two identity hardening changes that landed in 1.8.0. Both are
+already present in this repository's copies, so there is no exposure and no
+adoption urgency — but the *reasons* are worth keeping, because they are the kind
+of defect that reappears in the next copy.
+
+- **`UserEmailDAO.register` is a conditional upsert.** `ON CONFLICT(email) DO
+  UPDATE … WHERE user_emails.is_verified = 0`, with `meta.changes` as the
+  verdict. Without the `WHERE`, a claim racing a revoke re-points a *verified*
+  address at a new account — the read and the write are not one statement. That is
+  an identity takeover, not a bug report.
+- **`accountLookup.resolveAccount` refuses a moved anchor.** An account whose
+  `current_email` has since changed resolves to `null` rather than to the address
+  it used to sign in with, so a stale cached lookup cannot authenticate the wrong
+  person.

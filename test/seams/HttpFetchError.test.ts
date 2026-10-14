@@ -85,7 +85,14 @@ describe('isRetryableThrownError', () => {
   });
 
   it('retries a transient failure', () => {
-    for (const message of ['Throttling: slow down', 'ServiceUnavailable', 'Rate exceeded', 'InternalError', 'socket hang up', 'ECONNRESET']) {
+    for (const message of [
+      'Throttling: slow down',
+      'ServiceUnavailable',
+      'Rate exceeded',
+      'InternalError',
+      'socket hang up',
+      'ECONNRESET',
+    ]) {
       expect(isRetryableThrownError(new Error(message)), message).toBe(true);
     }
   });

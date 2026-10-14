@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { Spinner } from '@rexezuge/web';
+import { EmptyState, Spinner } from '@rexezuge/web';
 import { formatAmount, formatCurrency, formatMonthLabel } from '../lib/format';
 import { maxTrend, sortAccountsByCost, trendBarPercent } from '../lib/costTrends';
 import { useResource } from '../hooks/useResource';
@@ -112,24 +112,29 @@ export default function CostDashboard() {
       )}
 
       {!summary || Object.keys(summary.accounts).length === 0 ? (
-        <div style={{ background: '#1e2433', borderRadius: '12px', padding: '48px', textAlign: 'center' }}>
-          <svg
-            style={{ width: '48px', height: '48px', color: '#4b5563', margin: '0 auto 16px' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>{t('costs.emptyTitle', 'No cost data available yet.')}</p>
-          <p style={{ fontSize: '14px', color: '#6b7280' }}>
-            {t('costs.emptyHint', 'Enable data collection for your accounts in the Admin panel to start tracking costs.')}
-          </p>
+        <div style={{ background: '#1e2433', borderRadius: '12px', padding: '48px' }}>
+          <EmptyState
+            icon={
+              <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            }
+            message={
+              <>
+                <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>
+                  {t('costs.emptyTitle', 'No cost data available yet.')}
+                </p>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                  {t('costs.emptyHint', 'Enable data collection for your accounts in the Admin panel to start tracking costs.')}
+                </p>
+              </>
+            }
+          />
         </div>
       ) : null}
     </div>

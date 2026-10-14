@@ -128,6 +128,12 @@
     "PRINCIPAL_TRUST_CHAIN_LIMIT": "3",
     "AUDIT_LOG_RETENTION_DAYS": "90",
     "DEMO_MODE": "false",
+    // `debug` | `info` | `warn` | `error`. `info` is the default and is what a
+    // production deployment should carry; raise it to `debug` while diagnosing
+    // the cron, which is the case this exists for — the redaction-aware logger is
+    // built at module scope, so without this the `debug` diagnostics it can emit
+    // are unreachable in a Worker. An unrecognised value is ignored, not fatal.
+    "LOG_LEVEL": "info",
     // Comma-separated AWS regions the resource inventory sweeps. Empty means the
     // built-in commercial-region list in
     // `backend-runtime/src/constants/InventoryRegions.ts` — which is also the

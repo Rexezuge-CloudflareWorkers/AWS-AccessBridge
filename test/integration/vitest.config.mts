@@ -1,16 +1,8 @@
-import { defineConfig } from 'vitest/config';
+import { defineIntegrationVitestConfig } from '@rexezuge/tooling/vitest-integration';
 import { cloudflareTest, cloudflarePool } from '@cloudflare/vitest-pool-workers';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-
-const apiSrcPath = fileURLToPath(new URL('../../apps/api/src', import.meta.url));
-const backgroundSrcPath = fileURLToPath(new URL('../../apps/background/src', import.meta.url));
-const backendDataSrcPath = fileURLToPath(new URL('../../packages/backend-data/src', import.meta.url));
-const backendRuntimeSrcPath = fileURLToPath(new URL('../../packages/backend-runtime/src', import.meta.url));
-const backendServicesSrcPath = fileURLToPath(new URL('../../packages/backend-services/src', import.meta.url));
-const providerClientsSrcPath = fileURLToPath(new URL('../../packages/provider-clients/src', import.meta.url));
-const sharedSrcPath = fileURLToPath(new URL('../../packages/shared/src', import.meta.url));
 
 const migrationsDir = path.resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
 const migrationFiles = readdirSync(migrationsDir)
@@ -22,11 +14,21 @@ const migrationEntries = migrationFiles.map((f) => ({ name: f, sql: readFileSync
 // kept for harnesses/tests that only want the whole bundle.
 const migrationSql = migrationEntries.map((f) => f.sql).join('\n\n');
 
-export default defineConfig({
-  define: {
-    __INTEGRATION_MIGRATION_SQL__: JSON.stringify(migrationSql),
-    __INTEGRATION_MIGRATION_FILES__: JSON.stringify(migrationEntries),
-  },
+/**
+ * The workerd integration suite, on the kit's factory.
+ *
+ * The factory generates the `@aws-access-bridge/* → src` table from `scope`, so
+ * this table cannot drift from the unit suite's — a suite resolving a workspace
+ * import differently from its sibling fails in a way that looks like a product
+ * bug. The `plugins`, `pool` and `define` blocks below are harness wiring the
+ * factory passes through untouched, by design: importing the workerd plugin into
+ * the tooling package would make it undownloadable for a consumer without one.
+ */
+export default defineIntegrationVitestConfig({
+  scope: '@aws-access-bridge',
+  root: new URL('../../', import.meta.url).href,
+  packages: ['shared', 'backend-runtime', 'backend-data', 'backend-services', 'provider-clients'],
+  include: ['test/integration/**/*.int.test.ts'],
   plugins: [
     cloudflareTest({
       wrangler: {
@@ -34,34 +36,29 @@ export default defineConfig({
       },
     }),
   ],
-  test: {
-    globals: true,
-    include: ['test/integration/**/*.int.test.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov', 'html'],
-      reportsDirectory: './coverage-integration',
-      include: ['apps/api/src/**/*.ts', 'apps/background/src/**/*.ts', 'packages/**/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.int.test.ts', '**/*.d.ts', '**/index.ts', '**/types.d.ts'],
+  pool: cloudflarePool({
+    wrangler: {
+      configPath: './test/integration/wrangler.test.jsonc',
     },
-    pool: cloudflarePool({
-      wrangler: {
-        configPath: './test/integration/wrangler.test.jsonc',
-      },
-    }),
+  }),
+  // Not a factory option: the harness injects the migration bundle as a compile
+  // time constant, which is what lets a test apply a *named range* rather than
+  // the whole set.
+  define: {
+    __INTEGRATION_MIGRATION_SQL__: JSON.stringify(migrationSql),
+    __INTEGRATION_MIGRATION_FILES__: JSON.stringify(migrationEntries),
   },
-  ssr: {
-    noExternal: ['hono', '@aws-access-bridge'],
-  },
-  resolve: {
-    alias: [
-      { find: '@aws-access-bridge/background', replacement: backgroundSrcPath },
-      { find: '@aws-access-bridge/backend-data', replacement: backendDataSrcPath },
-      { find: '@aws-access-bridge/backend-runtime', replacement: backendRuntimeSrcPath },
-      { find: '@aws-access-bridge/backend-services', replacement: backendServicesSrcPath },
-      { find: '@aws-access-bridge/provider-clients', replacement: providerClientsSrcPath },
-      { find: '@aws-access-bridge/shared', replacement: sharedSrcPath },
-      { find: /^@\//, replacement: `${apiSrcPath}/` },
-    ],
-  },
+  // `hono` and `chanfana` are peers of every kit package rather than
+  // dependencies, so a `link:` install can hand two copies to Node: the kit's for
+  // its own imports, the app's for the app's. Two `hono` means two
+  // `HTTPException` identities and a `toErrorResponse` that does not recognise
+  // what a route threw. The kit's own `dist/` is kept in the pipeline for the
+  // same reason the unit config inlines it.
+  aliases: [
+    {
+      find: '@aws-access-bridge/web',
+      replacement: fileURLToPath(new URL('../../apps/web/src', import.meta.url)),
+    },
+  ],
+  ssrNoExternal: ['hono', 'chanfana', '@aws-access-bridge'],
 });

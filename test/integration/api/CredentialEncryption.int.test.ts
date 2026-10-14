@@ -42,9 +42,19 @@ describe('Credential encryption against real D1', () => {
     // Backward-read compatibility: rows written before migration 0031 carry one
     // IV for all three ciphertexts, and must keep decrypting.
     const sharedIv = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(12))));
-    const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, ['encrypt']);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0),
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt'],
+    );
     const encryptLegacy = async (data: string): Promise<string> => {
-      const out = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: Uint8Array.from(atob(sharedIv), (c) => c.codePointAt(0) ?? 0) }, key, new TextEncoder().encode(data));
+      const out = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: Uint8Array.from(atob(sharedIv), (c) => c.codePointAt(0) ?? 0) },
+        key,
+        new TextEncoder().encode(data),
+      );
       return btoa(String.fromCodePoint(...new Uint8Array(out)));
     };
     const legacyArn = 'arn:aws:iam::123456789012:role/Legacy';
@@ -66,7 +76,9 @@ describe('Credential encryption against real D1', () => {
     const dao = new CredentialsDAO(env.AccessBridgeDB as never, [MASTER_KEY], 3);
     await dao.storeCredential(arn, 'AKIAUPGRADEDKEY00000', 'upgradedSecretValue', 'tok');
 
-    const row = await env.AccessBridgeDB.prepare('SELECT salt, salt_secret_access_key, salt_session_token FROM credentials WHERE principal_arn = ?')
+    const row = await env.AccessBridgeDB.prepare(
+      'SELECT salt, salt_secret_access_key, salt_session_token FROM credentials WHERE principal_arn = ?',
+    )
       .bind(arn)
       .first<{ salt: string; salt_secret_access_key: string; salt_session_token: string }>();
     expect(new Set([row!.salt, row!.salt_secret_access_key, row!.salt_session_token]).size).toBe(3);
@@ -123,9 +135,13 @@ describe('Per-feature credential keys', () => {
   Write a row under an older key, as a deployment mid-rotation would.
   */
   async function seedLegacyRow(): Promise<void> {
-    const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, [
-      'encrypt',
-    ]);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      Uint8Array.from(atob(MASTER_KEY), (c) => c.codePointAt(0) ?? 0),
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt'],
+    );
     const iv = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(12))));
     const seal = async (data: string): Promise<string> => {
       const out = await crypto.subtle.encrypt(
@@ -175,7 +191,9 @@ describe('Per-feature credential keys', () => {
   it('treats an absent ciphertext column as absent, not as corruption', async () => {
     // A relationship-only row carries no ciphertext in any column.
     const relationshipArn = 'arn:aws:iam::123456789012:role/ChildOnly';
-    await env.AccessBridgeDB.prepare('INSERT OR REPLACE INTO credentials (principal_arn, assumed_by) VALUES (?, ?)').bind(relationshipArn, legacyArn).run();
+    await env.AccessBridgeDB.prepare('INSERT OR REPLACE INTO credentials (principal_arn, assumed_by) VALUES (?, ?)')
+      .bind(relationshipArn, legacyArn)
+      .run();
     const dao = new CredentialsDAO(env.AccessBridgeDB as never, [featureKey, MASTER_KEY], 3);
     const credential = await dao.getCredentialByPrincipalArn(relationshipArn);
     expect(credential.assumedBy).toBe(legacyArn);

@@ -40,7 +40,7 @@ function distinctCountsPerTable(): void {
 describe('MaintenanceService.cleanupOrphanedData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     for (const dao of Object.values(TABLES)) {
       vi.mocked(dao.prototype.deleteOrphaned).mockResolvedValue(1);
     }
@@ -87,7 +87,10 @@ describe('MaintenanceService.cleanupOrphanedData', () => {
 
     const result = await new MaintenanceService(ENV).cleanupOrphanedData();
 
-    expect(result.failures.map((failure) => failure.table).toSorted((left, right) => left.localeCompare(right))).toEqual(['costData', 'spendAlerts']);
+    expect(result.failures.map((failure) => failure.table).toSorted((left, right) => left.localeCompare(right))).toEqual([
+      'costData',
+      'spendAlerts',
+    ]);
     expect(result.totalDeleted).toBe(5);
   });
 

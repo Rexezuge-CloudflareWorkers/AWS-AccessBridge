@@ -1,10 +1,19 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { LocaleUtil } from '@aws-access-bridge/shared';
+import { LocaleUtil, SUPPORTED_LOCALES } from '@rexezuge/shared';
 import { resolvePreferredLanguage } from './lib/language';
 import en from './locales/en/translation.json';
 
-export const SUPPORTED_LANGUAGES = ['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja', 'zh-CN', 'zh-TW', 'ko'] as const;
+/**
+ * The languages the selector offers.
+ *
+ * Derived from the kit's support table rather than declared here, because this
+ * list used to exist twice — once in the SPA and once in a `LocaleUtil` the SPA
+ * imported — and a script existed purely to check the two agreed. They cannot
+ * disagree now, and the check that guarded them has nothing left to guard.
+ * A locale added to the kit's table is offered here on the next bump.
+ */
+export const SUPPORTED_LANGUAGES = SUPPORTED_LOCALES;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 

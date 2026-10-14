@@ -59,7 +59,7 @@ describe('ListAuditLogsRoute account filter', () => {
   it('still searches by address alone when the id cannot be resolved', async () => {
     // Best-effort: an unresolvable address must not turn a search into a 500, and
     // the address arm alone is the behaviour that predates the id.
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockResolvedValue(null);
 
     await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));
@@ -75,7 +75,7 @@ describe('ListAuditLogsRoute account filter', () => {
     // `console.warn.mock` does not exist, and the assertion could not be written the way
     // it was. Reading the recorded calls off the value the call returned is also the
     // only version that still works once the install is un-restored.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(UserIdentityService.prototype.resolveUserId).mockRejectedValue(new Error('d1 is busy'));
 
     await new ListAuditLogsRoute({} as never).handle(context(`?userEmail=${EMAIL}`));

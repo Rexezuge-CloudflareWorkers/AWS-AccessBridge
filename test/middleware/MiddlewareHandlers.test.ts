@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { CF_CONNECTING_IP_HEADER, CF_RAY_HEADER, API_WORKER_BASE_HOSTNAME, DEMO_USER_EMAIL, FORWARDED_FOR_HEADER, INTERNAL_USER_EMAIL_HEADER, SELF_WORKER_BASE_HOSTNAME } from '@aws-access-bridge/shared/constants';
+import {
+  CF_CONNECTING_IP_HEADER,
+  CF_RAY_HEADER,
+  API_WORKER_BASE_HOSTNAME,
+  DEMO_USER_EMAIL,
+  FORWARDED_FOR_HEADER,
+  INTERNAL_USER_EMAIL_HEADER,
+  SELF_WORKER_BASE_HOSTNAME,
+} from '@aws-access-bridge/shared/constants';
 import { UnauthorizedError } from '@rexezuge/errors';
 import { TokenService } from '@aws-access-bridge/backend-services/auth';
 
@@ -96,7 +104,7 @@ function d1Session(): D1DatabaseSession {
   const empty = () => d1Result<Record<string, unknown>>([]);
   return {
     prepare: () => ({
-      bind: () => undefined,
+      bind: () => {},
       first: async () => null,
       run: empty,
       all: empty,
@@ -503,7 +511,7 @@ describe('MiddlewareHandlers', () => {
      */
     it('never turns a failing request into a success while skipping the audit write', async () => {
       const app = new Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>();
-      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       mount(app, '*', MiddlewareHandlers.activityAudit());
       app.get('/api/test', () => {
         throw Object.assign(new Error('upstream exploded'), { status: 401 });

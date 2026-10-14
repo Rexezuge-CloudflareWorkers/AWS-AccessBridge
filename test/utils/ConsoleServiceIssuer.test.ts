@@ -57,9 +57,7 @@ describe('ConsoleService.getSigninToken', () => {
   // `ServiceError` taxonomy every caller maps status codes through.
   it('raises InternalServerError, not SyntaxError, for a malformed body', async () => {
     const http = new StubHttpClient().setHandler(() => new Response('<html>oops</html>', { status: 200 }));
-    const thrown = await new ConsoleService(http)
-      .getSigninToken('AKIA', 'secret')
-      .catch((error: unknown) => error);
+    const thrown = await new ConsoleService(http).getSigninToken('AKIA', 'secret').catch((error: unknown) => error);
     expect(thrown).toBeInstanceOf(InternalServerError);
     expect(thrown).not.toBeInstanceOf(SyntaxError);
   });

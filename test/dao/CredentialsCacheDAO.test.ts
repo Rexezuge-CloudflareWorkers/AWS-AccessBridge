@@ -41,7 +41,13 @@ describe('CredentialsCacheDAO', () => {
   it('round-trips a credential with a distinct IV per field', async () => {
     const dao = new CredentialsCacheDAO(kv, [key]);
     const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + 3600;
-    await dao.storeCachedCredential({ principalArn: PRINCIPAL_ARN, accessKeyId: 'AKIAIOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG', sessionToken: 'session-token', expiresAt });
+    await dao.storeCachedCredential({
+      principalArn: PRINCIPAL_ARN,
+      accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+      secretAccessKey: 'wJalrXUtnFEMI/K7MDENG',
+      sessionToken: 'session-token',
+      expiresAt,
+    });
 
     const raw = JSON.parse(store.get(cacheKey()) ?? '{}') as Record<string, string>;
     expect(new Set([raw.salt, raw.saltSecretAccessKey, raw.saltSessionToken]).size).toBe(3);
@@ -98,7 +104,11 @@ describe('CredentialsCacheDAO', () => {
       }),
     );
 
-    await expect(dao.getCachedCredential(PRINCIPAL_ARN)).resolves.toMatchObject({ accessKeyId: 'AKIA', secretAccessKey: 'SECRET', sessionToken: undefined });
+    await expect(dao.getCachedCredential(PRINCIPAL_ARN)).resolves.toMatchObject({
+      accessKeyId: 'AKIA',
+      secretAccessKey: 'SECRET',
+      sessionToken: undefined,
+    });
   });
 
   it('treats an undecryptable entry as a miss and evicts it', async () => {
@@ -127,7 +137,13 @@ describe('CredentialsCacheDAO', () => {
 
   it('evicts an expired entry', async () => {
     const dao = new CredentialsCacheDAO(kv, [key]);
-    await dao.storeCachedCredential({ principalArn: PRINCIPAL_ARN, accessKeyId: 'AKIA', secretAccessKey: 'SECRET', sessionToken: 'TOKEN', expiresAt: TimestampUtil.getCurrentUnixTimestampInSeconds() - 10 });
+    await dao.storeCachedCredential({
+      principalArn: PRINCIPAL_ARN,
+      accessKeyId: 'AKIA',
+      secretAccessKey: 'SECRET',
+      sessionToken: 'TOKEN',
+      expiresAt: TimestampUtil.getCurrentUnixTimestampInSeconds() - 10,
+    });
     await expect(dao.getCachedCredential(PRINCIPAL_ARN)).resolves.toBeUndefined();
     expect(store.has(cacheKey())).toBe(false);
   });
@@ -137,7 +153,17 @@ describe('CredentialsCacheDAO', () => {
 Build a ciphertext with a caller-chosen IV, as pre-fix code did.
 */
 async function encryptWithIv(data: string, keyBase64: string, ivBase64: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0), { name: 'AES-GCM' }, false, ['encrypt']);
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: Uint8Array.from(atob(ivBase64), (c) => c.codePointAt(0) ?? 0) }, key, new TextEncoder().encode(data));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: Uint8Array.from(atob(ivBase64), (c) => c.codePointAt(0) ?? 0) },
+    key,
+    new TextEncoder().encode(data),
+  );
   return btoa(String.fromCodePoint(...new Uint8Array(encrypted)));
 }

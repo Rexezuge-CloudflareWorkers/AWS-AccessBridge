@@ -1,6 +1,5 @@
 import type { Team, TeamInternal } from '@aws-access-bridge/shared/model';
 import { TimestampUtil, UUIDUtil } from '@rexezuge/shared';
-import { assertD1Success } from '../utils/D1Utils';
 import { BaseDAO } from './BaseDAO';
 
 class TeamsDAO extends BaseDAO {
@@ -11,7 +10,12 @@ class TeamsDAO extends BaseDAO {
     // `{success: false}` rather than throwing. Without this check a duplicate name
     // returned 200 with a teamId that resolves to no row, and every later member
     // or account write targeted a team that does not exist.
-    await this.run('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)', [teamId, teamName, createdAt, createdBy]);
+    await this.run('INSERT INTO teams (team_id, team_name, created_at, created_by) VALUES (?, ?, ?, ?)', [
+      teamId,
+      teamName,
+      createdAt,
+      createdBy,
+    ]);
     return { teamId, teamName, createdAt, createdBy };
   }
 
@@ -28,16 +32,14 @@ class TeamsDAO extends BaseDAO {
   public async deleteTeam(teamId: string): Promise<void> {
     // Batched so the cascade is atomic: three separate autocommitted statements
     // could fail partway and leave a team with a partially destroyed member or
-    // account set, while still reporting success (none checked `result.success`).
-    // D1 rolls the whole batch back if any statement fails.
-    const results = await this.batch([
+    // account set, while still reporting success. `BaseDAO.batch` raises if any
+    // statement in it resolved with `success: false`, and D1 rolls the whole batch
+    // back when one does.
+    await this.batch([
       this.database.prepare('DELETE FROM team_accounts WHERE team_id = ?').bind(teamId),
       this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId),
       this.database.prepare('DELETE FROM teams WHERE team_id = ?').bind(teamId),
     ]);
-    for (const result of results) {
-      assertD1Success(result, `delete team ${teamId}`);
-    }
   }
 
   public async updateTeamName(teamId: string, newName: string): Promise<void> {

@@ -173,7 +173,7 @@ describe('run reporting', () => {
    * expression rather than dropping the tick entirely.
    */
   it('warns but still runs when the trigger body is not JSON', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const response = await worker().fetch(post('not json'));
     expect(warn).toHaveBeenCalled();
     expect(response.status).toBe(200);
@@ -185,7 +185,7 @@ describe('run reporting', () => {
    * and the tick still runs.
    */
   it('substitutes defaults for wrongly-typed fields without warning', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const response = await worker().fetch(post({ cron: 42, scheduledTime: 'soon' }));
     expect(warn).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
@@ -198,7 +198,7 @@ describe('run reporting', () => {
    */
   it('reports a failed run as failed, naming the task', async () => {
     handleOf(0, 1).mockRejectedValue(new TypeError('chain is a cycle'));
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const response = await worker().fetch(post({ cron: 'x', scheduledTime: 1 }));
     expect(response.status).toBe(500);
@@ -212,7 +212,7 @@ describe('run reporting', () => {
    */
   it('still runs the later phase when an earlier one fails', async () => {
     handleOf(0, 1).mockRejectedValue(new Error('phase 1 exploded'));
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await worker().fetch(post({ cron: 'x', scheduledTime: 1 }));
     expect(handleOf(0, 2)).toHaveBeenCalledOnce();
@@ -220,7 +220,7 @@ describe('run reporting', () => {
 
   it('reports a non-Error rejection without losing it', async () => {
     handleOf(0, 1).mockRejectedValue('a bare string');
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await statusOf(worker(), post({ cron: 'x', scheduledTime: 1 }))).toBe(500);
     expect(error).toHaveBeenCalled();
   });
@@ -233,7 +233,7 @@ describe('overlap protection', () => {
    * the deliberate answer: the second tick is skipped, not queued.
    */
   it('answers 202 while a run is already in flight', async () => {
-    let release: () => void = () => undefined;
+    let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -267,7 +267,7 @@ describe('overlap protection', () => {
 
   it('accepts a new run after the previous one failed', async () => {
     handleOf(0, 1).mockRejectedValueOnce(new Error('boom'));
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const durable = worker();
     expect(await statusOf(durable, post({ cron: 'x', scheduledTime: 1 }))).toBe(500);
@@ -283,7 +283,7 @@ describe('a wedged run does not hold the guard forever', () => {
    * carries the run's start time and expires after `MAX_RUN_AGE_MS`.
    */
   function hangFirstRun(): void {
-    handleOf(0, 1).mockImplementationOnce(() => new Promise<never>(() => undefined));
+    handleOf(0, 1).mockImplementationOnce(() => new Promise<never>(() => {}));
   }
 
   afterEach(() => {
@@ -307,7 +307,7 @@ describe('a wedged run does not hold the guard forever', () => {
 
   it('expires the guard and starts a new run once the old one is older than the maximum age', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     hangFirstRun();
     const durable = worker();
     void durable.fetch(post({ cron: 'x', scheduledTime: 1 }));

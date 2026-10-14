@@ -39,7 +39,9 @@ describe('ConsoleService', () => {
   describe('buildIssuerUrl', () => {
     it('appends federate parameters when account and role are known', () => {
       const service = new ConsoleService();
-      expect(service.buildIssuerUrl('https://example.com', '123456789012', 'Dev')).toContain('/user/aws/federate?awsAccountId=123456789012&role=Dev');
+      expect(service.buildIssuerUrl('https://example.com', '123456789012', 'Dev')).toContain(
+        '/user/aws/federate?awsAccountId=123456789012&role=Dev',
+      );
       expect(service.buildIssuerUrl('https://example.com')).toBe('https://example.com');
     });
   });

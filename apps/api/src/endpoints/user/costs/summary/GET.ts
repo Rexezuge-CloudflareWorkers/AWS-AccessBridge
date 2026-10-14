@@ -1,4 +1,3 @@
-
 import { IActivityAPIRoute } from '@/endpoints/IActivityAPIRoute';
 import type { ActivityContext, IEnv, IRequest, IResponse } from '@/endpoints/IActivityAPIRoute';
 import { getRequestScope } from '@aws-access-bridge/backend-services/composition';
@@ -35,7 +34,7 @@ class GetCostSummaryRoute extends IActivityAPIRoute<GetCostSummaryRequest, GetCo
                   type: 'string' as const,
                   nullable: true,
                   description:
-                    "Currency the grand total is denominated in, or null when the accounts do not all share one. Null means the sum spans currencies and no symbol should be shown.",
+                    'Currency the grand total is denominated in, or null when the accounts do not all share one. Null means the sum spans currencies and no symbol should be shown.',
                 },
               },
             },

@@ -1,4 +1,4 @@
-import { LocaleUtil } from '@aws-access-bridge/shared';
+import { LocaleUtil } from '@rexezuge/shared';
 
 type SupportedLanguageTag = ReturnType<typeof LocaleUtil.normalize>;
 

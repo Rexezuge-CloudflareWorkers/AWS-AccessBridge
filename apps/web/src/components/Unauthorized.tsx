@@ -30,12 +30,15 @@ export default function Unauthorized({ reason }: { reason?: string | null }) {
         </div>
         <h1 className="text-lg font-medium mt-4 mb-1">{t('auth.loadFailedTitle', 'Could Not Load Your Profile')}</h1>
         <p className="text-gray-400 text-sm">
-          {t('auth.loadFailedDescription', 'Your session may still be valid. Reload to try again; if this persists, contact an administrator.')}
+          {t(
+            'auth.loadFailedDescription',
+            'Your session may still be valid. Reload to try again; if this persists, contact an administrator.',
+          )}
         </p>
         <p className="text-red-400 text-xs mt-3 break-words">{reason}</p>
         <button
           type="button"
-          onClick={() => globalThis.location.reload()}
+          onClick={() => location.reload()}
           className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded text-sm font-medium transition-colors"
         >
           {t('auth.retry', 'Reload')}
