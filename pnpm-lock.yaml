@@ -227,9 +227,6 @@ importers:
       '@rexezuge/errors':
         specifier: 1.8.0
         version: 1.8.0
-      '@rexezuge/identity':
-        specifier: 1.8.0
-        version: 1.8.0
       '@rexezuge/shared':
         specifier: 1.8.0
         version: 1.8.0
@@ -275,9 +272,6 @@ importers:
         specifier: 1.8.0
         version: 1.8.0
       '@rexezuge/errors':
-        specifier: 1.8.0
-        version: 1.8.0
-      '@rexezuge/identity':
         specifier: 1.8.0
         version: 1.8.0
       '@rexezuge/runtime':
@@ -1401,9 +1395,6 @@ packages:
 
   '@rexezuge/http@1.8.0':
     resolution: {integrity: sha512-OF8AUB0K1XOn9uF0xOpb6FPBRlAExrY09Q4d0DCRmb6+ynX/t4j/5wcuWiArSgChYZuyPPct8PESnYJrZM5rcw==}
-
-  '@rexezuge/identity@1.8.0':
-    resolution: {integrity: sha512-WO718CFkOhJ0T3bapWSPFSVG377YFfJmf7FJTKo99vdPy4J7pqAKSph6jevoJzR7Y9FtbOob0StilZ9cw2IbqQ==}
 
   '@rexezuge/runtime@1.8.0':
     resolution: {integrity: sha512-4O5P7Dq7UoV2RVGV0bwFTiiKq3h3BJ/IDxMeMF33Ct0R/YVzP1IlcretkCyYOlQJdNocY+U9izdE9z3iNKum5Q==}
@@ -3814,12 +3805,6 @@ snapshots:
       chanfana: 3.4.0
       hono: 4.13.13
       jose: 6.2.12
-
-  '@rexezuge/identity@1.8.0':
-    dependencies:
-      '@rexezuge/d1': 1.8.0
-      '@rexezuge/errors': 1.8.0
-      '@rexezuge/shared': 1.8.0
 
   '@rexezuge/runtime@1.8.0': {}
 

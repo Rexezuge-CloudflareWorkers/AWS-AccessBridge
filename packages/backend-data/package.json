@@ -22,7 +22,6 @@
     "@aws-access-bridge/shared": "workspace:*",
     "@rexezuge/d1": "1.8.0",
     "@rexezuge/errors": "1.8.0",
-    "@rexezuge/identity": "1.8.0",
     "@rexezuge/shared": "1.8.0"
   },
   "devDependencies": {
