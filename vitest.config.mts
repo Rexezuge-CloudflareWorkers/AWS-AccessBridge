@@ -1,162 +1,135 @@
-import { defineConfig } from 'vitest/config';
+import { defineRepoVitestConfig } from '@rexezuge/tooling/vitest-repo';
 import { fileURLToPath } from 'node:url';
 
-const apiSrcPath = fileURLToPath(new URL('apps/api/src', import.meta.url));
-const backgroundSrcPath = fileURLToPath(new URL('apps/background/src', import.meta.url));
-const backendDataSrcPath = fileURLToPath(new URL('packages/backend-data/src', import.meta.url));
-const backendRuntimeSrcPath = fileURLToPath(new URL('packages/backend-runtime/src', import.meta.url));
-const backendServicesSrcPath = fileURLToPath(new URL('packages/backend-services/src', import.meta.url));
-const providerClientsSrcPath = fileURLToPath(new URL('packages/provider-clients/src', import.meta.url));
-const sharedSrcPath = fileURLToPath(new URL('packages/shared/src', import.meta.url));
-const webSrcPath = fileURLToPath(new URL('apps/web/src', import.meta.url));
-// The kit's `cloudflare:workers` stand-in, which is the union of every class a
-// `@rexezuge/runtime` subclass may extend: `DurableObject`, `RpcTarget` and
-// `WorkflowEntrypoint`. This repo's own copy exported only the first, which was
-// enough until 1.7.1 made `AbstractWorkflowWorker` extend the real
-// `WorkflowEntrypoint` — after which the runtime barrel failed to evaluate with
-// "Class extends value undefined", taking down every suite that imported it for a
-// reason that had nothing to do with workflows.
-const cloudflareWorkersMockPath = fileURLToPath(
-  new URL(import.meta.resolve('@rexezuge/tooling/test/mocks/cloudflare-workers'), import.meta.url),
-);
+/**
+ * The unit suite, on the kit's single-file `projects` factory.
+ *
+ * This replaced 162 lines that spelled out what the factory derives: the
+ * workspace alias table for the five packages this repo actually has, the
+ * `cloudflare:workers` mock, the `hono` dedupe, and the `node`/`dom` split by
+ * file extension. The reasoning for those choices was not lost — it lives here,
+ * in the places where this repo's answer differs from the factory's default.
+ */
+export default defineRepoVitestConfig({
+  scope: '@aws-access-bridge',
+  root: new URL('.', import.meta.url).href,
 
-export default defineConfig({
-  // The runtime package is built as ESM and its public root re-exports worker
-  // bases that import `cloudflare:workers`. Inline it so Vitest's resolver can
-  // apply the Workers mock alias below instead of handing that scheme to Node.
-  test: {
-    server: {
-      deps: {
-        inline: ['@rexezuge/runtime'],
-      },
-    },
-    globals: true,
-    // Two projects, because `environment` is per-project and the DOM stack cannot
-    // be switched per file. `node` keeps the fast suite for the backend and for
-    // web logic that needs no renderer; `jsdom` covers React hooks and
-    // components. A `.tsx` file is the marker for the second one, so the split
-    // is by extension rather than by directory — otherwise a component test
-    // written as `.ts` would silently run in `node` and fail on `document`.
+  /**
+   * The five packages under `packages/`. The factory's default is the union
+   * across all nine consumer repos, so an explicit list is what keeps this repo's
+   * table to its own scope — an alias for `dav-store` here would never match, but
+   * a reader should not have to reason about why.
+   */
+  packages: ['shared', 'backend-runtime', 'backend-data', 'backend-services', 'provider-clients'],
+
+  /**
+   * Only `cloudflare:workers` is aliased. The family default also aliases
+   * `cloudflare:sockets` and `cloudflare:workflows`; neither specifier appears in
+   * this repository, and the mock's own header notes that an alias for an absent
+   * mock fires only when a test imports the specifier — so listing them costs
+   * nothing but implies a runtime surface this worker does not have.
+   */
+  mocks: ['workers'],
+
+  backend: {
+    include: ['test/**/*.test.ts'],
+    // `**/node_modules/**` is Vitest's own default exclusion, and naming
+    // `exclude` at all **replaces** that default rather than adding to it.
     //
-    // `test/floci/**` is excluded from `node` because those tests need a running
-    // emulator on 127.0.0.1:4566; they run only under `pnpm run test:floci`, from
-    // their own config. Without this exclusion `pnpm test` and `pnpm run checks`
-    // would pass locally and fail in CI for want of a container.
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: 'node',
-          globals: true,
-          environment: 'node',
-          include: ['test/**/*.test.ts'],
-          // `**/node_modules/**` is Vitest's own default exclusion, and naming
-          // `exclude` at all **replaces** that default rather than adding to it.
-          //
-          // That was harmless while `test/` was outside the workspace and had no
-          // `node_modules` of its own, and it stopped being harmless the moment it
-          // became a workspace project: pnpm then links `test/node_modules`, which
-          // sits under the `test/**/*.test.ts` glob, and the suite collected the
-          // dependency's own test files — `zod`, `@testing-library/jest-dom` and the
-          // rest, 3,000-odd files and ten times the real suite's runtime. Nothing
-          // announced it: the run reported failures from inside `node_modules` that
-          // belonged to no code in this repository.
-          exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
-        },
-      },
-      {
-        extends: true,
-        test: {
-          name: 'dom',
-          globals: true,
-          environment: 'jsdom',
-          include: ['test/**/*.test.tsx'],
-          exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
-          setupFiles: ['test/setup/dom.ts'],
-        },
-      },
-    ],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov', 'html'],
-      reportsDirectory: './coverage',
-      include: [
-        'apps/api/src/**/*.ts',
-        'apps/background/src/**/*.ts',
-        // Web: services and lib are pure enough for the node project. Hooks and
-        // components are covered by the `dom` project but stay out of this
-        // umbrella: they are JSX-heavy and mostly markup, and including them
-        // would move the aggregate without adding meaningful signal.
-        'apps/web/src/services/**/*.ts',
-        'apps/web/src/lib/**/*.ts',
-        'packages/**/src/**/*.ts',
-      ],
-      exclude: [
-        '**/*.test.ts',
-        '**/*.d.ts',
-        // Barrels are already excluded; also exclude the `apps/api/src/schema/*`
-        // shim layer, which is pure `export *` over shared and has no executable
-        // statements of its own.
-        '**/index.ts',
-        '**/types.d.ts',
-        '**/model/**',
-        'apps/api/src/schema/**',
-        // Type-only modules compile to no runnable code, so v8 reports 0% and
-        // they would otherwise drag the aggregate down without any behaviour
-        // left to cover.
-        'packages/backend-services/src/composition/ServiceEnv.ts',
-        'packages/backend-services/src/composition/tokens.ts',
-        // A Workflow class is the platform's entrypoint, like a Durable Object
-        // class: it can only be constructed inside the Workers runtime, so the
-        // node project cannot execute it at all. What is worth asserting about
-        // it — that the cron starts one instance per tick and leaves the
-        // collection tasks to it — is asserted against `CronTasksWorker` in
-        // `test/workers/CronTasksWorkerContract.test.ts`.
-        'apps/background/src/CollectionWorkflow.ts',
-      ],
-      // Raised as coverage improved (was 93/80/94/93, before that 92/78/93/92,
-      // before that 91/78/93/90). Set a little under the measured figures
-      // (94.03/83.11/94.17/94.45) so ordinary churn does not fail the build but a
-      // real regression does.
-      //
-      // `pnpm run check:coverage-floor` complements this: an aggregate can be met
-      // while a single security-critical file rots, which is how
-      // `MiddlewareHandlers` sat at 61.5% branch while the total looked healthy.
-      // That gate pins the files whose coverage *regression* would matter most.
-      thresholds: {
-        statements: 94,
-        branches: 83,
-        functions: 94,
-        lines: 94,
-      },
+    // That was harmless while `test/` was outside the workspace and had no
+    // `node_modules` of its own, and it stopped being harmless the moment it
+    // became a workspace project: pnpm then links `test/node_modules`, which sits
+    // under the `test/**/*.test.ts` glob, and the suite collected the dependency's
+    // own test files — `zod`, `@testing-library/jest-dom` and the rest, 3,000-odd
+    // files and ten times the real suite's runtime. Nothing announced it: the run
+    // reported failures from inside `node_modules` that belonged to no code in
+    // this repository.
+    //
+    // `test/integration/**` has its own config against real D1, and
+    // `test/floci/**` needs the emulator on 127.0.0.1:4566 and runs only under
+    // `pnpm run test:floci`. Without the exclusion `pnpm test` and
+    // `pnpm run checks` would pass locally and fail in CI for want of a container.
+    exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
+
+    /**
+     * `@rexezuge/runtime` ships ESM `dist/` that re-exports worker bases which
+     * import `cloudflare:workers`. Inlined so Vitest's resolver applies the
+     * Workers mock alias instead of handing that scheme to Node — otherwise the
+     * runtime barrel fails to evaluate with "Class extends value undefined",
+     * taking down every suite that imports it for a reason that has nothing to do
+     * with workflows.
+     *
+     * The factory's default is `['dofs']`; this repository has no `dofs`
+     * dependency, so the override replaces rather than extends it.
+     */
+    serverDepsInline: ['@rexezuge/runtime'],
+  },
+
+  web: {
+    environment: 'jsdom',
+    include: ['test/**/*.test.tsx'],
+    exclude: ['**/node_modules/**', 'test/integration/**', 'test/floci/**'],
+    setupFiles: ['test/setup/dom.ts'],
+  },
+
+  coverageInclude: [
+    'apps/api/src/**/*.ts',
+    'apps/background/src/**/*.ts',
+    // Web: services and lib are pure enough for the node project. Hooks and
+    // components are covered by the `dom` project but stay out of this umbrella:
+    // they are JSX-heavy and mostly markup, and including them would move the
+    // aggregate without adding meaningful signal.
+    'apps/web/src/services/**/*.ts',
+    'apps/web/src/lib/**/*.ts',
+    'packages/**/src/**/*.ts',
+  ],
+
+  coverageExclude: [
+    // Barrels are already excluded by the factory; the API schema layer is pure
+    // `export *` over shared and has no executable statements of its own.
+    'apps/api/src/schema/**',
+    // Type-only modules compile to no runnable code, so v8 reports 0% and they
+    // would otherwise drag the aggregate down without any behaviour left to cover.
+    'packages/backend-services/src/composition/ServiceEnv.ts',
+    'packages/backend-services/src/composition/tokens.ts',
+    // A Workflow class is the platform's entrypoint, like a Durable Object
+    // class: it can only be constructed inside the Workers runtime, so the node
+    // project cannot execute it at all. What is worth asserting about it — that
+    // the cron starts one instance per tick and leaves the collection tasks to it
+    // — is asserted against `CronTasksWorker` in
+    // `test/workers/CronTasksWorkerContract.test.ts`.
+    'apps/background/src/CollectionWorkflow.ts',
+  ],
+
+  // Raised as coverage improved (was 93/80/94/93, before that 92/78/93/92,
+  // before that 91/78/93/90). Set a little under the measured figures so ordinary
+  // churn does not fail the build but a real regression does.
+  //
+  // `pnpm run check:coverage-floor` complements this: an aggregate can be met
+  // while a single security-critical file rots, which is how `MiddlewareHandlers`
+  // sat at 61.5% branch while the total looked healthy. That gate pins the files
+  // whose coverage *regression* would matter most.
+  thresholds: { statements: 94, branches: 83, functions: 94, lines: 94 },
+
+  reportsDirectory: './coverage',
+
+  /**
+   * The SPA is reached as `@aws-access-bridge/web/...`, and the factory derives
+   * aliases for the scope only from directories it is told about — `packages/*`
+   * plus `background` under `apps/`. The SPA lives under `apps/web` and is
+   * published under the same scope as a workspace package, so it needs saying
+   * explicitly; without this the SPA suites fail to resolve their own services
+   * and hooks, which reads as a broken import rather than a missing alias.
+   *
+   * A plain string `find` is a prefix match in Vite, so this covers both
+   * `@aws-access-bridge/web` and every `/…` beneath it. Applied to both
+   * projects: a suite resolving the SPA differently from its sibling fails like a
+   * product bug, and Vitest projects do not inherit the root `resolve`.
+   */
+  aliases: [
+    {
+      find: '@aws-access-bridge/web',
+      replacement: fileURLToPath(new URL('apps/web/src', import.meta.url)),
     },
-  },
-  resolve: {
-    alias: [
-      { find: /^@aws-access-bridge\/background$/, replacement: `${backgroundSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/background\/(.*)$/, replacement: `${backgroundSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/backend-data$/, replacement: `${backendDataSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/backend-data\/(.*)$/, replacement: `${backendDataSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/backend-runtime$/, replacement: `${backendRuntimeSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/backend-runtime\/(.*)$/, replacement: `${backendRuntimeSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/backend-services$/, replacement: `${backendServicesSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/backend-services\/(.*)$/, replacement: `${backendServicesSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/provider-clients$/, replacement: `${providerClientsSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/provider-clients\/(.*)$/, replacement: `${providerClientsSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/shared$/, replacement: `${sharedSrcPath}/index.ts` },
-      { find: /^@aws-access-bridge\/shared\/(.*)$/, replacement: `${sharedSrcPath}/$1` },
-      { find: /^@aws-access-bridge\/web\/(.*)$/, replacement: `${webSrcPath}/$1` },
-      {
-        find: 'hono/http-exception',
-        replacement: fileURLToPath(new URL('apps/api/node_modules/hono/dist/http-exception.js', import.meta.url)),
-      },
-      {
-        find: 'hono/utils/http-status',
-        replacement: fileURLToPath(new URL('apps/api/node_modules/hono/dist/utils/http-status.js', import.meta.url)),
-      },
-      { find: /^hono$/, replacement: fileURLToPath(new URL('apps/api/node_modules/hono', import.meta.url)) },
-      { find: 'cloudflare:workers', replacement: cloudflareWorkersMockPath },
-      { find: /^@\//, replacement: `${apiSrcPath}/` },
-    ],
-  },
+  ],
 });

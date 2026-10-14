@@ -90,7 +90,7 @@ them from scratch.
 | `ensure-spa-shell-stub` / `verify-spa-shell` | The kit's invariant is inverted: it asserts the shell stub is **absent** in development and present in a build, where this repo's is that a build replaced the stub. Adopting it would let a `dist/` left over from a previous build pass for a fresh one.                           |
 | `apps/web/vite.config.ts`           | No terser pass-through in the kit's factory, and the build settings here (chunk splitting, the Workers `browser` target) are tuned to this bundle.                                                                                                                         |
 
-`eslint.config.mjs` and `vitest.config.mts` _are_ on the factories. `eslint` needed one adjustment:
+`eslint.config.mjs`, `vitest.config.mts` and `test/integration/vitest.config.mts` _are_ on the factories. `eslint` needed one adjustment:
 the factory ignores `scripts/**`, which is the wrong default here — `verify-migrations.ts` is
 TypeScript *so that* it is linted, and it is the gate that decides whether a migration may be edited.
 `extraIgnores: ['!scripts/**']` un-ignores it; a global ignore cannot be undone by a later config
