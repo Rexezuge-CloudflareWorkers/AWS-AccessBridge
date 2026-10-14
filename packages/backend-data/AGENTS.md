@@ -4,10 +4,39 @@ Scope: `packages/backend-data/**`. Parent index: `../../AGENTS.md`. Layer 2: may
 
 ## The DAO inventory
 
-All D1 access goes through a DAO extending `BaseDAO` (`ctor(database: D1Queryable)`, `withRetry()`,
-`deleteOrphanedRows()`). `EncryptedDAO` adds `encryptionKeys` — an ordered chain, own key first — for
-encrypted rows. Deployed chains hold a single key; the list shape is kept for rotation. Never redeclare `database`; it is `protected readonly` on
-the base.
+All D1 access goes through a DAO extending `BaseDAO` (`ctor(database, meter?)`, `run()`,
+`runTracked()`, `executeWithRetry()`, `deleteOrphanedRows()`). `EncryptedDAO` adds
+`encryptionKeys` — an ordered chain, own key first — for encrypted rows. Deployed chains hold a
+single key; the list shape is kept for rotation. Never redeclare `database`; it is `protected
+readonly` on the base.
+
+`run()` and `executeWithRetry()` **throw** `DatabaseError` when D1 answers
+`{success: false}`. They did not always, which is why the twenty-nine
+`assertD1Success(...)` calls that used to follow every `run()` are gone: against the current
+`@rexezuge/d1` they were unreachable. Do not reintroduce one — read the thrown error instead.
+
+### The meter is not optional in spirit
+
+`BaseDAO`'s second constructor argument is the `SubrequestMeter` its statements are charged
+against. It defaults to `UNMETERED_SUBREQUESTS`, which makes forgetting it look like a default. It
+is not one.
+
+D1 counts every statement against the Workers per-invocation ceiling, and a DAO that spends one
+without telling anybody makes every number that budgets work wrong. The failure has **no symptom**
+until the platform terminates the invocation — at which point the rows are right and the suite is
+green. `apps/background`'s `CronTask` owns the counter for its invocation and exposes it as
+`this.meter`; the fan-out paths (`AbstractCollectionTask`, `ResourceInventoryDAO.upsertResource`)
+pass it. A DAO built outside a task — a request, a Durable Object — legitimately takes the default,
+and that is the only correct way to say "nobody is counting", never silence.
+
+`runTracked()` is the statement to use on a write. It charges the meter and reports the
+`billedRowsForTable` cost; `run()` does not. A DAO that calls `run()` on an insert is not
+accounting for a row it wrote.
+
+Pricing lives in `constants/d1/billedRows.ts`, derived from `migrations/`, and
+`test/data/BilledRows.test.ts` fails when the two drift. An indexed table nobody priced leaves
+`billedRows: null` on the D1 result, and an unpriced table is silent — no error, no counter, just a
+budget that is quietly wrong in the direction of "we can afford this".
 
 | DAO                                               | Holds                                                      | Notes                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |

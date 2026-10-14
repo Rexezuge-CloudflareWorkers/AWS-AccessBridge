@@ -197,12 +197,18 @@ interface Logger {
  *
  * The arguments arrive as `[message, fields]`, already redacted by the logger that
  * handed them over, so the sink's own job is formatting and nothing more.
+ *
+ * Both are destructured as **required**, which they are: the only caller is the
+ * closure in `createLogger`, which always passes a message and always passes a
+ * field bag — `at()` defaults `fields` to `{}`. Writing them as optional and
+ * falling back would have added two branches that no call could reach and no test
+ * could cover, and a defensive branch in a redaction path reads as "this can
+ * happen" to the next person who has to reason about what reaches the log.
  */
 function redactingSink(level: LogLevel, message: string, args: readonly unknown[]): void {
-  const [text, bag] = args as [string | undefined, LogFields | undefined];
-  const fields: LogFields = bag ?? {};
+  const [text, fields] = args as [string, LogFields];
   const formatted = Object.keys(fields).length > 0 ? ` ${formatFields(fields)}` : '';
-  consoleSink(level, `${text ?? message}${formatted}`, []);
+  consoleSink(level, `${text}${formatted}`, []);
 }
 
 /**

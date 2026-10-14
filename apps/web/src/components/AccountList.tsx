@@ -6,7 +6,7 @@ import AccessKeyModal from './AccessKeyModal';
 import AccountRoleRow from './AccountRoleRow';
 import type { HideDialogInfo } from './AccountRoleRow';
 import HideRoleConfirmDialog from './HideRoleConfirmDialog';
-import { Spinner } from '@rexezuge/web';
+import { EmptyState, Spinner } from '@rexezuge/web';
 import { useResource } from '../hooks/useResource';
 import { useAccountMutations } from '../hooks/useAccountMutations';
 import { listAccounts } from '../services/accountService';
@@ -69,53 +69,29 @@ export default function AccountList({ showHidden, searchTerm, pageSize, currentP
     <div>
       {isLoading && <Spinner size={32} label={t('accounts.loading', 'Loading Accounts...')} padding="32px 0" />}
       {!isLoading && error && (
-        <div
-          style={{
-            background: 'rgba(127, 29, 29, 0.3)',
-            color: '#fca5a5',
-            padding: '12px 16px',
-            borderRadius: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <svg style={{ width: '20px', height: '20px', marginRight: '8px', color: '#f87171' }} fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>{error}</span>
-          </div>
-        </div>
-      )}
-      {!error && Object.keys(rolesData).length === 0 && !isLoading && (
-        <div
-          style={{
-            background: '#1e2433',
-            padding: '48px',
-            borderRadius: '12px',
-            textAlign: 'center',
-          }}
-        >
-          <svg
-            style={{ width: '48px', height: '48px', color: '#4b5563', margin: '0 auto 16px' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>{t('accounts.emptyTitle', 'No AWS accounts available')}</p>
-          <p style={{ fontSize: '14px', color: '#6b7280' }}>
-            {t('accounts.emptyHint', "You don't have access to any AWS accounts. Contact your administrator to request access.")}
-          </p>
+        <div style={{ background: '#1e2433', padding: '48px', borderRadius: '12px' }}>
+          <EmptyState
+            icon={
+              <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            }
+            message={
+              <>
+                <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>
+                  {t('accounts.emptyTitle', 'No AWS accounts available')}
+                </p>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                  {t('accounts.emptyHint', "You don't have access to any AWS accounts. Contact your administrator to request access.")}
+                </p>
+              </>
+            }
+          />
         </div>
       )}
       {!isLoading &&

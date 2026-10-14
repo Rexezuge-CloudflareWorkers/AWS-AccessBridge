@@ -5,8 +5,7 @@ Scope: `apps/web/**`. Parent index: [`../../AGENTS.md`](../../AGENTS.md). Worksp
 Vite React SPA served at `/user/` — the canonical entry, protected by Cloudflare Access, so
 top-level navigation there triggers the Zero Trust login. Pages live under `/user/app/*`. Entry
 `src/main.tsx` → `src/SpaApp.tsx`: auth gate via `useAuth`, language state via `hooks/useSpaLanguage`,
-routing via `hooks/useRouter`, and a `SpaNavbar` with a controlled `LanguageSelector` and the toast
-banner.
+routing via `hooks/useRouter`, and a `SpaNavbar` with a controlled `LanguageSelector`.
 
 ## One request path
 
@@ -24,10 +23,29 @@ handling remains consistent. This behavior comes from the SDK API client.
 ## Shared web primitives and hooks come from the SDK
 
 Use `@rexezuge/web` for converged controls (`Spinner`, `Pagination`, `FocusInput`, `LoadingButton`,
-`LanguageSelector`, `Unauthorized`) and hooks (`useCurrentUser`, `useNotice`). Keep app-only pages,
-feature widgets, translations, and the backend-authoritative language save flow local. Map app labels
-through component props; do not fork a shared control just to call i18next. `globals.css` supplies the
-SDK's shared color variables.
+`LanguageSelector`, `ModalShell`, `NoticeBar`, `EmptyState`, `TypeToConfirmModal`, `ReadOnlyField`,
+`RefreshButton`, `Unauthorized`, `ConfirmDeleteModal`) and hooks (`useCurrentUser`, `useNotice`,
+`useCopyToClipboard`). Keep app-only pages, feature widgets, translations, and the
+backend-authoritative language save flow local. Map app labels through component props; do not fork a
+shared control just to call i18next. `globals.css` supplies the SDK's shared color variables — all 22
+of them, which is why adopting a class-based control needs no stylesheet change.
+
+There is **no `components/ui/` directory** and there never was; an earlier version of this guide named
+one, and a reader looking for a file to edit found nothing. `AccessKeyModal` and `Unauthorized` are
+top-level components.
+
+### Where a kit control is still *not* adopted, and why
+
+- **`useCopyToClipboard`, in `AccessKeyModal`.** The kit's is right that an inlined handler leaks
+  its reset timer and can report a copy that never happened. It reports failure by *silence* —
+  `copied` never becomes true. That is the honest answer to the question it was asked and the wrong
+  answer to this one: a refused clipboard write leaves a live AWS secret on screen and the operator
+  believing it is on their clipboard. This component reports the refusal in words and points at the
+  snippet. The kit's `ModalShell` around it *is* adopted.
+- **`useToast` (`hooks/useToast.ts`) stays.** Fourteen call sites use it. It is now a four-line
+  adapter over the kit's `useNotice`, reshaped back to this app's `{ type, text }` prop shape, and
+  `AdminPage` — the only file that rendered the banner — has moved to `useNotice` + `NoticeBar`
+  directly. The shim is deleted when the remaining call sites move, not before.
 
 ## Pure logic belongs in `lib/`, not in a component
 
@@ -109,8 +127,9 @@ route requires `collectionTypes`.
 `teams/TeamListSection`, `teams/TeamMembersSection`, `teams/TeamAccountsSection`) — plus
 `AdminPage` (shell) with `admin/` one-file-per-tab (`Credentials`, `Access`, `Accounts`,
 `RoleConfig`, `SpendAlerts`, `DataCollection`, `MaintenanceTab`), the `OnboardingWizard` shell with
-`onboarding/` per-step components and `WizardProgress`, `SpaNavbar`, `LanguageSelector`,
-`AccessKeyModal`, `ui/` primitives, and `Unauthorized`.
+`onboarding/` per-step components and `WizardProgress`, `SpaNavbar`, `AccessKeyModal` (on the kit's
+`ModalShell`), and `Unauthorized`. `LanguageSelector` and the notice banner are the kit's, not files
+here.
 
 ### The onboarding wizard is split by step, and its rules live in `lib/`
 

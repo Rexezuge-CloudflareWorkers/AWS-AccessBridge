@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createPortal } from 'react-dom';
+import { NoticeBar, useNotice } from '@rexezuge/web';
 import OnboardingWizard from './OnboardingWizard';
 import AuditLogsTab from './AuditLogsTab';
 import TeamsTab from './TeamsTab';
@@ -13,7 +13,6 @@ import RoleConfigTab from './admin/RoleConfigTab';
 import SpendAlertsTab from './admin/SpendAlertsTab';
 import DataCollectionTab from './admin/DataCollectionTab';
 import MaintenanceTab from './admin/MaintenanceTab';
-import { useToast } from '../hooks/useToast';
 
 interface AdminPageProps {
   activeTab?: string;
@@ -23,7 +22,14 @@ interface AdminPageProps {
 export default function AdminPage({ activeTab: activeTabProp, onTabChange }: AdminPageProps = {}) {
   const { t } = useTranslation();
   const activeTab: string = activeTabProp || 'wizard';
-  const { message, showMessage, dismiss } = useToast();
+  const { notice, showNotice: showMessage } = useNotice();
+  // Translated rather than the module-level defaults: the prefix is the only
+  // thing telling a screen-reader user whether the operation worked, and it has
+  // to be in the catalogue to be right in every language the SPA ships.
+  const statusLabels = {
+    success: t('common.success', 'Success'),
+    error: t('common.error', 'Error'),
+  };
 
   const tabGroups = [
     { header: t('admin.setupHeader', 'SETUP'), tabs: [{ id: 'wizard', label: t('admin.wizardTab', 'Setup Wizard') }] },
@@ -60,34 +66,7 @@ export default function AdminPage({ activeTab: activeTabProp, onTabChange }: Adm
 
   return (
     <div style={{ maxWidth: '72rem', margin: '0 auto', padding: '32px 24px' }}>
-      {message &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="animate-slide-down"
-            style={{
-              position: 'fixed',
-              top: '48px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 50,
-              padding: '12px 24px',
-              borderRadius: '12px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
-              background: message.type === 'success' ? 'rgba(22,163,74,0.9)' : 'rgba(220,38,38,0.9)',
-              backdropFilter: 'blur(8px)',
-              color: '#ffffff',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span>{message.text}</span>
-              <button onClick={dismiss} style={{ color: 'rgba(255,255,255,0.8)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                ✕
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+      <NoticeBar notice={notice} statusLabels={statusLabels} />
 
       <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
         <aside

@@ -234,6 +234,44 @@ describe('CostDataCollectionTask', () => {
     );
   });
 
+  it('pauses the sweep on a D1 daily-allowance refusal instead of retrying it', async () => {
+    // The refusal that cannot change for hours. Retrying it re-runs the whole
+    // failure path at the alarm's rate and reports a transient fault for what is
+    // really a scheduled pause — so the run stops, says what is spent and when it
+    // comes back, and leaves the remaining accounts due rather than burning
+    // their attempt times through the reset.
+    vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([
+      'arn:aws:iam::123456789012:role/Dev',
+      'arn:aws:iam::210987654321:role/Prod',
+      'arn:aws:iam::111111111111:role/Stage',
+    ]);
+    vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-daily');
+    vi.mocked(BackgroundTaskRunDAO.prototype.succeedRun).mockResolvedValue(undefined);
+    vi.mocked(CredentialsDAO.prototype.getCredentialChainByPrincipalArn).mockResolvedValue(CHAIN);
+    vi.mocked(StsService.prototype.assumeRole).mockResolvedValue(ASSUMED);
+    vi.mocked(CostExplorerService.prototype.getCostAndUsage).mockRejectedValue(
+      new Error('D1_ERROR: exceeded D1 free tier daily row write limit'),
+    );
+
+    await new CostDataCollectionTask().handle(createEvent(), taskEnv(), {} as unknown as ExecutionContext);
+
+    // Stopped at the first refusal rather than walking the batch: the accounts
+    // after it stay due for the next cron.
+    expect(CostExplorerService.prototype.getCostAndUsage).toHaveBeenCalledTimes(1);
+    // Recorded as a pause, not as a failure: the refusal is not an account that
+    // failed to collect, and counting it as one is what would drive the operator
+    // to look at an account when the cause was the platform's allowance.
+    expect(BackgroundTaskRunDAO.prototype.succeedRun).toHaveBeenCalledWith(
+      'run-daily',
+      expect.objectContaining({
+        itemsProcessed: 0,
+        itemsFailed: 0,
+        summary: expect.stringContaining('Paused: D1 daily write allowance exhausted until '),
+        details: { reason: 'd1-daily-limit', resetsAt: expect.any(Number) },
+      }),
+    );
+  });
+
   it('reports empty when nothing is due', async () => {
     vi.mocked(DataCollectionConfigDAO.prototype.getPrincipalArnsNeedingCollection).mockResolvedValue([]);
     vi.mocked(BackgroundTaskRunDAO.prototype.startRun).mockResolvedValue('run-3');

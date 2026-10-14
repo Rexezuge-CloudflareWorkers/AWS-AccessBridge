@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { Spinner } from '@rexezuge/web';
+import { EmptyState, Spinner } from '@rexezuge/web';
 import { Pagination } from '@rexezuge/web';
 import ResourceRow from './ResourceRow';
 import ResourceSummaryCards from './ResourceSummaryCards';
@@ -134,33 +134,29 @@ export default function ResourceInventory() {
           {resourcesError}
         </div>
       ) : resources.length === 0 ? (
-        <div
-          style={{
-            background: '#1e2433',
-            padding: '48px',
-            borderRadius: '12px',
-            textAlign: 'center',
-          }}
-        >
-          <svg
-            style={{ width: '48px', height: '48px', color: '#4b5563', margin: '0 auto 16px' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-            />
-          </svg>
-          <p className="text-lg" style={{ color: '#d1d5db', marginBottom: '8px' }}>
-            {t('resources.emptyTitle', 'No resources found.')}
-          </p>
-          <p className="text-sm" style={{ color: '#6b7280' }}>
-            {t('resources.emptyHint', 'Enable resource collection for your accounts in the Admin panel.')}
-          </p>
+        <div style={{ background: '#1e2433', padding: '48px', borderRadius: '12px' }}>
+          <EmptyState
+            icon={
+              <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
+              </svg>
+            }
+            message={
+              <>
+                <p style={{ fontSize: '18px', color: '#d1d5db', marginBottom: '8px' }}>
+                  {t('resources.emptyTitle', 'No resources found.')}
+                </p>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                  {t('resources.emptyHint', 'Enable resource collection for your accounts in the Admin panel.')}
+                </p>
+              </>
+            }
+          />
         </div>
       ) : (
         <div
