@@ -261,6 +261,12 @@ export const KIT_REQUIRED_CSS_TOKENS: readonly string[] = [
  * leading `.` is what a generated utility always has and a custom property never
  * has. Backslashes are stripped from both sides first, so the escape form
  * (`.bg-\[var\(--color-accent\)\]`) and the plain token agree.
+ *
+ * The remediation message names the *file* and the *package*, never the path. It
+ * used to quote the `@source` line verbatim, which meant that changing the form
+ * of that line — a glob to a directory, say — left the operator being told to
+ * restore text that no longer existed anywhere in the repo. A gate that reports
+ * the wrong fix is worse than no gate: it gets acted on.
  */
 export function checkCss(css: string | null): ShellProblem[] {
   if (css === null) {
@@ -282,8 +288,8 @@ export function checkCss(css: string | null): ShellProblem[] {
       detail:
         'The built CSS is missing the kit primitive utilities ' +
         missing.map((token) => `\`${token}\``).join(', ') +
-        ' — these only compile when `apps/web/src/globals.css` declares ' +
-        '`@source "../node_modules/@rexezuge/web/dist/*.js";`. Without it every shared control ships without styling. ' +
+        ' — these only compile when ' +
+        'the `@source` line for `@rexezuge/web` in `globals.css` is present. Without it every shared control ships without styling. ' +
         'Run `pnpm run build` after restoring the line.',
     },
   ];

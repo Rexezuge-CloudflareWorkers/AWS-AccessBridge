@@ -1,9 +1,21 @@
 @import 'tailwindcss';
 
-/* Scan the kit's class-based primitives (Button, ModalShell, NoticeBar, Spinner,
-   Unauthorized, etc.). They live in node_modules, which @tailwindcss/vite excludes,
-   so without this directive their Tailwind utilities are never generated. */
-@source "../node_modules/@rexezuge/web/dist/*.js";
+/* Scan `@rexezuge/web` for class names.
+ *
+ * Tailwind ignores `node_modules` entirely, and the kit's primitives live
+ * there, so without this line a control adopted from the kit renders its markup
+ * with none of its styling. The utilities this app also uses survive the
+ * deletion anyway, which is what makes the failure quiet: the build looks
+ * almost right. See `apps/web/AGENTS.md` for the one that does not, and for why
+ * a class name must never be written in a comment in this file.
+ *
+ * A **directory**, not `dist/*.js`. The glob is the more obvious thing to
+ * write and is quietly narrower — it misses any file the kit ships that is not
+ * `.js`, so a kit release that changed its build output would drop half the
+ * primitives with nothing failing anywhere. The directory form is the one
+ * Tailwind documents for this and needs no update when that output moves.
+ */
+@source '../node_modules/@rexezuge/web/dist';
 
 :root {
   --color-accent: #2563eb;
@@ -31,6 +43,20 @@
 }
 
 @theme {
+  /*
+   * These are declared here, not in `:root`, because in Tailwind v4 a keyframe
+   * only becomes an `animate-*` utility when `@theme` registers it. A bare
+   * `@keyframes` produces a name nothing references.
+   *
+   * The spinner animation is absent on purpose — Tailwind ships that one in its
+   * own default theme.
+   *
+   * Do not spell a Tailwind utility class name in a comment here either. This
+   * file is inside the scan root, so a class named in a comment is emitted into
+   * the bundle whether or not the kit is a source — which would satisfy the
+   * build gate without the kit being styled at all. Name the control that stops
+   * working, not the utility.
+   */
   --animate-fade-in: fade-in 0.2s ease-out both;
   --animate-fade-in-up: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-backdrop-in: backdrop-in 0.2s ease-out both;

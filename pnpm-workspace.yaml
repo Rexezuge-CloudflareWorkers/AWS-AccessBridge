@@ -24,3 +24,46 @@ minimumReleaseAgeExclude:
   - '@rexezuge/shared@1.8.0'
   - '@rexezuge/tooling@1.8.0'
   - '@rexezuge/web@1.8.0'
+
+# pnpm 11 reads settings from this file, not `.npmrc`, so a `minimum-release-age`
+# carried there was doing nothing and pnpm's 24-hour default applied instead —
+# which is what the `minimumReleaseAgeExclude` list above exists to work around.
+minimumReleaseAge: 0
+
+overrides:
+  # One copy of `hono`, always.
+  #
+  # `apps/api` and `backend-services` both declared `hono: ^4.13.12`, and
+  # `@rexezuge/http@1.8.0` requires `^4.13.13`. The ranges overlap, so the resolver
+  # was free to satisfy them with two different resolutions — and it did:
+  # `apps/api/node_modules/hono` was 4.13.12 while the kit's was 4.13.13.
+  #
+  # That is not a warning, it is a type error, and it surfaces in the least obvious
+  # place available. `fromHono(app)` is typed over `Hono<Env, Schema, BasePath>`, and
+  # the two Hono releases disagree about the defaults for the last two parameters —
+  # the app's own Hono produced `{}, string` where chanfana's expected
+  # `BlankSchema, '/'`. The message named neither Hono and neither version, so the
+  # fix looked like a chanfana problem rather than an install-layout one.
+  #
+  # The manifest pins `hono` exactly for the same reason. A range is a standing
+  # invitation for the two sides to drift apart again the next time either releases.
+  hono: '4.13.13'
+
+  # One copy of every kit package.
+  #
+  # The kit versions in lockstep, but a publish does not reach the registry
+  # atomically: mid-window, `@rexezuge/http@1.8.0` can carry a dependency on
+  # `@rexezuge/errors@1.7.2` while this repo asks for 1.8.0 directly, and pnpm
+  # installs both. Two copies of a package that identifies its types with
+  # `instanceof` is a silent correctness bug — a `DatabaseError` thrown inside the
+  # kit stops being a `ServiceError` at this repo's boundary, so every `catch`
+  # that narrows on the taxonomy falls through to a masked 500, and the failure
+  # names no package.
+  '@rexezuge/d1': '1.8.0'
+  '@rexezuge/errors': '1.8.0'
+  '@rexezuge/http': '1.8.0'
+  '@rexezuge/identity': '1.8.0'
+  '@rexezuge/runtime': '1.8.0'
+  '@rexezuge/shared': '1.8.0'
+  '@rexezuge/tooling': '1.8.0'
+  '@rexezuge/web': '1.8.0'
