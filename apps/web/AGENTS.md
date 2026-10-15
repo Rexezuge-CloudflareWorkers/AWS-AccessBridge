@@ -33,9 +33,14 @@ utility class names, and Tailwind v4 scans only the Vite project root, which exc
 A control adopted from `@rexezuge/web` is therefore silent — its markup renders, its classes do not —
 unless `globals.css` names the kit as a Tailwind source:
 
-    @source "../node_modules/@rexezuge/web/dist/*.js";
+    @source '../node_modules/@rexezuge/web/dist';
 
 That line is load-bearing; deleting it unstyles every kit primitive in the SPA.
+
+Note the **directory**, not `dist/*.js`. A glob looks tidier and is quietly narrower: it misses any file the kit ships that is not `.js`, so a kit release that changed its build output would drop half the primitives with no error anywhere. The directory form is what Tailwind documents for this and needs no update when the kit's output shape moves.
+
+What makes this failure mode so quiet is worth keeping in mind: the utilities AWS's own components also use survive the deletion, so a build with the line removed is only _partly_ unstyled. The one utility only the kit uses is the spinner animation, and its absence shows up as a control that looks correct and does not move.
+
 `scripts/build/verify-spa-shell.ts` (run by the `spa-shell` CI job, after the web build) fails the
 build if any kit utility is absent from the generated CSS.
 
@@ -49,14 +54,14 @@ There is **no `components/ui/` directory** and there never was; an earlier versi
 one, and a reader looking for a file to edit found nothing. `AccessKeyModal` and `Unauthorized` are
 top-level components.
 
-### Where a kit control is still *not* adopted, and why
+### Where a kit control is still _not_ adopted, and why
 
 - **`useCopyToClipboard`, in `AccessKeyModal`.** The kit's is right that an inlined handler leaks
-  its reset timer and can report a copy that never happened. It reports failure by *silence* —
+  its reset timer and can report a copy that never happened. It reports failure by _silence_ —
   `copied` never becomes true. That is the honest answer to the question it was asked and the wrong
   answer to this one: a refused clipboard write leaves a live AWS secret on screen and the operator
   believing it is on their clipboard. This component reports the refusal in words and points at the
-  snippet. The kit's `ModalShell` around it *is* adopted.
+  snippet. The kit's `ModalShell` around it _is_ adopted.
 - **`useToast` (`hooks/useToast.ts`) stays.** Fourteen call sites use it. It is now a four-line
   adapter over the kit's `useNotice`, reshaped back to this app's `{ type, text }` prop shape, and
   `AdminPage` — the only file that rendered the banner — has moved to `useNotice` + `NoticeBar`
