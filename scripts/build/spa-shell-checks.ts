@@ -215,26 +215,36 @@ export function checkShell(shellSource: string | null, distIndex: string | null,
 }
 
 /**
- * The Tailwind utilities the SPA cannot ship without. Each one is emitted only by
- * a kit primitive that the scanner must reach through the `@source` directive in
- * `globals.css` — `animate-spin` by `Spinner`, `animate-backdrop-in`/`inset-0` by
- * `ModalShell`, `sr-only`/`-translate-x-1/2`/`max-w-[calc(100vw-2rem)]` by
- * `NoticeBar`, `focus-visible:ring-2` by `Button`. None of them is used app-locally,
- * so their absence means the kit's styling never made it into the bundle.
+ * The Tailwind utilities the SPA cannot ship without, one per reported symptom so
+ * a failure names something a reader can see on screen: `Spinner` renders a circle
+ * that only rotates with its animation utility, `Button` has no background or focus
+ * ring without its colour and ring utilities, `ModalShell` has no overlay without
+ * the inset utility, and `NoticeBar` loses both its screen-reader prefix and its
+ * centring without the remaining three.
  *
- * Compared after stripping every backslash, so the Tailwind-escape form
- * (`.bg-\[var\(--color-accent\)\]`) and the plain source token (`bg-[var(--color-accent)]`)
- * agree.
+ * **Every token here must appear nowhere under `apps/web/`.** Tailwind's scan root
+ * is the Vite root, so it reads *Markdown as well as JSX* — a class name written in
+ * this guide is a class name the scanner finds, and Tailwind emits it whether or not
+ * the kit is a source. That is not a hypothetical: an earlier version of this list
+ * named four utilities this paragraph also named, so four of eight tokens were
+ * satisfied by this repository's own prose and passed with the `@source` line
+ * deleted. `test/scripts/spa-shell-checks.test.ts` asserts the property, so the next
+ * person to document a utility finds out from the suite rather than from a gate that
+ * has quietly stopped measuring.
+ *
+ * Matched as class *selectors* — see `checkCss`.
  */
 export const KIT_REQUIRED_CSS_TOKENS: readonly string[] = [
   'animate-spin',
   'animate-backdrop-in',
-  'inset-0',
-  'sr-only',
-  '-translate-x-1/2',
-  'max-w-[calc(100vw-2rem)]',
-  'focus-visible:ring-2',
   'bg-[var(--color-accent)]',
+  'bg-[var(--color-error-bg)]',
+  'disabled:pointer-events-none',
+  'focus-visible:ring-[var(--color-accent)]',
+  'hover:brightness-125',
+  'max-w-[calc(100vw-2rem)]',
+  '-translate-x-1/2',
+  'sr-only',
 ];
 
 /**
@@ -243,6 +253,14 @@ export const KIT_REQUIRED_CSS_TOKENS: readonly string[] = [
  * `css` is the bundle text, or `null` when no bundle exists. A missing bundle is a
  * build that did not run; a bundle missing one of the kit tokens means `globals.css`
  * lost its `@source` line, so only half the kit is styled.
+ *
+ * Each token is matched as a class **selector**, never as a bare substring. A bare
+ * match is satisfied by the theme variable of the same name — Tailwind emits
+ * `--animate-spin:spin 1s linear infinite` from its default theme whether or not
+ * anything uses it — so a substring check would call a frozen spinner present. The
+ * leading `.` is what a generated utility always has and a custom property never
+ * has. Backslashes are stripped from both sides first, so the escape form
+ * (`.bg-\[var\(--color-accent\)\]`) and the plain token agree.
  */
 export function checkCss(css: string | null): ShellProblem[] {
   if (css === null) {
@@ -253,8 +271,8 @@ export function checkCss(css: string | null): ShellProblem[] {
       },
     ];
   }
-  const normalized = css.replace(/\\/g, '');
-  const missing = KIT_REQUIRED_CSS_TOKENS.filter((token) => !normalized.includes(token.replace(/\\/g, '')));
+  const selectors = css.replaceAll('\\', '');
+  const missing = KIT_REQUIRED_CSS_TOKENS.filter((token) => !selectors.includes(`.${token.replaceAll('\\', '')}`));
   if (missing.length === 0) {
     return [];
   }
