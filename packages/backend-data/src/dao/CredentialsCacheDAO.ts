@@ -19,6 +19,19 @@ class CredentialsCacheDAO extends IKeyValueDAO {
     super(kv, KV_NAMESPACE_CREDENTIAL_CACHE);
   }
 
+  /**
+   * Drop the cached credential for one principal.
+   *
+   * Called when the principal's `assumed_by` relationship changes: the entry
+   * short-circuits chain resolution, and a warm hop answers for the chain that
+   * produced it — so a re-pointed chain must not be able to hide behind an entry
+   * written before the change. Entries expire on their own; this is the
+   * explicit half.
+   */
+  public async invalidate(principalArn: string): Promise<void> {
+    await this.delete(principalArn);
+  }
+
   public async getCachedCredential(principalArn: string): Promise<CredentialCache | undefined> {
     const cached: CachedCredentialData | null = await this.get<CachedCredentialData>(principalArn);
     if (!cached) {

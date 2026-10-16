@@ -44,7 +44,9 @@ class ResourceInventoryCollectionTask extends AbstractCollectionTask<ResourceInv
     const registry = createRequestScope(env).get(Tokens.CollectorRegistry);
     const collectors = registry.getAll();
     const regions = ConfigurationManager.resource.getInventoryRegions(env);
-    const resourceDAO = new ResourceInventoryDAO(env.AccessBridgeDB);
+    // Metered: one write per discovered resource per account per region, the
+    // largest fan-out in the repository.
+    const resourceDAO = new ResourceInventoryDAO(env.AccessBridgeDB, this.meter);
     const collectedAt: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
 
     // Sweep every collector across every configured region. Two rules govern what

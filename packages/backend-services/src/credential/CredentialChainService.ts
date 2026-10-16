@@ -80,11 +80,14 @@ class CredentialChainService {
       // where the short-circuit can serve a chain the cold walk refuses: the cached
       // hop is the last one the budget reaches, so whether the chain continues past
       // it is precisely what is unknown — and returning here answers "it is fine"
-      // without ever asking. Every position below the boundary is already accounted
-      // for by hops this walk took, so those still short-circuit, and still cost no
-      // extra D1 read. That is the whole point of the cache, so it is not traded
-      // away to make the boundary decidable; the boundary is decided by the read
-      // below, which only the rejected case pays for.
+      // without ever asking. Every position below the boundary still short-circuits,
+      // and still costs no extra D1 read — that is the whole point of the cache — so
+      // it is not traded away to make the boundary decidable; the boundary is decided
+      // by the read below, which only the rejected case pays for. A re-pointed chain
+      // cannot hide behind one of those hits, because a relationship write or a
+      // credential removal invalidates the hop's entry (see `CredentialStoreService`);
+      // an entry written under a different `PRINCIPAL_TRUST_CHAIN_LIMIT` ages out with
+      // its credentials.
       const atBoundary: boolean = hops >= limit;
       if (assumedBy !== principalArn && !atBoundary) {
         const cachedCredential: CredentialCache | undefined = await cacheDAO.getCachedCredential(assumedBy);

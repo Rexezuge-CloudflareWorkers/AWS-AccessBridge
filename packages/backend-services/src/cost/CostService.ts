@@ -74,7 +74,12 @@ class CostService {
 
     const accounts: Record<string, AccountCostSummary> = {};
     let grandTotal: number = 0;
-    let summaryCurrency: string | null = null;
+    // Two variables, not one sentinel: `null` cannot mean both "nothing seen
+    // yet" and "they disagree", or a third distinct currency re-opens the
+    // decision and the summary names it. `firstCurrency` never resets;
+    // `currenciesDisagree` is sticky.
+    let firstCurrency: string | null = null;
+    let currenciesDisagree: boolean = false;
 
     for (const data of costData) {
       if (accounts[data.awsAccountId] === undefined) {
@@ -85,10 +90,10 @@ class CostService {
       // Track agreement rather than taking the first account's currency: a
       // sum that silently spans USD and EUR is arithmetically meaningless, and
       // the honest answer is to report no currency at all.
-      if (summaryCurrency === null) {
-        summaryCurrency = data.currency;
-      } else if (summaryCurrency !== data.currency) {
-        summaryCurrency = null;
+      if (firstCurrency === null) {
+        firstCurrency = data.currency;
+      } else if (firstCurrency !== data.currency) {
+        currenciesDisagree = true;
       }
     }
 
@@ -96,7 +101,7 @@ class CostService {
       accounts[accountId].totalCost = MoneyUtil.round(accounts[accountId].totalCost);
     }
 
-    return { accounts, grandTotal: MoneyUtil.round(grandTotal), currency: summaryCurrency };
+    return { accounts, grandTotal: MoneyUtil.round(grandTotal), currency: currenciesDisagree ? null : firstCurrency };
   }
 
   public async getAccountCost(userEmail: string, awsAccountId: string, startDate?: string, endDate?: string): Promise<AccountCost> {

@@ -11,128 +11,49 @@ Scope: the decoupled account key, the frozen email anchor, the address registry,
 | `current_email` | `user_metadata.current_email`    | Mutable sign-in address. `NULL` on pre-0032 rows and unresolved stragglers. |
 | registry        | `user_emails`                    | Address → account. `is_verified = 1` may authenticate.                      |
 
-Two addresses per account, deliberately: the anchor is what the legacy
-`*_email` columns and their foreign keys hold (so nothing is rebuilt), and
-`current_email` is what the user signs in with. Reads and writes for grants,
-favourites, memberships and tokens key on `id`, which is what makes an address
-change non-destructive.
+Two addresses per account, deliberately: the anchor is what the legacy `*_email` columns and their foreign keys hold (so nothing is rebuilt), and `current_email` is what the user signs in with. Reads and writes for grants, favourites, memberships and tokens key on `id`, which is what makes an address change non-destructive.
 
 ## Why the anchor is frozen
 
-D1 enforces foreign keys through the Worker binding and honours neither
-`PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on` (both verified
-against real D1 in `test/integration/api/UserIdentityUpgrade.int.test.ts`).
-`defer_foreign_keys` is honoured, but D1 documents that it does not suppress
-`ON DELETE CASCADE`, and SQLite rewrites a child's FK clause when the parent is
-renamed. Three live references (`assumable_roles`, `user_favorite_accounts`,
-`user_access_tokens` — the last `ON DELETE CASCADE`) therefore cannot be
-repointed without losing rows, so `0032` is purely additive.
+D1 enforces foreign keys through the Worker binding and honours neither `PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on` (verified against real D1 in `test/integration/api/UserIdentityUpgrade.int.test.ts`), and SQLite rewrites a child's FK clause when the parent is renamed. Three live references (`assumable_roles`, `user_favorite_accounts`, `user_access_tokens` — the last `ON DELETE CASCADE`) therefore cannot be repointed without losing rows, so `0032` is purely additive.
 
 ## Resolution
 
-`UserIdentityService` (`packages/backend-services/src/identity/`), one memoized
-instance per request scope:
+`UserIdentityService` (`packages/backend-services/src/identity/`), one memoized instance per request scope:
 
-1. `user_emails`, looked up with the address **lowercased**. A row that is
-   `is_verified = 0` **does not resolve** — otherwise a reassigned company
-   address would inherit the previous holder's account.
+1. `user_emails`, looked up with the address **lowercased**. A row that is `is_verified = 0` **does not resolve** — otherwise a reassigned company address would inherit the previous holder's account.
 2. `user_metadata.current_email`.
-3. The frozen anchor — the pre-0032 floor, where the address _is_ the identity —
-   and only when the row's `current_email` is `NULL` or equal to the address
-   presented.
+3. The frozen anchor — the pre-0032 floor — and only when the row's `current_email` is `NULL` or equal to the address presented.
 
-Two rules there are load-bearing. The registry lookup lowercases because
-registry rows are _stored_ lowercased: an exact-match lookup meant a mixed-case
-address (`Alice@x.com`) missed the registry, fell through to the anchor arm, and
-an account that had since moved to `bob@x.com` still resolved for it — a revoked
-address keeping its access. And `findByAnchor` rejects a row whose
-`current_email` differs, because "the anchor" is a floor for accounts that have
-never moved, not a permanent alias for one that has.
-
-Matching is case-insensitive at every arm, because every address compared here is one
-either the registry or `setPrimaryEmail` already normalized — `Alice@x.com` and
-`alice@x.com` are the same address by construction, and treating them as two would
-hand the difference to whoever chose the casing. What the exactness claim _does_ cover
-is the `WHERE` itself: a straggler with no registry row is matched on the anchor
-verbatim, so it cannot be steered into another account's by a case variant alone.
-
-Services take the caller's sign-in address and resolve internally, so routes,
-the OpenAPI document and the web client are unaffected. Every write targets the
-resolved **anchor**, never the presented address.
+Two rules are load-bearing. The registry lookup lowercases because registry rows are _stored_ lowercased: an exact-match lookup let a mixed-case address (`Alice@x.com`) miss the registry and keep resolving for an account that had since moved — a revoked address keeping its access. And `findByAnchor` rejects a row whose `current_email` differs, because "the anchor" is a floor for accounts that have never moved, not a permanent alias for one that has. Every write targets the resolved **anchor**, never the presented address; routes, the OpenAPI document and the web client stay address-based.
 
 ## Changing an address
 
-Service method `UserIdentityService.setPrimaryEmail`, ops script
-`scripts/ops/change-email.ts` (same claim → move → revoke sequence). Claiming before
-revoking is the safety property: a brief dual-auth window, never a lockout.
-
-**No route exposes this yet.** Cloudflare Access is the only authenticator, so a
-self-service change needs a proof-of-control confirm step — performed while
-authenticated as the _new_ address — before it can be exposed. Until that lands,
-`scripts/ops/change-email.ts` is the only supported path.
+Service method `UserIdentityService.setPrimaryEmail`, ops script `scripts/ops/change-email.ts` (same claim → move → revoke sequence). Claiming before revoking is the safety property: a brief dual-auth window, never a lockout. **No route exposes this yet** — Cloudflare Access is the only authenticator, so a self-service change needs a proof-of-control confirm step performed while authenticated as the _new_ address. Until then, the ops script is the only supported path.
 
 ## Case-variant accounts
 
-`0032` assigns `current_email` only where the lowercased address is
-unambiguous. A live database can hold both `Alice@x.com` and `alice@x.com` (the
-PK is case-sensitive and nothing normalized on the way in), and those rows are
-left with `current_email IS NULL` — merging them would hand one account's grants
-to the other, and normalizing unconditionally would abort the migration on the
-unique index. Find them with:
+`0032` assigns `current_email` only where the lowercased address is unambiguous. A live database can hold both `Alice@x.com` and `alice@x.com` (the PK is case-sensitive and nothing normalized on the way in), and those rows are left with `current_email IS NULL` — merging them would hand one account's grants to the other, and normalizing unconditionally would abort the migration on the unique index. Find them with:
 
 ```sql
 SELECT user_email FROM user_metadata WHERE current_email IS NULL;
 ```
 
-They still authenticate via their anchor. Merge them deliberately before any
-address change (`scripts/ops/change-email.ts` refuses an account with no `id`).
+They still authenticate via their anchor. Merge them deliberately before any address change (`scripts/ops/change-email.ts` refuses an account with no `id`).
 
 ## `@rexezuge/identity` is NOT adopted, and the reason is the schema
 
-The kit owns a converged identity: `UserDAO`, `UserEmailDAO`, `accountLookup`,
-`UserIdentityService` and its own migration set. This repository carries the same
-four shapes itself and is not yet on the kit's — and the gap is not the code, it is
-the table.
+The kit's `UserDAO` reads a **`users`** table; this repository's identity anchor lives in **`user_metadata`** (from `0032`), with `user_emails` as the registry under the name both implementations agree on. So adopting the kit's DAOs is a data migration, and SQLite makes it a **three-release arc**:
 
-The kit's `UserDAO` reads a **`users`** table. This repository has no `users`
-table: the identity anchor lives in **`user_metadata`** (`user_email`,
-`current_email`, `id`, `is_superadmin`, from migration `0032`), and `user_emails`
-is the address registry under the name both implementations agree on. So adopting
-the kit's DAOs is not a swap, it is a data migration, and SQLite makes it a
-**three-release arc**:
-
-1. **Expand** — `0035_kit_users_expand.sql` creates `users`, and every writer
-   dual-writes. Readers still read `user_metadata`.
-2. **Adopt** — `UserIdentityService` and `AddressRegistryService` read `users`.
-   `accountLookup` takes over from `resolveOwner`.
+1. **Expand** — `0035_kit_users_expand.sql` creates `users`; every writer dual-writes, readers still read `user_metadata`.
+2. **Adopt** — `UserIdentityService` and `AddressRegistryService` read `users`; `accountLookup` takes over from `resolveOwner`.
 3. **Contract** — drop `user_metadata`'s identity columns and the dual-write.
 
-It cannot be one migration. SQLite cannot `ALTER` a primary key, cannot change a
-`REFERENCES` clause, and D1 honours neither `foreign_keys=off` nor
-`legacy_alter_table` — so the new table has to exist alongside the old one for at
-least one deploy between any two states. A single-release version of this would
-either lose the anchor or abort halfway with the schema in a state no later
-migration expects.
-
-**Until that arc lands, `@rexezuge/identity` is not a dependency.** It was
-declared while the adoption was being scoped and removed once it was clear nothing
-imported it: an unused dependency installs a package that suggests an adoption
-that never happened, and the next reader has to check whether some file uses it
-before they can trust the manifest.
+It cannot be one migration: SQLite cannot `ALTER` a primary key or change a `REFERENCES` clause, and D1 honours neither `foreign_keys=off` nor `legacy_alter_table`, so the new table must exist alongside the old one for at least one deploy between any two states. **Until that arc lands, `@rexezuge/identity` is not a dependency** — it was declared while the adoption was scoped and removed once nothing imported it.
 
 ### What the kit's fixes mean for the local copies
 
-The kit carries two identity hardening changes that landed in 1.8.0. Both are
-already present in this repository's copies, so there is no exposure and no
-adoption urgency — but the *reasons* are worth keeping, because they are the kind
-of defect that reappears in the next copy.
+Two identity hardening changes landed in the kit at 1.8.0; both are already present in this repository's copies, so there is no exposure — but the reasons are worth keeping:
 
-- **`UserEmailDAO.register` is a conditional upsert.** `ON CONFLICT(email) DO
-  UPDATE … WHERE user_emails.is_verified = 0`, with `meta.changes` as the
-  verdict. Without the `WHERE`, a claim racing a revoke re-points a *verified*
-  address at a new account — the read and the write are not one statement. That is
-  an identity takeover, not a bug report.
-- **`accountLookup.resolveAccount` refuses a moved anchor.** An account whose
-  `current_email` has since changed resolves to `null` rather than to the address
-  it used to sign in with, so a stale cached lookup cannot authenticate the wrong
-  person.
+- **`UserEmailDAO.register` is a conditional upsert.** `ON CONFLICT(email) DO UPDATE … WHERE user_emails.is_verified = 0`, with `meta.changes` as the verdict. Without the `WHERE`, a claim racing a revoke re-points a _verified_ address at a new account — an identity takeover.
+- **`accountLookup.resolveAccount` refuses a moved anchor.** An account whose `current_email` has since changed resolves to `null` rather than to the address it used to sign in with, so a stale cached lookup cannot authenticate the wrong person.

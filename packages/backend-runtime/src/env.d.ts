@@ -2,13 +2,12 @@ declare global {
   interface Env {
     AccessBridgeKV: KVNamespace;
     AccessBridgeDB: D1Database;
-    // The two per-feature credential keys, plus the legacy master key they are seeded
-    // from and the HMAC secret for internal self-calls. All four are declared in
-    // `apps/api/wrangler.template.jsonc` and in the generated `CloudflareEnv`; the two
-    // `CREDENTIAL_*` bindings were missing here, so anything typed against the global
-    // `Env` rather than `ServiceEnv` could not name them at all — which is how a
-    // binding can be present in the template, in the generated types and in
-    // `ServiceEnv`, and absent from the fourth place with nothing reporting it.
+    // The two per-feature credential keys and the HMAC secret for internal
+    // self-calls, declared in `apps/api/wrangler.template.jsonc` and the
+    // generated `CloudflareEnv` as well. The two `CREDENTIAL_*` bindings were
+    // missing here once, and that is exactly how a binding can exist in the
+    // template, the generated types and `ServiceEnv` while being absent from
+    // this fourth place with nothing reporting it.
     CREDENTIAL_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
     CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
     INTERNAL_REQUEST_HMAC_SECRET: SecretsStoreSecret;

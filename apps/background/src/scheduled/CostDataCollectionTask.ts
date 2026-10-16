@@ -45,7 +45,9 @@ class CostDataCollectionTask extends AbstractCollectionTask<CostDataCollectionTa
     // rotation. Consistent with `AbstractCollectionTask`'s own scope usage.
     const scope = createRequestScope(env);
     const costExplorer = scope.get(Tokens.CostExplorerService);
-    const costDataDAO = new CostDataDAO(env.AccessBridgeDB);
+    // Metered: this DAO writes one row per period per account inside the cron's
+    // fan-out, which is exactly the spend the counter exists to bound.
+    const costDataDAO = new CostDataDAO(env.AccessBridgeDB, this.meter);
 
     const { startDate, endDate } = MoneyUtil.lookbackWindow(lookbackDays);
 

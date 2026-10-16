@@ -1,7 +1,7 @@
 # AWS-AccessBridge — Index
 
 **AWS-AccessBridge** is a self-hosted AWS multi-account access portal on Cloudflare Workers: a
-Hono + Chanfana API, a cron Durable Object, and a Vite React SPA in one pnpm workspace. Engineers
+Hono + Chanfana API, a cron Durable Object with a collection Workflow, and a Vite React SPA in one pnpm workspace. Engineers
 sign in with Cloudflare Zero Trust, see which AWS roles they may assume across connected accounts,
 assume them (multi-hop), mint temporary Console URLs, and watch spend and inventory. IAM
 credentials live encrypted in D1; the cron pre-assumes hot chains into KV so the interactive path

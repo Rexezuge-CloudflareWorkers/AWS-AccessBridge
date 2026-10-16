@@ -1,4 +1,3 @@
-import { DatabaseError } from '@rexezuge/errors';
 import type { UserMetadataInternal } from '@aws-access-bridge/shared/model';
 import { isMissingSchemaError } from '@rexezuge/d1';
 import { BaseDAO } from './BaseDAO';
@@ -127,21 +126,18 @@ class UserMetadataDAO extends BaseDAO {
     // enforce foreign keys by default, so an `assumable_roles` row can exist with
     // no metadata row at all and this path then becomes the first writer.
     await this.ensureUserEmailExists(userEmail);
-    // INSERT rather than UPDATE: callers that reach here before any other
-    // metadata write (e.g. token creation) have no row yet, and an UPDATE would
-    // match nothing — the generated name would be returned but never persisted,
-    // handing the user a different STS RoleSessionName on every assume-role and
-    // defeating CloudTrail correlation. ON CONFLICT keeps concurrent callers on
-    // the single stored value rather than racing to overwrite it.
-    const insertResult = await this.run(
-      'UPDATE user_metadata SET federation_username = COALESCE(federation_username, ?) WHERE user_email = ?',
-      [federationUsername, userEmail],
-    );
-    if (!insertResult.success) {
-      throw new DatabaseError(`Failed to store federation username: ${insertResult.error}`);
-    }
-    // Re-read rather than returning the candidate: under a concurrent insert
-    // another caller may have won, and their value is now the stored one.
+    // `COALESCE` rather than a plain assignment: concurrent callers must keep
+    // the one stored value, or a loser of the race overwrites the winner and the
+    // account's STS RoleSessionName changes underneath CloudTrail correlation.
+    // The row exists by now — `ensureUserEmailExists` above is what guarantees
+    // the UPDATE has something to match.
+    await this.run('UPDATE user_metadata SET federation_username = COALESCE(federation_username, ?) WHERE user_email = ?', [
+      federationUsername,
+      userEmail,
+    ]);
+    // Re-read rather than returning the candidate: under a concurrent write
+    // another caller may have stored its value first, and theirs is the stored
+    // one.
     const stored: UserMetadataInternal | null = await this.database
       .prepare('SELECT federation_username FROM user_metadata WHERE user_email = ?')
       .bind(userEmail)

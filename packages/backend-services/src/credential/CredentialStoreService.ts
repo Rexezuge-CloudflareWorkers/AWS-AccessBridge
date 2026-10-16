@@ -1,11 +1,12 @@
 import { ConfigurationManager } from '@aws-access-bridge/backend-runtime/config';
-import { CredentialCacheConfigDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
+import { CredentialCacheConfigDAO, CredentialsCacheDAO, CredentialsDAO } from '@aws-access-bridge/backend-data/dao';
 
 import { BadRequestError, InternalServerError } from '@rexezuge/errors';
 import { AWS_IAM_PRINCIPAL_ARN_PATTERN } from '@aws-access-bridge/shared/schema';
 import { StsService, type CallerIdentity } from '../aws/sts';
 import type { ServiceEnv } from '../composition/ServiceEnv';
 import { resolveCredentialKeys } from '../composition/encryptionKeys';
+import type { CredentialKeyProvider } from '../composition/encryptionKeys';
 
 /**
  * The canonical principal-ARN matcher, not a local copy. The non-capturing group
@@ -17,9 +18,8 @@ const PRINCIPAL_ARN_PATTERN: RegExp = AWS_IAM_PRINCIPAL_ARN_PATTERN;
 
 type CredentialStoreServiceEnv = ServiceEnv;
 
-async function defaultCredentialKeyProvider(env: CredentialStoreServiceEnv): Promise<readonly string[]> {
-  const keys = await resolveCredentialKeys(env);
-  return keys.credentials;
+function defaultKeyProvider(env: CredentialStoreServiceEnv): CredentialKeyProvider {
+  return async () => resolveCredentialKeys(env);
 }
 
 /**
@@ -33,25 +33,42 @@ class CredentialStoreService {
     private readonly env: CredentialStoreServiceEnv,
     sts?: StsService,
     /**
-     * The ordered key chain for the `credentials` table, injected by the
-     * composition root from the same scope that constructed this service. See
-     * `CredentialChainService`'s equivalent for why it is injected.
+     * The ordered key chains for both surfaces, injected by the composition
+     * root from the same scope that constructed this service. The cache chain is
+     * needed because a relationship write invalidates the principal's cached
+     * credentials — see `invalidateCachedCredential`.
      */
-    private readonly credentialKeys: () => Promise<readonly string[]> = (): Promise<readonly string[]> => defaultCredentialKeyProvider(env),
+    private readonly encryptionKeys: CredentialKeyProvider = defaultKeyProvider(env),
   ) {
     this.sts = sts ?? new StsService();
   }
 
   /**
-  The ordered keys for the `credentials` table: own key first, legacy master key after.
+  The ordered keys for the `credentials` table.
   */
   public async getEncryptionKeys(): Promise<readonly string[]> {
-    return this.credentialKeys();
+    return (await this.encryptionKeys()).credentials;
   }
 
   public async createCredentialsDAO(): Promise<CredentialsDAO> {
     const limit = ConfigurationManager.credential.getTrustChainLimit(this.env);
     return new CredentialsDAO(this.env.AccessBridgeDB, await this.getEncryptionKeys(), limit);
+  }
+
+  /**
+   * Drop the principal's cached credentials after its chain changed.
+   *
+   * The cache short-circuits chain resolution, so a warm hop answers for the
+   * chain that produced it: without this, a re-pointed `assumed_by` would keep
+   * being served from an entry written for the old chain. A missing KV binding
+   * means there is no cache to invalidate, not a failure to report.
+   */
+  private async invalidateCachedCredential(principalArn: string): Promise<void> {
+    if (!this.env.AccessBridgeKV) {
+      return;
+    }
+    const { cache } = await this.encryptionKeys();
+    await new CredentialsCacheDAO(this.env.AccessBridgeKV, cache).invalidate(principalArn);
   }
 
   public async storeCredential(principalArn: string, accessKeyId: string, secretAccessKey: string, sessionToken?: string): Promise<void> {
@@ -78,6 +95,11 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.storeCredentialRelationship(principalArn, assumedBy);
+    // The chain this principal resolves through just changed, so whatever the
+    // cache holds for it was keyed to the old relation: chain resolution
+    // short-circuits on a warm hop, and a hit that speaks for the previous chain
+    // must not outlive the write.
+    await this.invalidateCachedCredential(principalArn);
     // Track the role so the scheduled refresh has work to do. Registered here, where
     // `assumed_by` is set, because only a principal that assumes another has a chain
     // with a hop to pre-assume; without any registration phase 1 of the cron
@@ -94,6 +116,9 @@ class CredentialStoreService {
     }
     const dao: CredentialsDAO = await this.createCredentialsDAO();
     await dao.removeCredential(principalArn);
+    // A warm entry would outlive the credential row it names and keep serving
+    // the chain that no longer exists.
+    await this.invalidateCachedCredential(principalArn);
     // Drop the refresh registration too. The table declares
     // `ON DELETE CASCADE`, but D1 does not enforce foreign keys by default, so
     // without this a deleted credential leaves a row the refresh task keeps

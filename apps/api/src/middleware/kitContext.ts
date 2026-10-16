@@ -1,4 +1,4 @@
-import type { HeaderContext, RateLimitContext } from '@rexezuge/http';
+import type { HeaderContext } from '@rexezuge/http';
 import type { Context } from 'hono';
 
 /**
@@ -41,23 +41,6 @@ export function asHeaderContext<E extends Record<string, unknown>>(c: Context<E>
     },
     res: { headers: c.res?.headers ?? new Headers() },
     req: { url: c.req?.url ?? '' },
-  };
-}
-
-/**
- * The slice of a Hono context `rateLimit` reads.
- *
- * `query` is optional on the kit's type and is **not** supplied here: this
- * repository's throttled surfaces all answer in one envelope, so there is no
- * protocol dialect for a throttled body to be written in.
- */
-export function asRateLimitContext<E extends Record<string, unknown>>(c: Context<E>): RateLimitContext {
-  return {
-    req: {
-      header: (name): string | undefined => c.req.header(name),
-    },
-    env: c.env,
-    json: (body, status, headers): Response => c.json(body, status as 400, headers),
   };
 }
 
