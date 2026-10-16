@@ -103,6 +103,18 @@ also match a different account's row. A DAO method taking a `null` `userId` narr
 arm alone. The rationale for the whole model — why `user_email` is a frozen anchor and cannot be
 repointed — is in [`../../docs/agents/features/identity/AGENTS.md`](../../docs/agents/features/identity/AGENTS.md).
 
+## An alias in a SQL fragment is a parameter, not a constant
+
+`AssumableRolesQueries.hiddenFilterClause(showHidden, alias)` takes the alias because
+`buildListRolesQuery` interpolates the same predicate twice — for the outer rows (`ar`) and inside
+the distinct-account paging subquery (`ar2`). It once hardcoded `ar`, which made the subquery's copy
+a *correlated* reference to the outer row: always true for a row the outer `WHERE` had already kept,
+so it filtered nothing. A fully hidden account then still occupied a `LIMIT` slot, the page rendered
+one account fewer than `getTotalAccountsCount` reported, and because the count drives the page
+space, the account that fell past the window was unreachable on any page — visible only by raising
+`limit` until the window covered every account. `ownerClause(alias)` is the same rule already
+applied to the owner predicate: a fragment that names a table takes that alias from its caller.
+
 ## `user_email` is an anchor, not a field
 
 `migrations/0032_user_identity.sql` added `user_metadata.id` (`usr_<hex>`, the stable account key),

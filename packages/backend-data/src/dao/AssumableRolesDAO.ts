@@ -78,7 +78,7 @@ class AssumableRolesDAO extends BaseDAO {
    * @returns The total number of unique accounts.
    */
   public async getTotalAccountsCount(owner: AssumableRoleOwner, showHidden: boolean): Promise<number> {
-    const hiddenFilter: string = hiddenFilterClause(showHidden);
+    const hiddenFilter: string = hiddenFilterClause(showHidden, 'ar');
     const countResult = await this.database
       .prepare(
         `SELECT COUNT(DISTINCT ar.aws_account_id) as total_accounts

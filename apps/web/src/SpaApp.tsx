@@ -200,7 +200,14 @@ export default function SpaApp() {
                       <label className="text-sm text-gray-400">{t('nav.perPage', 'Per page:')}</label>
                       <select
                         value={pageSize}
-                        onChange={(e) => setPageSize(Number(e.target.value))}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value));
+                          // A page number from the old size can sit past the new
+                          // page space (e.g. page 2 of size 10 -> offset 20 when
+                          // 11 accounts fit one page of 20), which renders an
+                          // empty list under a range that claims rows exist.
+                          setCurrentPage(1);
+                        }}
                         className="text-white text-sm focus:outline-none"
                         style={{ padding: '6px 8px', background: '#252d3d', borderRadius: '6px', border: 'none' }}
                       >

@@ -52,12 +52,28 @@ const ASSUMABLE_ROLES_ORDER_BY = `ORDER BY is_favorite DESC,
 const ASSUMABLE_ROLES_SELECT = `SELECT ar.aws_account_id, ar.role_name, ar.hidden, aa.aws_account_nickname,
                 CASE WHEN ufa.aws_account_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite`;
 
-function hiddenFilterClause(showHidden: boolean): string {
-  return showHidden ? '' : 'AND (ar.hidden IS NULL OR ar.hidden = FALSE)';
+/**
+ * The hidden predicate for a user-keyed role statement.
+ *
+ * The alias is a parameter, not a constant, because `buildListRolesQuery`
+ * interpolates this predicate twice: once for the outer rows (`ar`) and once
+ * inside the distinct-account subquery (`ar2`). It once hardcoded `ar`, which
+ * made the subquery's copy a *correlated* reference to the outer row — always
+ * true for a row the outer `WHERE` had already kept — so it filtered nothing: a
+ * fully hidden account still occupied a `LIMIT` slot, the page rendered one
+ * account fewer than `getTotalAccountsCount` reported, and since the count
+ * drives the page space, the account that fell past the window was unreachable
+ * at any page. Raising `limit` until the window covered every account was the
+ * only way to see it.
+ */
+function hiddenFilterClause(showHidden: boolean, alias: string): string {
+  return showHidden ? '' : `AND (${alias}.hidden IS NULL OR ${alias}.hidden = FALSE)`;
 }
 
 function buildListRolesQuery(showHidden: boolean): string {
-  const hiddenFilter: string = hiddenFilterClause(showHidden);
+  const hiddenFilter: string = hiddenFilterClause(showHidden, 'ar');
+  // The subquery's own copy must filter `ar2`. See `hiddenFilterClause`.
+  const subqueryHiddenFilter: string = hiddenFilterClause(showHidden, 'ar2');
   // Paginate over a distinct-account subquery, not over role rows: one account
   // with many roles used to consume the whole page and produce a map an
   // account-keyed client could not render. The subquery carries the same
@@ -71,7 +87,7 @@ function buildListRolesQuery(showHidden: boolean): string {
               FROM assumable_roles ar2
               LEFT JOIN aws_accounts aa2 ON ar2.aws_account_id = aa2.aws_account_id
               LEFT JOIN user_favorite_accounts ufa2 ON ar2.aws_account_id = ufa2.aws_account_id AND ${ownerClause('ufa2')}
-              WHERE ${ownerClause('ar2')} ${hiddenFilter}
+              WHERE ${ownerClause('ar2')} ${subqueryHiddenFilter}
               GROUP BY ar2.aws_account_id
               ORDER BY MAX(CASE WHEN ufa2.aws_account_id IS NOT NULL THEN 1 ELSE 0 END) DESC,
                        CASE WHEN MAX(aa2.aws_account_nickname) IS NOT NULL THEN 0 ELSE 1 END,
@@ -83,7 +99,7 @@ function buildListRolesQuery(showHidden: boolean): string {
 }
 
 function buildSearchRolesQuery(showHidden: boolean): string {
-  const hiddenFilter: string = hiddenFilterClause(showHidden);
+  const hiddenFilter: string = hiddenFilterClause(showHidden, 'ar');
   // `ESCAPE` is required for the caller's escaped pattern to be honoured; without
   // it a literal `\%` would not match a backslash-then-percent.
   const escape: string = LIKEUtil.escapeClause;
