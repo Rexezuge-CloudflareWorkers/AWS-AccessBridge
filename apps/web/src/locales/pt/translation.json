@@ -32,11 +32,13 @@
     "cancel": "Cancelar",
     "close": "Fechar",
     "delete": "Excluir",
+    "error": "Erro",
     "errorPrefix": "Erro",
     "loading": "Carregando...",
     "refresh": "Atualizar",
     "remove": "Remover",
-    "rename": "Renomear"
+    "rename": "Renomear",
+    "success": "Sucesso"
   },
   "accounts": {
     "accessKeys": "Chaves de acesso",

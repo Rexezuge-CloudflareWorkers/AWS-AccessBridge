@@ -20,10 +20,10 @@ The run is split into four jobs so a broken destination never blocks the other:
 
 > [!IMPORTANT]
 >
-> - **Encryption is required, not optional.** `AccessBridgeDB` stores `user_metadata` email addresses, audit logs, and team membership in plaintext, and `user_access_tokens` holds only SHA-256 digests since migration `0034` — no bearer token can be replayed from a dump. An unencrypted dump is still a full disclosure of who can reach which AWS account, so the workflow refuses to run without `BACKUP_ENCRYPTION_KEY`. See [What a backup contains](#what-a-backup-contains).
+> - **Encryption is required, not optional.** A dump carries every sign-in address, audit row and team membership; `user_access_tokens` holds only SHA-256 digests since migration `0034`, so no bearer token can be replayed, but an unencrypted dump is still a full disclosure of who can reach which AWS account. The workflow refuses to run without `BACKUP_ENCRYPTION_KEY`.
 > - **Manual trigger required for the first run:** scheduled workflows only start after you run the workflow once from the Actions tab (GitHub → Actions → Backup D1 Database → Run workflow).
-> - **Keep backups off this Cloudflare account.** The Worker, its D1 database, and the Secrets Store holding the IAM encryption key all live in one account. Storing backups in R2 in that _same_ account means a single suspension or ban takes down production and recovery alike. Use a different S3-compatible provider (AWS S3, Backblaze B2, MinIO) or a separate Cloudflare account.
-> - **If you configure no destination at all, every backup job skips silently.** That is the intended state for a repository that does not want off-site backups — not a failure.
+> - **Keep backups off this Cloudflare account.** The Worker, its D1 database, and the Secrets Store holding the IAM encryption key all live in one account. Use a different S3-compatible provider (AWS S3, Backblaze B2, MinIO) or a separate Cloudflare account.
+> - **If you configure no destination at all, every backup job skips silently.** That is the intended state — not a failure.
 
 ### Backup destination secrets
 
@@ -73,17 +73,15 @@ Keep the bucket private. The workflow uploads with the `aws s3 cp` CLI, so bucke
 | `BACKUP_RETENTION_DAYS` | no       | Days to keep backups. Defaults to 30 |
 
 > [!WARNING]
-> **GitHub automatically disables scheduled workflows after 60 days of repository inactivity.** If your fork receives no commits to the default branch for 60 days, the backup workflow (and every other cron-triggered workflow) is disabled, and you get an email beforehand. Periodically [sync with upstream](https://github.com/Rexezuge-CloudflareWorkers/AWS-AccessBridge) or re-enable it from the Actions tab. See [GitHub docs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows).
+> **GitHub automatically disables scheduled workflows after 60 days of repository inactivity.** Periodically [sync with upstream](https://github.com/Rexezuge-CloudflareWorkers/AWS-AccessBridge) or re-enable it from the Actions tab. See [GitHub docs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows).
 
-### Backup features
+### How the run behaves
 
-- **Automatic daily backups** at 04:15 UTC, with a `check-secrets` preflight so misconfiguration fails fast with a named missing secret.
-- **Manual trigger** from the Actions tab — same code path, useful before a risky migration.
 - **Same database as the deploy.** The export job runs `scripts/deploy/prepare-wrangler-config.ts` exactly like Continuous Deployment, honoring `WRANGLER_JSONC`, `WRANGLER_PATCH_JSON`, and `WRANGLER_VARS_PATCH_JSON`. Whatever `AccessBridgeDB` resolves to at deploy time is what gets exported.
-- **Compression then encryption:** xz (`-T0 -6`), then AES-256-CBC (PBKDF2, 100k iterations, random salt).
-- **No plaintext ever leaves the job.** The unencrypted SQL is deleted before the artifact is stored, and only the `.enc` file is handed to the upload jobs.
+- **Compression then encryption:** xz (`-T0 -6`), then AES-256-CBC (PBKDF2, 100k iterations, random salt). The unencrypted SQL is deleted before the artifact is stored; only the `.enc` file reaches the upload jobs.
 - **Automatic cleanup** past `BACKUP_RETENTION_DAYS` in each destination. The S3 prune only ever deletes `*.sql.xz` / `*.sql.xz.enc` (and the pre-xz `*.sql.gz[.enc]`) inside the `aws-access-bridge/production/` prefix.
 - **Empty-database guard:** if `prepare-wrangler-config.ts` had to create the D1 database, the `database_id` is still the template placeholder and the run aborts rather than uploading an empty dump as a "backup".
+- **Manual trigger** from the Actions tab — same code path, useful before a risky migration.
 
 ### Where the logic lives
 
@@ -97,9 +95,7 @@ The workflow is only a job graph; each step delegates to an entrypoint in `scrip
 | `upload-s3.ts`                   | Upload To S3                   | Upload, then prune only `*.sql.xz[.enc]` in the backup prefix                 |
 | `upload-webdav.ts`               | Upload To WebDAV               | Configures the rclone remote, uploads, then prunes by age                     |
 
-Each entrypoint carries a `#!` line and exports nothing; the guards it calls live in sibling modules without a shebang (`destination-config.ts`, `d1-target.ts`, `naming.ts`, `s3-prune.ts`, `webdav-target.ts`, `retention.ts`). See `scripts/README.md`.
-
-Run one locally to see what it would do in CI, for example:
+Each entrypoint carries a `#!` line and exports nothing; the guards it calls live in sibling modules without a shebang (`destination-config.ts`, `d1-target.ts`, `naming.ts`, `s3-prune.ts`, `webdav-target.ts`, `retention.ts`). See `scripts/README.md`. Run one locally to see what it would do in CI, for example:
 
 ```bash
 pnpm exec tsx scripts/backup/evaluate-destination-config.ts
@@ -129,7 +125,7 @@ s3://<S3_BUCKET>/aws-access-bridge/production/access-bridge_prod_YYYY-MM-DD_HH-M
 | `cost_data`, `resource_inventory`, `spend_alerts` | AWS account IDs, nicknames, spend, and resource inventory.                                                                                           |
 | `background_task_runs`                            | Cron phase history.                                                                                                                                  |
 
-This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working directory of who reaches which AWS account, which IAM roles exist, and what spend and inventory look like. Since `0034` it is no longer a set of usable API credentials — that is what the digest column bought.
+This is why `BACKUP_ENCRYPTION_KEY` is mandatory: a stolen `.enc` file is useless without it, while a stolen `.sql.xz` is a working directory of who reaches which AWS account.
 
 ### Decrypting a backup
 
@@ -184,10 +180,7 @@ pnpm exec wrangler d1 execute aws-access-bridge-db-restored --remote --config ./
 #    - forks:   update the WRANGLER_JSONC GitHub variable, then run Continuous Deployment
 ```
 
-`--remote` is required; without it the command runs against the local development database.
-
-> [!NOTE]
-> Import on top of a database that already has the schema and rows will error on the `CREATE TABLE` statements. That is the reason for the create-then-repoint flow, not a corrupt backup.
+`--remote` is required; without it the command runs against the local development database. Importing on top of a database that already has the schema and rows will error on the `CREATE TABLE` statements — that is the reason for the create-then-repoint flow, not a corrupt backup.
 
 #### Option C — import in place (last resort)
 
@@ -200,12 +193,12 @@ pnpm exec wrangler d1 execute AccessBridgeDB --remote --config ./wrangler.jsonc 
 
 > ⚠️ **Troubleshooting: `no such table: main.<x>` on import**
 >
-> `wrangler d1 export` can emit tables in an order that violates foreign-key dependencies (for example `assumable_roles` before `user_metadata`, or `credential_cache_config` before `credentials`). D1 honours neither `PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on` — the schema in `migrations/0030_squash.sql` only avoids the problem because its `CREATE TABLE` statements are already in dependency order.
+> `wrangler d1 export` can emit tables in an order that violates foreign-key dependencies (for example `assumable_roles` before `user_metadata`). D1 honours neither `PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on` — the schema in `migrations/0030_squash.sql` only avoids the problem because its `CREATE TABLE` statements are already in dependency order.
 >
 > Options, in order of preference:
 >
 > 1. Use Option B (fresh database) — the ordering problem disappears with the target schema.
-> 2. Prepend `PRAGMA defer_foreign_keys=TRUE;` to the dump. The D1 exporter already emits this pragma; if your file is missing it, rebuild the head of the file:
+> 2. Prepend `PRAGMA defer_foreign_keys=TRUE;` to the dump:
 >    ```bash
 >    { echo "PRAGMA defer_foreign_keys=TRUE;"; cat backup.sql; } > restored.sql
 >    pnpm exec wrangler d1 execute <DATABASE> --remote --config ./wrangler.jsonc --file=restored.sql
@@ -228,9 +221,7 @@ pnpm exec wrangler d1 time-travel info AccessBridgeDB --config ./wrangler.jsonc 
 # Restore (destructive — overwrites the database in place)
 pnpm exec wrangler d1 time-travel restore AccessBridgeDB --config ./wrangler.jsonc --timestamp=1756687200
 pnpm exec wrangler d1 time-travel restore AccessBridgeDB --config ./wrangler.jsonc --bookmark=00000085-…
-```
 
-```bash
 # Confirm the database is on the Time Travel-capable backend first
 pnpm exec wrangler d1 info AccessBridgeDB --config ./wrangler.jsonc   # expect version: production
 ```

@@ -3,11 +3,13 @@ import { CredentialChainService } from '@aws-access-bridge/backend-services/cred
 import { CredentialStoreService } from '@aws-access-bridge/backend-services/credential/CredentialStoreService';
 import { CredentialsDAO } from '@aws-access-bridge/backend-data/dao/CredentialsDAO';
 import { CredentialsCacheDAO } from '@aws-access-bridge/backend-data/dao/CredentialsCacheDAO';
+import { CredentialCacheConfigDAO } from '@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO';
 import { StsService } from '@aws-access-bridge/backend-services/aws/sts';
 import { BadRequestError, ForbiddenError, InternalServerError } from '@rexezuge/errors';
 
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsDAO');
 vi.mock('@aws-access-bridge/backend-data/dao/CredentialsCacheDAO');
+vi.mock('@aws-access-bridge/backend-data/dao/CredentialCacheConfigDAO');
 vi.mock('@aws-access-bridge/backend-services/aws/sts');
 
 const BASE = 'arn:aws:iam::123456789012:user/base';
@@ -168,6 +170,46 @@ describe('CredentialStoreService', () => {
     await expect(svc.storeCredentialRelationship('nope', MID)).rejects.toBeInstanceOf(BadRequestError);
     await expect(svc.storeCredentialRelationship(MID, 'nope')).rejects.toBeInstanceOf(BadRequestError);
     await expect(svc.removeCredential('')).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('invalidates the principal cache entry when its relationship changes', async () => {
+    // The chain the principal resolves through just changed, so a warm entry
+    // written for the old chain must not survive the write. Without this, a
+    // below-boundary cache hit keeps answering for a chain that no longer
+    // exists.
+    vi.mocked(CredentialsDAO.prototype.storeCredentialRelationship).mockResolvedValue(undefined);
+    vi.mocked(CredentialCacheConfigDAO.prototype.create).mockResolvedValue(undefined);
+    const svc = new CredentialStoreService(env());
+
+    await svc.storeCredentialRelationship(MID, BASE);
+
+    expect(CredentialsCacheDAO.prototype.invalidate).toHaveBeenCalledWith(MID);
+  });
+
+  it('invalidates the principal cache entry when its credential is removed', async () => {
+    vi.mocked(CredentialsDAO.prototype.removeCredential).mockResolvedValue(undefined);
+    vi.mocked(CredentialCacheConfigDAO.prototype.delete).mockResolvedValue(undefined);
+    const svc = new CredentialStoreService(env());
+
+    await svc.removeCredential(MID);
+
+    expect(CredentialsCacheDAO.prototype.invalidate).toHaveBeenCalledWith(MID);
+  });
+
+  it('writes a relationship without a cache binding', async () => {
+    // No KV binding means no cache to invalidate; the relation write itself
+    // must still succeed.
+    vi.mocked(CredentialsDAO.prototype.storeCredentialRelationship).mockResolvedValue(undefined);
+    vi.mocked(CredentialCacheConfigDAO.prototype.create).mockResolvedValue(undefined);
+    const svc = new CredentialStoreService({
+      AccessBridgeDB: {},
+      CREDENTIAL_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('k') },
+      CREDENTIAL_CACHE_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('k') },
+      PRINCIPAL_TRUST_CHAIN_LIMIT: '3',
+    } as never);
+
+    await expect(svc.storeCredentialRelationship(MID, BASE)).resolves.toBeUndefined();
+    expect(CredentialsCacheDAO.prototype.invalidate).not.toHaveBeenCalled();
   });
 
   it('rejects a test-chain request with no principal ARN', async () => {

@@ -32,11 +32,13 @@
     "cancel": "Annuleren",
     "close": "Sluiten",
     "delete": "Verwijderen",
+    "error": "Fout",
     "errorPrefix": "Fout",
     "loading": "Laden...",
     "refresh": "Vernieuwen",
     "remove": "Verwijderen",
-    "rename": "Naam wijzigen"
+    "rename": "Naam wijzigen",
+    "success": "Gelukt"
   },
   "accounts": {
     "accessKeys": "Toegangssleutels",

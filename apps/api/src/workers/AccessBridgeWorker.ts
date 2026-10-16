@@ -94,7 +94,7 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
     // Middleware Handlers
     // Cloudflare Access protects the human surface (/user/*) only.
     // The programmatic surface (/api/*) authenticates via Bearer PAT
-    // (or HMAC-signed internal SELF calls) and must stay outside Access.
+    // (or HMAC-signed internal calls) and must stay outside Access.
     app.use('*', MiddlewareHandlers.hmacValidation());
     // Every response on both surfaces carries AWS credentials, a session token, a
     // 15-minute pre-authenticated console URL, or account and audit data. Without
@@ -225,7 +225,6 @@ class AccessBridgeWorker extends AbstractEntrypointWorker {
 
   private registerApiRoutes(openapi: AppRouter): void {
     // Programmatic API (Bearer PAT or HMAC-signed internal calls, never Cloudflare Access).
-    // Federate internally fans out to these two endpoints via SELF + HMAC.
     openapi.post('/api/aws/console', GenerateConsoleUrlRoute);
     openapi.post('/api/aws/assume-role', AssumeRoleRoute);
     openapi.get('/api/aws/federate', FederateRoute);

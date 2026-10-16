@@ -32,11 +32,13 @@
     "cancel": "취소",
     "close": "닫기",
     "delete": "삭제",
+    "error": "오류",
     "errorPrefix": "오류",
     "loading": "로드 중...",
     "refresh": "새로 고침",
     "remove": "제거",
-    "rename": "이름 바꾸기"
+    "rename": "이름 바꾸기",
+    "success": "성공"
   },
   "accounts": {
     "accessKeys": "액세스 키",

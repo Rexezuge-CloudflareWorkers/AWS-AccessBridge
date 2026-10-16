@@ -91,7 +91,7 @@ function createRequestScope(env: RequestScopeEnvShape): Container {
   });
   const chainService = new CredentialChainService(env, undefined, keyProvider);
   scope.bind(Tokens.CredentialChainService, () => chainService);
-  scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env, undefined, () => credentialKey()));
+  scope.bind(Tokens.CredentialStoreService, () => new CredentialStoreService(env, undefined, keyProvider));
   scope.bind(
     Tokens.AssumeRoleService,
     () => new AssumeRoleService({ ...env, AccessBridgeKV: requireCredentialCacheKv(env) }, undefined, chainService, identity),

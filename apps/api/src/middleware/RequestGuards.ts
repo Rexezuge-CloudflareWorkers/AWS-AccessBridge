@@ -118,8 +118,9 @@ async function noStoreHandler(c: PlainContext, next: Next): Promise<void> {
  * empty one — so it must declare JSON too. A browser always frames a form post,
  * so the frameless case is not reachable from the CSRF threat model; treating it
  * as "has a body" means the guard never depends on a header an attacker
- * influences. `apiRequest` sends `Content-Type: application/json` on every
- * mutating call including the body-less ones, so this costs the SPA nothing.
+ * influences. `apiRequest` sends a JSON body on every mutating call but one —
+ * `POST /user/admin/maintenance/cleanup-orphaned`, which a browser frames with
+ * `Content-Length: 0` and the guard admits as body-less.
  */
 const STATE_CHANGING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

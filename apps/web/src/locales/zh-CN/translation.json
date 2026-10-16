@@ -32,11 +32,13 @@
     "cancel": "取消",
     "close": "关闭",
     "delete": "删除",
+    "error": "错误",
     "errorPrefix": "错误",
     "loading": "加载中...",
     "refresh": "刷新",
     "remove": "移除",
-    "rename": "重命名"
+    "rename": "重命名",
+    "success": "成功"
   },
   "accounts": {
     "accessKeys": "访问密钥",

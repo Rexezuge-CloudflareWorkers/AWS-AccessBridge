@@ -93,6 +93,21 @@ describe('CostService.getSummary currency', () => {
     expect(summary.currency).toBeNull();
   });
 
+  it('reports no currency when three different currencies appear', async () => {
+    // Regression guard: the sentinel used to be `null` for both "not seen yet"
+    // and "they disagree", so `USD → EUR → JPY` re-opened the decision on the
+    // third currency and the summary named JPY.
+    vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([
+      row('111111111111', 1, 'USD'),
+      row('222222222222', 1, 'EUR'),
+      row('333333333333', 1, 'JPY'),
+    ]);
+
+    const summary = await service().getSummary('user@example.com');
+
+    expect(summary.currency).toBeNull();
+  });
+
   it('reports no currency when the disagreement is only visible on a later row of one account', async () => {
     vi.mocked(CostDataDAO.prototype.getCostDataForOwner).mockResolvedValue([row('111111111111', 1, 'USD'), row('111111111111', 2, 'GBP')]);
 

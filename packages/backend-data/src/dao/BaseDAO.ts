@@ -1,6 +1,6 @@
 import { DatabaseError } from '@rexezuge/errors';
 import { assertSqlIdentifier, BaseDAO as SdkBaseDAO } from '@rexezuge/d1';
-import type { D1Result } from '@rexezuge/d1';
+import type { D1Result, TrackedStatement, WriteResult } from '@rexezuge/d1';
 import { UNMETERED_SUBREQUESTS } from '@rexezuge/shared';
 import type { SubrequestMeter } from '@rexezuge/shared';
 import { billedRowsForTable } from '../constants/d1/billedRows';
@@ -36,6 +36,21 @@ abstract class BaseDAO extends SdkBaseDAO {
    */
   constructor(database: D1Queryable, meter: SubrequestMeter = UNMETERED_SUBREQUESTS) {
     super(database, meter, { billedRowsForTable });
+  }
+
+  /**
+   * `runTracked` is charged here because the kit does not charge it.
+   *
+   * `@rexezuge/d1` 1.8.0 charges `run`, `first`, `all` and `batch`, but its
+   * `runTracked` only accounts billed rows — so the largest write in this
+   * repository (one row per discovered resource) spent a D1 subrequest nobody
+   * counted, which is the silent under-count the meter exists to prevent. The
+   * kit's own class comment says "every statement is charged"; this restores
+   * that here and goes away when upstream charges `runTracked` itself.
+   */
+  protected override async runTracked(tracked: TrackedStatement): Promise<WriteResult> {
+    this.meter.charge(1, 'd1');
+    return super.runTracked(tracked);
   }
 
   protected deleteOrphanedRows(table: string, orphanCondition: string, binds: unknown[] = []): Promise<D1Result> {

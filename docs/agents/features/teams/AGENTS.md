@@ -1,63 +1,31 @@
 # Team Workspaces
 
-Scope: the team tables, the admin surface, and — importantly — what team membership does and does
-not currently gate. Parent index: [`../../../../AGENTS.md`](../../../../AGENTS.md).
+Scope: the team tables, the admin surface, and — importantly — what team membership does and does not currently gate. Parent index: [`../../../../AGENTS.md`](../../../../AGENTS.md).
 
 ## The tables
 
-`teams`, `team_members` (role `admin` or `member`), `team_accounts`. DAOs: `TeamsDAO`,
-`TeamMembersDAO`, `TeamAccountsDAO`; service: `TeamService` (`Tokens.TeamService`).
+`teams`, `team_members` (role `admin` or `member`), `team_accounts`. DAOs: `TeamsDAO`, `TeamMembersDAO`, `TeamAccountsDAO`; service: `TeamService` (`Tokens.TeamService`).
 
-A default team, `00000000-0000-0000-0000-000000000000`, is seeded by `migrations/0030_squash.sql`
-and holds every account and member that existed before teams. It cannot be deleted —
-`TeamService.deleteTeam` rejects that id with `BadRequestError`.
+A default team, `00000000-0000-0000-0000-000000000000`, is seeded by `migrations/0030_squash.sql` and holds every account and member that existed before teams. It cannot be deleted — `TeamService.deleteTeam` rejects that id with `BadRequestError`.
 
-`TeamService.createTeam` adds the creator as `owner`, i.e. a member whose `user_email` is the
-account's **anchor**, which is why `team_members` is half-keyed on it (see
-[`../../../../packages/backend-data/AGENTS.md`](../../../../packages/backend-data/AGENTS.md)).
+`TeamService.createTeam` inserts the team row only: the creator is **not** added as a member, so a new team starts empty until someone is added through the member routes. `team_members` is half-keyed on the **anchor** address (see [`../../../../packages/backend-data/AGENTS.md`](../../../../packages/backend-data/AGENTS.md)), which keeps a member findable after an address change.
 
 ## Three roles exist; two of them are currently inert
 
-This is the part worth knowing before you rely on it.
-
-`team_members.role` is `admin` or `member`, and it is read in exactly one place:
-`TeamService.getMemberRole` / `countAdmins`, which keep a team from losing its last admin and turn a
-role change for a non-member into a 404 instead of a silent success. There is still no per-user team
-lookup, and nothing on the **read** path consults teams:
-`AssumableRolesDAO` and `AssumableRolesQueries` never join `team_accounts`, so
-`GET /user/assumables`, the cost reads and the resource reads are driven entirely by
-`assumable_roles` grants and the caller's owner predicate.
-
-What that means in practice:
+`team_members.role` is read in exactly one place: `TeamService.getMemberRole` / `countAdmins`, which keep a team from losing its last admin and turn a role change for a non-member into a 404 instead of a silent success. There is still no per-user team lookup, and nothing on the **read** path consults teams: `AssumableRolesDAO` and `AssumableRolesQueries` never join `team_accounts`, so `GET /user/assumables`, the cost reads and the resource reads are driven entirely by `assumable_roles` grants and the caller's owner predicate. In practice:
 
 - Team membership is **recorded and displayed**, not **enforced**.
-- A team admin has no capability a team member lacks: every `/user/admin/team/*` route extends
-  `IAdminActivityAPIRoute`, whose guard is demo-mode plus **superadmin**, not team role.
+- A team admin has no capability a team member lacks: every `/user/admin/team/*` route extends `IAdminActivityAPIRoute`, whose guard is demo-mode plus **superadmin**, not team role.
 - Adding an account to a team does not restrict who can assume it; removing it does not revoke.
 
 Superadmin is the only tier with teeth, and it is global (`UserMetadataDAO.isSuperAdmin`).
 
-This is a real gap between the docs-that-used-to-exist and the code, not a subtlety. If you
-implement enforcement, the shape is: resolve the caller's teams and admin flag once per request
-(the DAO needs new per-user team lookups for it), then narrow the
-account set the assumables query returns — and add a per-file coverage floor, because the predicate
-that decides who sees which account is exactly the kind of code that rots unnoticed.
+If you implement enforcement, the shape is: resolve the caller's teams and admin flag once per request (the DAO needs new per-user team lookups for it), then narrow the account set the assumables query returns — and add a per-file coverage floor, because the predicate that decides who sees which account is exactly the kind of code that rots unnoticed.
 
 ## The surface
 
-`/user/admin/team*` — `POST|DELETE /user/admin/team`, `GET /user/admin/teams`, `PUT …/team/name`,
-`POST|DELETE …/team/member`, `GET …/team/members`, `PUT …/team/member/role`,
-`POST|DELETE …/team/account`, `GET …/team/accounts`. All superadmin-gated, all audited.
+`/user/admin/team*` — `POST|DELETE /user/admin/team`, `GET /user/admin/teams`, `PUT …/team/name`, `POST|DELETE …/team/member`, `GET …/team/members`, `PUT …/team/member/role`, `POST|DELETE …/team/account`, `GET …/team/accounts`. All superadmin-gated, all audited.
 
-A member write answers for what it did rather than assuming it worked: a duplicate add is a 409, a
-role change or removal for a non-member is a 404, demoting or removing the last admin is a 409, and
-adding an account the deployment has never connected is a 404. Each of those DAO methods returns its
-`meta.changes` for exactly this reason — `INSERT OR IGNORE` and a bare `UPDATE` both report success
-whether or not they touched a row.
+A member write answers for what it did rather than assuming it worked: a duplicate add is a 409, a role change or removal for a non-member is a 404, demoting or removing the last admin is a 409, and adding an account the deployment has never connected is a 404. Each of those DAO methods returns its `meta.changes` for exactly this reason — `INSERT OR IGNORE` and a bare `UPDATE` both report success whether or not they touched a row.
 
-Frontend: `TeamsTab` in `apps/web` holds handlers only; its three sections are
-`teams/TeamListSection`, `teams/TeamMembersSection` and `teams/TeamAccountsSection`.
-
-Team accounts are cleaned up by the orphan sweep (`TeamAccountsDAO.deleteOrphaned`), so removing a
-role grant eventually removes the team link through
-`POST /user/admin/maintenance/cleanup-orphaned`.
+Frontend: `TeamsTab` in `apps/web` holds handlers only; its three sections are `teams/TeamListSection`, `teams/TeamMembersSection` and `teams/TeamAccountsSection`. Team accounts are cleaned up by the orphan sweep (`TeamAccountsDAO.deleteOrphaned`), so removing a role grant eventually removes the team link through `POST /user/admin/maintenance/cleanup-orphaned`.

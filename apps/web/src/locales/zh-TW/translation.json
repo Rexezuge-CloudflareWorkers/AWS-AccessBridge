@@ -32,11 +32,13 @@
     "cancel": "取消",
     "close": "關閉",
     "delete": "刪除",
+    "error": "錯誤",
     "errorPrefix": "錯誤",
     "loading": "載入中...",
     "refresh": "重新整理",
     "remove": "移除",
-    "rename": "重新命名"
+    "rename": "重新命名",
+    "success": "成功"
   },
   "accounts": {
     "accessKeys": "存取金鑰",

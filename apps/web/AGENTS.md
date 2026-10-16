@@ -2,231 +2,101 @@
 
 Scope: `apps/web/**`. Parent index: [`../../AGENTS.md`](../../AGENTS.md). Workspace and layer rules: [`../../docs/agents/repo/AGENTS.md`](../../docs/agents/repo/AGENTS.md).
 
-Vite React SPA served at `/user/` — the canonical entry, protected by Cloudflare Access, so
-top-level navigation there triggers the Zero Trust login. Pages live under `/user/app/*`. Entry
-`src/main.tsx` → `src/SpaApp.tsx`: auth gate via `useAuth`, language state via `hooks/useSpaLanguage`,
-routing via `hooks/useRouter`, and a `SpaNavbar` with a controlled `LanguageSelector`.
+Vite React SPA served at `/user/` — the canonical entry, protected by Cloudflare Access, so top-level navigation there triggers the Zero Trust login. Pages live under `/user/app/*`. Entry `src/main.tsx` → `src/SpaApp.tsx`: auth gate via `useAuth`, language state via `hooks/useSpaLanguage`, routing via `hooks/useRouter`, and a `SpaNavbar` with a controlled `LanguageSelector`.
 
 ## One request path
 
-`src/lib/api.ts` holds the same-origin `@rexezuge/web` client and `apiRequest<T>`, the **only**
-request helper. The SDK owns response parsing and normalizes failures to `ServiceError`; the app's
-`isUnauthorized` predicate distinguishes a 401 from authorization failures and server errors.
-The app-specific services keep endpoint paths and payload types.
+`src/lib/api.ts` holds the same-origin `@rexezuge/web` client and `apiRequest<T>`, the **only** request helper. The SDK owns response parsing and normalizes failures to `ServiceError`; the app's `isUnauthorized` predicate distinguishes a 401 from authorization failures and server errors. Service functions in `src/services/` keep endpoint paths and payload types and use `apiRequest` — never `fetch` inside a component or a hook. `apiRequest<T>` raises a `ServiceError` (not `SyntaxError`) for a non-JSON 2xx body, from the SDK.
 
-Reach for a service in `src/services/`, never `fetch` inside a component or a hook. Service
-functions use `apiRequest` from the SDK-backed client.
+## Shared web primitives come from the SDK
 
-`apiRequest<T>` raises a `ServiceError` (not `SyntaxError`) for a non-JSON 2xx body, so shared error
-handling remains consistent. This behavior comes from the SDK API client.
-
-## Shared web primitives and hooks come from the SDK
-
-Use `@rexezuge/web` for converged controls (`Spinner`, `Pagination`, `FocusInput`, `LoadingButton`,
-`LanguageSelector`, `ModalShell`, `NoticeBar`, `EmptyState`, `TypeToConfirmModal`, `ReadOnlyField`,
-`RefreshButton`, `Unauthorized`, `ConfirmDeleteModal`) and hooks (`useCurrentUser`, `useNotice`,
-`useCopyToClipboard`). Keep app-only pages, feature widgets, translations, and the
-backend-authoritative language save flow local. Map app labels through component props; do not fork a
-shared control just to call i18next. `globals.css` supplies the SDK's shared color variables — all 22
-of them — **but the variables are necessary, not sufficient.** The kit's controls render Tailwind
-utility class names, and Tailwind v4 scans only the Vite project root, which excludes `node_modules`.
-A control adopted from `@rexezuge/web` is therefore silent — its markup renders, its classes do not —
-unless `globals.css` names the kit as a Tailwind source:
+Use `@rexezuge/web` for converged controls (`Spinner`, `Pagination`, `FocusInput`, `LoadingButton`, `LanguageSelector`, `ModalShell`, `NoticeBar`, `EmptyState`, `TypeToConfirmModal`, `ReadOnlyField`, `RefreshButton`, `Unauthorized`, `ConfirmDeleteModal`) and hooks (`useCurrentUser`, `useNotice`, `useCopyToClipboard`). Keep app-only pages, feature widgets, translations, and the backend-authoritative language save flow local. Map app labels through component props; do not fork a shared control just to call i18next. `globals.css` supplies the SDK's shared color variables — all 22 of them — **but the variables are necessary, not sufficient.** The kit's controls render the scanner's utility class names, and the scan root is the Vite project root, which excludes `node_modules`, so an adopted control is silent — its markup renders, its classes do not — unless `globals.css` names the kit as a source:
 
     @source '../node_modules/@rexezuge/web/dist';
 
-That line is load-bearing; deleting it unstyles every kit primitive in the SPA.
+That line is load-bearing; deleting it unstyles every kit primitive in the SPA. Note the **directory**, not `dist/*.js`: a glob is quietly narrower and would drop any non-`.js` file the kit ships. What makes the failure quiet is that the utilities our own components use survive the deletion — ten utilities belong to the kit alone, each with a visible symptom (a frozen spinner, an unstyled button background or focus ring, a missing modal overlay, a notice bar without its screen-reader prefix or centring). `scripts/build/verify-spa-shell.ts` (the `spa-shell` CI job, after the web build) fails when any is absent from the generated CSS.
 
-Note the **directory**, not `dist/*.js`. A glob looks tidier and is quietly narrower: it misses any file the kit ships that is not `.js`, so a kit release that changed its build output would drop half the primitives with no error anywhere. The directory form is what Tailwind documents for this and needs no update when the kit's output shape moves.
-
-What makes this failure mode so quiet is worth keeping in mind: the utilities AWS's own components also use survive the deletion, so a build with the line removed is only _partly_ unstyled. The one utility only the kit uses is the spinner animation, and its absence shows up as a control that looks correct and does not move.
-
-`scripts/build/verify-spa-shell.ts` (run by the `spa-shell` CI job, after the web build) fails the
-build if any kit utility is absent from the generated CSS.
-
-**Do not spell a Tailwind utility class name in this file.** The scan root is `apps/web/**`, so the
-scanner reads this Markdown too, and a class named here is emitted into the production bundle whether
-or not the kit is a source. That is not pedantry: it silently satisfies the gate above, which is how
-half of its tokens came to measure this paragraph rather than the kit. Name the control (`Spinner`,
-`Button`, `ModalShell`, `NoticeBar`, `Unauthorized`) and what looks wrong without it, not the utility.
-
-There is **no `components/ui/` directory** and there never was; an earlier version of this guide named
-one, and a reader looking for a file to edit found nothing. `AccessKeyModal` and `Unauthorized` are
-top-level components.
+**Do not spell a Tailwind utility class name in this file.** The scan root is `apps/web/**`, so the scanner reads this Markdown too, and a class named here is emitted into the production bundle whether or not the kit is a source — silently satisfying the gate above. Name the control (`Spinner`, `Button`, `ModalShell`, `NoticeBar`, `Unauthorized`) and what looks wrong without it. `test/scripts/spa-shell-checks.test.ts` asserts the property. There is **no `components/ui/` directory**; it was removed, and `AccessKeyModal` and `Unauthorized` are top-level components.
 
 ### Where a kit control is still _not_ adopted, and why
 
-- **`useCopyToClipboard`, in `AccessKeyModal`.** The kit's is right that an inlined handler leaks
-  its reset timer and can report a copy that never happened. It reports failure by _silence_ —
-  `copied` never becomes true. That is the honest answer to the question it was asked and the wrong
-  answer to this one: a refused clipboard write leaves a live AWS secret on screen and the operator
-  believing it is on their clipboard. This component reports the refusal in words and points at the
-  snippet. The kit's `ModalShell` around it _is_ adopted.
-- **`useToast` (`hooks/useToast.ts`) stays.** Fourteen call sites use it. It is now a four-line
-  adapter over the kit's `useNotice`, reshaped back to this app's `{ type, text }` prop shape, and
-  `AdminPage` — the only file that rendered the banner — has moved to `useNotice` + `NoticeBar`
-  directly. The shim is deleted when the remaining call sites move, not before.
+- **`useCopyToClipboard`, in `AccessKeyModal`.** The kit's reports failure by _silence_ — `copied` never becomes true. That is the wrong answer here: a refused clipboard write leaves a live AWS secret on screen and the operator believing it is on their clipboard. This component reports the refusal in words and points at the snippet. The kit's `ModalShell` around it _is_ adopted.
+- **`useToast` (`hooks/useToast.ts`) stays.** Seventeen files thread `showMessage`. It is a four-line adapter over the kit's `useNotice`, reshaped back to this app's `{ type, text }` prop shape, and `AdminPage` — the only file that rendered the banner — has moved to `useNotice` + `NoticeBar` directly. The shim is deleted when the remaining call sites move, not before.
 
 ## Pure logic belongs in `lib/`, not in a component
 
-| File                       | Holds                                                                                                                                                                                           |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/routes.ts`            | `routeForPathname` / `pathForView` / `isAdminPath` — the pathname↔view mapping, pure so it is testable without a DOM. `hooks/useRouter` owns only the `location` read and the popstate listener |
-| `lib/presentation.ts`      | `pageNumbers`, `resourceStateColor`, `httpStatusColor`                                                                                                                                          |
-| `lib/requestGuard.ts`      | `createRequestGuard` — the framework-free ordering rule behind `hooks/useRequestGuard.ts`                                                                                                       |
-| `lib/authOutcome.ts`       | `classifyAuthFailure` — 401 → `expired-session`, everything else → `load-failed`                                                                                                                |
-| `lib/format.ts`            | locale-aware dates and numbers; `formatAmount` renders a symbol-less "mixed currency" figure when the currency is `null`                                                                        |
-| `lib/shellExport.ts`       | `formatShellExport`, the canonical home of the shell snippet (both rendered and copied text)                                                                                                    |
-| `lib/constants.ts`         | `ZERO_TRUST_AUTHENTICATION_PATH`, `DEFAULT_TEAM_ID`                                                                                                                                             |
-| `lib/asyncAction.ts`       | `runAction` (rejection → a typed result with display text) and `afterSuccess` (run the refresh only after the write succeeded) — the shape `hooks/useAsyncAction.ts` wraps with busy state      |
-| `lib/pagination.ts`        | `totalPages` / `clampPage` / `pageRange` — 1-based page arithmetic that reports `0` pages rather than `Infinity`/`NaN`                                                                          |
-| `lib/numbers.ts`           | `parsePositiveNumber` — form strings to numbers; `NaN`, `0` and negatives return `null` so the caller shows its own error and sends nothing                                                     |
-| `lib/storage.ts`           | `readStoredInt` — the whole-number read from `localStorage`, with a fallback for absent, garbage, below-min and throwing storage                                                                |
-| `lib/roleSelection.ts`     | `defaultRoleSelection` — defaults each account's selected role, returning the _same object_ when nothing changed so `setState` bails out                                                        |
-| `lib/costTrends.ts`        | `maxTrend` (floored at 1), `trendBarPercent` (clamped to `[0, 100]`), `sortAccountsByCost`                                                                                                      |
-| `lib/onboardingWizard.ts`  | the wizard's cross-step rules: steps, gates, and the credential/chain/role reducers                                                                                                             |
-| `lib/onboardingBatches.ts` | `settleAll` — a sequential batch that counts failures instead of aborting                                                                                                                       |
-| `lib/teamRoles.ts`         | `TEAM_ROLES` / `isTeamRole` — narrows a `<select>` value against the list the server accepts                                                                                                    |
-| `lib/errors.ts`            | `toErrorMessage` — one place that turns an unknown throw into display text, so no component re-spells `err instanceof Error ? …`                                                                |
+| File                       | Holds                                                                                                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/routes.ts`            | `routeForPathname` / `pathForView` / `isAdminPath` — the pathname↔view mapping, pure so it is testable without a DOM. `hooks/useRouter` owns the `location` read, the `history.pushState` write, and the popstate listener |
+| `lib/presentation.ts`      | `pageNumbers`, `resourceStateColor`, `httpStatusColor`                                                                                                                                                                     |
+| `lib/requestGuard.ts`      | `createRequestGuard` — the framework-free ordering rule behind `hooks/useRequestGuard.ts`                                                                                                                                  |
+| `lib/authOutcome.ts`       | `classifyAuthFailure` — 401 → `expired-session`, everything else → `load-failed`                                                                                                                                           |
+| `lib/format.ts`            | locale-aware dates and numbers; `formatAmount` renders a symbol-less "mixed currency" figure when the currency is `null`                                                                                                   |
+| `lib/language.ts`          | `resolvePreferredLanguage` — the detection precedence as a pure function; `hooks/useSpaLanguage` only carries the state                                                                                                    |
+| `lib/accountVisibility.ts` | `applyHiddenToggle` — the hidden-role toggle over a fetched account/role set, without a renderer                                                                                                                           |
+| `lib/shellExport.ts`       | `formatShellExport`, the canonical home of the shell snippet (both rendered and copied text)                                                                                                                               |
+| `lib/constants.ts`         | `ZERO_TRUST_AUTHENTICATION_PATH`, `DEFAULT_TEAM_ID`                                                                                                                                                                        |
+| `lib/asyncAction.ts`       | `runAction` (rejection → a typed result with display text) and `afterSuccess` (run the refresh only after the write succeeded) — the shape `hooks/useAsyncAction.ts` wraps with busy state                                 |
+| `lib/pagination.ts`        | `totalPages` / `clampPage` / `pageRange` — 1-based page arithmetic that reports `0` pages rather than `Infinity`/`NaN`                                                                                                     |
+| `lib/numbers.ts`           | `parsePositiveNumber` — form strings to numbers; `NaN`, `0` and negatives return `null` so the caller shows its own error                                                                                                  |
+| `lib/storage.ts`           | `readStoredInt` — the whole-number read from `localStorage`, with a fallback for absent, garbage, below-min and throwing storage                                                                                           |
+| `lib/roleSelection.ts`     | `defaultRoleSelection` — defaults each account's selected role, returning the _same object_ when nothing changed so `setState` bails out                                                                                   |
+| `lib/costTrends.ts`        | `maxTrend` (floored at 1), `trendBarPercent` (clamped to `[0, 100]`), `sortAccountsByCost`                                                                                                                                 |
+| `lib/onboardingWizard.ts`  | the wizard's cross-step rules: steps, gates, and the credential/chain/role reducers                                                                                                                                        |
+| `lib/onboardingBatches.ts` | `settleAll` — a sequential batch that counts failures instead of aborting                                                                                                                                                  |
+| `lib/teamRoles.ts`         | `TEAM_ROLES` / `isTeamRole` — narrows a `<select>` value against the list the server accepts                                                                                                                               |
+| `lib/errors.ts`            | `toErrorMessage` — one place that turns an unknown throw into display text                                                                                                                                                 |
 
-Keep new pure logic there rather than as a module-private function inside a component — a private
-function inside a `.tsx` reads as covered when it is not, and the logic is untestable without a DOM.
-
-Dates and numbers must pass an explicit locale (`i18n.resolvedLanguage`); never rely on the ambient
-default.
+Keep new pure logic there rather than as a module-private function inside a component — a private function inside a `.tsx` reads as covered when it is not, and the logic is untestable without a DOM. Dates and numbers must pass an explicit locale (`i18n.resolvedLanguage`); never rely on the ambient default.
 
 ## Overlapping requests must be guarded
 
-Hooks and components that can issue overlapping requests **must** use
-`hooks/useRequestGuard.ts` (`begin()` / `isCurrent()` / `invalidate()`), never a hand-rolled counter.
-A slower earlier request must not render after a newer one — search boxes and pagination both trigger
-the overlap — and the check belongs before _every_ `setState`, including the loading flag.
-`AccountList` and `AuditLogsTab` were the two places that had no guard, which is why the rule now
-lives in one tested factory rather than in each caller.
-
-Mount effects follow the `useCurrentUser` shape: a single promise chain with `setState` only inside
-`.then` / `.catch`, never a component-scope fetcher or a synchronous `setState` in the effect body.
-Event-handler fire-and-forget calls take an explicit `void` prefix.
+Hooks and components that can issue overlapping requests **must** use `hooks/useRequestGuard.ts` (`begin()` / `isCurrent()` / `invalidate()`), never a hand-rolled counter. A slower earlier request must not render after a newer one — search boxes and pagination both trigger the overlap — and the check belongs before _every_ `setState`, including the loading flag. `AccountList` and `AuditLogsTab` were the two places that had no guard, which is why the rule lives in one tested factory rather than in each caller. Mount effects follow the `useCurrentUser` shape: a single promise chain with `setState` only inside `.then` / `.catch`. Event-handler fire-and-forget calls take an explicit `void` prefix.
 
 ## Toast state is shared, and its timer is ref-held
 
-`hooks/useToast.ts` owns `message` / `showMessage` / `dismiss`, passed down as `showMessage`.
-`ShowMessage` is the exported prop type — take it rather than re-spelling
-`(type: 'success' | 'error', text: string) => void`, which was copy-pasted into every feature tab's
-props. The dismissal timer lives in a ref, so a new toast replaces the old one's timer instead of
-being dismissed early by it, and unmounting does not leave a timer calling `setState` on a component
-that is gone.
+`hooks/useToast.ts` owns `message` / `showMessage` / `dismiss`, passed down as `showMessage`. `ShowMessage` is the exported prop type — take it rather than re-spelling `(type: 'success' | 'error', text: string) => void`. The dismissal timer lives in a ref, so a new toast replaces the old one's timer instead of being dismissed early by it, and unmounting does not leave a timer calling `setState` on a component that is gone.
 
-Domain hooks `useTeams` / `useResources` / `useRouter` / `useAccountMutations` /
-`useOnboardingWizard` / `useSpaLanguage` own fetching and state per vertical slice.
+Domain hooks `useTeams` / `useResources` / `useResource` / `useRouter` / `useAccountMutations` / `useOnboardingWizard` / `useSpaLanguage` own fetching and state per vertical slice.
 
 ## A failure is not an empty answer
 
-**`loadSummary` in `resourceService` throws; it does not resolve `null`.** It used to
-`return res.ok ? readJson(...) : null`, which made a 500 indistinguishable from an account with no
-resources — the inventory rendered its empty state and the failure was never surfaced. `useResources`
-already has a `summaryError` path for exactly this, and a service that swallows errors into `null`
-makes it unreachable.
+**`loadSummary` in `resourceService` throws; it does not resolve `null`.** It used to `return res.ok ? readJson(...) : null`, which made a 500 indistinguishable from an account with no resources — the inventory rendered its empty state and the failure was never surfaced. `useResources` already has a `summaryError` path for exactly this.
 
-`Unauthorized` takes a `reason` so a _failed profile load_ gets a reload button instead of a login
-prompt, since re-authenticating cannot fix a 500. Same reasoning in `lib/authOutcome.ts`.
+`Unauthorized` takes a `reason` so a _failed profile load_ gets a reload button instead of a login prompt, since re-authenticating cannot fix a 500. Same reasoning in `lib/authOutcome.ts`.
 
 ## All admin mutations go through `adminService`
 
-The seven `components/admin/*Tab.tsx` files used to call the removed `apiFetch` directly. Now every
-mutation is an `adminService` function, which is what makes the contract visible in one place: two
-mismatches were hiding there — `cleanupOrphaned` typed `{deleted}` against the route's per-table
-`deletedCounts` + `failures`, and `enableDataCollection` sent a singular `collectionType` where the
-route requires `collectionTypes`.
+The seven `components/admin/*Tab.tsx` files used to call the removed `apiFetch` directly. Now every mutation is an `adminService` function, which is what makes the contract visible in one place: two mismatches were hiding there — `cleanupOrphaned` typed `{deleted}` against the route's per-table `deletedCounts` + `failures`, and `enableDataCollection` sent a singular `collectionType` where the route requires `collectionTypes`.
 
 ## Components
 
-`src/components/`: feature tabs — `AccountList` (+ extracted `AccountRoleRow`,
-`HideRoleConfirmDialog`), `CostDashboard`, `ResourceInventory` (+ `ResourceRow`,
-`ResourceSummaryCards`), `AuditLogsTab`, `TeamsTab` (handlers only; its three sections are
-`teams/TeamListSection`, `teams/TeamMembersSection`, `teams/TeamAccountsSection`) — plus
-`AdminPage` (shell) with `admin/` one-file-per-tab (`Credentials`, `Access`, `Accounts`,
-`RoleConfig`, `SpendAlerts`, `DataCollection`, `MaintenanceTab`), the `OnboardingWizard` shell with
-`onboarding/` per-step components and `WizardProgress`, `SpaNavbar`, `AccessKeyModal` (on the kit's
-`ModalShell`), and `Unauthorized`. `LanguageSelector` and the notice banner are the kit's, not files
-here.
+`src/components/`: feature tabs — `AccountList` (+ `AccountRoleRow`, `HideRoleConfirmDialog`), `CostDashboard`, `ResourceInventory` (+ `ResourceRow`, `ResourceSummaryCards`), `AuditLogsTab`, `TeamsTab` (handlers only; sections in `teams/TeamListSection`, `teams/TeamMembersSection`, `teams/TeamAccountsSection`) — plus `AdminPage` (shell) with `admin/` one file per tab (`Credentials`, `Access`, `Accounts`, `RoleConfig`, `SpendAlerts`, `DataCollection`, `MaintenanceTab`), `OnboardingWizard` with `onboarding/` per-step components and `WizardProgress`, `SpaNavbar`, `AccessKeyModal`, and `Unauthorized`. `LanguageSelector` and the notice banner are the kit's.
 
 ### The onboarding wizard is split by step, and its rules live in `lib/`
 
-`hooks/onboarding/*` holds one hook per step (`account`, `credentials`, `chain`, `roles`, `users`),
-composed by `hooks/useOnboardingWizard.ts`, so no file is over the god-file limit. The rules that
-span steps are pure functions in `lib/onboardingWizard.ts` — `WIZARD_STEP`, `canAdvanceFromStep`,
-`editCredentialField`, `editIntermediateRoleArn`, `addManualRole`, `validEmails` — and they are
-tested in `test/web/WebPureLogic.test.ts` without a renderer.
-
-The cross-field invalidation is the design, and it is one rule per field rather than one per call
-site: editing a credential clears `credentialValidated` (but not `credentialStored`, which describes
-what the server already has), and editing the intermediate ARN clears `chainConfigured` while
-keeping `roleForDiscovery`. Each action has its own `WIZARD_BUSY` key; the account save used to
-borrow `'validate'`, which spun the Validate button on the next step.
-
-`lib/onboardingBatches.ts` holds the two sequential batch loops (`settleAll` counts failures rather
-than aborting, and stays sequential because the operations are AWS-backed writes). Prefer new pure
-logic in `lib/` and new batch logic there, not inside a step hook.
+`hooks/onboarding/*` holds one hook per step (`account`, `credentials`, `chain`, `roles`, `users`), composed by `hooks/useOnboardingWizard.ts`, so no file is over the god-file limit. The rules that span steps are pure functions in `lib/onboardingWizard.ts` — `WIZARD_STEP`, `canAdvanceFromStep`, `editCredentialField`, `editIntermediateRoleArn`, `addManualRole`, `validEmails` — tested in `test/web/WebPureLogic.test.ts` without a renderer. The cross-field invalidation is the design: editing a credential clears `credentialValidated` (but not `credentialStored`, which describes what the server already has), and editing the intermediate ARN clears `chainConfigured` while keeping `roleForDiscovery`. Each action has its own `WIZARD_BUSY` key; the account save used to borrow `'validate'`, which spun the Validate button on the next step. `lib/onboardingBatches.ts` holds the two sequential batch loops.
 
 ## The favicon is generated
 
-`public/favicon.svg` is the bridge-mark icon and the **single source of truth** for it. The
-`favicon-inline` Vite plugin rewrites the `<link rel="icon">` placeholder in `index.html` into a
-`data:` URI at build time, so the Worker never serves it. Do not paste a data URI into `index.html` —
-it is generated, and a missing `public/favicon.svg` or a missing placeholder fails the build rather
-than shipping a broken icon.
+`public/favicon.svg` is the bridge-mark icon and the **single source of truth** for it. The `favicon-inline` Vite plugin rewrites the `<link rel="icon">` placeholder in `index.html` into a `data:` URI at build time, so do not paste a data URI into `index.html` — a missing `public/favicon.svg` or a missing placeholder fails the build rather than shipping a broken icon.
 
-`public/_routes.json` scopes Pages routing to `/`, `/user`, `/user/*`, `/api/*`, `/docs*`,
-`/openapi.*`, excluding `/assets/*`.
+`public/_routes.json` scopes Pages routing to `/`, `/user`, `/user/*`, `/api/*`, `/docs*`, `/openapi.*`, excluding `/assets/*`.
 
 ## Frontend Internationalization
 
-SPA UI strings live in `src/locales/<tag>/translation.json` — **12 locales**: `en`, `de`, `fr`, `es`,
-`it`, `nl`, `pt`, `pl`, `ja`, `zh-CN`, `zh-TW`, `ko` — consumed via `useTranslation()`.
-Always pass the English default: `t('ns.key', 'English Default')`, so a missing key still renders.
+SPA UI strings live in `src/locales/<tag>/translation.json` — **12 locales**: `en`, `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `ja`, `zh-CN`, `zh-TW`, `ko` — consumed via `useTranslation()`. Always pass the English default: `t('ns.key', 'English Default')`, so a missing key still renders.
 
-- **Adding a key**: add it with its English default to `en/translation.json` first, then mirror it
-  into the other 11 bundles in the same key order. Validate with `pnpm run validate:locales`
-  (`scripts/i18n/validate_locales.ts`, rules in `scripts/i18n/locale-checks.ts`, unit-tested in
-  `test/scripts/locale-checks.test.ts`; both `pnpm run checks` and the `locales` CI job run it). It
-  checks JSON validity, key parity with no extras, `{{placeholder}}` parity, and no empty or
-  non-string values **in `en` as well as the others** — `en` is the fallback for every missing key,
-  so an empty value there is indistinguishable from a missing one and is what a user actually sees.
-  It also cross-checks the declared tag lists against the directories in both directions:
-  `SUPPORTED_LANGUAGES` (`src/i18n.ts`) and `SUPPORTED_LOCALES` (`shared/utils/LocaleUtil.ts`) must
-  agree with each other and with the `locales/<tag>/` directories. A tag declared with no directory
-  makes `loadLanguage` throw; a directory no tag names can never be loaded. The tag lists are parsed
-  from source text rather than imported, because `src/i18n.ts` calls `import.meta.glob` and only
-  exists after Vite's transform. Key **order** is deliberately not checked.
-- **Lazy loading**: `src/i18n.ts` code-splits per-locale chunks (`loadLanguage`, `import.meta.glob`;
-  `normalizeLanguage` delegates to shared `LocaleUtil`). Never statically import a non-English
-  locale — only `en` is static, and importing the rest breaks code-splitting (Vite's
-  `INEFFECTIVE_DYNAMIC_IMPORT` warning).
-- **Detection precedence**: backend `preferredLanguage` (`GET /user/me`) >
-  `localStorage('aws-access-bridge-lng')` > `navigator.language` > `en`.
-  `hooks/useSpaLanguage` owns it — explicit `language` / `languageStatus` / `languagePending`, a
-  `languageChanged` listener, `<html lang>` sync, a backend-authoritative save
-  (`load → PUT → localStorage → setUser`), and an `unknown` error state that disables the controlled
-  `LanguageSelector`.
-- **There is no backend locale bundle.** `shared/src/i18n/` and its twelve empty `strings: {}`
-  tables were removed: no `src` file called `getBackendStrings`, every table was empty, and all
-  twelve declared `locale: 'en'` — so `getBackendStrings('de').locale` returned `'en'` while a test
-  asserted that wrong answer as correct. `validate:locales` covers the web catalogs only, so a
-  passing check says nothing about server-side text. If backend translation is ever added, start from
-  `LocaleUtil` / `SUPPORTED_LOCALES` and add a validator in the same change; do not reintroduce
-  unvalidated tables.
+- **Adding a key**: add it with its English default to `en/translation.json` first, then mirror it into the other 11 bundles in the same key order. Validate with `pnpm run validate:locales` (`scripts/i18n/validate_locales.ts`, rules in `scripts/i18n/locale-checks.ts`, unit-tested in `test/scripts/locale-checks*.test.ts`; both `pnpm run checks` and the `locales` CI job run it). It checks JSON validity, key parity with no extras, `{{placeholder}}` parity, no empty or non-string values **in `en` as well as the others** (`en` is the fallback for every missing key, so an empty value there is indistinguishable from a missing one), and it resolves every `t()` call site, comparing the inline default against the bundle and reporting dynamic keys it cannot check. It no longer cross-checks declared tag lists: `SUPPORTED_LANGUAGES` (`src/i18n.ts`) is now `SUPPORTED_LOCALES` (`shared/utils/LocaleUtil.ts`), so there is no second list to disagree with the directories. Key **order** is deliberately not checked.
+- **Lazy loading**: `src/i18n.ts` code-splits per-locale chunks (`loadLanguage`, `import.meta.glob`; `normalizeLanguage` delegates to shared `LocaleUtil`). Never statically import a non-English locale — importing the rest breaks code-splitting (Vite's `INEFFECTIVE_DYNAMIC_IMPORT` warning).
+- **Detection precedence**: backend `preferredLanguage` (`GET /user/me`) > `localStorage('aws-access-bridge-lng')` > `navigator.language` > `en`. `hooks/useSpaLanguage` owns it — explicit `language` / `languageStatus` / `languagePending`, a `languageChanged` listener, `<html lang>` sync, a backend-authoritative save (`load → PUT → localStorage → reloadUser`), and an `unknown` error state that disables the controlled `LanguageSelector`.
+- **There is no backend locale bundle.** `shared/src/i18n/` and its twelve empty `strings: {}` tables were removed: no `src` file called `getBackendStrings`, every table was empty, and all twelve declared `locale: 'en'`. `validate:locales` covers the web catalogs only, so a passing check says nothing about server-side text. If backend translation is ever added, start from `LocaleUtil` / `SUPPORTED_LOCALES` and add a validator in the same change.
 - API error `Message` strings stay English, with stable `Type` codes. Translate display-side only.
 
 ## Web UI Text Conventions
 
-**English-source** user-visible text in `apps/web/` must use **Title Case**: button labels, headings,
-card titles, section headers, form labels, placeholders, empty-state messages, toasts, confirm
-dialogs, `aria-label`, `<option>` text. Translations use each language's natural casing — Title Case
-is English-only.
+**English-source** user-visible text in `apps/web/` must use **Title Case**: button labels, headings, card titles, section headers, form labels, placeholders, empty-state messages, toasts, confirm dialogs, `aria-label`, `<option>` text. Translations use each language's natural casing — Title Case is English-only.
 
-**Never hardcode ALL CAPS in JSX.** Use CSS (a Tailwind `uppercase` / `text-transform: uppercase`)
-instead.
+**Never hardcode ALL CAPS in JSX.** Use CSS (a Tailwind `uppercase` / `text-transform: uppercase`) instead.
 
-**Exceptions** (no Title Case): `<code>` content, technical URI placeholders, dynamic API response
-content.
+**Exceptions** (no Title Case): `<code>` content, technical URI placeholders, dynamic API response content.
