@@ -4,8 +4,19 @@ import { mapRowsToAssumableMap } from '@aws-access-bridge/backend-data/dao/Assum
 
 describe('AssumableRolesQueries', () => {
   it('omits the hidden filter when requested', () => {
-    expect(hiddenFilterClause(true)).toBe('');
-    expect(hiddenFilterClause(false)).toContain('hidden');
+    expect(hiddenFilterClause(true, 'ar')).toBe('');
+    expect(hiddenFilterClause(false, 'ar')).toContain('hidden');
+  });
+
+  it('scopes the hidden filter to the alias it is interpolated into', () => {
+    const list = buildListRolesQuery(false);
+    // The paging subquery must filter its own rows (`ar2`). A hardcoded `ar`
+    // there is a correlated reference to the outer row — always true for a row
+    // the outer WHERE kept — so a fully hidden account would consume a LIMIT
+    // slot and push a visible account past the last page.
+    const subquery = list.slice(list.indexOf('AND ar.aws_account_id IN ('));
+    expect(subquery).toContain('(ar2.hidden IS NULL OR ar2.hidden = FALSE)');
+    expect(subquery).not.toContain('(ar.hidden IS NULL');
   });
 
   it('builds list and search queries sharing the same FROM/JOIN shape', () => {
