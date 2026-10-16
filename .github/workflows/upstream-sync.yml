@@ -2,7 +2,10 @@ name: Upstream Sync
 
 on:
   schedule:
-    - cron: '0 2 * * 1'
+    # Deliberately off the hour. Scheduled jobs queued at `:00` are delayed and can
+    # be dropped under load — the fork's weekly syncs stopped firing that way — and
+    # changing the value restarts a schedule that has silently stopped.
+    - cron: '17 2 * * 1'
   workflow_dispatch:
 
 permissions:
