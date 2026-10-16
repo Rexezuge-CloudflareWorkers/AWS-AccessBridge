@@ -337,7 +337,11 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
 
   dispatch-upstream-sync-deployment:
-    if: ${{ github.event_name == 'repository_dispatch' && github.event.action == 'Upstream Sync' }}
+    # `github.event.action` is the `event_type` of the dispatch: it must match the
+    # `repository_dispatch` types list at the top of this file and the value
+    # `upstream-sync.yml` sends. A stale copy here skips the job silently — CI goes
+    # green and the deployment dispatch that follows it never leaves.
+    if: ${{ github.event_name == 'repository_dispatch' && github.event.action == 'Upstream Sync Integration' }}
     name: Dispatch Upstream Sync Deployment
     needs:
       - typecheck

@@ -191,6 +191,10 @@ Deployment runs after CI succeeds on `main` (the recommended path for forks), an
 
 A second job, `deploy-pages`, builds the SPA and deploys it to Cloudflare Pages with the `API_WORKER` service binding (from `apps/web/wrangler.template.jsonc`), defaulting to `aws-access-bridge-web` when the `CLOUDFLARE_PAGES_PROJECT_NAME` variable is unset.
 
+### Syncing a fork and deploying it
+
+The `Upstream Sync` workflow pulls `main` from the upstream repository (weekly, and on demand from **Actions → Upstream Sync → Run workflow**). When the sync brings new commits it dispatches Continuous Integration and, once that passes, Continuous Deployment. The **Sync fork** button — and `gh repo sync` — are not a substitute: they update the branch server-side, fire no `push` event, and therefore run no workflow at all. To deploy changes that are already on `main` without waiting for the schedule, run **Actions → Continuous Deployment → Run workflow**.
+
 ### Keeping `WRANGLER_JSONC` up to date
 
 The template evolves, so an older `WRANGLER_JSONC` can fall behind. `prepare-wrangler-config.ts` refuses to deploy a config that omits any binding or var the template declares and names every gap. If CI reports a coverage error, diff your variable against `apps/api/wrangler.template.jsonc` and resync — or supply the missing vars through `WRANGLER_VARS_PATCH_JSON`. KV namespaces are excluded (they are injected automatically when missing), and `ratelimits` / `workflows` blocks are not covered at all, so keep those in sync yourself.
