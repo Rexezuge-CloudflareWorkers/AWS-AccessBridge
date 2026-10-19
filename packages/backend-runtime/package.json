@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@rexezuge/runtime": "1.9.1",
-    "@rexezuge/shared": "1.8.0"
+    "@rexezuge/shared": "1.9.1"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

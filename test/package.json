@@ -20,7 +20,7 @@
     "@rexezuge/errors": "1.9.1",
     "@rexezuge/http": "1.8.0",
     "@rexezuge/runtime": "1.9.1",
-    "@rexezuge/shared": "1.8.0",
+    "@rexezuge/shared": "1.9.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "hono": "^4.13.12",
