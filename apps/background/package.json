@@ -19,7 +19,7 @@
     "@aws-access-bridge/backend-services": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
     "@rexezuge/errors": "1.8.0",
-    "@rexezuge/runtime": "1.8.0",
+    "@rexezuge/runtime": "1.9.1",
     "@rexezuge/shared": "1.8.0"
   },
   "devDependencies": {

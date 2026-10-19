@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rexezuge/runtime": "1.8.0",
+    "@rexezuge/runtime": "1.9.1",
     "@rexezuge/shared": "1.8.0"
   },
   "devDependencies": {

@@ -28,7 +28,7 @@
     "@cloudflare/vitest-pool-workers": "0.23.0",
     "@rexezuge/d1": "1.8.0",
     "@rexezuge/errors": "1.8.0",
-    "@rexezuge/runtime": "1.8.0",
+    "@rexezuge/runtime": "1.9.1",
     "@rexezuge/shared": "1.8.0",
     "@rexezuge/tooling": "1.8.0",
     "@testing-library/jest-dom": "^7.0.1",
