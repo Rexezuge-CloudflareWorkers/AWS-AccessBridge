@@ -12,7 +12,7 @@
     "@rexezuge/web": "1.8.0",
     "@aws-access-bridge/shared": "workspace:*",
     "lucide-react": "^1.61.0",
-    "i18next": "^26.4.3",
+    "i18next": "^26.5.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-i18next": "^17.1.4"
