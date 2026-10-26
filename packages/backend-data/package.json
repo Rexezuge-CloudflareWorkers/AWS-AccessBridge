@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@aws-access-bridge/shared": "workspace:*",
-    "@rexezuge/d1": "1.9.1",
+    "@rexezuge/d1": "1.9.2",
     "@rexezuge/errors": "1.9.2",
     "@rexezuge/shared": "1.9.1"
   },
