@@ -17,7 +17,7 @@
     "@aws-access-bridge/shared": "workspace:*",
     "@cloudflare/vitest-pool-workers": "0.23.0",
     "@rexezuge/d1": "1.9.1",
-    "@rexezuge/errors": "1.9.1",
+    "@rexezuge/errors": "1.9.2",
     "@rexezuge/http": "1.8.0",
     "@rexezuge/runtime": "1.9.1",
     "@rexezuge/shared": "1.9.1",
