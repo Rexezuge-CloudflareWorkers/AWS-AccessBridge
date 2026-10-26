@@ -15,7 +15,7 @@
   "dependencies": {
     "@aws-access-bridge/shared": "workspace:*",
     "aws4fetch": "^1.0.20",
-    "@rexezuge/errors": "1.9.1",
+    "@rexezuge/errors": "1.9.2",
     "@rexezuge/shared": "1.9.1"
   },
   "devDependencies": {

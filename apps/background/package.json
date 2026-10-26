@@ -18,7 +18,7 @@
     "@aws-access-bridge/backend-runtime": "workspace:*",
     "@aws-access-bridge/backend-services": "workspace:*",
     "@aws-access-bridge/shared": "workspace:*",
-    "@rexezuge/errors": "1.9.1",
+    "@rexezuge/errors": "1.9.2",
     "@rexezuge/runtime": "1.9.1",
     "@rexezuge/shared": "1.9.1"
   },
