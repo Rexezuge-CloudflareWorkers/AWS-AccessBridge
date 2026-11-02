@@ -28,7 +28,7 @@
     "@cloudflare/vitest-pool-workers": "0.23.0",
     "@rexezuge/d1": "1.9.2",
     "@rexezuge/errors": "1.9.2",
-    "@rexezuge/runtime": "1.9.1",
+    "@rexezuge/runtime": "1.9.2",
     "@rexezuge/shared": "1.9.1",
     "@rexezuge/tooling": "1.9.2",
     "@testing-library/jest-dom": "^7.0.1",
