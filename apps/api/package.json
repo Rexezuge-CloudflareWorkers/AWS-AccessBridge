@@ -16,7 +16,7 @@
     "@rexezuge/http": "1.9.2",
     "@rexezuge/runtime": "1.9.2",
     "@rexezuge/shared": "1.9.2",
-    "chanfana": "^3.4.0",
+    "chanfana": "^3.4.2",
     "hono": "4.13.14",
     "zod": "^4.6.7"
   },
