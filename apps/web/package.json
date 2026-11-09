@@ -11,7 +11,7 @@
   "dependencies": {
     "@rexezuge/web": "1.9.2",
     "@aws-access-bridge/shared": "workspace:*",
-    "lucide-react": "^1.61.0",
+    "lucide-react": "^1.70.0",
     "i18next": "^26.5.12",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
