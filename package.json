@@ -33,7 +33,7 @@
     "@rexezuge/tooling": "1.9.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
